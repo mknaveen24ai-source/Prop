@@ -1,38 +1,159 @@
-.App {
-  text-align: center;
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+body {
+  font-family: Arial, sans-serif;
+  background-color: #0a1628;
+  color: #ffffff;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+.card {
+  background-color: #132240;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 20px;
+  border: 1px solid #1e3a5f;
+}
+
+.btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.btn-gold {
+  background-color: #c9a84c;
+  color: #0a1628;
+}
+
+.btn-green {
+  background-color: #1a7a4a;
   color: white;
 }
 
-.App-link {
-  color: #61dafb;
+.btn-red {
+  background-color: #c0392b;
+  color: white;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.btn:hover {
+  opacity: 0.9;
+}
+
+input, select {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 16px;
+  border-radius: 6px;
+  border: 1px solid #1e3a5f;
+  background-color: #0a1628;
+  color: white;
+  font-size: 14px;
+}
+
+.error {
+  color: #c0392b;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.success {
+  color: #1a7a4a;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.stat-card {
+  background-color: #132240;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+  border: 1px solid #1e3a5f;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: bold;
+  color: #c9a84c;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #888;
+  margin-top: 4px;
+}
+
+.positive { color: #1a7a4a; }
+.negative { color: #c0392b; }
+.gold { color: #c9a84c; }
+.nav { 
+  background-color: #132240;
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #c9a84c;
+}
+
+.nav-logo {
+  font-size: 20px;
+  font-weight: bold;
+  color: #c9a84c;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  background-color: #0a1628;
+  padding: 12px;
+  text-align: left;
+  font-size: 12px;
+  color: #888;
+  border-bottom: 1px solid #1e3a5f;
+}
+
+td {
+  padding: 12px;
+  font-size: 14px;
+  border-bottom: 1px solid #1e3a5f;
+}
+
+.progress-bar {
+  background-color: #0a1628;
+  border-radius: 4px;
+  height: 8px;
+  margin-top: 8px;
+}
+
+.progress-fill {
+  height: 8px;
+  border-radius: 4px;
+  transition: width 0.3s ease;
 }
