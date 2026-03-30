@@ -1,0 +1,234 @@
+import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+
+export default function TermsOfService() {
+  const navigate = useNavigate()
+  const [activeSection, setActiveSection] = useState(null)
+
+  const sections = [
+    {
+      id: 'nature',
+      title: '1. Nature of the Platform',
+      content: `This platform is a trader evaluation program operated as a performance assessment service. It is not a brokerage, investment firm, financial advisor, or regulated financial service provider.
+
+All trading accounts provided are simulated evaluation accounts. No real market orders are placed on your behalf. Profits and losses within the evaluation environment are simulated and do not represent actual gains or losses in live financial markets.
+
+By registering, you acknowledge that you are participating in a skill-based evaluation program, not engaging in live financial trading or investment activity.`
+    },
+    {
+      id: 'eligibility',
+      title: '2. Eligibility',
+      content: `You must be at least 18 years of age to register and use this platform. By registering, you confirm that you are of legal age in your jurisdiction.
+
+This service is not available to residents of the United States, Canada, Iran, North Korea, Cuba, Syria, Russia, Belarus, or any jurisdiction where participation would violate applicable law. You are solely responsible for ensuring that your use of this platform complies with the laws of your country of residence.
+
+We reserve the right to suspend or terminate accounts from any jurisdiction at our sole discretion.`
+    },
+    {
+      id: 'evaluation',
+      title: '3. Evaluation Program Rules',
+      content: `The evaluation program consists of two phases followed by a funded stage:
+
+Phase 1: Achieve a 10% profit target within 30 days without breaching the maximum drawdown limit of 10%.
+
+Phase 2: Achieve a 10% profit target within 30 days without breaching the maximum drawdown limit of 10%.
+
+Funded Account: Trade with our simulated capital. No profit target required. A 5% maximum drawdown limit applies.
+
+Failure to meet phase requirements, breaching drawdown limits, or expiry of the time limit will result in account termination. No refunds or appeals are available for failed accounts.`
+    },
+    {
+      id: 'payouts',
+      title: '4. Funded Account Payouts',
+      content: `Traders who reach the funded stage and generate profits are eligible to request payouts subject to the following conditions:
+
+— Minimum payout request is $50 USD equivalent.
+— Payouts are calculated at 80% of realized profits above the starting balance.
+— Only one pending payout request is permitted at a time.
+— Payouts are discretionary performance bonuses paid from company capital and do not represent withdrawal of deposited funds.
+— Payouts are processed in USDT (TRC20 network). You are responsible for providing a valid wallet address and for any network fees.
+— We reserve the right to delay, withhold, or deny payouts if we have reasonable grounds to suspect manipulation, abuse, or violation of these Terms.
+— KYC verification must be completed and approved before any payout is processed.
+— Payout processing time is up to 7 business days after admin approval.`
+    },
+    {
+      id: 'kyc',
+      title: '5. KYC & Identity Verification',
+      content: `All users must complete identity verification (KYC) before accessing funded accounts or requesting payouts. You agree to provide accurate, current, and complete identification documents as requested.
+
+We collect and process KYC data solely for identity verification and fraud prevention purposes. KYC documents are stored securely and are not shared with third parties except where required by law.
+
+Providing false, misleading, or fraudulent identification documents will result in immediate account termination and may be reported to relevant authorities.`
+    },
+    {
+      id: 'prohibited',
+      title: '6. Prohibited Conduct',
+      content: `The following activities are strictly prohibited and will result in immediate account termination without payout:
+
+— Trading with the intent to exploit platform pricing or technical errors
+— Use of automated trading bots, scripts, or algorithmic strategies unless explicitly permitted
+— Copy trading between multiple accounts owned by the same user or coordinated group
+— Hedging across multiple accounts on the same platform
+— Any strategy that generates profit without genuine market risk (e.g., latency arbitrage)
+— Creating multiple accounts to circumvent account limits or rules
+— Sharing account credentials with third parties
+— Any form of market manipulation or fraudulent activity`
+    },
+    {
+      id: 'liability',
+      title: '7. Limitation of Liability',
+      content: `This platform is provided on an "as is" and "as available" basis. We make no warranties, express or implied, regarding the accuracy of price feeds, continuity of service, or fitness for any particular purpose.
+
+To the maximum extent permitted by applicable law, we shall not be liable for any direct, indirect, incidental, special, or consequential damages arising from your use of or inability to use this platform, including but not limited to lost profits, data loss, or business interruption.
+
+Our total liability to you for any claim arising from your use of this platform shall not exceed the value of any payout you have received in the 30 days preceding the claim.`
+    },
+    {
+      id: 'termination',
+      title: '8. Termination',
+      content: `We reserve the right to suspend or terminate your account at any time, with or without notice, for any reason including but not limited to violation of these Terms, suspected fraud, or at our sole discretion.
+
+Upon termination, any pending payout requests may be cancelled. You may not create a new account after termination without our express written consent.
+
+You may close your account at any time by contacting support. Closure does not entitle you to any payout that has not already been approved.`
+    },
+    {
+      id: 'changes',
+      title: '9. Changes to Terms',
+      content: `We reserve the right to modify these Terms at any time. Changes will be effective upon posting to this page. Your continued use of the platform after changes constitutes acceptance of the revised Terms.
+
+It is your responsibility to review these Terms periodically. We will make reasonable efforts to notify users of material changes via email or platform notification.`
+    },
+    {
+      id: 'governing',
+      title: '10. Governing Law & Disputes',
+      content: `These Terms are governed by and construed in accordance with the laws of the jurisdiction in which the company is incorporated, without regard to conflict of law principles.
+
+Any dispute arising from these Terms or your use of the platform shall first be attempted to be resolved through good-faith negotiation. If unresolved, disputes shall be submitted to binding arbitration. You waive any right to participate in class action lawsuits.
+
+If any provision of these Terms is found to be unenforceable, the remaining provisions shall continue in full force and effect.`
+    }
+  ]
+
+  return (
+    <div style={{
+      background: 'var(--navy)',
+      minHeight: '100vh',
+      color: 'var(--text)',
+      fontFamily: 'DM Sans, sans-serif'
+    }}>
+
+      {/* Nav */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '20px 48px', borderBottom: '1px solid var(--nav-border)',
+        position: 'sticky', top: 0, background: 'var(--nav-bg)',
+        backdropFilter: 'blur(12px)', zIndex: 100
+      }}>
+        <span
+          onClick={() => navigate('/')}
+          style={{ fontFamily: 'Inter, serif', fontSize: '22px', fontWeight: '700', color: 'var(--accent)', letterSpacing: '0.12em', cursor: 'pointer' }}
+        >
+          PROP FIRM
+        </span>
+        <button onClick={() => navigate(-1)} className="btn" style={{
+          background: 'transparent', border: '1px solid var(--navy-border)',
+          color: 'var(--text-muted)', padding: '8px 20px', fontSize: '13px'
+        }}>
+          ← Back
+        </button>
+      </div>
+
+      {/* Hero */}
+      <div style={{
+        textAlign: 'center', padding: '64px 24px 48px',
+        borderBottom: '1px solid var(--navy-border)',
+        background: 'radial-gradient(ellipse at 50% 0%, rgba(148, 148, 148, 0.06) 0%, transparent 60%)'
+      }}>
+        <div style={{
+          display: 'inline-block', background: 'rgba(148, 148, 148, 0.1)',
+          border: '1px solid rgba(148, 148, 148, 0.3)', borderRadius: '99px',
+          padding: '5px 14px', fontSize: '11px', color: 'var(--accent)',
+          letterSpacing: '0.1em', marginBottom: '20px'
+        }}>
+          LEGAL DOCUMENT
+        </div>
+        <h1 style={{
+          fontFamily: 'Inter, serif', fontSize: '40px', fontWeight: '700',
+          marginBottom: '12px', color: 'var(--text)'
+        }}>
+          Terms of Service
+        </h1>
+        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+          Last updated: {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+        </p>
+      </div>
+
+      <div style={{ maxWidth: '860px', margin: '0 auto', padding: '48px 24px' }}>
+
+        {/* Intro box */}
+        <div style={{
+          background: 'rgba(148, 148, 148, 0.06)', border: '1px solid rgba(148, 148, 148, 0.2)',
+          borderRadius: '12px', padding: '24px 28px', marginBottom: '40px'
+        }}>
+          <p style={{ color: 'var(--text)', lineHeight: '1.8', fontSize: '14px', margin: 0 }}>
+            Please read these Terms of Service carefully before using our platform. By registering an account or using any part of this service, you agree to be bound by these Terms. If you do not agree, do not use this platform.
+          </p>
+        </div>
+
+        {/* Sections */}
+        {sections.map((section) => (
+          <div
+            key={section.id}
+            style={{
+              background: 'var(--navy-card)',
+              border: `1px solid ${activeSection === section.id ? 'var(--accent-dim)' : 'var(--navy-border)'}`,
+              borderRadius: '12px', marginBottom: '12px',
+              overflow: 'hidden', transition: 'border-color 0.2s ease'
+            }}
+          >
+            <button
+              onClick={() => setActiveSection(activeSection === section.id ? null : section.id)}
+              style={{
+                width: '100%', display: 'flex', justifyContent: 'space-between',
+                alignItems: 'center', padding: '20px 24px', background: 'transparent',
+                border: 'none', cursor: 'pointer', color: 'var(--text)', textAlign: 'left'
+              }}
+            >
+              <span style={{ fontFamily: 'Inter, serif', fontSize: '14px', fontWeight: '600', letterSpacing: '0.05em' }}>
+                {section.title}
+              </span>
+              <span style={{
+                color: 'var(--accent)', fontSize: '18px', transition: 'transform 0.2s ease',
+                transform: activeSection === section.id ? 'rotate(45deg)' : 'rotate(0deg)',
+                display: 'inline-block'
+              }}>+</span>
+            </button>
+
+            {activeSection === section.id && (
+              <div style={{ padding: '0 24px 24px', borderTop: '1px solid var(--navy-border)' }}>
+                <p style={{
+                  color: 'var(--text-muted)', lineHeight: '1.9', fontSize: '14px',
+                  marginTop: '20px', whiteSpace: 'pre-line', margin: '20px 0 0'
+                }}>
+                  {section.content}
+                </p>
+              </div>
+            )}
+          </div>
+        ))}
+
+        {/* Footer note */}
+        <div style={{
+          marginTop: '40px', padding: '24px', background: 'var(--navy-mid)',
+          border: '1px solid var(--navy-border)', borderRadius: '12px', textAlign: 'center'
+        }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0, lineHeight: '1.7' }}>
+            By using this platform you confirm you have read, understood, and agreed to these Terms of Service.<br />
+            For questions, contact us at <span style={{ color: 'var(--accent)' }}>support@propfirm.com</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}

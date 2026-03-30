@@ -1,0 +1,193 @@
+import React, { useState, useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import axios from 'axios'
+import ThemeToggle from '../components/ThemeToggle'
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000'
+
+export default function TraderProfile() {
+  const { userId } = useParams()
+  const navigate   = useNavigate()
+  const [profile, setProfile]   = useState(null)
+  const [loading, setLoading]   = useState(true)
+  const [notFound, setNotFound] = useState(false)
+
+  useEffect(() => {
+    if (!userId) { setNotFound(true); setLoading(false); return }
+    axios.get(`${API_URL}/api/auth/profile/${userId}`)
+      .then(res => setProfile(res.data))
+      .catch(err => {
+        if (err.response?.status === 404) setNotFound(true)
+      })
+      .finally(() => setLoading(false))
+  }, [userId])
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--navy)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Loading profile...</div>
+      </div>
+    )
+  }
+
+  if (notFound || !profile) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--navy)' }}>
+        <div className="nav">
+          <span className="nav-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>PROP FIRM</span>
+          <ThemeToggle />
+        </div>
+        <div style={{ textAlign: 'center', padding: '120px 24px' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>
+          <h2 style={{ color: 'var(--accent)', marginBottom: '12px' }}>Profile Not Found</h2>
+          <p style={{ color: 'var(--text-muted)', marginBottom: '24px' }}>This trader profile is private or does not exist.</p>
+          <button onClick={() => navigate('/leaderboard')} className="btn" style={{ border: '1px solid var(--navy-border)', padding: '10px 24px', background: 'transparent', color: 'var(--text-muted)', borderRadius: '8px', cursor: 'pointer' }}>
+            ← Back to Leaderboard
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const { trader, stats } = profile
+  const joinDate = trader.joined_at
+    ? new Date(trader.joined_at).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+    : 'Unknown'
+
+  const winRate = stats.total_trades > 0
+    ? ((stats.winning_trades / stats.total_trades) * 100).toFixed(1)
+    : '0.0'
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--navy)' }}>
+      {/* Nav */}
+      <div className="nav">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <span className="nav-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>PROP FIRM</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button onClick={() => navigate('/leaderboard')} style={{ background: 'transparent', border: '1px solid var(--navy-border)', color: 'var(--text-muted)', padding: '7px 16px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>
+            ← Leaderboard
+          </button>
+          <ThemeToggle />
+        </div>
+      </div>
+
+      <div style={{ maxWidth: '760px', margin: '0 auto', padding: '48px 24px' }}>
+
+        {/* ── Profile Header ── */}
+        <div className="card" style={{ marginBottom: '20px', padding: '32px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
+            {/* Avatar */}
+            <div style={{
+              width: '72px', height: '72px', borderRadius: '50%',
+              background: 'rgba(148, 148, 148, 0.15)',
+              border: '2px solid var(--accent)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '28px', flexShrink: 0
+            }}>
+              {trader.full_name?.charAt(0)?.toUpperCase() || '?'}
+            </div>
+
+            {/* Name + badges */}
+            <div style={{ flex: 1 }}>
+              <h1 style={{ fontFamily: 'Inter, serif', color: 'var(--accent)', fontSize: '22px', marginBottom: '6px' }}>
+                {trader.full_name}
+              </h1>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
+                  📍 {trader.country || 'Unknown'}
+                </span>
+                <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>·</span>
+                <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
+                  🗓 Joined {joinDate}
+                </span>
+                {trader.is_funded && (
+                  <span style={{
+                    padding: '2px 10px', borderRadius: '99px',
+                    background: 'rgba(133, 133, 133, 0.12)',
+                    border: '1px solid rgba(133, 133, 133, 0.3)',
+                    fontSize: '11px', color: 'var(--cyan)', fontWeight: '600'
+                  }}>
+                    ✦ FUNDED TRADER
+                  </span>
+                )}
+                {trader.total_phases_passed > 0 && (
+                  <span style={{
+                    padding: '2px 10px', borderRadius: '99px',
+                    background: 'rgba(148, 148, 148, 0.1)',
+                    border: '1px solid rgba(148, 148, 148, 0.3)',
+                    fontSize: '11px', color: 'var(--accent)', fontWeight: '600'
+                  }}>
+                    🏆 {trader.total_phases_passed} Phase{trader.total_phases_passed !== 1 ? 's' : ''} Passed
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Key Stats ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+          {[
+            { label: 'Total Profit',    value: `+$${parseFloat(stats.total_profit || 0).toFixed(2)}`,         color: 'var(--green)' },
+            { label: 'Win Rate',        value: `${winRate}%`,                                                  color: parseFloat(winRate) >= 50 ? 'var(--green)' : 'var(--red)' },
+            { label: 'Total Trades',    value: stats.total_trades || 0,                                        color: 'var(--text)' },
+            { label: 'Best Trade',      value: `+$${parseFloat(stats.best_trade || 0).toFixed(2)}`,            color: 'var(--accent)' },
+            { label: 'Funded Accounts', value: trader.funded_accounts || 0,                                    color: 'var(--cyan)' },
+            { label: 'Challenges',      value: trader.total_accounts || 0,                                     color: 'var(--text-muted)' },
+          ].map(s => (
+            <div key={s.label} className="stat-card" style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '20px', fontWeight: '700', color: s.color, fontFamily: 'DM Mono, monospace', marginBottom: '4px' }}>
+                {s.value}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-dim)', letterSpacing: '0.06em' }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Trading Style ── */}
+        {(stats.favourite_instrument || stats.avg_hold_mins) && (
+          <div className="card" style={{ marginBottom: '20px' }}>
+            <h3 style={{ color: 'var(--accent)', marginBottom: '16px', fontSize: '14px', letterSpacing: '0.08em' }}>TRADING STYLE</h3>
+            <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+              {stats.favourite_instrument && (
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>FAVOURITE INSTRUMENT</div>
+                  <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--accent)', fontFamily: 'DM Mono, monospace' }}>
+                    {stats.favourite_instrument}
+                  </div>
+                </div>
+              )}
+              {stats.avg_hold_mins && (
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>AVG HOLD TIME</div>
+                  <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text)', fontFamily: 'DM Mono, monospace' }}>
+                    {stats.avg_hold_mins < 60
+                      ? `${Math.round(stats.avg_hold_mins)}m`
+                      : `${(stats.avg_hold_mins / 60).toFixed(1)}h`}
+                  </div>
+                </div>
+              )}
+              {stats.profit_factor && (
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>PROFIT FACTOR</div>
+                  <div style={{ fontSize: '15px', fontWeight: '700', color: parseFloat(stats.profit_factor) >= 1.5 ? 'var(--green)' : 'var(--text)', fontFamily: 'DM Mono, monospace' }}>
+                    {parseFloat(stats.profit_factor).toFixed(2)}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Privacy notice ── */}
+        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          <p style={{ color: 'var(--text-dim)', fontSize: '12px' }}>
+            Only aggregated public statistics are shown. No personal contact information is displayed.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
