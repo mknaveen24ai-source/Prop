@@ -13,7 +13,9 @@ const securityConfig = {
     requireUppercase: true,
     requireLowercase: true,
     requireNumbers: true,
-    requireSpecialChars: false,
+    // FIX: auth.js checkPasswordStrength() enforces special chars — keep this
+    // config in sync so any future code reading this object reflects reality.
+    requireSpecialChars: true,
     maxAttempts: 5,
     lockoutDuration: 15 * 60 * 1000, // 15 minutes
   },

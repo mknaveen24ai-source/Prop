@@ -3,18 +3,62 @@ import axios from 'axios'
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000'
 const ax = axios.create({ baseURL: API_URL, withCredentials: true })
+
+// FIX (MEDIUM #19): Add response interceptor to handle 401 errors gracefully.
+// Previously, if admin token expired, API calls would fail silently or with
+// generic errors instead of showing the admin login modal.
+ax.interceptors.response.use(
+  response => response,
+  error => {
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      // Redirect to admin login if not already there
+      if (!window.location.pathname.includes('/admin')) {
+        window.location.href = '/admin?expired=1'
+      }
+    }
+    return Promise.reject(error)
+  }
+)
+
 const COLOR_ACCENT = '#2962ff'
 const COLOR_POS = '#00c896'
 const COLOR_NEG = '#ff4757'
 const COLOR_MUTED = 'var(--text-muted)'
 // FIX: Removed COLOR_GOLD and COLOR_LAVENDER (no-unused-vars)
 
-// ─── helpers ────────────────────────────────────────────────────────────────
+// ─── helpers ───────────────────────────────────────────────────────────
 function fmt(n, dec = 2) { return parseFloat(n || 0).toFixed(dec) }
 function fmtUSD(n) { return '$' + fmt(n) }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString() : 'N/A' }
 function fmtDateTime(d) { return d ? new Date(d).toLocaleString() : '–' }
 function fmtPct(n) { return fmt(n) + '%' }
+
+function fmtTimerMinutes(minutes) {
+  const m = Math.max(0, Math.floor(Number(minutes) || 0))
+  const d = Math.floor(m / 1440)
+  const h = Math.floor((m % 1440) / 60)
+  const mm = m % 60
+  if (d > 0) return `${d}d ${h}h ${mm}m`
+  if (h > 0) return `${h}h ${mm}m`
+  return `${mm}m`
+}
+
+function calcRemainingSlaMinutes(createdAt, slaHours) {
+  if (!createdAt) return null
+  const startMs = new Date(createdAt).getTime()
+  if (Number.isNaN(startMs)) return null
+  const totalMs = Math.max(1, Number(slaHours) || 0) * 3600000
+  const remainingMs = (startMs + totalMs) - Date.now()
+  return Math.floor(remainingMs / 60000)
+}
+
+function toDateTimeLocalValue(value) {
+  if (!value) return ''
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 
 function StatusBadge({ status }) {
   const colors = {
@@ -51,7 +95,13 @@ function StatusBadge({ status }) {
     phase1: COLOR_ACCENT,
     phase2: COLOR_ACCENT,
     locked: COLOR_NEG,
-    banned: COLOR_NEG
+    banned: COLOR_NEG,
+    disabled: COLOR_MUTED,
+    healthy: COLOR_POS,
+    watch: '#ffa502',
+    critical: COLOR_NEG,
+    operational: COLOR_POS,
+    stale: '#ff7f50'
   }
   const c = colors[status] || COLOR_MUTED
   return (
@@ -82,7 +132,7 @@ function Modal({ title, onClose, children, width = '520px' }) {
           <button onClick={onClose} style={{
             background: 'none', border: '1px solid var(--navy-border)', color: 'var(--text-muted)',
             borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', fontSize: '16px'
-          }}>✕</button>
+          }}>×</button>
         </div>
         {children}
       </div>
@@ -261,7 +311,6 @@ function OverviewTab({ overview }) {
           )}
         </div>
       )}
-
       {exposure && exposure.length === 0 && (
         <div style={{ background: 'var(--navy-card)', border: '1px solid var(--navy-border)', borderRadius: '10px', padding: '20px 24px', marginBottom: '28px' }}>
           <div style={{ color: 'var(--text-dim)', fontSize: '13px' }}>📊 No open trades – hedge exposure is zero.</div>
@@ -367,7 +416,7 @@ function TradersTab({ traders, onRefresh, showMsg }) {
       <div style={{ display: 'flex', gap: '6px' }}>
         <Btn variant="ghost" style={{ padding: '4px 8px', fontSize: '11px' }} onClick={e => { e.stopPropagation(); setSelected(row); loadNotes(row.id) }}>Notes</Btn>
         {row.kyc_status === 'pending' && <>
-          <Btn variant="ghost" style={{ padding: '4px 8px', fontSize: '11px', color: 'var(--accent)' }} onClick={e => { e.stopPropagation(); window.open(`${API_URL}/api/admin/kyc/document/${row.id}/id?admin_token=${localStorage.getItem('adminToken')}`, '_blank') }}>View ID</Btn>
+          <Btn variant="ghost" style={{ padding: '4px 8px', fontSize: '11px', color: 'var(--accent)' }} onClick={e => { e.stopPropagation(); window.open(`${API_URL}/api/admin/kyc/document/${row.id}/id`, '_blank') }}>View ID</Btn>
           <Btn variant="green" style={{ padding: '4px 8px', fontSize: '11px' }} onClick={e => { e.stopPropagation(); approveKyc(row.id) }}>Approve</Btn>
           <Btn variant="red"   style={{ padding: '4px 8px', fontSize: '11px' }} onClick={e => { e.stopPropagation(); setShowKycReject(row.id) }}>Reject</Btn>
         </>}
@@ -385,7 +434,7 @@ function TradersTab({ traders, onRefresh, showMsg }) {
         <div style={{ background: 'rgba(139, 139, 139, 0.08)', border: '1px solid rgba(139, 139, 139, 0.3)', borderRadius: '10px', padding: '14px 18px', marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <span style={{ color: 'var(--text-muted)', fontWeight: '700', fontSize: '13px' }}>
-              ⏰ {staleKyc.stale_count} trader{staleKyc.stale_count !== 1 ? 's' : ''} with KYC older than {staleKyc.expiry_months} months
+              â° {staleKyc.stale_count} trader{staleKyc.stale_count !== 1 ? 's' : ''} with KYC older than {staleKyc.expiry_months} months
             </span>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Set KYC_EXPIRY_MONTHS in .env to configure</span>
           </div>
@@ -423,7 +472,7 @@ function TradersTab({ traders, onRefresh, showMsg }) {
                   <div style={{ fontSize: '13px', color: 'var(--text)' }}>{n.note_text}</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>{fmtDateTime(n.created_at)}</div>
                 </div>
-                <button onClick={() => deleteNote(n.id, selected.id)} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: '14px' }}>✕</button>
+                <button onClick={() => deleteNote(n.id, selected.id)} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontSize: '14px' }}>×</button>
               </div>
             ))}
           </div>
@@ -582,7 +631,7 @@ function AccountsTab({ accounts, onRefresh, showMsg }) {
     { key: 'account_size', label: 'Size',    render: v => fmtUSD(v) },
     { key: 'current_balance', label: 'Balance', render: v => fmtUSD(v) },
     { key: 'status',       label: 'Status',  render: v => <StatusBadge status={v} /> },
-    { key: 'review_flagged', label: 'Flag',   render: v => v ? <span style={{ color: 'var(--red)', fontSize: '11px' }}>⚑ REVIEW</span> : null },
+    { key: 'review_flagged', label: 'Flag',   render: v => v ? <span style={{ color: 'var(--red)', fontSize: '11px' }}>âš‘ REVIEW</span> : null },
     { key: 'phase_end_date', label: 'Expires', render: v => fmtDate(v) },
     { key: '_actions', label: 'Actions', render: (_, row) => (
       <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
@@ -593,7 +642,7 @@ function AccountsTab({ accounts, onRefresh, showMsg }) {
           <Btn variant="cyan" style={{ padding: '3px 7px', fontSize: '11px' }} onClick={e => { e.stopPropagation(); openModal(row, 'promote') }}>Promote</Btn>
           <Btn variant="ghost" style={{ padding: '3px 7px', fontSize: '11px' }} onClick={e => { e.stopPropagation(); openModal(row, 'lotoverride') }}>Lots</Btn>
           <Btn variant={row.review_flagged ? 'red' : 'ghost'} style={{ padding: '3px 7px', fontSize: '11px' }} onClick={e => { e.stopPropagation(); openModal(row, 'flag') }}>
-            {row.review_flagged ? '⚑ Unflag' : '⚑ Flag'}
+            {row.review_flagged ? 'âš‘ Unflag' : 'âš‘ Flag'}
           </Btn>
         </>}
         {['failed', 'expired'].includes(row.status) && (
@@ -662,7 +711,7 @@ function AccountsTab({ accounts, onRefresh, showMsg }) {
           {hasFilter && (
             <Btn variant="ghost" style={{ fontSize: '11px', padding: '7px 12px', alignSelf: 'flex-end' }}
               onClick={() => { setFilterStatus(''); setFilterType(''); setFilterCountry(''); setFilterFrom(''); setFilterTo(''); setFilterSearch('') }}>
-              ✕ Clear
+              × Clear
             </Btn>
           )}
         </div>
@@ -756,7 +805,7 @@ function AccountsTab({ accounts, onRefresh, showMsg }) {
           <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '4px' }}>
             This will restore the account to its original starting balance of <strong style={{ color: 'var(--text)' }}>{fmtUSD(selected.starting_balance)}</strong> and restart the clock.
           </p>
-          <p style={{ color: 'var(--red)', fontSize: '12px', marginBottom: '16px' }}>⚠ All existing trade history will be cancelled.</p>
+          <p style={{ color: 'var(--red)', fontSize: '12px', marginBottom: '16px' }}>âš  All existing trade history will be cancelled.</p>
           <Inp label="REASON" value={form.reason || ''} onChange={e => setForm({ ...form, reason: e.target.value })} placeholder="e.g. Goodwill reset – technical issue" />
           <div style={{ display: 'flex', gap: '8px' }}>
             <Btn variant="green" disabled={loading} onClick={() => doAction('accounts/reset', { account_id: selected.id, reason: form.reason }, 'Account reset')}>
@@ -770,7 +819,7 @@ function AccountsTab({ accounts, onRefresh, showMsg }) {
       {modal === 'promote' && selected && (
         <Modal title={`Manual Promotion – ${selected.full_name}`} onClose={closeModal}>
           <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '4px' }}>
-            Force-promote <strong style={{ color: 'var(--text)' }}>{selected.account_type.toUpperCase()}</strong> → <strong style={{ color: 'var(--accent)' }}>{selected.account_type === 'phase1' ? 'PHASE 2' : 'FUNDED'}</strong> without requiring profit target.
+            Force-promote <strong style={{ color: 'var(--text)' }}>{selected.account_type.toUpperCase()}</strong> â†’ <strong style={{ color: 'var(--accent)' }}>{selected.account_type === 'phase1' ? 'PHASE 2' : 'FUNDED'}</strong> without requiring profit target.
           </p>
           <p style={{ color: 'var(--text-dim)', fontSize: '12px', marginBottom: '16px' }}>Account must be active. Current phase will be marked as passed.</p>
           <Inp label="REASON" value={form.reason || ''} onChange={e => setForm({ ...form, reason: e.target.value })} placeholder="e.g. Partnership agreement" />
@@ -844,7 +893,7 @@ function AccountsTab({ accounts, onRefresh, showMsg }) {
                   <div style={{ fontSize: '13px', color: 'var(--text)' }}>{n.note_text}</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>{fmtDateTime(n.created_at)}</div>
                 </div>
-                <button onClick={() => deleteNote(n.id)} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer' }}>✕</button>
+                <button onClick={() => deleteNote(n.id)} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer' }}>×</button>
               </div>
             ))}
           </div>
@@ -964,7 +1013,7 @@ function RiskTab({ showMsg }) {
 
       {priceStaleness?.any_stale && (
         <div style={{ background: '#ff475722', border: '1px solid #ff4757', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '18px' }}>⚠️</span>
+          <span style={{ fontSize: '18px' }}>âš ï¸</span>
           <div>
             <div style={{ color: '#ff4757', fontWeight: '700', fontSize: '13px' }}>PRICE FEED STALE</div>
             <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
@@ -1024,7 +1073,7 @@ function RiskTab({ showMsg }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
         <div style={{ background: 'var(--navy-card)', border: '1px solid #c0392b44', borderRadius: '10px', overflow: 'hidden' }}>
           <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--navy-border)', background: '#c0392b0a' }}>
-            <h3 style={{ color: 'var(--red)', margin: 0 }}>⚠ Near Drawdown Breach (≥70% used)</h3>
+            <h3 style={{ color: 'var(--red)', margin: 0 }}>âš  Near Drawdown Breach (≥70% used)</h3>
           </div>
           {near_breach_accounts.length === 0
             ? <p style={{ padding: '20px', color: 'var(--text-dim)', fontSize: '13px' }}>All clear – no accounts near breach.</p>
@@ -1533,7 +1582,7 @@ function ChatTab({ showMsg }) {
       <div style={{ display: 'flex', flexDirection: 'column', height: '75vh', border:'1px solid var(--navy-border)', borderRadius:'12px', background:'var(--navy-card)', overflow:'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--navy-border)', display: 'flex', alignItems: 'center', background:'rgba(16, 24, 40, 0.4)', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <button onClick={() => setSelectedConv(null)} style={{ background:'transparent', border:'none', color:'var(--text-muted)', cursor:'pointer', marginRight:'16px', fontSize:'24px', lineHeight:'1' }}>‹</button>
+            <button onClick={() => setSelectedConv(null)} style={{ background:'transparent', border:'none', color:'var(--text-muted)', cursor:'pointer', marginRight:'16px', fontSize:'24px', lineHeight:'1' }}>”¹</button>
             <div>
               <h3 style={{ margin: 0, color: 'var(--text)', fontSize:'16px' }}>{selectedConv.subject}</h3>
               <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop:'4px' }}>
@@ -1777,7 +1826,7 @@ function SupportTab({ showMsg }) {
       <div style={{ display: 'flex', flexDirection: 'column', height: '75vh', border:'1px solid var(--navy-border)', borderRadius:'12px', background:'var(--navy-card)', overflow:'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--navy-border)', display: 'flex', alignItems: 'center', background:'rgba(16, 24, 40, 0.4)', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <button onClick={() => setSelectedTicket(null)} style={{ background:'transparent', border:'none', color:'var(--text-muted)', cursor:'pointer', marginRight:'16px', fontSize:'24px', lineHeight:'1' }}>‹</button>
+            <button onClick={() => setSelectedTicket(null)} style={{ background:'transparent', border:'none', color:'var(--text-muted)', cursor:'pointer', marginRight:'16px', fontSize:'24px', lineHeight:'1' }}>”¹</button>
             <div>
               <h3 style={{ margin: 0, color: 'var(--text)', fontSize:'16px' }}>{selectedTicket.subject}</h3>
               <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop:'4px' }}>Ticket #{selectedTicket.id} • {selectedTicket.name} ({selectedTicket.email}) • {selectedTicket.status.toUpperCase()}</div>
@@ -2200,7 +2249,7 @@ function SettingsPanelTab({ showMsg }) {
           <p style={{ color: 'var(--text-dim)', fontSize: '12px' }}>Changes are audited and take effect immediately (30s cache on trading rules).</p>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          {dirty && <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>● Unsaved changes</span>}
+          {dirty && <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>● Unsaved changes</span>}
           <Btn variant="ghost" onClick={() => {
             setLoading(true)
             ax.get('/api/admin/settings')
@@ -2251,7 +2300,7 @@ function SettingsPanelTab({ showMsg }) {
       </div>
 
       <div style={{ marginTop: '20px', padding: '14px 18px', background: 'rgba(148, 148, 148, 0.06)', border: '1px solid rgba(148, 148, 148, 0.2)', borderRadius: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
-        ⚠️ <strong style={{ color: 'var(--text)' }}>Important:</strong> Leave a field blank to remove/reset it to the system default. All changes are logged in the Settings Log tab.
+        âš ï¸ <strong style={{ color: 'var(--text)' }}>Important:</strong> Leave a field blank to remove/reset it to the system default. All changes are logged in the Settings Log tab.
       </div>
     </div>
   )
@@ -2435,11 +2484,14 @@ function IncidentCenterTab({ showMsg }) {
   const [severity, setSeverity] = useState('medium')
   const [source, setSource] = useState('manual')
   const [details, setDetails] = useState('')
+  const [selectedIncidentId, setSelectedIncidentId] = useState('')
 
   const load = useCallback(async () => {
     try {
       const r = await ax.get('/api/admin/incidents')
-      setIncidents(r.data || [])
+      const rows = r.data || []
+      setIncidents(rows)
+      setSelectedIncidentId(prev => prev || (rows.length > 0 ? String(rows[0].id) : ''))
     } catch {
       showMsg('Could not load incidents', true)
     }
@@ -2471,6 +2523,12 @@ function IncidentCenterTab({ showMsg }) {
   }
 
   const sevColor = { low: '#4b7bec', medium: '#ffa502', high: '#ff7f50', critical: '#ff4757' }
+  const selectedIncident = incidents.find(i => String(i.id) === String(selectedIncidentId)) || incidents[0] || null
+  const timelineEvents = selectedIncident ? [
+    { label: 'Created', at: selectedIncident.created_at, color: '#2962ff' },
+    { label: 'Acknowledged', at: selectedIncident.acknowledged_at, color: '#ffa502' },
+    { label: 'Resolved', at: selectedIncident.resolved_at, color: '#00c896' },
+  ] : []
 
   return (
     <div>
@@ -2493,6 +2551,7 @@ function IncidentCenterTab({ showMsg }) {
       </div>
 
       {loading ? <div style={{ color: 'var(--text-muted)' }}>Loading...</div> : (
+        <>
         <div style={{ background: 'var(--navy-card)', border: '1px solid var(--navy-border)', borderRadius: '10px', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
@@ -2504,7 +2563,15 @@ function IncidentCenterTab({ showMsg }) {
             </thead>
             <tbody>
               {incidents.map(i => (
-                <tr key={i.id} style={{ borderBottom: '1px solid var(--navy-border)' }}>
+                <tr
+                  key={i.id}
+                  onClick={() => setSelectedIncidentId(String(i.id))}
+                  style={{
+                    borderBottom: '1px solid var(--navy-border)',
+                    cursor: 'pointer',
+                    background: String(i.id) === String(selectedIncidentId) ? 'rgba(41,98,255,0.08)' : 'transparent'
+                  }}
+                >
                   <td style={{ padding: '10px 12px', color: 'var(--text-dim)' }}>{fmtDateTime(i.created_at)}</td>
                   <td style={{ padding: '10px 12px', color: 'var(--text)' }}>{i.title}</td>
                   <td style={{ padding: '10px 12px', color: sevColor[i.severity] || 'var(--text)' }}>{String(i.severity).toUpperCase()}</td>
@@ -2521,13 +2588,59 @@ function IncidentCenterTab({ showMsg }) {
             </tbody>
           </table>
         </div>
-      )}
+        <div style={{ marginTop: '12px', background: 'var(--navy-card)', border: '1px solid var(--navy-border)', borderRadius: '10px', padding: '14px' }}>
+          <div style={{ color: 'var(--text)', fontSize: '13px', fontWeight: 600, marginBottom: '10px' }}>Incident Timeline</div>
+          {!selectedIncident && <div style={{ color: 'var(--text-dim)', fontSize: '12px' }}>Select an incident row to view lifecycle timeline.</div>}
+          {selectedIncident && (
+            <>
+              <div style={{ marginBottom: '10px' }}>
+                <div style={{ color: 'var(--text)', fontWeight: 700 }}>{selectedIncident.title}</div>
+                <div style={{ color: 'var(--text-dim)', fontSize: '12px', marginTop: '3px' }}>
+                  {(selectedIncident.details || '').trim() || 'No details provided'}
+                </div>
+              </div>
+              <div style={{ position: 'relative', paddingLeft: '16px' }}>
+                {timelineEvents.map((event, idx) => (
+                  <div key={event.label} style={{ position: 'relative', paddingBottom: idx === timelineEvents.length - 1 ? 0 : '12px' }}>
+                    <div style={{
+                      position: 'absolute',
+                      left: '-16px',
+                      top: '4px',
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: event.at ? event.color : 'var(--navy-border)',
+                      border: '1px solid rgba(255,255,255,0.2)'
+                    }} />
+                    {idx !== timelineEvents.length - 1 && (
+                      <div style={{
+                        position: 'absolute',
+                        left: '-13px',
+                        top: '12px',
+                        width: '2px',
+                        height: '18px',
+                        background: 'var(--navy-border)'
+                      }} />
+                    )}
+                    <div style={{ color: 'var(--text)', fontSize: '12px', fontWeight: 600 }}>{event.label}</div>
+                    <div style={{ color: event.at ? 'var(--text-muted)' : 'var(--text-dim)', fontSize: '12px' }}>
+                      {event.at ? fmtDateTime(event.at) : 'Pending'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </>)}
     </div>
   )
 }
 
 function RuleBuilderTab({ showMsg }) {
   const [rules, setRules] = useState([])
+  const [dragRuleId, setDragRuleId] = useState('')
+  const [reordering, setReordering] = useState(false)
   const [name, setName] = useState('')
   const [scope, setScope] = useState('global')
   const [priority, setPriority] = useState('100')
@@ -2575,9 +2688,40 @@ function RuleBuilderTab({ showMsg }) {
     try { await ax.delete(`/api/admin/rules/${id}`); load() } catch { showMsg('Could not delete rule', true) }
   }
 
+  async function persistOrder(nextRules) {
+    const orderedIds = nextRules.map(r => r.id)
+    if (!orderedIds.length) return
+    setReordering(true)
+    try {
+      const r = await ax.post('/api/admin/rules/reorder', { ordered_ids: orderedIds })
+      setRules(r.data || [])
+      showMsg('Rule priorities updated')
+    } catch (err) {
+      showMsg(err?.response?.data?.error || 'Could not reorder rules', true)
+      load()
+    }
+    setReordering(false)
+  }
+
+  function handleDrop(targetRuleId) {
+    if (!dragRuleId || String(dragRuleId) === String(targetRuleId)) return
+    const sourceIndex = rules.findIndex(r => String(r.id) === String(dragRuleId))
+    const targetIndex = rules.findIndex(r => String(r.id) === String(targetRuleId))
+    if (sourceIndex < 0 || targetIndex < 0) return
+    const next = [...rules]
+    const [moved] = next.splice(sourceIndex, 1)
+    next.splice(targetIndex, 0, moved)
+    setRules(next)
+    setDragRuleId('')
+    persistOrder(next)
+  }
+
   return (
     <div>
       <h2 style={{ color: 'var(--text)', marginBottom: '16px' }}>Rule Builder</h2>
+      <div style={{ color: 'var(--text-muted)', fontSize: '12px', marginBottom: '10px' }}>
+        Drag and drop rows to reorder rule execution priority.
+      </div>
 
       <div style={{ background: 'var(--navy-card)', border: '1px solid var(--navy-border)', borderRadius: '10px', padding: '16px', marginBottom: '16px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '8px', marginBottom: '8px' }}>
@@ -2603,18 +2747,30 @@ function RuleBuilderTab({ showMsg }) {
         </div>
       </div>
 
-      <div style={{ background: 'var(--navy-card)', border: '1px solid var(--navy-border)', borderRadius: '10px', overflow: 'hidden' }}>
+      <div style={{ background: 'var(--navy-card)', border: '1px solid var(--navy-border)', borderRadius: '10px', overflow: 'hidden', opacity: reordering ? 0.75 : 1 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
           <thead>
             <tr style={{ background: 'var(--navy-hover)' }}>
-              {['Name', 'Scope', 'Priority', 'Enabled', 'Action', 'Triggers', 'Actions'].map(h => (
+              {['Order', 'Name', 'Scope', 'Priority', 'Enabled', 'Action', 'Triggers', 'Actions'].map(h => (
                 <th key={h} style={{ padding: '10px 12px', textAlign: 'left', color: 'var(--text-muted)', fontSize: '11px' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {rules.map(r => (
-              <tr key={r.id} style={{ borderBottom: '1px solid var(--navy-border)' }}>
+            {rules.map((r, idx) => (
+              <tr
+                key={r.id}
+                draggable
+                onDragStart={() => setDragRuleId(String(r.id))}
+                onDragOver={e => e.preventDefault()}
+                onDrop={() => handleDrop(r.id)}
+                style={{
+                  borderBottom: '1px solid var(--navy-border)',
+                  cursor: 'grab',
+                  background: String(dragRuleId) === String(r.id) ? 'rgba(41,98,255,0.08)' : 'transparent'
+                }}
+              >
+                <td style={{ padding: '10px 12px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{idx + 1}</td>
                 <td style={{ padding: '10px 12px' }}>{r.name}</td>
                 <td style={{ padding: '10px 12px' }}>{r.scope}</td>
                 <td style={{ padding: '10px 12px' }}>{r.priority}</td>
@@ -2629,7 +2785,7 @@ function RuleBuilderTab({ showMsg }) {
                 </td>
               </tr>
             ))}
-            {rules.length === 0 && <tr><td colSpan={7} style={{ padding: '20px', textAlign: 'center', color: 'var(--text-dim)' }}>No rules</td></tr>}
+            {rules.length === 0 && <tr><td colSpan={8} style={{ padding: '20px', textAlign: 'center', color: 'var(--text-dim)' }}>No rules</td></tr>}
           </tbody>
         </table>
       </div>
@@ -3206,6 +3362,7 @@ function AmlVelocityTab({ showMsg }) {
 function KycSlaTab({ showMsg }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [nowTick, setNowTick] = useState(Date.now())
 
   const load = useCallback(async () => {
     try {
@@ -3217,6 +3374,10 @@ function KycSlaTab({ showMsg }) {
     setLoading(false)
   }, [showMsg])
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(Date.now()), 60000)
+    return () => clearInterval(t)
+  }, [])
 
   if (loading) return <div style={{ color: 'var(--text-muted)' }}>Loading KYC SLA queue...</div>
   if (!data) return null
@@ -3240,6 +3401,17 @@ function KycSlaTab({ showMsg }) {
             { key: 'country', label: 'Country' },
             { key: 'submitted_at', label: 'Submitted', render: v => fmtDateTime(v) },
             { key: 'wait_hours', label: 'Wait (h)' },
+            {
+              key: 'remaining_sla',
+              label: 'SLA Timer',
+              render: (_, row) => {
+                const remainingRaw = calcRemainingSlaMinutes(row.submitted_at, data.sla_hours || 24)
+                const remaining = remainingRaw == null ? null : remainingRaw + (nowTick ? 0 : 0)
+                if (remaining == null) return '-'
+                if (remaining <= 0) return <span style={{ color: COLOR_NEG, fontWeight: 700 }}>Breached</span>
+                return <span style={{ color: remaining <= 60 ? '#ff7f50' : 'var(--text)' }}>{fmtTimerMinutes(remaining)}</span>
+              }
+            },
             { key: 'sla_status', label: 'SLA', render: v => <StatusBadge status={v} /> },
             { key: 'accounts_total', label: 'Accounts' },
             { key: 'funded_accounts', label: 'Funded' },
@@ -3546,6 +3718,7 @@ function NotificationCenterTab({ showMsg }) {
   const [title, setTitle] = useState('')
   const [message, setMessage] = useState('')
   const [audience, setAudience] = useState('all')
+  const [scheduledFor, setScheduledFor] = useState('')
 
   const load = useCallback(async () => {
     try {
@@ -3560,9 +3733,17 @@ function NotificationCenterTab({ showMsg }) {
 
   async function createNotification() {
     try {
-      await ax.post('/api/admin/notifications', { type, channel, title, message, audience })
+      await ax.post('/api/admin/notifications', {
+        type,
+        channel,
+        title,
+        message,
+        audience,
+        scheduled_for: scheduledFor ? new Date(scheduledFor).toISOString() : null
+      })
       setTitle('')
       setMessage('')
+      setScheduledFor('')
       showMsg('Notification queued')
       load()
     } catch (err) {
@@ -3597,11 +3778,18 @@ function NotificationCenterTab({ showMsg }) {
           <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Title (optional)"
             style={{ background: 'var(--navy-hover)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 10px', color: 'var(--text)' }} />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px auto', gap: '8px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 220px auto', gap: '8px' }}>
           <textarea rows={2} value={message} onChange={e => setMessage(e.target.value)} placeholder="Notification message"
             style={{ width: '100%', background: 'var(--navy-hover)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 10px', color: 'var(--text)' }} />
           <input value={audience} onChange={e => setAudience(e.target.value)} placeholder="Audience"
             style={{ background: 'var(--navy-hover)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 10px', color: 'var(--text)' }} />
+          <input
+            type="datetime-local"
+            value={scheduledFor}
+            onChange={e => setScheduledFor(e.target.value)}
+            style={{ background: 'var(--navy-hover)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 10px', color: 'var(--text)' }}
+            title="Optional scheduled send time"
+          />
           <Btn variant="accent" onClick={createNotification} disabled={!message.trim()}>Create</Btn>
         </div>
       </div>
@@ -3614,6 +3802,7 @@ function NotificationCenterTab({ showMsg }) {
             { key: 'title', label: 'Title' },
             { key: 'message', label: 'Message' },
             { key: 'audience', label: 'Audience' },
+            { key: 'scheduled_for', label: 'Scheduled', render: v => v ? fmtDateTime(v) : '-' },
             { key: 'status', label: 'Status', render: v => <StatusBadge status={v} /> },
             {
               key: 'id',
@@ -3760,6 +3949,7 @@ function CaseManagementTab({ showMsg }) {
 function DisputeWorkflowTab({ showMsg }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [nowTick, setNowTick] = useState(Date.now())
   const [selectedId, setSelectedId] = useState('')
   const [owner, setOwner] = useState('')
   const [priority, setPriority] = useState('normal')
@@ -3781,6 +3971,10 @@ function DisputeWorkflowTab({ showMsg }) {
     setLoading(false)
   }, [showMsg, selectedId])
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(Date.now()), 60000)
+    return () => clearInterval(t)
+  }, [])
 
   useEffect(() => {
     const row = (data?.rows || []).find(r => String(r.dispute_id) === String(selectedId))
@@ -3875,10 +4069,378 @@ function DisputeWorkflowTab({ showMsg }) {
             { key: 'priority', label: 'Priority', render: v => <StatusBadge status={v} /> },
             { key: 'status', label: 'Status', render: v => <StatusBadge status={v} /> },
             { key: 'age_hours', label: 'Age (h)' },
+            {
+              key: 'sla_timer',
+              label: 'SLA Timer',
+              render: (_, row) => {
+                const remainingRaw = calcRemainingSlaMinutes(row.created_at, row.sla_hours || 48)
+                const remaining = remainingRaw == null ? null : remainingRaw + (nowTick ? 0 : 0)
+                if (remaining == null) return '-'
+                if (remaining <= 0) return <span style={{ color: COLOR_NEG, fontWeight: 700 }}>Breached</span>
+                return <span style={{ color: remaining <= 60 ? '#ff7f50' : 'var(--text)' }}>{fmtTimerMinutes(remaining)}</span>
+              }
+            },
             { key: 'sla_status', label: 'SLA', render: v => <StatusBadge status={v} /> },
           ]}
           rows={rows}
         />
+      </div>
+    </div>
+  )
+}
+
+function AccountHealthTab({ showMsg }) {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    try {
+      const r = await ax.get('/api/admin/account-health')
+      setData(r.data || null)
+    } catch {
+      showMsg('Could not load account health scores', true)
+    }
+    setLoading(false)
+  }, [showMsg])
+  useEffect(() => { load() }, [load])
+
+  if (loading) return <div style={{ color: 'var(--text-muted)' }}>Loading account health scores...</div>
+  if (!data) return null
+
+  const summary = data.summary || {}
+  const rows = data.rows || []
+
+  return (
+    <div>
+      <h2 style={{ color: 'var(--text)', marginBottom: '16px' }}>Account Health Score</h2>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,minmax(130px,1fr))', gap: '10px', marginBottom: '14px' }}>
+        <StatCard label="Accounts" value={summary.total || 0} />
+        <StatCard label="Healthy" value={summary.healthy || 0} color={COLOR_POS} />
+        <StatCard label="Watch" value={summary.watch || 0} color="#ffa502" />
+        <StatCard label="Critical" value={summary.critical || 0} color={COLOR_NEG} />
+        <StatCard label="Avg Score" value={summary.avg_health_score || 0} color={COLOR_ACCENT} />
+      </div>
+      <div style={{ background: 'var(--navy-card)', border: '1px solid var(--navy-border)', borderRadius: '10px', overflow: 'hidden' }}>
+        <Table
+          cols={[
+            { key: 'account_uid', label: 'Account' },
+            { key: 'full_name', label: 'Trader' },
+            { key: 'account_type', label: 'Type' },
+            { key: 'account_status', label: 'Status', render: v => <StatusBadge status={v} /> },
+            {
+              key: 'health_score',
+              label: 'Health Score',
+              render: v => <span style={{ fontWeight: 700, color: v >= 75 ? COLOR_POS : v >= 45 ? '#ffa502' : COLOR_NEG }}>{v}</span>
+            },
+            { key: 'health_band', label: 'Band', render: v => <StatusBadge status={v} /> },
+            { key: 'win_rate_pct', label: 'Win Rate', render: v => `${fmt(v)}%` },
+            { key: 'closed_trades', label: 'Closed Trades' },
+            { key: 'flagged_payouts', label: 'Flagged Payouts' },
+            { key: 'open_disputes', label: 'Open Disputes' },
+            { key: 'reasons', label: 'Risk Signals', render: v => (Array.isArray(v) && v.length ? v.join('; ') : '-') },
+          ]}
+          rows={rows}
+        />
+      </div>
+    </div>
+  )
+}
+
+function StressTestSimulatorTab({ showMsg }) {
+  const [shockPct, setShockPct] = useState('2')
+  const [slippagePoints, setSlippagePoints] = useState('0')
+  const [instrument, setInstrument] = useState('')
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  async function runSimulation() {
+    setLoading(true)
+    try {
+      const r = await ax.post('/api/admin/stress-simulator', {
+        shock_pct: parseFloat(shockPct),
+        slippage_points: parseFloat(slippagePoints),
+        instrument: instrument.trim().toUpperCase() || null
+      })
+      setData(r.data || null)
+    } catch (err) {
+      showMsg(err?.response?.data?.error || 'Could not run stress simulation', true)
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => { runSimulation() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div>
+      <h2 style={{ color: 'var(--text)', marginBottom: '16px' }}>Stress Test Simulator</h2>
+      <div style={{ background: 'var(--navy-card)', border: '1px solid var(--navy-border)', borderRadius: '10px', padding: '14px', marginBottom: '14px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '120px 150px 160px auto', gap: '8px' }}>
+          <input type="number" min="0.1" max="25" step="0.1" value={shockPct} onChange={e => setShockPct(e.target.value)}
+            placeholder="Shock %"
+            style={{ background: 'var(--navy-hover)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 10px', color: 'var(--text)' }} />
+          <input type="number" min="0" max="500" step="1" value={slippagePoints} onChange={e => setSlippagePoints(e.target.value)}
+            placeholder="Slippage points"
+            style={{ background: 'var(--navy-hover)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 10px', color: 'var(--text)' }} />
+          <input value={instrument} onChange={e => setInstrument(e.target.value)} placeholder="Instrument (optional)"
+            style={{ background: 'var(--navy-hover)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 10px', color: 'var(--text)' }} />
+          <Btn variant="accent" onClick={runSimulation} disabled={loading}>{loading ? 'Running...' : 'Run Simulation'}</Btn>
+        </div>
+      </div>
+
+      {data && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,minmax(130px,1fr))', gap: '10px', marginBottom: '14px' }}>
+            <StatCard label="Open Trades" value={data.summary?.open_trades || 0} />
+            <StatCard label="Affected Accounts" value={data.summary?.affected_accounts || 0} />
+            <StatCard label="Current P&L" value={fmtUSD(data.summary?.current_total_pnl || 0)} color={COLOR_ACCENT} />
+            <StatCard label="Stressed P&L" value={fmtUSD(data.summary?.stressed_total_pnl || 0)} color={COLOR_NEG} />
+            <StatCard label="P&L Delta" value={fmtUSD(data.summary?.pnl_delta || 0)} color={(data.summary?.pnl_delta || 0) < 0 ? COLOR_NEG : COLOR_POS} />
+          </div>
+          <div style={{ background: 'var(--navy-card)', border: '1px solid var(--navy-border)', borderRadius: '10px', overflow: 'hidden', marginBottom: '12px' }}>
+            <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--navy-border)', color: 'var(--text)' }}>Account Impact</div>
+            <Table
+              cols={[
+                { key: 'account_uid', label: 'Account' },
+                { key: 'full_name', label: 'Trader' },
+                { key: 'account_type', label: 'Type' },
+                { key: 'trade_count', label: 'Trades' },
+                { key: 'current_pnl', label: 'Current P&L', render: v => fmtUSD(v) },
+                { key: 'stressed_pnl', label: 'Stressed P&L', render: v => fmtUSD(v) },
+                { key: 'pnl_delta', label: 'Delta', render: v => <span style={{ color: v < 0 ? COLOR_NEG : COLOR_POS }}>{fmtUSD(v)}</span> },
+              ]}
+              rows={data.by_account || []}
+            />
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function ScheduledReportsTab({ showMsg }) {
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [editingId, setEditingId] = useState('')
+  const [reportKey, setReportKey] = useState('risk_digest')
+  const [title, setTitle] = useState('Daily Risk Digest')
+  const [channel, setChannel] = useState('email')
+  const [recipients, setRecipients] = useState('ops@company.com')
+  const [scheduleCron, setScheduleCron] = useState('0 9 * * *')
+  const [timezone, setTimezone] = useState('UTC')
+  const [nextRun, setNextRun] = useState('')
+  const [enabled, setEnabled] = useState(true)
+
+  const load = useCallback(async () => {
+    try {
+      const r = await ax.get('/api/admin/scheduled-reports')
+      setRows(r.data || [])
+    } catch {
+      showMsg('Could not load scheduled reports', true)
+    }
+    setLoading(false)
+  }, [showMsg])
+  useEffect(() => { load() }, [load])
+
+  async function save() {
+    try {
+      await ax.post('/api/admin/scheduled-reports', {
+        id: editingId || null,
+        report_key: reportKey,
+        title,
+        channel,
+        recipients,
+        schedule_cron: scheduleCron,
+        timezone,
+        enabled,
+        next_run_at: nextRun ? new Date(nextRun).toISOString() : null
+      })
+      showMsg('Scheduled report saved')
+      setEditingId('')
+      load()
+    } catch (err) {
+      showMsg(err?.response?.data?.error || 'Could not save scheduled report', true)
+    }
+  }
+
+  async function toggle(id) {
+    try {
+      await ax.post(`/api/admin/scheduled-reports/${id}/toggle`)
+      load()
+    } catch (err) {
+      showMsg(err?.response?.data?.error || 'Could not toggle scheduled report', true)
+    }
+  }
+
+  function edit(row) {
+    setEditingId(String(row.id))
+    setReportKey(row.report_key || '')
+    setTitle(row.title || '')
+    setChannel(row.channel || 'email')
+    setRecipients(row.recipients || '')
+    setScheduleCron(row.schedule_cron || '0 9 * * *')
+    setTimezone(row.timezone || 'UTC')
+    setNextRun(toDateTimeLocalValue(row.next_run_at))
+    setEnabled(!!row.enabled)
+  }
+
+  return (
+    <div>
+      <h2 style={{ color: 'var(--text)', marginBottom: '16px' }}>Scheduled Reports</h2>
+      <div style={{ background: 'var(--navy-card)', border: '1px solid var(--navy-border)', borderRadius: '10px', padding: '14px', marginBottom: '14px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 120px 1fr', gap: '8px', marginBottom: '8px' }}>
+          <input value={reportKey} onChange={e => setReportKey(e.target.value)} placeholder="report_key"
+            style={{ background: 'var(--navy-hover)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 10px', color: 'var(--text)' }} />
+          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Title"
+            style={{ background: 'var(--navy-hover)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 10px', color: 'var(--text)' }} />
+          <select value={channel} onChange={e => setChannel(e.target.value)}
+            style={{ background: 'var(--navy-hover)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 10px', color: 'var(--text)' }}>
+            {['email', 'web', 'webhook'].map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <input value={recipients} onChange={e => setRecipients(e.target.value)} placeholder="Recipients (comma-separated)"
+            style={{ background: 'var(--navy-hover)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 10px', color: 'var(--text)' }} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 220px auto auto', gap: '8px', alignItems: 'center' }}>
+          <input value={scheduleCron} onChange={e => setScheduleCron(e.target.value)} placeholder="Cron e.g. 0 9 * * *"
+            style={{ background: 'var(--navy-hover)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 10px', color: 'var(--text)' }} />
+          <input value={timezone} onChange={e => setTimezone(e.target.value)} placeholder="Timezone"
+            style={{ background: 'var(--navy-hover)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 10px', color: 'var(--text)' }} />
+          <input type="datetime-local" value={nextRun} onChange={e => setNextRun(e.target.value)}
+            style={{ background: 'var(--navy-hover)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 10px', color: 'var(--text)' }} />
+          <label style={{ color: 'var(--text)', fontSize: '13px' }}>
+            <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} style={{ marginRight: '6px' }} />
+            Enabled
+          </label>
+          <Btn variant="accent" onClick={save}>{editingId ? 'Update' : 'Create'}</Btn>
+        </div>
+      </div>
+      {loading ? <div style={{ color: 'var(--text-muted)' }}>Loading...</div> : (
+        <>
+        <div style={{ background: 'var(--navy-card)', border: '1px solid var(--navy-border)', borderRadius: '10px', overflow: 'hidden' }}>
+          <Table
+            cols={[
+              { key: 'report_key', label: 'Key' },
+              { key: 'title', label: 'Title' },
+              { key: 'channel', label: 'Channel' },
+              { key: 'schedule_cron', label: 'Schedule' },
+              { key: 'timezone', label: 'TZ' },
+              { key: 'next_run_at', label: 'Next Run', render: v => v ? fmtDateTime(v) : '-' },
+              { key: 'enabled', label: 'Enabled', render: v => <StatusBadge status={v ? 'active' : 'disabled'} /> },
+              {
+                key: 'id',
+                label: 'Actions',
+                render: (v, row) => (
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <Btn variant="ghost" style={{ padding: '3px 8px', fontSize: '11px' }} onClick={() => edit(row)}>Edit</Btn>
+                    <Btn variant="ghost" style={{ padding: '3px 8px', fontSize: '11px' }} onClick={() => toggle(v)}>
+                      {row.enabled ? 'Disable' : 'Enable'}
+                    </Btn>
+                  </div>
+                )
+              },
+            ]}
+            rows={rows}
+          />
+        </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function EmergencyKillSwitchTab({ showMsg }) {
+  const [status, setStatus] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [preview, setPreview] = useState(null)
+  const [confirmPhrase, setConfirmPhrase] = useState('')
+  const [reEnableCopier, setReEnableCopier] = useState(false)
+  const [working, setWorking] = useState(false)
+
+  async function loadStatus() {
+    try {
+      const r = await ax.get('/api/admin/emergency-kill/status')
+      setStatus(r.data || null)
+    } catch {
+      showMsg('Could not load emergency kill status', true)
+    }
+    setLoading(false)
+  }
+  useEffect(() => { loadStatus() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function runDryRun() {
+    setWorking(true)
+    try {
+      const r = await ax.post('/api/admin/emergency-kill/execute', { dry_run: true })
+      setPreview(r.data || null)
+    } catch (err) {
+      showMsg(err?.response?.data?.error || 'Could not run dry run', true)
+    }
+    setWorking(false)
+  }
+
+  async function executeKill() {
+    setWorking(true)
+    try {
+      const r = await ax.post('/api/admin/emergency-kill/execute', {
+        dry_run: false,
+        confirm_phrase: confirmPhrase
+      })
+      showMsg(`Emergency kill executed. Closed ${r.data?.closed_trades || 0} trades.`)
+      setConfirmPhrase('')
+      setPreview(null)
+      loadStatus()
+    } catch (err) {
+      showMsg(err?.response?.data?.error || 'Could not execute emergency kill', true)
+    }
+    setWorking(false)
+  }
+
+  async function resetKill() {
+    setWorking(true)
+    try {
+      await ax.post('/api/admin/emergency-kill/reset', { reenable_copier: reEnableCopier })
+      showMsg('Emergency kill switch reset')
+      loadStatus()
+    } catch (err) {
+      showMsg(err?.response?.data?.error || 'Could not reset emergency kill switch', true)
+    }
+    setWorking(false)
+  }
+
+  if (loading) return <div style={{ color: 'var(--text-muted)' }}>Loading emergency kill switch...</div>
+
+  return (
+    <div>
+      <h2 style={{ color: 'var(--text)', marginBottom: '16px' }}>Emergency Kill Switch</h2>
+      <div style={{ background: 'rgba(255,71,87,0.08)', border: '1px solid rgba(255,71,87,0.25)', color: '#ff6b7a', borderRadius: '10px', padding: '12px 14px', marginBottom: '14px', fontSize: '13px' }}>
+        Use only during platform emergencies. This action force-closes all open trades and disables copier.
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(140px,1fr))', gap: '10px', marginBottom: '14px' }}>
+        <StatCard label="Kill Enabled" value={status?.enabled ? 'YES' : 'NO'} color={status?.enabled ? COLOR_NEG : COLOR_POS} />
+        <StatCard label="Open Trades" value={status?.open_trades || 0} color={COLOR_ACCENT} />
+        <StatCard label="Copier" value={status?.copier_enabled ? 'ON' : 'OFF'} color={status?.copier_enabled ? COLOR_POS : COLOR_NEG} />
+        <StatCard label="Last Triggered" value={status?.last_triggered_at ? fmtDateTime(status.last_triggered_at) : '-'} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', gap: '8px', alignItems: 'center', marginBottom: '12px' }}>
+        <Btn variant="ghost" onClick={runDryRun} disabled={working}>Dry Run</Btn>
+        <input value={confirmPhrase} onChange={e => setConfirmPhrase(e.target.value)} placeholder='Type KILL ALL TRADES'
+          style={{ background: 'var(--navy-hover)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 10px', color: 'var(--text)' }} />
+        <Btn variant="red" onClick={executeKill} disabled={working}>Execute Kill</Btn>
+        <Btn variant="ghost" onClick={loadStatus} disabled={working}>Refresh</Btn>
+      </div>
+      {preview && (
+        <div style={{ background: 'var(--navy-card)', border: '1px solid var(--navy-border)', borderRadius: '10px', padding: '12px 14px', marginBottom: '12px' }}>
+          <div style={{ color: 'var(--text)', marginBottom: '8px', fontWeight: 600 }}>Dry Run Preview</div>
+          <div style={{ color: 'var(--text-muted)', fontSize: '12px', marginBottom: '6px' }}>
+            Open trades: {preview.open_trades || 0} | Affected accounts: {preview.affected_accounts || 0}
+          </div>
+        </div>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', alignItems: 'center' }}>
+        <label style={{ color: 'var(--text)', fontSize: '13px' }}>
+          <input type="checkbox" checked={reEnableCopier} onChange={e => setReEnableCopier(e.target.checked)} style={{ marginRight: '6px' }} />
+          Re-enable copier when resetting kill switch
+        </label>
+        <Btn variant="accent" onClick={resetKill} disabled={working}>Reset Kill Switch</Btn>
       </div>
     </div>
   )
@@ -3925,8 +4487,13 @@ function Admin() {
   const [msg, setMsg]                   = useState({ text: '', isError: false })
   const [loginLoading, setLoginLoading] = useState(false)
   const msgTimer = useRef(null)
+  // 2FA admin login state
+  const [adminLoginStep, setAdminLoginStep]     = useState('password')  // 'password' | 'totp'
+  const [adminPre2faToken, setAdminPre2faToken] = useState('')
+  const [totpDigits, setTotpDigits]             = useState(['', '', '', '', '', ''])
+  const totpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()]
 
-  useEffect(() => { ax.defaults.withCredentials = true }, [showMsg])
+  useEffect(() => { ax.defaults.withCredentials = true }, [])
   useEffect(() => { checkSession() }, [])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -3963,10 +4530,57 @@ function Admin() {
     e.preventDefault()
     setLoginLoading(true)
     try {
-      await ax.post('/api/admin/login', { password })
-      setToken(true); setPassword('')
+      const r = await ax.post('/api/admin/login', { password })
+      if (r.data.requires2FA) {
+        setAdminPre2faToken(r.data.pre2faToken)
+        setAdminLoginStep('totp')
+        setTotpDigits(['', '', '', '', '', ''])
+        setTimeout(() => totpRefs[0].current?.focus(), 50)
+      } else {
+        setToken(true); setPassword('')
+      }
     } catch { showMsg('Invalid admin password', true) }
     setLoginLoading(false)
+  }
+
+  async function handleAdminTotpVerify(code) {
+    setLoginLoading(true)
+    try {
+      await ax.post(
+        '/api/admin/2fa/validate',
+        { token: code },
+        { headers: { Authorization: `Bearer ${adminPre2faToken}` } }
+      )
+      setToken(true)
+      setAdminLoginStep('password')
+      setAdminPre2faToken('')
+      setPassword('')
+    } catch (err) {
+      showMsg(err?.response?.data?.error || 'Invalid code. Please try again.', true)
+    }
+    setLoginLoading(false)
+  }
+
+  function handleAdminTotpDigit(index, value) {
+    const d = value.replace(/\D/g, '').slice(0, 1)
+    const next = [...totpDigits]
+    next[index] = d
+    setTotpDigits(next)
+    if (d && index < 5) totpRefs[index + 1].current?.focus()
+    if (d && index === 5) {
+      const code = [...next.slice(0, 5), d].join('')
+      if (code.length === 6) handleAdminTotpVerify(code)
+    }
+  }
+
+  function handleAdminTotpKeyDown(index, e) {
+    if (e.key === 'Backspace' && !totpDigits[index] && index > 0) {
+      totpRefs[index - 1].current?.focus()
+    }
+    if (e.key === 'Enter') {
+      const code = totpDigits.join('')
+      if (code.length === 6) handleAdminTotpVerify(code)
+    }
   }
 
   async function handleLogout() {
@@ -4053,17 +4667,65 @@ function Admin() {
         <div style={{ position: 'absolute', top: '30%', left: '50%', transform: 'translate(-50%, -50%)', width: '500px', height: '500px', background: 'radial-gradient(circle, rgba(41,98,255,0.06), transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ background: 'var(--navy-card)', border: '1px solid var(--navy-border)', borderRadius: '16px', padding: '40px', width: '400px', position: 'relative', boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}>
           <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(41,98,255,0.15), rgba(123,97,255,0.1))', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', border: '1px solid rgba(41,98,255,0.2)' }}>
-            <span style={{ fontSize: '22px' }}>⬡</span>
+            <span style={{ fontSize: '22px' }}>{adminLoginStep === 'totp' ? '🔐' : '⚡'}</span>
           </div>
           <h1 style={{ color: 'var(--text)', textAlign: 'center', marginBottom: '6px', fontSize: '22px', fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>ADMIN PANEL</h1>
-          <p style={{ color: 'var(--text-dim)', textAlign: 'center', fontSize: '13px', marginBottom: '28px' }}>Prop Firm Control Centre</p>
+          <p style={{ color: 'var(--text-dim)', textAlign: 'center', fontSize: '13px', marginBottom: '28px' }}>
+            {adminLoginStep === 'totp' ? 'Enter your authenticator code' : 'Prop Firm Control Centre'}
+          </p>
           {msg.text && <div style={{ background: msg.isError ? 'rgba(255,71,87,0.08)' : 'rgba(0,200,150,0.08)', border: `1px solid ${msg.isError ? 'rgba(255,71,87,0.2)' : 'rgba(0,200,150,0.2)'}`, color: msg.isError ? '#ff6b7a' : '#00c896', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '13px' }}>{msg.text}</div>}
-          <form onSubmit={handleLogin}>
-            <Inp label="ADMIN PASSWORD" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter admin password" />
-            <Btn variant="accent" type="submit" style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'linear-gradient(135deg, #2962ff, #4d82ff)', boxShadow: '0 4px 16px rgba(41,98,255,0.3)' }} disabled={loginLoading}>
-              {loginLoading ? 'Logging in...' : 'Login'}
-            </Btn>
-          </form>
+
+          {adminLoginStep === 'password' && (
+            <form onSubmit={handleLogin}>
+              <Inp label="ADMIN PASSWORD" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter admin password" />
+              <Btn variant="accent" type="submit" style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'linear-gradient(135deg, #2962ff, #4d82ff)', boxShadow: '0 4px 16px rgba(41,98,255,0.3)' }} disabled={loginLoading}>
+                {loginLoading ? 'Logging in...' : 'Login'}
+              </Btn>
+            </form>
+          )}
+
+          {adminLoginStep === 'totp' && (
+            <div>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '20px' }}
+                onPaste={e => {
+                  const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+                  if (pasted.length === 6) { setTotpDigits(pasted.split('')); handleAdminTotpVerify(pasted) }
+                }}>
+                {totpDigits.map((d, i) => (
+                  <input
+                    key={i}
+                    ref={totpRefs[i]}
+                    id={`admin-totp-digit-${i}`}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={1}
+                    value={d}
+                    onChange={e => handleAdminTotpDigit(i, e.target.value)}
+                    onKeyDown={e => handleAdminTotpKeyDown(i, e)}
+                    style={{
+                      width: '44px', height: '52px', textAlign: 'center',
+                      fontSize: '22px', fontFamily: 'monospace', fontWeight: 700,
+                      background: 'var(--navy-hover)',
+                      border: `2px solid ${d ? '#2962ff' : 'var(--navy-border)'}`,
+                      borderRadius: '10px', color: 'var(--text)', outline: 'none',
+                    }}
+                  />
+                ))}
+              </div>
+              <Btn variant="accent"
+                onClick={() => handleAdminTotpVerify(totpDigits.join(''))}
+                disabled={loginLoading || totpDigits.join('').length < 6}
+                style={{ width: '100%', padding: '12px', borderRadius: '10px', marginBottom: '10px', opacity: (loginLoading || totpDigits.join('').length < 6) ? 0.5 : 1 }}>
+                {loginLoading ? 'Verifying…' : 'Verify Code'}
+              </Btn>
+              <button
+                onClick={() => { setAdminLoginStep('password'); setAdminPre2faToken(''); showMsg('') }}
+                style={{ width: '100%', background: 'transparent', border: '1px solid var(--navy-border)', color: 'var(--text-muted)', padding: '10px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>
+                ← Back
+              </button>
+            </div>
+          )}
         </div>
       </div>
     )
@@ -4073,6 +4735,7 @@ function Admin() {
     'feat_incident_center',
     'feat_rule_builder',
     'feat_auto_enforcement',
+    'feat_account_health',
     'feat_payout_fraud',
     'feat_device_graph',
     'feat_news_protection',
@@ -4090,104 +4753,79 @@ function Admin() {
     'feat_notifications',
     'feat_case_management',
     'feat_dispute_workflow',
+    'feat_stress_simulator',
+    'feat_scheduled_reports',
+    'feat_emergency_kill',
   ])
   const activePlannedFeature = PLANNED_FEATURES.find(
     f => f.id === activeTab && !implementedFeatureIds.has(f.id)
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--navy)', display: 'grid', gridTemplateColumns: '280px 1fr' }}>
-      <aside style={{
-        borderRight: '1px solid var(--navy-border)',
-        background: 'rgba(10, 14, 23, 0.92)',
-        height: '100vh',
-        overflowY: 'auto',
-        padding: '14px 12px'
-      }}>
-        <div style={{ padding: '10px 10px 14px', borderBottom: '1px solid var(--navy-border)', marginBottom: '10px' }}>
-          <div style={{ color: '#2962ff', fontWeight: 700, fontSize: '14px', letterSpacing: '0.08em' }}>ADMIN PORTAL</div>
-          <div style={{ color: 'var(--text-dim)', fontSize: '11px', marginTop: '4px' }}>Operations and Risk Control</div>
+    <div className="dashboard-layout">
+      <aside className="sidebar sidebar-admin" style={{ padding: '14px 12px', borderRight: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
+        <div style={{ padding: '10px 10px 14px', borderBottom: '1px solid var(--border)', marginBottom: '10px' }}>
+          <div style={{ color: 'var(--admin-accent)', fontWeight: 700, fontSize: '14px', letterSpacing: '0.08em' }}>ADMIN PORTAL</div>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '4px' }}>Operations and Risk Control</div>
         </div>
 
-        <div style={{ fontSize: '10px', color: 'var(--text-dim)', letterSpacing: '0.1em', margin: '8px 10px' }}>LIVE MODULES</div>
-        {CORE_TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              width: '100%',
-              textAlign: 'left',
-              padding: '8px 10px',
-              borderRadius: '8px',
-              marginBottom: '4px',
-              cursor: 'pointer',
-              fontSize: '12px',
-              fontWeight: 600,
-              border: activeTab === tab.id ? '1px solid rgba(41,98,255,0.3)' : '1px solid transparent',
-              background: activeTab === tab.id ? 'rgba(41,98,255,0.1)' : 'transparent',
-              color: activeTab === tab.id ? '#fff' : 'var(--text-muted)',
-              transition: 'all 0.2s'
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
+        <div style={{ fontSize: '10px', color: 'var(--text-secondary)', letterSpacing: '0.1em', margin: '8px 10px' }}>LIVE MODULES</div>
+        <div className="sidebar-nav" style={{ padding: 0 }}>
+          {CORE_TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`sidebar-item ${activeTab === tab.id ? 'active' : ''}`}
+              style={{
+                width: '100%',
+                border: 'none',
+                background: activeTab === tab.id ? undefined : 'transparent',
+                textAlign: 'left',
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
 
-        <div style={{ fontSize: '10px', color: 'var(--text-dim)', letterSpacing: '0.1em', margin: '14px 10px 8px' }}>
+        <div style={{ fontSize: '10px', color: 'var(--text-secondary)', letterSpacing: '0.1em', margin: '14px 10px 8px' }}>
           FEATURE ROADMAP ({PLANNED_FEATURES.length})
         </div>
         {PLANNED_FEATURES.map(feature => (
           <button
             key={feature.id}
             onClick={() => setActiveTab(feature.id)}
+            className={`sidebar-item ${activeTab === feature.id ? 'active' : ''}`}
             style={{
               width: '100%',
+              border: 'none',
+              background: activeTab === feature.id ? undefined : 'transparent',
               textAlign: 'left',
-              padding: '8px 10px',
-              borderRadius: '8px',
-              marginBottom: '4px',
-              cursor: 'pointer',
-              fontSize: '12px',
-              fontWeight: 600,
-              border: activeTab === feature.id ? '1px solid rgba(148, 148, 148, 0.35)' : '1px solid transparent',
-              background: activeTab === feature.id ? 'rgba(148, 148, 148, 0.12)' : 'transparent',
-              color: activeTab === feature.id ? 'var(--text)' : 'var(--text-dim)',
-              transition: 'all 0.2s'
             }}
             title={feature.description}
           >
             {feature.label}
           </button>
         ))}
+        </div>
 
-        <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--navy-border)' }}>
-          <button onClick={handleLogout} style={{
-            width: '100%',
-            padding: '8px 12px',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            border: '1px solid rgba(255,71,87,0.2)',
-            background: 'rgba(255,71,87,0.06)',
-            color: 'var(--red)',
-            fontWeight: 600
-          }}>
+        <div className="sidebar-footer">
+          <button className="btn btn-danger" onClick={handleLogout} style={{ width: '100%' }}>
             Logout
           </button>
         </div>
       </aside>
 
-      <div style={{ minWidth: 0 }}>
+      <div className="dashboard-main animate-fade-up">
         {msg.text && (
           <div style={{
-            background: msg.isError ? 'rgba(255,71,87,0.06)' : 'rgba(0,200,150,0.06)',
-            borderBottom: `1px solid ${msg.isError ? 'rgba(255,71,87,0.15)' : 'rgba(0,200,150,0.15)'}`,
-            color: msg.isError ? '#ff6b7a' : '#00c896',
-            padding: '10px 24px', fontSize: '13px', fontWeight: 500
+            background: msg.isError ? 'var(--danger-bg)' : 'var(--success-bg)',
+            borderBottom: `1px solid ${msg.isError ? 'var(--danger)' : 'var(--success)'}`,
+            color: msg.isError ? 'var(--danger)' : 'var(--success)',
+            padding: '10px 24px', fontSize: '13px', fontWeight: 500, borderRadius: 'var(--radius-sm)', marginBottom: '16px'
           }}>{msg.text}</div>
         )}
 
-        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px 20px' }}>
+        <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           {activeTab === 'overview'     && <OverviewTab overview={overview} />}
           {activeTab === 'risk'         && <RiskTab showMsg={showMsg} />}
           {activeTab === 'traders'      && <TradersTab traders={traders} onRefresh={fetchTraders} showMsg={showMsg} />}
@@ -4210,6 +4848,7 @@ function Admin() {
           {activeTab === 'feat_incident_center' && <IncidentCenterTab showMsg={showMsg} />}
           {activeTab === 'feat_rule_builder'    && <RuleBuilderTab showMsg={showMsg} />}
           {activeTab === 'feat_auto_enforcement' && <AutoEnforcementTab accounts={accounts} showMsg={showMsg} />}
+          {activeTab === 'feat_account_health'  && <AccountHealthTab showMsg={showMsg} />}
           {activeTab === 'feat_payout_fraud'    && <PayoutFraudScoringTab showMsg={showMsg} />}
           {activeTab === 'feat_device_graph'    && <DeviceIpGraphTab showMsg={showMsg} />}
           {activeTab === 'feat_news_protection' && <NewsProtectionTab showMsg={showMsg} />}
@@ -4227,6 +4866,9 @@ function Admin() {
           {activeTab === 'feat_notifications'    && <NotificationCenterTab showMsg={showMsg} />}
           {activeTab === 'feat_case_management'  && <CaseManagementTab showMsg={showMsg} />}
           {activeTab === 'feat_dispute_workflow' && <DisputeWorkflowTab showMsg={showMsg} />}
+          {activeTab === 'feat_stress_simulator' && <StressTestSimulatorTab showMsg={showMsg} />}
+          {activeTab === 'feat_scheduled_reports' && <ScheduledReportsTab showMsg={showMsg} />}
+          {activeTab === 'feat_emergency_kill'   && <EmergencyKillSwitchTab showMsg={showMsg} />}
           {activePlannedFeature && <PlannedFeatureTab feature={activePlannedFeature} />}
         </div>
       </div>
@@ -4235,3 +4877,4 @@ function Admin() {
 }
 
 export default Admin
+

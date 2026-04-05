@@ -268,7 +268,15 @@ function Dashboard({ user, onLogout }) {
   }
 
   function pushNotification(message, type = 'info') {
-    const notif = { id: Date.now(), message, type, time: new Date().toISOString(), read: false }
+    // FIX (MEDIUM #14): Use crypto.randomUUID() instead of Date.now() to prevent
+    // ID collisions when two notifications arrive in the same millisecond.
+    const notif = { 
+      id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, 
+      message, 
+      type, 
+      time: new Date().toISOString(), 
+      read: false 
+    }
     setNotifications(prev => {
       const updated = [notif, ...prev].slice(0, 50)
       localStorage.setItem('notifications', JSON.stringify(updated))
@@ -403,7 +411,7 @@ function Dashboard({ user, onLogout }) {
     : 0
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--navy)' }}>
+    <div className="dashboard-layout">
 
       {/* ── Onboarding walkthrough — shown on first login ── */}
       {showOnboarding && (
@@ -447,46 +455,58 @@ function Dashboard({ user, onLogout }) {
         )
       })()}
 
-      {/* Top Nav */}
-      <div className="nav dashboard-nav">
+      <Sidebar
+        activePage={activePage}
+        setActivePage={setActivePage}
+        kycStatus={kycStatus}
+        pendingPayouts={payouts.filter(p => p.status === 'pending').length}
+        unreadNotifications={notifications.filter(n => !n.read).length}
+      />
+
+      {/* Main Content */}
+      <div className="dashboard-main animate-fade-up" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        {/* Top Nav */}
+      <div className="nav" style={{ 
+        margin: '16px 24px', 
+        borderRadius: '16px', 
+        background: 'rgba(17, 24, 39, 0.7)', 
+        backdropFilter: 'blur(16px)',
+        border: '1px solid var(--border)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.2)' 
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span className="nav-logo">PROP FIRM</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: connected ? 'var(--green)' : 'var(--red)' }}>
-            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: connected ? 'var(--green-light)' : 'var(--red)', boxShadow: connected ? '0 0 6px var(--green-light)' : 'none', display: 'inline-block' }} />
-            {connected ? 'LIVE' : 'OFFLINE'}
+          <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Terminal Status</span>
+          <span className={`badge ${connected ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '10px', padding: '4px 10px', boxShadow: connected ? '0 0 10px rgba(16,185,129,0.3)' : '0 0 10px rgba(239,68,68,0.3)' }}>
+            {connected ? '● LIVE SYNC' : '○ OFFLINE'}
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <span className="nav-username" style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{user?.full_name || 'Trader'}</span>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500' }}>{user?.full_name || 'Trader'}</span>
           {kycStatus !== 'approved' && (
-            <span onClick={() => setActivePage('kyc')} style={{
-              background: kycStatus === 'pending' ? 'rgba(148, 148, 148, 0.12)' : 'rgba(97, 97, 97, 0.15)',
-              border: '1px solid ' + (kycStatus === 'pending' ? 'var(--accent)' : 'var(--red)'),
-              padding: '4px 10px', borderRadius: '4px', fontSize: '12px',
-              cursor: 'pointer', color: kycStatus === 'pending' ? 'var(--accent)' : '#fff'
-            }}>
+            <span className={`badge ${kycStatus === 'pending' ? 'badge-warning' : 'badge-danger'}`} onClick={() => setActivePage('kyc')} style={{ cursor: 'pointer' }}>
               {kycStatus === 'pending' ? '⏳ KYC Pending' : '⚠️ Complete KYC'}
             </span>
           )}
           {kycStatus === 'approved' && (
-            <span style={{ background: 'rgba(74, 74, 74, 0.15)', border: '1px solid var(--green)', padding: '4px 10px', borderRadius: '4px', fontSize: '12px', color: 'var(--green-light)' }}>
-              ✅ KYC Verified
-            </span>
+            <span className="badge badge-success">✅ KYC Verified</span>
           )}
 
           {/* ── Notification Bell ── */}
           <div style={{ position: 'relative' }}>
             <button
-              onClick={() => { setShowNotifications(p => !p); markAllRead() }}
-              style={{ background: 'none', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer', fontSize: '16px', color: 'var(--text-muted)', position: 'relative' }}
+              onClick={() => { 
+                setShowNotifications(p => {
+                  if (!p) markAllRead()
+                  return !p
+                })
+              }}
+              className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '16px' }}
             >
               🔔
               {notifications.filter(n => !n.read).length > 0 && (
-                <span style={{
-                  position: 'absolute', top: '-4px', right: '-4px',
-                  background: 'var(--red)', color: '#fff',
-                  borderRadius: '99px', fontSize: '9px', fontWeight: '700',
-                  padding: '0 4px', lineHeight: '14px', minWidth: '14px', textAlign: 'center'
+                <span className="badge badge-danger" style={{
+                  position: 'absolute', top: '-6px', right: '-6px',
+                  padding: '2px 6px', fontSize: '9px'
                 }}>
                   {notifications.filter(n => !n.read).length}
                 </span>
@@ -495,28 +515,28 @@ function Dashboard({ user, onLogout }) {
             {showNotifications && (
               <div style={{
                 position: 'absolute', right: 0, top: '42px', width: '320px', maxHeight: '400px',
-                background: 'var(--navy-card)', border: '1px solid var(--navy-border)',
-                borderRadius: '10px', boxShadow: '0 8px 32px rgba(0,0,0,0.4)', zIndex: 999,
+                background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', zIndex: 999,
                 overflow: 'hidden', display: 'flex', flexDirection: 'column'
               }}>
-                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--navy-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontWeight: '600', fontSize: '13px', color: 'var(--accent)' }}>Notifications</span>
                   {notifications.length > 0 && (
-                    <button onClick={clearNotifications} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: '11px', cursor: 'pointer' }}>Clear all</button>
+                    <button onClick={clearNotifications} className="btn-ghost" style={{ border: 'none', color: 'var(--text-secondary)', fontSize: '11px', cursor: 'pointer' }}>Clear all</button>
                   )}
                 </div>
                 <div style={{ overflowY: 'auto', maxHeight: '340px' }}>
                   {notifications.length === 0 ? (
-                    <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '13px' }}>No notifications yet</div>
+                    <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>No notifications yet</div>
                   ) : (
                     notifications.map(n => (
                       <div key={n.id} style={{
-                        padding: '12px 16px', borderBottom: '1px solid var(--navy-border)',
-                        borderLeft: `3px solid ${n.type === 'error' ? 'var(--red)' : n.type === 'success' ? 'var(--green)' : 'var(--accent)'}`,
+                        padding: '12px 16px', borderBottom: '1px solid var(--border)',
+                        borderLeft: `3px solid ${n.type === 'error' ? 'var(--danger)' : n.type === 'success' ? 'var(--success)' : 'var(--accent)'}`,
                         background: 'transparent'
                       }}>
-                        <div style={{ fontSize: '13px', color: 'var(--text)', marginBottom: '4px' }}>{n.message}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
+                        <div style={{ fontSize: '13px', color: 'var(--text-primary)', marginBottom: '4px' }}>{n.message}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                           {new Date(n.time).toLocaleString()}
                         </div>
                       </div>
@@ -528,23 +548,11 @@ function Dashboard({ user, onLogout }) {
           </div>
 
           <ThemeToggle />
-          <button className="btn btn-red" onClick={onLogout} style={{ padding: '7px 14px', fontSize: '12px' }}>Logout</button>
+          <button className="btn btn-danger" onClick={onLogout} style={{ padding: '6px 12px', fontSize: '12px' }}>Logout</button>
         </div>
       </div>
 
-      {/* Sidebar */}
-      <Sidebar
-        activePage={activePage}
-        setActivePage={setActivePage}
-        kycStatus={kycStatus}
-        pendingPayouts={payouts.filter(p => p.status === 'pending').length}
-        unreadNotifications={notifications.filter(n => !n.read).length}
-      />
-
-      {/* Main Content */}
-      <div className="dashboard-content">
-
-        {error && <div className="error">{error}</div>}
+      {/* Main Content Pages */}        {error && <div className="error">{error}</div>}
         {success && <div className="success">{success}</div>}
 
         {/* Dashboard Page */}
@@ -568,9 +576,9 @@ function Dashboard({ user, onLogout }) {
           kycStatus !== 'approved' ? (
             <div className="card" style={{ textAlign: 'center', padding: '48px' }}>
               <div style={{ fontSize: '48px', marginBottom: '16px' }}>🪪</div>
-              <h3 style={{ color: 'var(--accent)', marginBottom: '12px' }}>KYC Required</h3>
-              <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>Complete your identity verification to start trading.</p>
-              <button className="btn btn-accent" onClick={() => setActivePage('kyc')} style={{ padding: '12px 32px' }}>Complete KYC</button>
+              <h3 className="page-title" style={{ marginBottom: '12px', fontSize: '20px' }}>KYC Required</h3>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>Complete your identity verification to start trading.</p>
+              <button className="btn btn-primary" onClick={() => setActivePage('kyc')} style={{ padding: '12px 32px' }}>Complete KYC</button>
             </div>
           ) : (
             <TradingPanel
@@ -796,7 +804,7 @@ function Dashboard({ user, onLogout }) {
                       <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
                         <div>
                           <div style={{ fontWeight: '700', fontSize: '15px', color: 'var(--accent)', marginBottom: '4px' }}>
-                            {acc.account_type.toUpperCase()} — ${parseFloat(acc.account_size).toLocaleString()}
+                            {acc.account_type.toUpperCase()} — ${parseFloat(acc.account_size).toLocaleString('en-US')}
                           </div>
                           <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
                             Started {acc.phase_start_date ? new Date(acc.phase_start_date).toLocaleDateString() : '—'}

@@ -262,12 +262,20 @@ export function sleep(ms) {
 export function debounce(func, wait) {
   let timeout
   return function executedFunction(...args) {
-    const later = () => {
+    return new Promise((resolve, reject) => {
+      const later = () => {
+        clearTimeout(timeout)
+        try {
+          // FIX (MEDIUM #18): Return the result of the debounced function
+          // so it can be used with async/await and Promise chains.
+          resolve(func.apply(this, args))
+        } catch (error) {
+          reject(error)
+        }
+      }
       clearTimeout(timeout)
-      func(...args)
-    }
-    clearTimeout(timeout)
-    timeout = setTimeout(later, wait)
+      timeout = setTimeout(later, wait)
+    })
   }
 }
 

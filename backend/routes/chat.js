@@ -4,6 +4,7 @@ const router = express.Router()
 const pool = require('../db')
 const { authenticateToken, authenticateAdmin } = require('./middleware')
 const rateLimit = require('express-rate-limit')
+const logger = require('../utils/logger')
 
 // Rate limiter for chat messages
 const chatMessageLimiter = rateLimit({
@@ -95,7 +96,7 @@ router.post('/conversations', authenticateToken, chatMessageLimiter, async funct
       conversation: result.rows[0]
     })
   } catch (error) {
-    console.error('Create conversation error:', error.message, error.stack)
+    logger.error('Create conversation error:', { error: error.message })
     res.status(500).json({ error: 'Could not create conversation' })
   }
 })
@@ -234,7 +235,7 @@ router.post('/conversations/:id/messages', authenticateToken, chatMessageLimiter
 
     res.status(201).json({ message: 'Message sent', messageData: messageResult.rows[0] })
   } catch (error) {
-    console.error('Send message error:', error.message)
+    logger.error('Send message error:', { error: error.message })
     res.status(500).json({ error: 'Could not send message' })
   }
 })
@@ -300,10 +301,11 @@ router.get('/admin/conversations', authenticateAdmin, async function(req, res) {
 
     const result = await pool.query(query, values)
     
-    const countResult = await pool.query(
-      `SELECT COUNT(*) FROM chat_conversations` + 
-      (conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ').replace(/\$\d+/g, (m) => `$${parseInt(m.slice(1))}`) : '')
-    )
+    const countQuery =
+      `SELECT COUNT(*) FROM chat_conversations` +
+      (conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '')
+    const countValues = status ? [status] : []
+    const countResult = await pool.query(countQuery, countValues)
 
     res.json({
       conversations: result.rows,
@@ -427,7 +429,7 @@ router.post('/admin/conversations/:id/messages', authenticateAdmin, chatMessageL
 
     res.status(201).json({ message: 'Message sent', messageData: messageResult.rows[0] })
   } catch (error) {
-    console.error('Admin send message error:', error.message)
+    logger.error('Admin send message error:', { error: error.message })
     res.status(500).json({ error: 'Could not send message' })
   }
 })

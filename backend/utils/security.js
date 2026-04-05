@@ -69,7 +69,10 @@ const passwordResetLimiter = rateLimit({
   message: { error: 'Too many password reset attempts. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.body.email || ipKeyGenerator(req)
+  // FIX: Key on IP, not email. Keying on req.body.email lets an attacker rotate
+  // through different email addresses to bypass per-email limits while still
+  // probing the same target. IP is the right unit of isolation here.
+  keyGenerator: ipKeyGenerator
 });
 
 // KYC submission rate limiter
@@ -141,6 +144,23 @@ const ABUSIVE_IP_TTL = 60 * 60 * 1000 // 1 hour
 const ipRequestCounts = new Map()
 const IP_BLOCK_THRESHOLD = 600 // requests per minute before auto-block
 setInterval(() => { ipRequestCounts.clear() }, 60 * 1000) // reset every minute
+
+// FIX (HIGH #5): Periodic cleanup of expired abusive IP entries to prevent
+// unbounded memory growth in long-running servers.
+const ABUSIVE_IPS_CLEANUP_INTERVAL = 10 * 60 * 1000 // 10 minutes
+setInterval(() => {
+  const now = Date.now()
+  let cleaned = 0
+  for (const [ip, entry] of abusiveIPs.entries()) {
+    if (now > entry.expiresAt) {
+      abusiveIPs.delete(ip)
+      cleaned++
+    }
+  }
+  if (cleaned > 0) {
+    logger.info('Abusive IPs periodic cleanup:', { cleaned, remaining: abusiveIPs.size })
+  }
+}, ABUSIVE_IPS_CLEANUP_INTERVAL)
 
 const abuseDetector = (req, res, next) => {
   const clientIP = req.ip || 'unknown'

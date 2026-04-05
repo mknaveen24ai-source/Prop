@@ -25,7 +25,9 @@ function getMarketStatus() {
     const minsLeft = 22 * 60 - total
     return { open: false, reason: `Market opens Sunday 22:00 UTC (in ${Math.floor(minsLeft/60)}h ${minsLeft%60}m).` }
   }
-  if (total >= 21 * 60 + 55 && total < 22 * 60 + 5) {
+  // FIX (MEDIUM #13): Only apply daily rollover on Mon-Fri (day 1-5), matching backend logic.
+  // Previously applied rollover on all days including Sunday, causing mismatch.
+  if (day >= 1 && day <= 5 && total >= 21 * 60 + 55 && total < 22 * 60 + 5) {
     return { open: false, reason: 'Daily rollover 21:55–22:05 UTC. Try again shortly.' }
   }
   return { open: true, reason: '' }

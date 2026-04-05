@@ -18,12 +18,22 @@ export default function Analytics({ selectedAccount }) {
 
 
 
+  // FIX (MEDIUM #17): Use a ref for data to prevent stale closure in ResizeObserver.
+  // The observer is created once but drawChart may be called after data changes,
+  // causing the observer to capture stale data from the closure.
+  const dataRef = useRef(data)
+  useEffect(() => {
+    dataRef.current = data
+  }, [data])
+
   const drawChart = useCallback(() => {
     const canvas = canvasRef.current
-    if (!canvas || !data?.analytics?.drawdown_curve?.length) return
+    // Use dataRef.current instead of data from closure
+    const currentData = dataRef.current
+    if (!canvas || !currentData?.analytics?.drawdown_curve?.length) return
 
     const ctx = canvas.getContext('2d')
-    const fullCurve = data.analytics.drawdown_curve
+    const fullCurve = currentData.analytics.drawdown_curve
     const curve = fullCurve.slice(0, Math.max(1, Math.floor(fullCurve.length * (replayIndex / 100))))
     const isDark = document.documentElement.getAttribute('data-theme') !== 'light'
 
@@ -165,7 +175,7 @@ export default function Analytics({ selectedAccount }) {
       <div>
         <h2 style={{ fontFamily: 'Inter, serif', color: 'var(--accent)', marginBottom: '8px', fontSize: '22px' }}>Analytics</h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '24px' }}>
-          {selectedAccount.account_type.toUpperCase()} — ${parseFloat(selectedAccount.account_size).toLocaleString()}
+          {selectedAccount.account_type.toUpperCase()} — ${parseFloat(selectedAccount.account_size).toLocaleString('en-US')}
         </p>
         <div className="card" style={{ textAlign: 'center', padding: '48px' }}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>📭</div>
@@ -184,7 +194,7 @@ export default function Analytics({ selectedAccount }) {
         Analytics
       </h2>
       <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '24px' }}>
-        {selectedAccount.account_type.toUpperCase()} — ${parseFloat(selectedAccount.account_size).toLocaleString()}
+        {selectedAccount.account_type.toUpperCase()} — ${parseFloat(selectedAccount.account_size).toLocaleString('en-US')}
       </p>
 
       {!hasData ? (

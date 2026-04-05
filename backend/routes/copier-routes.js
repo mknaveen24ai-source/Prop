@@ -11,6 +11,7 @@ const express = require('express')
 const router  = express.Router()
 const pool    = require('../db')
 const { authenticateAdmin } = require('./middleware')
+const logger = require('../utils/logger')
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Ensure copier settings columns exist
@@ -29,7 +30,9 @@ async function ensureCopierSettings() {
     ).catch(() => {})
   }
 }
-ensureCopierSettings()
+// FIX (HIGH #7): Export both router and function for server startup.
+// This will be placed at the END of the file after all routes are defined.
+// module.exports = { router, ensureCopierSettings }  <-- Moved to end of file
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/admin/copier/status
@@ -46,9 +49,9 @@ router.get('/copier/status', authenticateAdmin, async (req, res) => {
     // Live stats
     const stats = await pool.query(`
       SELECT
-        COUNT(*) FILTER (WHERE status = 'open') as open_trades,
-        COUNT(*) FILTER (WHERE status = 'closed' AND close_time >= NOW() - INTERVAL '1 hour') as closed_last_hour,
-        COUNT(*) FILTER (WHERE status = 'closed' AND close_time >= NOW() - INTERVAL '24 hours') as closed_last_24h
+        COUNT(*) FILTER (WHERE t.status = 'open') as open_trades,
+        COUNT(*) FILTER (WHERE t.status = 'closed' AND t.close_time >= NOW() - INTERVAL '1 hour') as closed_last_hour,
+        COUNT(*) FILTER (WHERE t.status = 'closed' AND t.close_time >= NOW() - INTERVAL '24 hours') as closed_last_24h
       FROM trades t
       JOIN accounts a ON t.account_id = a.id
       WHERE ($1 = 'false' OR a.account_type = 'funded')
@@ -64,7 +67,7 @@ router.get('/copier/status', authenticateAdmin, async (req, res) => {
       stats: stats.rows[0]
     })
   } catch (err) {
-    console.error('[copier/status]', err.message)
+    logger.error('[copier/status] error:', { error: err.message })
     res.status(500).json({ error: 'Could not fetch copier status' })
   }
 })
@@ -102,10 +105,10 @@ router.post('/copier/config', authenticateAdmin, async (req, res) => {
       )
     }
 
-    console.log('[ADMIN] Copier config updated:', updates)
+    logger.info('[ADMIN] Copier config updated:', { updates })
     res.json({ message: 'Copier config saved', config: updates })
   } catch (err) {
-    console.error('[copier/config]', err.message)
+    logger.error('[copier/config] error:', { error: err.message })
     res.status(500).json({ error: 'Could not save copier config' })
   }
 })
@@ -141,9 +144,10 @@ router.get('/copier/open-trades', authenticateAdmin, async (req, res) => {
 
     res.json(result.rows)
   } catch (err) {
-    console.error('[copier/open-trades] Error:', err.message)
+    logger.error('[copier/open-trades] error:', { error: err.message })
     res.status(500).json({ error: 'Could not fetch open trades' })
   }
 })
 
-module.exports = router
+// FIX (HIGH #7): Export both router and ensureCopierSettings function
+module.exports = { router, ensureCopierSettings }

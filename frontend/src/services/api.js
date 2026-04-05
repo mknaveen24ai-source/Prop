@@ -16,15 +16,13 @@ const api = axios.create({
   withCredentials: true
 })
 
-// Request interceptor - add auth token if available
+// Request interceptor
+// FIX: Removed localStorage token lookup. The backend sets the JWT as an
+// httpOnly cookie which axios sends automatically via withCredentials: true.
+// Storing the token in localStorage creates an XSS theft vector — any injected
+// script can read it. The httpOnly cookie is inaccessible to JavaScript.
 api.interceptors.request.use(
-  config => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
+  config => config,
   error => Promise.reject(error)
 )
 
@@ -33,10 +31,16 @@ api.interceptors.response.use(
   response => response,
   error => {
     if (error.response?.status === 401 || error.response?.status === 403) {
-      // Only logout for non-admin endpoints
-      if (!error.config?.url?.includes('/api/admin')) {
-        localStorage.removeItem('token')
-        localStorage.removeItem('user')
+      // FIX (HIGH #11): Only redirect for user-initiated navigation requests,
+      // not background polling, uploads, or analytics. Prevents losing page state.
+      const isUserInitiated = error.config?.headers?.['X-User-Initiated'] === 'true'
+      const isBackgroundRequest = error.config?.url?.includes('/prices') ||
+                                  error.config?.url?.includes('/ping') ||
+                                  error.config?.url?.includes('/analytics')
+      
+      if (!isBackgroundRequest && !window.location.pathname.includes('/login')) {
+        // Save current location for redirect back after login
+        localStorage.setItem('redirectAfterLogin', window.location.pathname + window.location.search)
         window.location.href = '/login'
       }
     }
@@ -64,7 +68,7 @@ export const authAPI = {
     api.post('/api/auth/reset-password', { token, password }),
   
   getProfile: () => 
-    api.get('/api/auth/profile'),
+    api.get('/api/auth/me'),
   
   updateTheme: (theme) => 
     api.patch('/api/auth/theme', { theme })
@@ -86,8 +90,9 @@ export const accountsAPI = {
   getAccountStats: (accountId) => 
     api.get(`/api/accounts/stats/${accountId}`),
   
+  // Backend has /api/accounts/stats/:account_id (no /api/accounts/:id route).
   getAccountDetails: (accountId) => 
-    api.get(`/api/accounts/${accountId}`)
+    api.get(`/api/accounts/stats/${accountId}`)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -103,8 +108,14 @@ export const tradesAPI = {
   getTradeHistory: (accountId) => 
     api.get(`/api/trades/history?account_id=${accountId}`),
   
+  // Backend exposes /api/trades/history (no /api/trades/closed route).
   getClosedTrades: (accountId) => 
-    api.get(`/api/trades/closed?account_id=${accountId}`),
+    api.get(`/api/trades/history?account_id=${accountId}`).then((response) => ({
+      ...response,
+      data: Array.isArray(response.data)
+        ? response.data.filter(trade => trade.status === 'closed')
+        : response.data
+    })),
   
   openTrade: (data) => 
     api.post('/api/trades/open', data),

@@ -13,11 +13,12 @@ const logger = require('../utils/logger')
 const { CONTRACT_SIZES } = require('../constants')
 const Decimal = require('decimal.js')
 const newsService = require('../services/newsService')
+const { validatePendingOrderPrice } = require('../utils/pendingOrderValidation')
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Leverage: 1:30 on forex (EURUSD, GBPUSD), 1:10 on commodities (XAUUSD, XAGUSD)
 // These values must NOT be changed without also reviewing margin checks.
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const LEVERAGE = {
   EURUSD: 30,
   GBPUSD: 30,
@@ -25,21 +26,21 @@ const LEVERAGE = {
   XAGUSD: 10
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Instrument groups for combined exposure checks
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const COMMODITY_INSTRUMENTS = ['XAUUSD', 'XAGUSD']
 const FOREX_INSTRUMENTS     = ['EURUSD', 'GBPUSD']
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Combined exposure limits per $1,000 of account size
 //   Forex (EURUSD + GBPUSD combined):        0.20 lots per $1k
 //   Commodities (XAUUSD + XAGUSD combined):  0.02 lots per $1k
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const FOREX_LOTS_PER_1K     = 0.20
 const COMMODITY_LOTS_PER_1K = 0.02
 
-// ── Load admin-configurable trading rules from platform_settings ──────────────
+// â”€â”€ Load admin-configurable trading rules from platform_settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Falls back to hardcoded defaults if a setting hasn't been configured yet.
 // Cached for 30s to avoid a DB hit on every single trade open.
 let _tradingRulesCache   = null
@@ -56,7 +57,15 @@ async function getTradingRules() {
        WHERE key IN ('min_hold_seconds','forex_lots_per_1k','commodity_lots_per_1k','min_lot_size','max_trades_per_1k','dynamic_commission_per_lot', 'slippage_simulator_enabled', 'slippage_max_pips_adverse')`
     )
     const s = {}
-    result.rows.forEach(r => { s[r.key] = parseFloat(r.value) })
+    // FIX (BUG-2): parseFloat('true') === NaN, so every boolean flag was always falsy.
+    // Parse each value with the correct type: booleans use strict string comparison,
+    // numerics continue to use parseFloat.
+    const BOOL_KEYS = new Set(['slippage_simulator_enabled'])
+    result.rows.forEach(r => {
+      s[r.key] = BOOL_KEYS.has(r.key)
+        ? (r.value === 'true' || r.value === true)
+        : parseFloat(r.value)
+    })
     _tradingRulesCache = {
       minHoldSeconds:    s.min_hold_seconds     ?? 60,
       forexLotsPer1k:    s.forex_lots_per_1k    ?? FOREX_LOTS_PER_1K,
@@ -64,7 +73,7 @@ async function getTradingRules() {
       minLotSize:        s.min_lot_size          ?? 0.01,
       maxTradesPer1k:    s.max_trades_per_1k     ?? 1,
       dynamicCommissionPerLot: s.dynamic_commission_per_lot ?? 3.0,
-      slippageSimulatorEnabled: s.slippage_simulator_enabled === 'true',
+      slippageSimulatorEnabled: s.slippage_simulator_enabled ?? false,
       slippageMaxPipsAdverse: parseFloat(s.slippage_max_pips_adverse || '0'),
     }
     _tradingRulesCachedAt = Date.now()
@@ -84,11 +93,11 @@ async function getTradingRules() {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Rate limit on trade open endpoint
 // Max 30 trade open requests per minute per authenticated user.
-// Key is userId only — avoids IPv6 bypass warning from express-rate-limit.
-// ─────────────────────────────────────────────────────────────────────────────
+// Key is userId only â€” avoids IPv6 bypass warning from express-rate-limit.
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const tradeOpenLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
@@ -98,9 +107,9 @@ const tradeOpenLimiter = rateLimit({
   keyGenerator: (req) => req.user ? String(req.user.userId) : 'anon'
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Helpers
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function getLivePrice(instrument) {
   const result = await pool.query(
     'SELECT bid, ask, updated_at FROM price_feed WHERE instrument = $1',
@@ -146,30 +155,30 @@ function getMarketStatus(instrument) {
   const min      = now.getUTCMinutes()
   const totalMins = hour * 60 + min
 
-  // Saturday — fully closed
+  // Saturday â€” fully closed
   if (day === 6) {
     return { open: false, reason: 'Market is closed for the weekend. Opens Sunday 22:00 UTC.' }
   }
-  // Friday after 22:00 UTC — weekend
+  // Friday after 22:00 UTC â€” weekend
   if (day === 5 && totalMins >= 22 * 60) {
     return { open: false, reason: 'Market is closed for the weekend. Opens Sunday 22:00 UTC.' }
   }
-  // Sunday before 22:00 UTC — not yet open
+  // Sunday before 22:00 UTC â€” not yet open
   if (day === 0 && totalMins < 22 * 60) {
     const minsUntil = 22 * 60 - totalMins
     const h = Math.floor(minsUntil / 60)
     const m = minsUntil % 60
     return { open: false, reason: `Market opens Sunday 22:00 UTC (in ${h}h ${m}m).` }
   }
-  // FIX (Bug 11): Daily rollover only applies Mon–Fri (not Sunday evening)
+  // FIX (Bug 11): Daily rollover only applies Monâ€“Fri (not Sunday evening)
   if (day >= 1 && day <= 5 && totalMins >= 21 * 60 + 55 && totalMins < 22 * 60 + 5) {
-    return { open: false, reason: 'Market is in daily rollover (21:55–22:05 UTC). Try again in a few minutes.' }
+    return { open: false, reason: 'Market is in daily rollover (21:55â€“22:05 UTC). Try again in a few minutes.' }
   }
   return { open: true, reason: '' }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// checkSLTP — SL/TP background checker
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// checkSLTP â€” SL/TP background checker
 //
 // FIX: Previously ran trade close + balance update as two independent queries
 // with no transaction. If the balance update failed after the trade was already
@@ -178,8 +187,21 @@ function getMarketStatus(instrument) {
 // Fix: each triggered SL/TP now runs inside its own BEGIN/COMMIT block with a
 // FOR UPDATE SKIP LOCKED lock on the trade row, preventing the floating
 // drawdown checker from racing on the same trade simultaneously.
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// FIX: Concurrency guards for background engine functions.
+// setInterval fires every 500ms, but each function makes DB queries that can
+// take longer than 500ms under load. Without guards, multiple invocations pile
+// up, issuing redundant queries and exhausting the connection pool.
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+let _checkSLTPRunning = false
+let _checkPendingOrdersRunning = false
+let _checkFloatingDrawdownRunning = false
+
 async function checkSLTP(io) {
+  if (_checkSLTPRunning) return
+  _checkSLTPRunning = true
   try {
     const openTrades = await pool.query(
       `SELECT t.id, t.account_id, t.instrument, t.direction, t.lot_size, t.open_price,
@@ -210,7 +232,7 @@ async function checkSLTP(io) {
         ? parseFloat(price.bid)
         : parseFloat(price.ask)
 
-      // ── Trailing Stop Loss Logic ──
+      // â”€â”€ Trailing Stop Loss Logic â”€â”€
       if (trade.trailing_step_pips) {
         let pipMult = 0.0001
         if (trade.instrument.includes('JPY')) pipMult = 0.01
@@ -233,8 +255,15 @@ async function checkSLTP(io) {
           else if (trade.direction === 'sell' && idealSL < parseFloat(trade.stop_loss)) shouldUpdate = true
 
           if (shouldUpdate) {
-            trade.stop_loss = idealSL.toFixed(5)
-            pool.query('UPDATE trades SET stop_loss = $1 WHERE id = $2', [trade.stop_loss, trade.id]).catch(()=>{})
+            // FIX (MEDIUM #21): Use async/await with error handling for trailing SL updates
+            // instead of fire-and-forget .catch(()=>{}) to ensure proper error tracking
+            // and prevent potential data loss on server crash.
+            try {
+              await pool.query('UPDATE trades SET stop_loss = $1 WHERE id = $2', [idealSL.toFixed(5), trade.id])
+              trade.stop_loss = idealSL.toFixed(5)
+            } catch (slErr) {
+              logger.warn(`Trailing SL update failed for trade ${trade.id}:`, { error: slErr.message })
+            }
           }
         }
       }
@@ -267,7 +296,7 @@ async function checkSLTP(io) {
       try {
         await client.query('BEGIN')
 
-        // Lock the trade row — skip if already being processed elsewhere
+        // Lock the trade row â€” skip if already being processed elsewhere
         const lockResult = await client.query(
           `SELECT id FROM trades WHERE id = $1 AND status = 'open' FOR UPDATE SKIP LOCKED`,
           [trade.id]
@@ -322,12 +351,14 @@ async function checkSLTP(io) {
     }
   } catch (error) {
     logger.error('SL/TP check error:', { error: error.message })
+  } finally {
+    _checkSLTPRunning = false
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Pending orders background checker
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function cancelPendingOrder(orderId, reason) {
   await pool.query(
     `UPDATE trades SET
@@ -408,6 +439,8 @@ async function validatePendingTrigger(client, order, rules) {
 }
 
 async function checkPendingOrders(io) {
+  if (_checkPendingOrdersRunning) return
+  _checkPendingOrdersRunning = true
   try {
     const pendingOrders = await pool.query(
       `SELECT t.id, t.account_id, t.instrument, t.direction, t.lot_size, t.order_type,
@@ -451,7 +484,7 @@ async function checkPendingOrders(io) {
         try {
           await client.query('BEGIN')
 
-          // Lock the order row — skip if already being processed elsewhere
+          // Lock the order row â€” skip if already being processed elsewhere
           const lockResult = await client.query(
             `SELECT id FROM trades WHERE id = $1 AND status = 'pending' FOR UPDATE SKIP LOCKED`,
             [order.id]
@@ -503,14 +536,16 @@ async function checkPendingOrders(io) {
     }
   } catch (error) {
     logger.error('Pending orders check error:', { error: error.message })
+  } finally {
+    _checkPendingOrdersRunning = false
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// autoCloseAndFail — balance update race condition resolved.
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// autoCloseAndFail â€” balance update race condition resolved.
 // Collects all trade PnLs first, then applies a single summed balance UPDATE
 // after all trades are closed inside the same transaction.
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function autoCloseAndFail(acc, reason, io) {
   const client = await pool.connect()
   try {
@@ -547,10 +582,11 @@ async function autoCloseAndFail(acc, reason, io) {
 
         const demo_pnl = calculatePnL(
           trade.direction,
-          parseFloat(trade.open_price, parseFloat(trade.commission || 0)),
+          parseFloat(trade.open_price),
           close_price,
           parseFloat(trade.lot_size),
-          trade.instrument
+          trade.instrument,
+          parseFloat(trade.commission || 0)
         )
 
         totalPnl += demo_pnl
@@ -570,7 +606,7 @@ async function autoCloseAndFail(acc, reason, io) {
       }
     }
 
-    // Single balance update after all trades are closed — no race condition
+    // Single balance update after all trades are closed â€” no race condition
     if (totalPnl !== 0) {
       await client.query(
         `UPDATE accounts SET
@@ -603,14 +639,14 @@ async function autoCloseAndFail(acc, reason, io) {
 
     if (io) {
       io.to(String(acc.user_id)).emit('account_update', {
-        message: `❌ Account FAILED — ${reason}. All trades closed automatically.`,
+        message: `âŒ Account FAILED â€” ${reason}. All trades closed automatically.`,
         pnl: parseFloat(totalPnl.toFixed(2)),
         account_id: acc.id,
         event: 'account_failed'
       })
     }
 
-    logger.info(`Account ${acc.id} FAILED via floating drawdown — ${reason}`)
+    logger.info(`Account ${acc.id} FAILED via floating drawdown â€” ${reason}`)
 
   } catch (err) {
     await client.query('ROLLBACK')
@@ -620,9 +656,9 @@ async function autoCloseAndFail(acc, reason, io) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// autoCloseAndPass — same single-update pattern as autoCloseAndFail
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// autoCloseAndPass â€” same single-update pattern as autoCloseAndFail
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function autoCloseAndPass(acc, io) {
   const client = await pool.connect()
   try {
@@ -637,6 +673,20 @@ async function autoCloseAndPass(acc, io) {
       return
     }
 
+    // FIX (BUG-9): Count is now INSIDE the transaction, AFTER the FOR UPDATE lock.
+    // This makes the open-trade check and the promotion atomic — eliminating the
+    // TOCTOU race where two concurrent engine cycles both saw 0 open trades and
+    // both tried to promote the same account.
+    const openCountResult = await client.query(
+      `SELECT COUNT(*) FROM trades WHERE account_id = $1 AND status = 'open'`,
+      [acc.id]
+    )
+    const openCount = parseInt(openCountResult.rows[0].count)
+    if (openCount > 0) {
+      await client.query('ROLLBACK')
+      logger.info(`Account ${acc.id} hit profit target but has ${openCount} open trade(s) — deferring pass until all closed`)
+      return
+    }
     const openTrades   = await client.query(
       `SELECT id, account_id, instrument, direction, lot_size, open_price, status
        FROM trades WHERE account_id = $1 AND status = 'open'`,
@@ -660,10 +710,11 @@ async function autoCloseAndPass(acc, io) {
 
         const demo_pnl = calculatePnL(
           trade.direction,
-          parseFloat(trade.open_price, parseFloat(trade.commission || 0)),
+          parseFloat(trade.open_price),
           close_price,
           parseFloat(trade.lot_size),
-          trade.instrument
+          trade.instrument,
+          parseFloat(trade.commission || 0)
         )
 
         totalPnl += demo_pnl
@@ -709,8 +760,8 @@ async function autoCloseAndPass(acc, io) {
     await client.query('COMMIT')
 
     const passMsg = acc.account_type === 'phase1'
-      ? `🏆 Phase 1 PASSED! Floating profit target hit. All trades closed. Phase 2 activating shortly.`
-      : `🎉 Phase 2 PASSED! Floating profit target hit. All trades closed. Funded account activating shortly.`
+      ? `ðŸ† Phase 1 PASSED! Floating profit target hit. All trades closed. Phase 2 activating shortly.`
+      : `ðŸŽ‰ Phase 2 PASSED! Floating profit target hit. All trades closed. Funded account activating shortly.`
 
     if (io) {
       io.to(String(acc.user_id)).emit('account_update', {
@@ -732,7 +783,7 @@ async function autoCloseAndPass(acc, io) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // checkFloatingDrawdown
 //
 // FIX 1 (BUG 3): Funded accounts now use funded_max_drawdown_pct from
@@ -740,11 +791,13 @@ async function autoCloseAndPass(acc, io) {
 // could be stale or accidentally 0 (which would instantly fail any account).
 //
 // FIX 2 (N+1 query): Previously fetched open trades per-account in a loop
-// (N accounts × 1 query each). Now fetches ALL open trades and ALL prices
-// in two queries up front and groups in JS — O(2) queries regardless of
+// (N accounts Ã— 1 query each). Now fetches ALL open trades and ALL prices
+// in two queries up front and groups in JS â€” O(2) queries regardless of
 // how many active accounts exist.
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function checkFloatingDrawdown(io) {
+  if (_checkFloatingDrawdownRunning) return
+  _checkFloatingDrawdownRunning = true
   try {
     // Fetch funded drawdown limit once from live platform settings
     const settingsResult = await pool.query(
@@ -774,7 +827,7 @@ async function checkFloatingDrawdown(io) {
     const priceMap     = {}
     pricesResult.rows.forEach(p => { priceMap[p.instrument] = p })
 
-    // Group trades by account_id in JS — no extra queries
+    // Group trades by account_id in JS â€” no extra queries
     const accountTrades = {}
     const accountMeta   = {}
 
@@ -811,7 +864,7 @@ async function checkFloatingDrawdown(io) {
 
         floatingPnl += calculatePnL(
           trade.direction,
-          parseFloat(trade.open_price, parseFloat(trade.commission || 0)),
+          parseFloat(trade.open_price),
           currentPrice,
           parseFloat(trade.lot_size),
           trade.instrument,
@@ -844,22 +897,26 @@ async function checkFloatingDrawdown(io) {
 
       const equity_profit = equity - acc.starting_balance
       if (equity_profit >= profit_target) {
-        const equity_profit_pct = ((equity_profit / acc.starting_balance) * 100).toFixed(2)
-        logger.info(`Account ${aid} profit target HIT: $${equity_profit.toFixed(2)} (${equity_profit_pct}%) >= $${profit_target.toFixed(2)}`)
+        // FIX (BUG-9): Open-trade COUNT was outside the transaction so two concurrent
+        // engine cycles (floating-drawdown + challenge engine) could both read 0 and
+        // both attempt promotion simultaneously. The COUNT is now moved INSIDE
+        // autoCloseAndPass, after the FOR UPDATE lock, so only one promotion wins.
         await autoCloseAndPass(acc, io)
       }
     }
 
   } catch (error) {
     logger.error('Floating drawdown check error:', { error: error.message })
+  } finally {
+    _checkFloatingDrawdownRunning = false
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // GET /api/trades/candles
-// Uses bid price for candle series — matches what traders see when a BUY trade
+// Uses bid price for candle series â€” matches what traders see when a BUY trade
 // closes (at bid), giving chart levels consistent with execution prices.
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get('/candles', authenticateToken, async function(req, res) {
   try {
     const { instrument, timeframe } = req.query
@@ -880,12 +937,57 @@ router.get('/candles', authenticateToken, async function(req, res) {
       return res.status(400).json({ error: 'Invalid timeframe. Use: 1M, 5M, 15M, 1H, 4H, 1D' })
     }
 
-    const retainDays = parseInt(process.env.PRICE_HISTORY_RETAIN_DAYS || '7', 10)
-    const since = new Date()
-    since.setDate(since.getDate() - retainDays)
+    const tfMs = tfMinutes * 60 * 1000
+    const retainDays = Math.max(1, parseInt(process.env.PRICE_HISTORY_RETAIN_DAYS || '90', 10) || 90)
+    const hourlyRetainDays = Math.max(
+      retainDays,
+      parseInt(process.env.PRICE_HISTORY_1H_RETAIN_DAYS || String(Math.max(retainDays, 365)), 10) || Math.max(retainDays, 365)
+    )
 
+    // Use the rolled-up 1H table for high timeframes to keep queries fast on long history.
+    if (tfMinutes >= 60) {
+      const sinceHourly = new Date(Date.now() - hourlyRetainDays * 24 * 60 * 60 * 1000)
+      const hourlyRows = await pool.query(
+        `SELECT bucket_time, open, high, low, close, ticks
+         FROM price_feed_history_1h
+         WHERE instrument = $1 AND bucket_time >= $2
+         ORDER BY bucket_time ASC`,
+        [instrument, sinceHourly]
+      )
+
+      if (hourlyRows.rows.length > 0) {
+        const candles = []
+        let current = null
+
+        for (const row of hourlyRows.rows) {
+          const rowTimeMs = new Date(row.bucket_time).getTime()
+          const bucketTime = Math.floor(rowTimeMs / tfMs) * tfMs / 1000
+          const open = parseFloat(row.open)
+          const high = parseFloat(row.high)
+          const low = parseFloat(row.low)
+          const close = parseFloat(row.close)
+          const ticks = parseInt(row.ticks, 10) || 0
+          if ([open, high, low, close].some(Number.isNaN)) continue
+
+          if (!current || current.time !== bucketTime) {
+            if (current) candles.push(current)
+            current = { time: bucketTime, open, high, low, close, volume: ticks }
+          } else {
+            current.high = Math.max(current.high, high)
+            current.low = Math.min(current.low, low)
+            current.close = close
+            current.volume += ticks
+          }
+        }
+        if (current) candles.push(current)
+        return res.json(candles)
+      }
+    }
+
+    // Raw tick fallback (also used for 1M/5M/15M).
+    const since = new Date(Date.now() - retainDays * 24 * 60 * 60 * 1000)
     const rows = await pool.query(
-      `SELECT recorded_at, bid, ask
+      `SELECT recorded_at, bid
        FROM price_feed_history
        WHERE instrument = $1 AND recorded_at >= $2
        ORDER BY recorded_at ASC`,
@@ -896,68 +998,46 @@ router.get('/candles', authenticateToken, async function(req, res) {
       return res.json([])
     }
 
-    const tfMs   = tfMinutes * 60 * 1000
     const candles = []
-    let current   = null
+    let current = null
 
     for (const row of rows.rows) {
-      // Use bid price — bid is what BUY trades close at, so chart levels match
+      // Use bid price - bid is what BUY trades close at, so chart levels match
       // actual execution prices traders experience.
       const price = parseFloat(row.bid)
-      const ts    = new Date(row.recorded_at).getTime()
+      if (Number.isNaN(price)) continue
+      const ts = new Date(row.recorded_at).getTime()
       const bucketTime = Math.floor(ts / tfMs) * tfMs / 1000
 
       if (!current || current.time !== bucketTime) {
         if (current) candles.push(current)
-        current = { time: bucketTime, open: price, high: price, low: price, close: price }
+        current = { time: bucketTime, open: price, high: price, low: price, close: price, volume: 1 }
       } else {
-        current.high  = Math.max(current.high, price)
-        current.low   = Math.min(current.low, price)
+        current.high = Math.max(current.high, price)
+        current.low = Math.min(current.low, price)
         current.close = price
+        current.volume += 1
       }
     }
     if (current) candles.push(current)
 
     res.json(candles)
-
   } catch (error) {
     logger.error('Candles error:', { error: error.message })
     res.status(500).json({ error: 'Could not fetch candles' })
   }
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // validatePendingOrderPrice
-//   buy_limit  → price must be BELOW current ask
-//   sell_limit → price must be ABOVE current bid
-//   buy_stop   → price must be ABOVE current ask
-//   sell_stop  → price must be BELOW current bid
-// ─────────────────────────────────────────────────────────────────────────────
-function validatePendingOrderPrice(orderType, pendingPrice, bid, ask) {
-  if (isNaN(pendingPrice) || pendingPrice <= 0) {
-    return 'Invalid pending order price'
-  }
-  if (isNaN(bid) || isNaN(ask)) {
-    return 'Live price not available — cannot validate pending order price'
-  }
-  if (orderType === 'buy_limit' && pendingPrice >= ask) {
-    return `Buy Limit price must be below current ask (${ask}). Use a Market order to buy at market price.`
-  }
-  if (orderType === 'sell_limit' && pendingPrice <= bid) {
-    return `Sell Limit price must be above current bid (${bid}). Use a Market order to sell at market price.`
-  }
-  if (orderType === 'buy_stop' && pendingPrice <= ask) {
-    return `Buy Stop price must be above current ask (${ask}).`
-  }
-  if (orderType === 'sell_stop' && pendingPrice >= bid) {
-    return `Sell Stop price must be below current bid (${bid}).`
-  }
-  return null
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
+//   buy_limit  â†’ price must be BELOW current ask
+//   sell_limit â†’ price must be ABOVE current bid
+//   buy_stop   â†’ price must be ABOVE current ask
+//   sell_stop  â†’ price must be BELOW current bid
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // POST /api/trades/open
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.post('/open', authenticateToken, tradingLimiter, async function(req, res) {
   try {
     const { account_id, instrument, direction, lots, stop_loss, take_profit, order_type, pending_price } = req.body
@@ -982,7 +1062,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       return res.status(400).json({ error: 'Direction must be buy or sell' })
     }
 
-    // ── Strict News Protection (3 min USD High Impact) ────────────────────────
+    // â”€â”€ Strict News Protection (3 min USD High Impact) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const activeNews = newsService.getActiveNewsEvent(3)
     if (activeNews) {
       return res.status(400).json({ error: `Cannot open trade. USD High-impact news event '${activeNews.title}' is active.` })
@@ -995,14 +1075,14 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
 
     const lotsNum = parseFloat(lots)
 
-    // ── Minimum lot size (admin-configurable) ──────────────────────────────
+    // â”€â”€ Minimum lot size (admin-configurable) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const rules = await getTradingRules()
     const MIN_LOT_SIZE = rules.minLotSize
     if (lotsNum < MIN_LOT_SIZE) {
       return res.status(400).json({ error: `Minimum lot size is ${MIN_LOT_SIZE}. You entered ${lotsNum}.` })
     }
 
-    // ── Lot size must be in 0.01 increments ───────────────────────────────
+    // â”€â”€ Lot size must be in 0.01 increments â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const lotsRounded = Math.round(lotsNum * 100) / 100
     if (Math.abs(lotsRounded - lotsNum) > 0.00001) {
       return res.status(400).json({ error: `Lot size must be in 0.01 increments (e.g. 0.01, 0.05, 1.00). You entered ${lotsNum}.` })
@@ -1022,13 +1102,13 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       return res.status(400).json({ error: marketStatus.reason })
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // RACE CONDITION FIX: All read-check-write operations run inside a single
     // transaction with SELECT ... FOR UPDATE on the account row. This serialises
-    // concurrent trade opens for the same account — two simultaneous requests
+    // concurrent trade opens for the same account â€” two simultaneous requests
     // will queue at the lock, and the second will see the first's INSERT already
     // in the DB when it runs its checks.
-    // ─────────────────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const client = await pool.connect()
     let newTrade
     try {
@@ -1055,7 +1135,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
         return res.status(400).json({ error: 'Challenge phase has expired. No new trades allowed.' })
       }
 
-      // ── Combined exposure check (inside transaction) ────────────────────
+      // â”€â”€ Combined exposure check (inside transaction) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       const accountSizeK = parseFloat(account.account_size) / 1000
 
       if (COMMODITY_INSTRUMENTS.includes(instrumentFinal)) {
@@ -1094,7 +1174,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
         }
       }
 
-      // ── Max simultaneous open trades cap (inside transaction) ─────────
+      // â”€â”€ Max simultaneous open trades cap (inside transaction) â”€â”€â”€â”€â”€â”€â”€â”€â”€
       const maxOpenTrades = Math.min(50, Math.max(5, Math.floor(parseFloat(account.account_size) / 1000) * rules.maxTradesPer1k))
       const openTradeCountResult = await client.query(
         `SELECT COUNT(*) FROM trades WHERE account_id = $1 AND status IN ('open', 'pending')`,
@@ -1108,7 +1188,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
         })
       }
 
-      // ── Margin check (inside transaction) ──────────────────────────────
+      // â”€â”€ Margin check (inside transaction) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       const margin = calculateMargin(instrumentFinal, lotsNum)
       
       let floatingPnl = 0
@@ -1121,7 +1201,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       )
       for (const t of openTradesResult.rows) {
         const currentPrice = t.direction === 'buy' ? parseFloat(t.bid) : parseFloat(t.ask)
-        floatingPnl += calculatePnL(t.direction, parseFloat(t.open_price, parseFloat(t.commission || 0)), currentPrice, parseFloat(t.lot_size), t.instrument, parseFloat(t.commission || 0))
+        floatingPnl += calculatePnL(t.direction, parseFloat(t.open_price), currentPrice, parseFloat(t.lot_size), t.instrument, parseFloat(t.commission || 0))
       }
       
       const equity = parseFloat(account.current_balance) + floatingPnl
@@ -1134,7 +1214,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       const demo_trade_id = uuidv4()
       const tradeCommission = parseFloat((lotsNum * rules.dynamicCommissionPerLot).toFixed(2))
 
-      // ── Pending order ───────────────────────────────────────────────────
+      // â”€â”€ Pending order â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (isPending) {
         const p = parseFloat(pending_price)
         const price = await getLivePrice(instrumentFinal).catch(() => null)
@@ -1149,8 +1229,8 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
         newTrade = await client.query(
           `INSERT INTO trades
            (account_id, demo_trade_id, instrument, direction, lot_size,
-            status, stop_loss, take_profit, order_type, pending_price, commission)
-           VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10)
+            status, stop_loss, take_profit, order_type, pending_price, commission, original_commission)
+           VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $10)
            RETURNING *`,
           [accountIdStr, demo_trade_id, instrumentFinal, directionFinal, lotsNum,
            stop_loss   ? parseFloat(stop_loss)   : null,
@@ -1170,7 +1250,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
         })
       }
 
-      // ── Market order ────────────────────────────────────────────────────
+      // â”€â”€ Market order â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       const price = await getLivePrice(instrumentFinal)
       const priceAgeMs = Date.now() - new Date(price.updated_at).getTime()
       // Allow up to 10 seconds for price age (more lenient for slower MT5 setups)
@@ -1220,8 +1300,8 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       newTrade = await client.query(
         `INSERT INTO trades
          (account_id, demo_trade_id, instrument, direction, lot_size, open_price, open_time,
-          status, stop_loss, take_profit, order_type, commission, slippage_pips)
-         VALUES ($1, $2, $3, $4, $5, $6, NOW(), 'open', $7, $8, 'market', $9, $10)
+          status, stop_loss, take_profit, order_type, commission, original_commission, slippage_pips)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW(), 'open', $7, $8, 'market', $9, $9, $10)
          RETURNING *`,
         [accountIdStr, demo_trade_id, instrumentFinal, directionFinal, lotsNum, open_price,
          stop_loss   ? parseFloat(stop_loss)   : null,
@@ -1247,7 +1327,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       trade: tradeRow
     })
 
-    // ── IP logging on trade open (non-fatal, runs after response) ──────────
+    // â”€â”€ IP logging on trade open (non-fatal, runs after response) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     try {
       const tradeIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown'
       await pool.query(
@@ -1261,18 +1341,18 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
 
   } catch (error) {
     logger.error('Open trade error:', { error: error.message })
-    res.status(500).json({ error: error.message || 'Could not open trade' })
+    res.status(500).json({ error: 'Could not open trade' })
   }
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // POST /api/trades/close
 //
 // FIX (Bug 1): Wrapped trade close + balance update in a single transaction
 // with FOR UPDATE SKIP LOCKED on the trade row. This prevents:
 // (a) balance corruption if one query succeeds but the other fails
 // (b) double-close race with the background checkSLTP checker
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // FIX (LOOPHOLE 1): Rate limit trade close to prevent DoS flooding
 const tradeCloseLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -1292,7 +1372,7 @@ router.post('/close', authenticateToken, tradeCloseLimiter, async function(req, 
 
     // Pre-flight check (outside transaction) for quick rejection
     const tradeResult = await pool.query(
-      `SELECT t.*, a.user_id FROM trades t
+      `SELECT t.*, t.original_commission, a.user_id FROM trades t
        JOIN accounts a ON t.account_id = a.id
        WHERE t.id = $1 AND t.status = 'open'`,
       [trade_id]
@@ -1353,8 +1433,16 @@ router.post('/close', authenticateToken, tradeCloseLimiter, async function(req, 
 
     isPartial = closeLotsAmt < currentLotSize
     const ratio = closeLotsAmt / currentLotSize
-    const partialCommission = parseFloat((parseFloat(trade.commission || 0) * ratio).toFixed(2))
-    const remainingCommission = parseFloat(trade.commission || 0) - partialCommission
+
+    // FIX (BUG-8): trade.commission on a repeated partial close is already the
+    // REDUCED value from the last partial, not the original full commission.
+    // Computing the proportional deduction from that already-reduced value causes
+    // each subsequent partial to over-deduct commission (double-deduction).
+    // Solution: read original_commission (stored at INSERT time) as the invariant
+    // base. Fall back to current commission only for old trades lacking the column.
+    const originalCommission = parseFloat(trade.original_commission ?? trade.commission ?? 0)
+    const partialCommission = parseFloat((originalCommission * ratio).toFixed(2))
+    const remainingCommission = parseFloat((originalCommission - partialCommission).toFixed(2))
 
     const pnlPortion = calculatePnL(
       trade.direction,
@@ -1371,7 +1459,7 @@ router.post('/close', authenticateToken, tradeCloseLimiter, async function(req, 
     try {
       await client.query('BEGIN')
 
-      // Lock the trade row — skip if already being processed by checkSLTP
+      // Lock the trade row â€” skip if already being processed by checkSLTP
       const lockResult = await client.query(
         `SELECT id FROM trades WHERE id = $1 AND status = 'open' FOR UPDATE SKIP LOCKED`,
         [trade_id]
@@ -1438,9 +1526,9 @@ router.post('/close', authenticateToken, tradeCloseLimiter, async function(req, 
   }
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // POST /api/trades/cancel   (cancel a pending order)
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.post('/cancel', authenticateToken, async function(req, res) {
   try {
     const { trade_id } = req.body
@@ -1476,10 +1564,21 @@ router.post('/cancel', authenticateToken, async function(req, res) {
   }
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // PATCH /api/trades/modify  (update SL/TP on open trade)
-// ─────────────────────────────────────────────────────────────────────────────
-router.patch('/modify', authenticateToken, async function(req, res) {
+// FIX: Added rate limiter â€” 60 modifications per minute per user is generous
+// for legitimate use but prevents bot-level abuse that would hammer the DB.
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const tradeModifyLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  message: { error: 'Too many modify requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user ? String(req.user.userId) : 'anon'
+})
+
+router.patch('/modify', authenticateToken, tradeModifyLimiter, async function(req, res) {
   try {
     const { trade_id, stop_loss, take_profit } = req.body
 
@@ -1560,10 +1659,10 @@ router.patch('/modify', authenticateToken, async function(req, res) {
   }
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PATCH /api/trades/note  — Save a personal note on a trade
-// Notes are private — only the trade owner can read/write them.
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// PATCH /api/trades/note  â€” Save a personal note on a trade
+// Notes are private â€” only the trade owner can read/write them.
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.patch('/note', authenticateToken, async function(req, res) {
   try {
     const { trade_id, note, tags } = req.body
@@ -1573,7 +1672,7 @@ router.patch('/note', authenticateToken, async function(req, res) {
     if (note.length > 1000) return res.status(400).json({ error: 'Note must be 1000 characters or less' })
     if (tags && typeof tags !== 'string') return res.status(400).json({ error: 'tags must be a comma separated string' })
 
-    // Ensure notes column exists (safe — idempotent)
+    // Ensure notes column exists (safe â€” idempotent)
     try {
       await pool.query(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS trader_note TEXT`)
     } catch (_) {}
@@ -1603,9 +1702,9 @@ router.patch('/note', authenticateToken, async function(req, res) {
   }
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // GET /api/trades/open
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get('/open', authenticateToken, async function(req, res) {
   try {
     const { account_id } = req.query
@@ -1632,9 +1731,9 @@ router.get('/open', authenticateToken, async function(req, res) {
   }
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // GET /api/trades/pending
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get('/pending', authenticateToken, async function(req, res) {
   try {
     const { account_id } = req.query
@@ -1661,9 +1760,9 @@ router.get('/pending', authenticateToken, async function(req, res) {
   }
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // GET /api/trades/history
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get('/history', authenticateToken, async function(req, res) {
   try {
     const { account_id } = req.query
@@ -1691,9 +1790,9 @@ router.get('/history', authenticateToken, async function(req, res) {
   }
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/trades/export — download full trade history as CSV
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// GET /api/trades/export â€” download full trade history as CSV
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get('/export', authenticateToken, async function(req, res) {
   try {
     const { account_id } = req.query
@@ -1764,9 +1863,9 @@ router.get('/export', authenticateToken, async function(req, res) {
   }
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // GET /api/trades/analytics
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get('/analytics', authenticateToken, async function(req, res) {
   try {
     const { account_id } = req.query
@@ -1839,7 +1938,10 @@ router.get('/analytics', authenticateToken, async function(req, res) {
     }
     trades.forEach(t => {
       if (!t.open_time) return
-      const h = new Date(t.open_time).getHours()
+      // FIX (BUG-5): .getHours() used local server timezone; all other time
+      // operations in this file use UTC. Switching to getUTCHours() ensures
+      // heatmap buckets are correct regardless of the server's OS timezone.
+      const h = new Date(t.open_time).getUTCHours()
       const bucket = `${String(Math.floor(h/2)*2).padStart(2, '0')}:00`
       heatmap[bucket] += parseFloat(t.demo_pnl)
     })
@@ -1867,9 +1969,9 @@ router.get('/analytics', authenticateToken, async function(req, res) {
   }
 })
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // POST /api/trades/batch-action
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.post('/batch-action', authenticateToken, tradingLimiter, async function(req, res) {
   try {
     const { action, account_id } = req.body
@@ -1888,11 +1990,24 @@ router.post('/batch-action', authenticateToken, tradingLimiter, async function(r
       return res.json({ message: 'No open trades to process', affected: 0 })
     }
 
+    // FIX: Check news protection before any batch close (same rule as manual close)
+    const activeNews = newsService.getActiveNewsEvent(3)
+    if (activeNews && action !== 'breakeven_winning') {
+      return res.status(400).json({ error: `Cannot close trades. USD High-impact news event '${activeNews.title}' is active.` })
+    }
+
+    const rules = await getTradingRules()
     let affectedCount = 0
 
     const client = await pool.connect()
     try {
       for (const trade of openTradesResult.rows) {
+        // FIX: Enforce minimum hold time on batch closes (same rule as individual close)
+        if (action !== 'breakeven_winning') {
+          const secondsOpen = (new Date() - new Date(trade.open_time)) / 1000
+          if (secondsOpen < rules.minHoldSeconds) continue
+        }
+
         let currentPrice
         try {
           const priceObj = await getLivePrice(trade.instrument)
@@ -1957,4 +2072,5 @@ router.post('/batch-action', authenticateToken, tradingLimiter, async function(r
   }
 })
 
-module.exports = { router, checkSLTP, checkPendingOrders, checkFloatingDrawdown, validatePendingOrderPrice }
+module.exports = { router, checkSLTP, checkPendingOrders, checkFloatingDrawdown }
+

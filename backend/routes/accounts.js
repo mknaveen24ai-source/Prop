@@ -14,7 +14,10 @@ function quotaKey(size) {
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // GET /api/accounts/available-sizes
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-router.get('/available-sizes', async function(req, res) {
+// FIX: Added authenticateToken — this endpoint reveals slot quotas, usage
+// counts and lock status for all account sizes. Unauthenticated access lets
+// competitors or bots scrape capacity data indefinitely.
+router.get('/available-sizes', authenticateToken, async function(req, res) {
   try {
     const settingsResult = await pool.query('SELECT key, value FROM platform_settings')
     const settings = {}
@@ -75,6 +78,52 @@ router.get('/available-sizes', async function(req, res) {
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // GET /api/accounts/platform-rules
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Public quota view for landing (no auth).
+// Returns configured quotas only, not live usage statistics.
+router.get('/available-sizes-public', async function(req, res) {
+  try {
+    const settingsResult = await pool.query('SELECT key, value FROM platform_settings')
+    const settings = {}
+    settingsResult.rows.forEach(row => { settings[row.key] = row.value })
+
+    const sizes = VALID_SIZES.map((size) => {
+      const key = quotaKey(size)
+      const raw = settings[key]
+      const parsed = raw !== undefined && raw !== null && raw !== '' ? parseInt(raw, 10) : 0
+      const quota = Number.isFinite(parsed) && parsed > 0 ? parsed : 0
+
+      if (quota === 0) {
+        return {
+          size,
+          quota: 0,
+          used: 0,
+          remaining: 0,
+          locked: true,
+          reason: 'This account size is currently unavailable.'
+        }
+      }
+
+      const unlimited = quota >= 999999
+      return {
+        size,
+        quota: unlimited ? 999999 : quota,
+        used: 0,
+        remaining: unlimited ? null : quota,
+        locked: false,
+        reason: null
+      }
+    })
+
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    res.set('Pragma', 'no-cache')
+    res.set('Expires', '0')
+    res.json(sizes)
+  } catch (error) {
+    logger.error('Public available sizes error:', { error: error.message })
+    res.status(500).json({ error: 'Could not fetch public available sizes' })
+  }
+})
+
 router.get('/platform-rules', authenticateToken, async function(req, res) {
   try {
     const result = await pool.query(
@@ -320,7 +369,8 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
     const account_id = req.params.account_id
 
     const accountIdStr = String(account_id || '').trim()
-    if (!accountIdStr || false) {
+    // FIX (LOW #29): Replace dead code `|| false` with proper numeric validation
+    if (!accountIdStr || isNaN(parseInt(accountIdStr))) {
       return res.status(400).json({ error: 'Invalid account ID' })
     }
 

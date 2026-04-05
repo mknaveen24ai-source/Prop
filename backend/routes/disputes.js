@@ -3,15 +3,50 @@ const router = express.Router()
 const pool = require('../db')
 const { authenticateToken } = require('./middleware')
 const logger = require('../utils/logger')
+const rateLimit = require('express-rate-limit')
+const { ipKeyGenerator } = require('express-rate-limit')
+const { sanitizeString } = require('../utils/validation')
+
+// FIX: Rate limit dispute submissions — max 3 per 24 hours per user.
+// Without this a banned/failed user could spam thousands of dispute records.
+const disputeLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,
+  max: 3,
+  message: { error: 'You can only submit 3 disputes per day. Please contact support directly if you need further assistance.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.user?.userId ? `user:${String(req.user.userId)}` : ipKeyGenerator(req)
+})
+
+// Allowed dispute reasons (allowlist — prevents freeform injection into admin queues)
+const VALID_REASONS = [
+  'Incorrect drawdown calculation',
+  'Technical issue during challenge',
+  'Price feed error',
+  'Incorrect trade closure',
+  'Account expired incorrectly',
+  'Other'
+]
 
 // POST /api/disputes/submit
-router.post('/submit', authenticateToken, async (req, res) => {
+router.post('/submit', authenticateToken, disputeLimiter, async (req, res) => {
   try {
     const { userId } = req.user
     const { account_id, reason, description } = req.body
 
     if (!account_id || !reason || !description) {
       return res.status(400).json({ error: 'All fields are required.' })
+    }
+
+    // FIX: Validate reason against allowlist — prevents freeform injection
+    if (!VALID_REASONS.includes(reason)) {
+      return res.status(400).json({ error: 'Invalid dispute reason. Please select from the provided options.' })
+    }
+
+    // FIX: Sanitize and length-limit description
+    const sanitizedDescription = sanitizeString(String(description), 2000)
+    if (!sanitizedDescription || sanitizedDescription.length < 20) {
+      return res.status(400).json({ error: 'Description must be at least 20 characters.' })
     }
 
     // Verify account belongs to user and is failed/expired
@@ -31,7 +66,7 @@ router.post('/submit', authenticateToken, async (req, res) => {
       `INSERT INTO disputes (user_id, account_id, reason, description, status)
        VALUES ($1, $2, $3, $4, 'open')
        RETURNING id, status, created_at`,
-      [userId, account_id, reason, description]
+      [userId, account_id, reason, sanitizedDescription]
     )
 
     res.json({ message: 'Dispute submitted successfully', dispute: result.rows[0] })
@@ -48,10 +83,10 @@ router.get('/my-disputes', authenticateToken, async (req, res) => {
     const result = await pool.query(
       `SELECT d.*, a.account_size, a.status as account_status
        FROM disputes d
-       JOIN accounts a ON d.account_id = a.id
-       WHERE d.user_id = $1
+       JOIN accounts a ON d.account_id::text = a.id::text
+       WHERE d.user_id::text = $1::text
        ORDER BY d.created_at DESC`,
-      [userId]
+      [String(userId)]
     )
     res.json(result.rows)
   } catch (error) {

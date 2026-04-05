@@ -3,26 +3,12 @@ import MultiChartGrid from './MultiChartGrid'
 import OrderPanel from './OrderPanel'
 import SimulatedTradingDisclaimer from './SimulatedTradingDisclaimer'
 import RiskWarningBanner from './RiskWarningBanner'
-import axios from 'axios'
-
-// FIX Step 1: Use env variable
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000'
+import api from '../services/api'
 
 const SUPPORTED_INSTRUMENTS = ['EURUSD', 'GBPUSD', 'XAUUSD', 'XAGUSD']
-const CONTRACT_SIZES = {
-  EURUSD: 100000,
-  GBPUSD: 100000,
-  XAUUSD: 100,
-  XAGUSD: 5000
-}
-
 function getDecimals(instrument) {
   if (instrument === 'XAUUSD' || instrument === 'XAGUSD') return 2
   return 5
-}
-
-function getLeverage(instrument) {
-  return (instrument === 'XAUUSD' || instrument === 'XAGUSD') ? 10 : 30
 }
 
 // ── Phase timer helpers ────────────────────────────────────────────────────────
@@ -74,8 +60,11 @@ function exportTradesToCSV(trades, accountType, accountSize) {
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
   const url  = URL.createObjectURL(blob)
   const link = document.createElement('a')
+  // FIX (MEDIUM #15): Sanitize filename components to prevent injection
+  const safeAccountType = String(accountType || 'account').replace(/[^a-zA-Z0-9_-]/g, '_')
+  const safeAccountSize = String(accountSize || '').replace(/[^a-zA-Z0-9_.]/g, '_')
   link.href     = url
-  link.download = `trade_history_${accountType}_${accountSize}_${new Date().toISOString().slice(0,10)}.csv`
+  link.download = `trade_history_${safeAccountType}_${safeAccountSize}_${new Date().toISOString().slice(0,10)}.csv`
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
@@ -94,7 +83,7 @@ export default function TradingPanel({
   async function handleBatchAction(actionType) {
     if (!window.confirm('Are you sure you want to execute batch action: ' + actionType.replace('_', ' ') + '?')) return
     try {
-      const res = await axios.post(`${API_URL}/api/trades/batch-action`, { action: actionType, account_id: selectedAccount.id }, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+      const res = await api.post('/api/trades/batch-action', { action: actionType, account_id: selectedAccount.id })
       alert(res.data.message + ' (Affected: ' + res.data.affected + ')')
     } catch (err) {
       alert(err.response?.data?.error || 'Batch action failed')
@@ -104,7 +93,7 @@ export default function TradingPanel({
   async function handlePartialClose(tradeId, currentLots, closeLots) {
     try {
       if (!closeLots || parseFloat(closeLots) <= 0 || parseFloat(closeLots) > parseFloat(currentLots)) return alert('Invalid lot fraction')
-      await axios.post(`${API_URL}/api/trades/close`, { trade_id: tradeId, close_lots: parseFloat(closeLots) }, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+      await api.post('/api/trades/close', { trade_id: tradeId, close_lots: parseFloat(closeLots) })
       setPartialForm(null)
       if (onTradeModified) onTradeModified()
     } catch (err) {
@@ -121,7 +110,7 @@ export default function TradingPanel({
   useEffect(() => {
     async function fetchPriceStatus() {
       try {
-        const res = await axios.get(`${API_URL}/api/price-status`)
+        const res = await api.get('/api/price-status')
         setPriceStatus(res.data)
       } catch (err) {
         setPriceStatus({ healthy: false, message: 'Unable to check price feed status' })
@@ -149,7 +138,7 @@ export default function TradingPanel({
     if (noteSaving) return  // FIX: prevent double-save on rapid clicks
     setNoteSaving(true)
     try {
-      await axios.patch(`${API_URL}/api/trades/note`, { trade_id: tradeId, note: noteText, tags: noteTags })
+      await api.patch('/api/trades/note', { trade_id: tradeId, note: noteText, tags: noteTags })
       setNoteSaved(true)
       // Update the trade in-place so the 📝 icon reflects the new note state
       if (onTradeModified) onTradeModified()
@@ -203,7 +192,7 @@ export default function TradingPanel({
       payload.stop_loss   = modifyForm.stop_loss   === '' ? null : parseFloat(modifyForm.stop_loss)
       payload.take_profit = modifyForm.take_profit === '' ? null : parseFloat(modifyForm.take_profit)
 
-      await axios.patch(`${API_URL}/api/trades/modify`, payload)
+      await api.patch('/api/trades/modify', payload)
 
 
 
@@ -224,17 +213,6 @@ export default function TradingPanel({
     return sum + parseFloat(trade.floating_pnl || 0)
   }, 0)
   const floatingBalance = currentBalance + floatingProfit
-  const marginUsed = openTrades.reduce((sum, trade) => {
-    if (trade.status !== 'open') return sum
-    const lots = parseFloat(trade.lot_size || 0)
-    const contractSize = CONTRACT_SIZES[trade.instrument] || 100000
-    const leverage = getLeverage(trade.instrument)
-    const price = parseFloat(trade.current_price || trade.open_price || 0)
-    if (!Number.isFinite(lots) || !Number.isFinite(price) || price <= 0) return sum
-    return sum + ((lots * contractSize * price) / leverage)
-  }, 0)
-  const freeMargin = floatingBalance - marginUsed
-  const marginLevelPct = marginUsed > 0 ? (floatingBalance / marginUsed) * 100 : null
   const startingBalance = stats ? parseFloat(stats.account?.starting_balance || selectedAccount?.starting_balance || 0) : 0
   const profitTargetAmount = stats ? parseFloat(stats.account?.profit_target || 0) : 0
   const realizedProfit = currentBalance - startingBalance
@@ -507,7 +485,12 @@ export default function TradingPanel({
 
 
             <div style={{ width: '100%', height: '400px', marginBottom: '16px' }}>
-              <MultiChartGrid selectedInstrument={orderForm.instrument} />
+              <MultiChartGrid
+                selectedInstrument={orderForm.instrument}
+                openTrades={openTrades}
+                tradeHistory={tradeHistory}
+                prices={prices}
+              />
             </div>
 
             {/* ── Phase Countdown Timer ── */}
@@ -785,7 +768,7 @@ export default function TradingPanel({
                               </tr>
                             )}
                           </React.Fragment>
-                        )
+                        ) 
                       })}
                       {visibleOpenTrades.length === 0 && (
                         <tr>
@@ -1054,3 +1037,4 @@ export default function TradingPanel({
     </div>
   )
 }
+

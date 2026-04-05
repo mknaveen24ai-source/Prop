@@ -1,7 +1,19 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-export default function LandingFooter() {
+export default function LandingFooter({ onFooterCta }) {
+  function linkHref(label) {
+    if (label === 'Account Sizes') return '#mp-calculator';
+    if (label === 'How It Works') return '#mp-scaling';
+    if (label === 'Trading Rules') return '#faq';
+    if (label === 'FAQ') return '#faq';
+    if (label === 'Help Center') return '/login';
+    if (label === 'Discord Community') return '/register';
+    if (label === 'Contact Us') return '/login';
+    if (label === 'Submit Ticket') return '/login';
+    return '/';
+  }
+
   return (
     <footer className="mp-section" style={{ background: '#060a12', paddingTop: '100px', paddingBottom: '40px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
       <div className="mp-container">
@@ -24,7 +36,7 @@ export default function LandingFooter() {
           <div style={{ position: 'relative', zIndex: 1 }}>
             <h2 className="mp-h2" style={{ fontSize: 'clamp(32px, 4vw, 52px)' }}>Claim Your Free Account</h2>
             <p className="mp-p-lead" style={{ margin: '0 auto 40px' }}>Limited monthly spots backed by real liquidity. No fees, no credit card, no catch.</p>
-            <Link to="/register" className="mp-btn-primary" style={{ padding: '22px 56px', fontSize: '17px', textDecoration: 'none' }}>
+            <Link to="/register" className="mp-btn-primary" style={{ padding: '22px 56px', fontSize: '17px', textDecoration: 'none' }} onClick={onFooterCta}>
               Get Started — It's Free
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12H19M19 12L12 5M19 12L12 19" />
@@ -99,7 +111,7 @@ export default function LandingFooter() {
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {col.links.map(link => (
                   <li key={link}>
-                    <a href="/#" style={{
+                    <a href={linkHref(link)} style={{
                       color: 'rgba(255,255,255,0.35)', textDecoration: 'none', fontSize: '14px',
                       transition: 'color 0.2s, transform 0.2s',
                       display: 'inline-block',

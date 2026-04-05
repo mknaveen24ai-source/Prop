@@ -8,6 +8,8 @@ export default function DashboardHome({ user, stats, accounts, selectedAccount, 
   const [availableSizes, setAvailableSizes] = useState([])
   const [sizesLoading, setSizesLoading]     = useState(true)
   const [creatingSize, setCreatingSize]     = useState(null)
+  // FIX (LOW #31): Use destructured hooks consistently instead of mixing React.useState
+  const [quotaTimeLeft, setQuotaTimeLeft] = useState(null)
 
   const hasActiveChallenge = accounts.some(
     a => a.status === 'active' && ['phase1', 'phase2', 'funded'].includes(a.account_type)
@@ -74,9 +76,7 @@ export default function DashboardHome({ user, stats, accounts, selectedAccount, 
     } catch { return 'the start of next month' }
   }
 
-  const [quotaTimeLeft, setQuotaTimeLeft] = React.useState(null)
-
-  React.useEffect(() => {
+  useEffect(() => {
     if (!quotaFull || !quotaNextOpen) { setQuotaTimeLeft(null); return }
 
     function calcTimeLeft() {
@@ -102,29 +102,53 @@ export default function DashboardHome({ user, stats, accounts, selectedAccount, 
 
   return (
     <div>
-      <h2 style={{ fontFamily: 'Inter, serif', color: 'var(--accent)', marginBottom: '24px', fontSize: '22px' }}>
+      <h2 className="page-title">
         Account Overview
       </h2>
 
       {/* ── Account Selector ── */}
       {accounts.length > 0 && (
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
-          {accounts.map(acc => (
-            <button key={acc.id} className="btn" onClick={() => setSelectedAccount(acc)}
-              style={{
-                background: selectedAccount?.id === acc.id ? 'var(--accent)' : 'var(--navy-card)',
-                color:      selectedAccount?.id === acc.id ? 'var(--navy)' : 'var(--text)',
-                border:     '1px solid var(--accent)'
-              }}>
-              {acc.account_type.toUpperCase()} ${parseFloat(acc.account_size).toLocaleString()}
-              <div style={{ marginTop: '6px', fontSize: '10px', fontFamily: 'DM Mono, monospace', color: selectedAccount?.id === acc.id ? 'var(--navy)' : 'var(--text-muted)' }}>
-                #{acc.account_uid ? acc.account_uid.slice(0, 8) : acc.id}
-              </div>
-              <span style={{ marginLeft: '6px', fontSize: '10px', color: selectedAccount?.id === acc.id ? 'var(--navy)' : getStatusColor(acc.status) }}>
-                ● {acc.status.toUpperCase()}
-              </span>
-            </button>
-          ))}
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '32px', flexWrap: 'wrap' }}>
+          {accounts.map(acc => {
+            const isSelected = selectedAccount?.id === acc.id;
+            return (
+              <button key={acc.id} onClick={() => setSelectedAccount(acc)}
+                style={{
+                  background: isSelected ? 'var(--accent)' : 'var(--bg-elevated)',
+                  color:      isSelected ? '#fff' : 'var(--text-primary)',
+                  border:     `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
+                  padding:    '16px 20px',
+                  borderRadius: '16px',
+                  display:    'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                  gap:        '4px',
+                  cursor:     'pointer',
+                  transition: 'all 0.3s',
+                  boxShadow:  isSelected ? '0 8px 24px var(--accent-glow)' : 'none',
+                  minWidth:   '180px'
+                }}>
+                <div style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '0.02em' }}>
+                  {acc.account_type.toUpperCase()} ${parseFloat(acc.account_size).toLocaleString('en-US')}
+                </div>
+                <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: isSelected ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)' }}>
+                  #{acc.account_uid ? acc.account_uid.slice(0, 8) : acc.id}
+                </div>
+                <span style={{ 
+                  marginTop: '8px', 
+                  fontSize: '10px', 
+                  fontWeight: 800, 
+                  letterSpacing: '0.1em', 
+                  color: isSelected ? '#fff' : getStatusColor(acc.status),
+                  background: isSelected ? 'rgba(255,255,255,0.2)' : 'var(--bg-hover)',
+                  padding: '4px 8px',
+                  borderRadius: '6px'
+                }}>
+                  ● {acc.status.toUpperCase()}
+                </span>
+              </button>
+            )
+          })}
         </div>
       )}
 
@@ -209,38 +233,31 @@ export default function DashboardHome({ user, stats, accounts, selectedAccount, 
           {sizesLoading ? (
             <div style={{ color: 'var(--text-muted)', fontSize: '14px', padding: '20px 0' }}>Loading available sizes...</div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px' }}>
+            <div className="grid-6">
               {availableSizes.map(({ size, locked, remaining, quota }) => {
                 const isCreating = creatingSize === size
                 return (
                   <div
                     key={size}
-                    className="stat-card"
+                    className="card-stat card-hover"
                     onClick={() => !locked && !isCreating && handleCreateAccount(size)}
                     style={{
                       cursor:     locked ? 'not-allowed' : isCreating ? 'wait' : 'pointer',
                       opacity:    locked ? 0.45 : 1,
-                      transition: 'all 0.2s',
-                      position:   'relative',
-                      border:     locked ? '1px solid #8a8a8a' : '1px solid var(--navy-border)'
+                      border:     locked ? '1px solid #8a8a8a' : undefined
                     }}
                   >
                     {/* Lock badge */}
                     {locked && (
-                      <div style={{
-                        position: 'absolute', top: '6px', right: '6px',
-                        background: '#8a8a8a', color: '#fff',
-                        fontSize: '9px', fontWeight: '700',
-                        padding: '2px 6px', borderRadius: '4px', letterSpacing: '0.5px'
-                      }}>
+                      <div className="badge badge-neutral" style={{ position: 'absolute', top: '6px', right: '6px' }}>
                         FULL
                       </div>
                     )}
 
-                    <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--accent)', fontFamily: 'DM Mono, monospace' }}>
-                      ${size.toLocaleString()}
+                    <div className="card-stat-value" style={{ color: 'var(--accent)' }}>
+                      ${size.toLocaleString('en-US')}
                     </div>
-                    <div style={{ fontSize: '11px', color: locked ? '#8a8a8a' : 'var(--text-muted)', marginTop: '4px' }}>
+                    <div className="card-stat-title" style={{ marginTop: '4px', color: locked ? '#8a8a8a' : 'var(--text-muted)' }}>
                       {locked
                         ? 'No slots left'
                         : isCreating
@@ -253,13 +270,9 @@ export default function DashboardHome({ user, stats, accounts, selectedAccount, 
 
                     {/* Slot progress bar */}
                     {!locked && quota !== null && remaining !== null && (
-                      <div style={{ marginTop: '8px', height: '3px', background: 'var(--navy-border)', borderRadius: '2px', overflow: 'hidden' }}>
-                        <div style={{
-                          height: '100%',
+                      <div className="progress-bar" style={{ marginTop: '8px' }}>
+                        <div className={`progress-fill ${remaining <= 5 ? 'progress-danger' : remaining <= Math.ceil(quota * 0.2) ? 'progress-warning' : 'progress-success'}`} style={{
                           width:  `${Math.min(((quota - remaining) / quota) * 100, 100)}%`,
-                          background: remaining <= 5 ? 'var(--red)' : remaining <= Math.ceil(quota * 0.2) ? '#878787' : 'var(--green)',
-                          borderRadius: '2px',
-                          transition: 'width 0.3s'
                         }} />
                       </div>
                     )}
@@ -292,32 +305,42 @@ export default function DashboardHome({ user, stats, accounts, selectedAccount, 
       {/* ── Stats ── */}
       {stats && selectedAccount && (
         <div>
-          <div className="grid-4" style={{ marginBottom: '20px' }}>
-            <div className="stat-card">
-              <div className="stat-value">${parseFloat(stats.account.current_balance).toFixed(2)}</div>
-              <div className="stat-label">Current Balance</div>
+          <div className="grid-4" style={{ marginBottom: '24px' }}>
+            <div className="card-stat" style={{ position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '4px', background: 'linear-gradient(90deg, var(--accent), var(--info))' }} />
+              <div className="card-stat-title" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                Current Balance <span style={{ fontSize: '18px' }}>💰</span>
+              </div>
+              <div className="card-stat-value" style={{ marginTop: '8px' }}>${parseFloat(stats.account.current_balance).toFixed(2)}</div>
             </div>
-            <div className="stat-card">
-              <div className="stat-value" style={{ color: stats.stats.profit_pct >= 0 ? 'var(--green)' : 'var(--red)' }}>
+            <div className="card-stat" style={{ position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '4px', background: stats.stats.profit_pct >= 0 ? 'var(--success)' : 'var(--danger)' }} />
+              <div className="card-stat-title" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                {isFunded ? 'Profit Earned' : `Profit (Target ${getProfitTargetLabel()})`} <span style={{ fontSize: '18px' }}>📈</span>
+              </div>
+              <div className={`card-stat-value ${stats.stats.profit_pct >= 0 ? 'pnl-positive' : 'pnl-negative'}`} style={{ marginTop: '8px' }}>
                 {stats.stats.profit_pct >= 0 ? '+' : ''}{stats.stats.profit_pct}%
               </div>
-              <div className="stat-label">
-                {isFunded ? 'Profit Earned' : `Profit (Target ${getProfitTargetLabel()})`}
-              </div>
             </div>
-            <div className="stat-card">
-              <div className="stat-value" style={{ color: stats.stats.drawdown_pct > 7 ? 'var(--red)' : 'var(--accent)' }}>
+            <div className="card-stat" style={{ position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '4px', background: stats.stats.drawdown_pct > 7 ? 'var(--danger)' : 'var(--warning)' }} />
+              <div className="card-stat-title" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                Drawdown (Max {stats.account.max_drawdown_pct}%) <span style={{ fontSize: '18px' }}>📉</span>
+              </div>
+              <div className="card-stat-value" style={{ marginTop: '8px', color: stats.stats.drawdown_pct > 7 ? 'var(--danger)' : 'var(--text-primary)' }}>
                 -{stats.stats.drawdown_pct}%
               </div>
-              <div className="stat-label">Drawdown (Max {stats.account.max_drawdown_pct}%)</div>
             </div>
-            <div className="stat-card">
-              <div className="stat-value">{daysRemainingDisplay}</div>
-              <div className="stat-label">Days Remaining</div>
+            <div className="card-stat" style={{ position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '4px', background: 'linear-gradient(90deg, var(--bg-hover), var(--border))' }} />
+              <div className="card-stat-title" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                Days Remaining <span style={{ fontSize: '18px' }}>⏳</span>
+              </div>
+              <div className="card-stat-value" style={{ marginTop: '8px' }}>{daysRemainingDisplay}</div>
             </div>
           </div>
 
-          <div className="card" style={{ marginBottom: '20px' }}>
+          <div className="card" style={{ marginBottom: '24px' }}>
             {!isFunded && (
               <>
                 {(() => {
@@ -468,7 +491,7 @@ export default function DashboardHome({ user, stats, accounts, selectedAccount, 
                 { label: 'Trader ID',       value: user?.trader_uid || user?.trader_id || '—' },
                 { label: 'Account ID',      value: selectedAccount.account_uid || selectedAccount.id || '—' },
                 { label: 'Account Type',     value: selectedAccount.account_type.toUpperCase() },
-                { label: 'Account Size',     value: `$${parseFloat(selectedAccount.account_size).toLocaleString()}` },
+                { label: 'Account Size',     value: `$${parseFloat(selectedAccount.account_size).toLocaleString('en-US')}` },
                 { label: 'Starting Balance', value: `$${parseFloat(stats.account.starting_balance).toFixed(2)}` },
                 { label: 'Current Balance',  value: `$${parseFloat(stats.account.current_balance).toFixed(2)}` },
                 { label: 'Status',           value: selectedAccount.status.toUpperCase() },

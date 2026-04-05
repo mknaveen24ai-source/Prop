@@ -42,7 +42,11 @@ jest.mock('axios', () => {
     patch: jest.fn(() => Promise.reject(new Error('network'))),
     delete: jest.fn(() => Promise.reject(new Error('network'))),
     put: jest.fn(() => Promise.reject(new Error('network'))),
-    defaults: { withCredentials: false }
+    defaults: { withCredentials: false },
+    interceptors: {
+      request: { use: jest.fn(() => 0), eject: jest.fn() },
+      response: { use: jest.fn(() => 0), eject: jest.fn() }
+    }
   }
 
   return {
@@ -54,6 +58,7 @@ jest.mock('axios', () => {
     create: jest.fn(() => apiClient),
     defaults: { withCredentials: false },
     interceptors: {
+      request: { use: jest.fn(() => 0), eject: jest.fn() },
       response: { use: jest.fn(() => 0), eject: jest.fn() }
     }
   }

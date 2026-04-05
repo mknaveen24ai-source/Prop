@@ -3,12 +3,16 @@
  * Use these helpers to validate user inputs consistently
  */
 
-// Sanitize string inputs - remove potentially dangerous characters
+// Sanitize string inputs - remove XSS-danger characters but preserve legitimate ones
+// FIX (MEDIUM #24): Only strip characters that are actually dangerous for HTML output
+// (< and > for script tags). Preserve apostrophes (O'Brien), ampersands (AT&T),
+// parentheses, etc. since parameterized queries prevent SQL injection.
 function sanitizeString(str, maxLength = 500) {
   if (typeof str !== 'string') return '';
   return str
     .slice(0, maxLength)
-    .replace(/[<>"'%;()&]/g, '') // Remove potentially dangerous chars
+    .replace(/</g, '&lt;')  // Escape < for HTML safety
+    .replace(/>/g, '&gt;')  // Escape > for HTML safety
     .trim();
 }
 

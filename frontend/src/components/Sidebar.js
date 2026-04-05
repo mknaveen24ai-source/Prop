@@ -1,5 +1,6 @@
 import React from 'react'
 import { useTheme } from '../ThemeContext'
+import packageJson from '../../package.json'
 
 const NAV_ITEMS = [
   { id: 'dashboard', icon: '📊', label: 'Dashboard' },
@@ -21,79 +22,63 @@ export default function Sidebar({ activePage, setActivePage, kycStatus, pendingP
 
   return (
     <>
-      {/* ── Desktop Sidebar ── */}
-      <div className="sidebar-desktop">
-        <div style={{
-          padding: '24px 20px 8px',
-          borderBottom: '1px solid var(--navy-border)',
-          marginBottom: '8px'
+      <div className="sidebar" style={{
+        background: 'var(--bg-surface)',
+        backdropFilter: 'blur(20px)',
+        borderRight: '1px solid var(--border)'
+      }}>
+        <div className="sidebar-header" style={{
+          display: 'flex', alignItems: 'center', gap: '12px', padding: '24px 20px', borderBottom: '1px solid var(--border)'
         }}>
-          <div style={{
-            fontSize: '11px', color: 'var(--text-dim)',
-            letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: '600'
-          }}>
-            Navigation
+          <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg, var(--accent), var(--info))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '18px', boxShadow: '0 4px 12px var(--accent-glow)' }}>
+            ⚡
+          </div>
+          <div>
+            <div style={{ fontSize: '15px', fontWeight: 800, letterSpacing: '0.02em', color: 'var(--text-primary)' }}>PROP FIRM</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Trader Portal</div>
           </div>
         </div>
 
-        <nav style={{ flex: 1, padding: '8px 12px' }}>
+        <nav className="sidebar-nav" style={{ padding: '24px 12px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '12px', paddingLeft: '12px' }}>
+            Menu
+          </div>
           {NAV_ITEMS.map(item => {
             const isActive = activePage === item.id
             return (
               <button
                 key={item.id}
                 onClick={() => setActivePage(item.id)}
+                className={`sidebar-item ${isActive ? 'active' : ''}`}
                 style={{
                   width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  padding: '12px 16px',
-                  marginBottom: '4px',
-                  borderRadius: '8px',
                   border: 'none',
-                  background: isActive ? 'rgba(148, 148, 148, 0.12)' : 'transparent',
-                  color: isActive ? 'var(--accent)' : 'var(--text-muted)',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: isActive ? '600' : '400',
-                  fontFamily: 'DM Sans, sans-serif',
+                  background: isActive ? 'var(--accent-glow)' : 'transparent',
+                  color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
                   textAlign: 'left',
-                  transition: 'all 0.15s',
-                  borderLeft: isActive ? '3px solid var(--accent)' : '3px solid transparent',
+                  borderRadius: '10px',
+                  padding: '12px 14px',
+                  marginBottom: '4px',
                   position: 'relative'
                 }}
-                onMouseEnter={e => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = 'rgba(148, 148, 148, 0.06)'
-                    e.currentTarget.style.color = 'var(--text)'
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!isActive) {
-                    e.currentTarget.style.background = 'transparent'
-                    e.currentTarget.style.color = 'var(--text-muted)'
-                  }
-                }}
               >
-                <span style={{ fontSize: '18px' }}>{item.icon}</span>
-                <span>{item.label}</span>
+                {isActive && (
+                  <div style={{ position: 'absolute', left: '-12px', top: '10%', height: '80%', width: '4px', background: 'var(--accent)', borderRadius: '0 4px 4px 0' }} />
+                )}
+                <span style={{ fontSize: '18px', marginRight: '12px' }}>{item.icon}</span>
+                <span style={{ fontWeight: isActive ? 600 : 500 }}>{item.label}</span>
 
                 {/* KYC badge */}
                 {item.id === 'kyc' && kycStatus === 'pending' && (
-                  <span style={{ marginLeft: 'auto', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
+                  <span style={{ marginLeft: 'auto', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--warning)', flexShrink: 0, boxShadow: '0 0 8px var(--warning)' }} />
                 )}
                 {item.id === 'kyc' && (kycStatus === 'not_submitted' || kycStatus === 'rejected') && (
-                  <span style={{ marginLeft: 'auto', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--red)', flexShrink: 0 }} />
+                  <span style={{ marginLeft: 'auto', width: '8px', height: '8px', borderRadius: '50%', background: 'var(--danger)', flexShrink: 0, boxShadow: '0 0 8px var(--danger)' }} />
                 )}
 
                 {/* Payouts badge */}
                 {item.id === 'payouts' && pendingPayouts > 0 && (
-                  <span style={{
-                    marginLeft: 'auto', background: 'var(--accent)', color: 'var(--navy)',
-                    borderRadius: '99px', fontSize: '10px', fontWeight: '700',
-                    padding: '1px 6px', flexShrink: 0
-                  }}>
+                  <span className="badge badge-danger" style={{ marginLeft: 'auto', flexShrink: 0, padding: '2px 8px', fontSize: '10px', borderRadius: '20px' }}>
                     {pendingPayouts}
                   </span>
                 )}
@@ -102,14 +87,16 @@ export default function Sidebar({ activePage, setActivePage, kycStatus, pendingP
           })}
         </nav>
 
-        <div style={{
-          padding: '16px 20px',
-          borderTop: '1px solid var(--navy-border)',
-          fontSize: '11px',
-          color: 'var(--text-dim)'
-        }}>
-          <div style={{ marginBottom: '4px' }}>PROP FIRM</div>
-          <div>v1.0.0</div>
+        <div className="sidebar-footer" style={{ borderTop: '1px solid var(--border)', padding: '20px 16px' }}>
+           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', borderRadius: '12px', background: 'var(--bg-hover)', cursor: 'pointer', border: '1px solid var(--border-strong)' }}>
+             <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '12px', fontWeight: 600 }}>
+               TR
+             </div>
+             <div style={{ flex: 1, overflow: 'hidden' }}>
+               <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>Trader</div>
+               <div style={{ fontSize: '11px', color: 'var(--success)' }}>● Active</div>
+             </div>
+           </div>
         </div>
       </div>
 

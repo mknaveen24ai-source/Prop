@@ -189,7 +189,6 @@ async function main() {
   } catch (err) {
     await client.query('ROLLBACK')
     console.error('\n✗ Import failed:', err.message)
-    console.error(err.stack)
   } finally {
     client.release()
     await pool.end()

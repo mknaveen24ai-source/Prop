@@ -1,6 +1,6 @@
 const test   = require('node:test')
 const assert = require('node:assert/strict')
-const { validatePendingOrderPrice } = require('../routes/trades')
+const { validatePendingOrderPrice } = require('../utils/pendingOrderValidation')
 
 // ── Test: correct side-of-market enforcement ───────────────────────────────
 test('validatePendingOrderPrice enforces proper side of market', () => {

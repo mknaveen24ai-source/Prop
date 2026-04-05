@@ -37,10 +37,10 @@ async function createChatTables() {
     
   } catch (err) {
     console.error('Error:', err.message)
-    console.error(err.stack)
   }
   
   process.exit(0)
 }
 
 createChatTables()
+

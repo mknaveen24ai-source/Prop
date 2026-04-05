@@ -11,7 +11,11 @@ function ParticleCanvas() {
   const particlesRef = useRef([]);
 
   const initParticles = useCallback((w, h) => {
-    const count = Math.min(Math.floor((w * h) / 12000), 100);
+    const isSmall = w < 768;
+    const count = Math.min(
+      Math.floor((w * h) / (isSmall ? 18000 : 13000)),
+      isSmall ? 46 : 90
+    );
     const particles = [];
     const colors = [
       'rgba(41, 98, 255, 0.6)',
@@ -34,26 +38,44 @@ function ParticleCanvas() {
   }, []);
 
   useEffect(() => {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return;
+    }
+
     const cvs = canvasRef.current;
     if (!cvs) return;
     const ctx = cvs.getContext('2d');
-    let w = (cvs.width = cvs.parentElement.offsetWidth);
-    let h = (cvs.height = cvs.parentElement.offsetHeight);
+    let dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    let w = cvs.parentElement.offsetWidth;
+    let h = cvs.parentElement.offsetHeight;
+    cvs.width = Math.floor(w * dpr);
+    cvs.height = Math.floor(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     initParticles(w, h);
 
     const handleResize = () => {
-      w = cvs.width = cvs.parentElement.offsetWidth;
-      h = cvs.height = cvs.parentElement.offsetHeight;
+      dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      w = cvs.parentElement.offsetWidth;
+      h = cvs.parentElement.offsetHeight;
+      cvs.width = Math.floor(w * dpr);
+      cvs.height = Math.floor(h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       initParticles(w, h);
     };
     const handleMouse = (e) => {
       const rect = cvs.getBoundingClientRect();
       mouseRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     };
+
     window.addEventListener('resize', handleResize);
-    window.addEventListener('mousemove', handleMouse);
+    window.addEventListener('pointermove', handleMouse, { passive: true });
 
     const draw = () => {
+      if (document.hidden) {
+        animRef.current = requestAnimationFrame(draw);
+        return;
+      }
+
       ctx.clearRect(0, 0, w, h);
       const pts = particlesRef.current;
       const mx = mouseRef.current.x;
@@ -105,7 +127,7 @@ function ParticleCanvas() {
     return () => {
       cancelAnimationFrame(animRef.current);
       window.removeEventListener('resize', handleResize);
-      window.removeEventListener('mousemove', handleMouse);
+      window.removeEventListener('pointermove', handleMouse);
     };
   }, [initParticles]);
 
@@ -118,12 +140,12 @@ function ScrambleText({ text, delay = 0 }) {
   const chars = '!<>-_\\/[]{}—=+*^?#________';
   
   React.useEffect(() => {
-    let frame = 0;
     let iteration = 0;
     let timeout;
+    let interval;
     
     const start = () => {
-      const interval = setInterval(() => {
+      interval = setInterval(() => {
         setDisplay(text.split('').map((char, index) => {
           if (index < iteration) return text[index];
           return chars[Math.floor(Math.random() * chars.length)];
@@ -137,6 +159,7 @@ function ScrambleText({ text, delay = 0 }) {
     timeout = setTimeout(start, delay);
     return () => {
       clearTimeout(timeout);
+      clearInterval(interval);
     };
   }, [text, delay]);
 
@@ -209,7 +232,7 @@ function useMagnetic(ref, strength = 0.4) {
 /* ══════════════════════════════════════════════════════════════
    LANDING HERO SECTION
    ══════════════════════════════════════════════════════════════ */
-export default function LandingHero() {
+export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
   const navigate = useNavigate();
   const heroRef = useRef(null);
   const magneticBtnRef = useRef(null);
@@ -251,19 +274,22 @@ export default function LandingHero() {
           
           <h1 className="mp-h1 mp-reveal mp-delay-100 mp-active" style={{ textWrap: 'balance' }}>
             Get Funded for <span className="mp-glow-text mp-shimmer" style={{ whiteSpace: 'nowrap' }}>Free.</span><br />
-            Trade with <span style={{ color: '#00c896', textShadow: '0 0 30px rgba(0,200,150,0.4)' }}>Real</span> Capital.
+            Trade with <span style={{ color: '#00c896', textShadow: '0 0 30px rgba(0,200,150,0.4)' }}>Firm-Backed</span> Capital.
           </h1>
           
           <p className="mp-p-lead mp-reveal mp-delay-200 mp-active" style={{ textWrap: 'balance' }}>
             No evaluation fees. No hidden costs. Pass our 2-phase institutional assessment 
-            and trade with real liquidity-backed capital. Limited accounts released monthly.
+            and move into real liquidity-backed deployment. Limited accounts released monthly.
           </p>
           
           <div className="mp-reveal mp-delay-300 mp-active" style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
             <button 
               ref={magneticBtnRef}
               className="mp-btn-primary" 
-              onClick={() => navigate('/register')} 
+              onClick={() => {
+                if (onPrimaryCta) onPrimaryCta();
+                navigate('/register');
+              }}
               style={{ padding: '22px 54px', fontSize: '18px', transition: 'transform 0.1s ease-out' }}
             >
               Claim Free Account
@@ -272,7 +298,8 @@ export default function LandingHero() {
               </svg>
             </button>
             <button className="mp-btn-secondary" onClick={() => {
-              document.getElementById('mp-accounts')?.scrollIntoView({ behavior: 'smooth' });
+              if (onSecondaryCta) onSecondaryCta();
+              document.getElementById('mp-calculator')?.scrollIntoView({ behavior: 'smooth' });
             }} style={{ padding: '20px 40px' }}>
               View Account Sizes
             </button>
@@ -293,8 +320,8 @@ export default function LandingHero() {
             </div>
             <div className="mp-stat-divider" />
             <div className="mp-stat-item">
-              <span className="mp-stat-number" style={{ color: '#ff4757' }}>Limited</span>
-              <span className="mp-stat-number">&nbsp;Monthly Spots</span>
+              <span className="mp-stat-number" style={{ color: '#f0b90b' }}>Weekly</span>
+              <span className="mp-stat-number">&nbsp;Payout Cycles</span>
             </div>
           </div>
         </div>

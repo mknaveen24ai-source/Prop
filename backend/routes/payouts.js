@@ -40,7 +40,8 @@ router.post('/request', payoutRequestLimiter, authenticateToken, async function(
     }
 
     const accountIdStr = String(account_id || '').trim()
-    if (!accountIdStr || false) {
+    // FIX (LOW #29): Replace dead code `|| false` with proper numeric validation
+    if (!accountIdStr || isNaN(parseInt(accountIdStr))) {
       return res.status(400).json({ error: 'Invalid account ID' })
     }
 
@@ -162,15 +163,18 @@ router.post('/request', payoutRequestLimiter, authenticateToken, async function(
       const flagReasons = []
 
       try {
+        // FIX (HIGH #9): Add cumulative payout tracking to prevent bypass by splitting withdrawals
         const flagResult = await client.query(
           `SELECT
              EXTRACT(EPOCH FROM (NOW() - a.created_at))/86400  AS account_age_days,
              COUNT(t.id) FILTER (WHERE t.status = 'closed')                   AS total_closed_trades,
              COUNT(t.id) FILTER (WHERE t.status = 'closed' AND t.demo_pnl > 0)  AS winning_trades,
              COALESCE(MAX(t.demo_pnl) FILTER (WHERE t.status = 'closed'), 0)     AS max_single_trade_pnl,
-             COALESCE(SUM(t.demo_pnl) FILTER (WHERE t.status = 'closed'), 0)     AS total_realised_pnl
+             COALESCE(SUM(t.demo_pnl) FILTER (WHERE t.status = 'closed'), 0)     AS total_realised_pnl,
+             COALESCE(SUM(p.amount_requested) FILTER (WHERE p.status IN ('pending', 'approved', 'paid')), 0) AS total_payouts_requested
            FROM accounts a
            LEFT JOIN trades t ON t.account_id = a.id
+           LEFT JOIN payouts p ON p.account_id = a.id
            WHERE a.id = $1
            GROUP BY a.id, a.created_at`,
           [accountIdStr]
@@ -182,7 +186,14 @@ router.post('/request', payoutRequestLimiter, authenticateToken, async function(
         const totalClosedTrades = parseInt(fd.total_closed_trades || 0)
         const maxTradePnl     = parseFloat(fd.max_single_trade_pnl || 0)
         const totalRealisedPnl = parseFloat(fd.total_realised_pnl || 0)
+        const totalPayoutsRequested = parseFloat(fd.total_payouts_requested || 0)
         const accountSize     = parseFloat(acc.account_size)
+
+        // FIX (HIGH #9): Cumulative payout check prevents splitting withdrawal bypass
+        if (totalPayoutsRequested + amountNum > accountSize * 0.80 && accountAgeDays < 30) {
+          is_flagged = true
+          flagReasons.push(`Cumulative payouts ($${(totalPayoutsRequested + amountNum).toFixed(2)}) exceed 80% of account size within 30 days`)
+        }
 
         // Enhanced flag detection - harder to game
         if (accountAgeDays < 5) {

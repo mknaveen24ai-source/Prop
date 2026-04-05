@@ -67,58 +67,85 @@ function Register({ onLogin }) {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-      <div className="card" style={{ width: '450px' }}>
+    <div style={{ 
+      minHeight: '100vh', 
+      display: 'flex', 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      padding: '24px',
+      background: 'radial-gradient(circle at 50% 0%, var(--bg-hover) 0%, var(--bg-base) 100%)',
+      position: 'relative',
+      overflow: 'hidden'
+    }}>
+      {/* Ambient background glows */}
+      <div style={{ position: 'absolute', top: '-10%', left: '-10%', width: '50vw', height: '50vw', background: 'radial-gradient(circle, var(--accent-glow) 0%, transparent 70%)', filter: 'blur(60px)', opacity: 0.5, pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: '-20%', right: '-10%', width: '60vw', height: '60vw', background: 'radial-gradient(circle, rgba(16,185,129,0.1) 0%, transparent 70%)', filter: 'blur(80px)', pointerEvents: 'none' }} />
+
+      <div className="card" style={{ width: '450px', zIndex: 10, animation: 'fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1)', padding: '40px 32px' }}>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <h1 className="accent" style={{ fontSize: '28px' }}>PROP FIRM</h1>
-          <p style={{ color: '#888', marginTop: '8px' }}>Create your free account</p>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'linear-gradient(135deg, var(--accent), var(--info))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '24px', boxShadow: '0 8px 16px var(--accent-glow)' }}>
+              ⚡
+            </div>
+          </div>
+          <h1 style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: '8px' }}>Create an account.</h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Join the premium prop firm today</p>
         </div>
 
         {error && <div className="error">{error}</div>}
 
         <form onSubmit={handleSubmit}>
-          <label style={{ fontSize: '12px', color: '#888' }}>FULL NAME</label>
-          <input
-            type="text"
-            name="full_name"
-            value={form.full_name}
-            onChange={handleChange}
-            placeholder="John Smith"
-            required
-          />
-
-          <label style={{ fontSize: '12px', color: '#888' }}>EMAIL</label>
-          <input
-            type="email"
-            name="email"
-            value={form.email}
-            onChange={handleChange}
-            placeholder="your@email.com"
-            required
-          />
-
-          <label style={{ fontSize: '12px', color: '#888' }}>PASSWORD</label>
-          <div style={{ position: 'relative' }}>
+          <div className="input-group">
+            <label className="input-label">FULL NAME</label>
             <input
-              type={showPassword ? 'text' : 'password'}
-              name="password"
-              value={form.password}
+              type="text"
+              name="full_name"
+              className="input-field"
+              value={form.full_name}
               onChange={handleChange}
-              placeholder="Min 8 chars, uppercase, number, special"
+              placeholder="John Smith"
               required
-              style={{ width: '100%', paddingRight: '44px' }}
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword(p => !p)}
-              style={{
-                position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--text-muted)', fontSize: '14px', padding: '4px'
-              }}
-            >
-              {showPassword ? '🙈' : '👁️'}
-            </button>
+          </div>
+
+          <div className="input-group">
+            <label className="input-label">EMAIL</label>
+            <input
+              type="email"
+              name="email"
+              className="input-field"
+              value={form.email}
+              onChange={handleChange}
+              placeholder="your@email.com"
+              required
+            />
+          </div>
+
+          <div className="input-group">
+            <label className="input-label">PASSWORD</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                className="input-field"
+                value={form.password}
+                onChange={handleChange}
+                placeholder="Min 8 chars, uppercase, number, special"
+                required
+                style={{ width: '100%', paddingRight: '44px' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(p => !p)}
+                style={{
+                  position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--text-muted)', fontSize: '14px', padding: '4px'
+                }}
+              >
+                {showPassword ? '🙈' : '👁️'}
+              </button>
+            </div>
           </div>
 
           {/* ── Live password strength indicator ── */}
@@ -154,42 +181,50 @@ function Register({ onLogin }) {
             </div>
           )}
 
-          <label style={{ fontSize: '12px', color: '#888', marginTop: '12px', display: 'block' }}>COUNTRY</label>
-          <select name="country" value={form.country} onChange={handleChange} required>
-            <option value="">Select your country</option>
-            <option value="India">India</option>
-            <option value="United Kingdom">United Kingdom</option>
-            <option value="Australia">Australia</option>
-            <option value="UAE">UAE</option>
-            <option value="South Africa">South Africa</option>
-            <option value="Nigeria">Nigeria</option>
-            <option value="Malaysia">Malaysia</option>
-            <option value="Singapore">Singapore</option>
-            <option value="Philippines">Philippines</option>
-            <option value="Kenya">Kenya</option>
-            <option value="Pakistan">Pakistan</option>
-            <option value="Bangladesh">Bangladesh</option>
-            <option value="Other">Other</option>
-          </select>
+          <div className="input-group">
+            <label className="input-label" style={{ marginTop: '12px' }}>COUNTRY</label>
+            <select name="country" className="select-field" value={form.country} onChange={handleChange} required>
+              <option value="">Select your country</option>
+              <option value="India">India</option>
+              <option value="United Kingdom">United Kingdom</option>
+              <option value="Australia">Australia</option>
+              <option value="UAE">UAE</option>
+              <option value="South Africa">South Africa</option>
+              <option value="Nigeria">Nigeria</option>
+              <option value="Malaysia">Malaysia</option>
+              <option value="Singapore">Singapore</option>
+              <option value="Philippines">Philippines</option>
+              <option value="Kenya">Kenya</option>
+              <option value="Pakistan">Pakistan</option>
+              <option value="Bangladesh">Bangladesh</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
 
-          <label style={{ fontSize: '12px', color: '#888' }}>PHONE / WHATSAPP</label>
-          <input
-            type="text"
-            name="phone"
-            value={form.phone}
-            onChange={handleChange}
-            placeholder="+91 9999999999"
-            required
-          />
+          <div className="input-group">
+            <label className="input-label">PHONE / WHATSAPP</label>
+            <input
+              type="text"
+              name="phone"
+              className="input-field"
+              value={form.phone}
+              onChange={handleChange}
+              placeholder="+91 9999999999"
+              required
+            />
+          </div>
 
-          <label style={{ fontSize: '12px', color: '#888' }}>REFERRAL CODE (optional)</label>
-          <input
-            type="text"
-            name="referred_by"
-            value={form.referred_by}
-            onChange={handleChange}
-            placeholder="Enter referral code if you have one"
-          />
+          <div className="input-group">
+            <label className="input-label">REFERRAL CODE (optional)</label>
+            <input
+              type="text"
+              name="referred_by"
+              className="input-field"
+              value={form.referred_by}
+              onChange={handleChange}
+              placeholder="Enter referral code if you have one"
+            />
+          </div>
 
           {/* Terms & Privacy Checkbox */}
           <div style={{
@@ -224,7 +259,7 @@ function Register({ onLogin }) {
           </div>
 
           <button
-            className="btn btn-accent"
+            className="btn btn-primary"
             type="submit"
             style={{ width: '100%', marginTop: '8px', opacity: (!termsAccepted || loading || !passwordValid) ? 0.6 : 1, transition: 'opacity 0.2s' }}
             disabled={loading || !termsAccepted || !passwordValid}

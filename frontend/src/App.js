@@ -5,7 +5,6 @@ import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
-import Admin from './pages/Admin'
 import TermsOfService from './pages/TermsOfService'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import Leaderboard from './pages/Leaderboard'
@@ -13,6 +12,21 @@ import TraderProfile from './pages/TraderProfile'
 import Chat from './pages/Chat'
 import { ThemeProvider } from './ThemeContext'
 import ErrorBoundary from './ErrorBoundary'
+// ── New Modular Admin Portal ──
+import AdminLayout from './pages/admin/AdminLayout'
+import AdminDashboard from './pages/admin/AdminDashboard'
+import AdminUsers from './pages/admin/AdminUsers'
+import AdminKYC from './pages/admin/AdminKYC'
+import AdminChallenges from './pages/admin/AdminChallenges'
+import AdminFunded from './pages/admin/AdminFunded'
+import AdminTrades from './pages/admin/AdminTrades'
+import AdminPayouts from './pages/admin/AdminPayouts'
+import AdminPlatformPnL from './pages/admin/AdminPlatformPnL'
+import AdminSettings from './pages/admin/AdminSettings'
+import AdminDisputes from './pages/admin/AdminDisputes'
+import AdminChat from './pages/admin/AdminChat'
+import AdminLeaderboard from './pages/admin/AdminLeaderboard'
+import AdminTradeCopier from './pages/admin/AdminTradeCopier'
 import './App.css'
 
 axios.defaults.withCredentials = true
@@ -117,12 +131,27 @@ function App() {
           />
 
           {/*
-            Admin route — no client-side token guard needed.
-            The Admin component shows its own login form before rendering anything.
-            Every API call it makes is verified by the backend with its own JWT.
+            Admin Portal — New modular architecture.
+            AdminLayout handles its own JWT session + login screen.
+            Each child route renders through the Outlet in AdminLayout.
           */}
-          <Route path="/admin"   element={<Admin />} />
-          <Route path="/admin/*" element={<Admin />} />
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="kyc" element={<AdminKYC />} />
+            <Route path="challenges" element={<AdminChallenges />} />
+            <Route path="funded" element={<AdminFunded />} />
+            <Route path="trades" element={<AdminTrades />} />
+            <Route path="payouts" element={<AdminPayouts />} />
+            <Route path="pnl" element={<AdminPlatformPnL />} />
+            <Route path="settings" element={<AdminSettings />} />
+            <Route path="disputes" element={<AdminDisputes />} />
+            <Route path="chat" element={<AdminChat />} />
+            <Route path="leaderboard" element={<AdminLeaderboard />} />
+            <Route path="copier" element={<AdminTradeCopier />} />
+            {/* Catch-all inside admin redirects to dashboard */}
+            <Route path="*" element={<Navigate to="/admin" replace />} />
+          </Route>
 
           {/* -- Public pages -- */}
           <Route path="/leaderboard" element={<Leaderboard />} />

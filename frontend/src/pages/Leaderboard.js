@@ -76,7 +76,7 @@ export default function Leaderboard() {
                     <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: '400', marginLeft: '8px' }}>View Profile →</span>
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
-                    {row.country || 'Unknown'} · ${parseFloat(row.account_size).toLocaleString()} account
+                    {row.country || 'Unknown'} · ${parseFloat(row.account_size).toLocaleString('en-US')} account
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px', fontFamily: 'DM Mono, monospace' }}>
                     Trader ID: {row.trader_uid || '—'} · Account ID: {row.account_uid || '—'}

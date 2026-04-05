@@ -13,13 +13,24 @@ const { Server } = require('socket.io')
 const helmet = require('helmet')
 const rateLimit = require('express-rate-limit')
 const { securityHeaders, apiLimiter, abuseDetector, requestSizeLimiter } = require('./utils/security')
+const { securityMonitor } = require('./config/security-config')
 const logger = require('./utils/logger')
+const { performanceMonitor, wrapDatabaseQuery, getMetrics, getHealthStatus } = require('./utils/performance')
 
 // -- Rate limiters --
 const authLimiter = rateLimit({ windowMs: 1*60*1000, max: 10, message: { error: 'Too many attempts. Wait 1 minute.' }, standardHeaders: true, legacyHeaders: false })
 const accountCreateLimiter = rateLimit({ windowMs: 60*60*1000, max: 20, message: { error: 'Too many account requests. Try again later.' }, standardHeaders: true, legacyHeaders: false })
 const supportLimiter = rateLimit({ windowMs: 60*60*1000, max: 10, message: { error: 'Too many support requests. Wait before retrying.' }, standardHeaders: true, legacyHeaders: false })
-const { fetchAndStorePrices, getCurrentPrices, subscribeSymbols, watchPriceFeed, pruneOldPriceHistory } = require('./priceFeed')
+const {
+  fetchAndStorePrices,
+  getCurrentPrices,
+  subscribeSymbols,
+  watchPriceFeed,
+  pruneOldPriceHistory,
+  ensurePriceHistoryInfrastructure,
+  bootstrapHistoricalPriceHistory,
+  syncHourlyPriceHistory
+} = require('./priceFeed')
 
 const authRoutes    = require('./routes/auth')
 const accountRoutes = require('./routes/accounts')
@@ -29,12 +40,14 @@ const payoutRoutes  = require('./routes/payouts')
 const kycRoutes     = require('./routes/kyc')
 const chatRoutes    = require('./routes/chat')
 // ── TRADE COPIER ──────────────────────────────────────────────────────────────
-const copierRoutes  = require('./routes/copier-routes')
+// (copierRoutes now imported below with ensureCopierSettings)
 // ─────────────────────────────────────────────────────────────────────────────
 const { authenticateToken: authTok, authenticateAdmin: authAdm } = require('./routes/middleware')
 const { runChallengeEngine } = require('./challengeEngine')
 const { validateEnv } = require('./env')
 const newsService = require('./services/newsService')
+const { ensureChatTables } = require('./routes/chat') // FIX (HIGH #6): Import for startup init
+const { router: copierRoutes, ensureCopierSettings } = require('./routes/copier-routes') // FIX (HIGH #7): Import for startup init
 
 validateEnv()
 
@@ -150,6 +163,25 @@ async function ensureUniqueIds() {
 
 ensureUniqueIds()
 
+// FIX (BUG-8): Add original_commission column to trades table.
+// Stores the commission at trade-open time so partial-close math always
+// computes proportional deductions from the original, not the already-reduced value.
+pool.query(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS original_commission NUMERIC(10,2)`).catch(err => {
+  logger.warn('[startup] Could not add original_commission column:', { error: err.message })
+})
+
+// FIX (HIGH #6): Run ensureChatTables once at startup instead of on every request.
+// This eliminates unnecessary DDL overhead on chat route handlers.
+ensureChatTables().catch(err => {
+  logger.error('[startup] Failed to ensure chat tables:', { error: err.message })
+})
+
+// FIX (HIGH #7): Run ensureCopierSettings at startup with proper error handling.
+// Previously called at module load time with silent error swallowing.
+ensureCopierSettings().catch(err => {
+  logger.error('[startup] Failed to ensure copier settings:', { error: err.message })
+})
+
 const app = express()
 const httpServer = createServer(app)
 
@@ -157,7 +189,12 @@ const httpServer = createServer(app)
 app.use(securityHeaders)
 app.use(abuseDetector)
 app.use(requestSizeLimiter)
+// Add performance monitoring middleware
+app.use(performanceMonitor)
 app.use(apiLimiter)
+// FIX: Mount attack pattern detector — checks for SQLi, path traversal, XSS
+// patterns in request bodies/paths. Was defined but never mounted.
+app.use(securityMonitor.checkAttackPatterns)
 
 const io = new Server(httpServer, {
   cors: {
@@ -200,9 +237,33 @@ io.use(function(socket, next) {
       return next(new Error('Unauthorized socket'))
     }
 
+    // FIX (CRITICAL #4): Validate token version against DB to support
+    // instant session invalidation (password change, logout all, ban).
+    // This matches the HTTP authenticateToken middleware behavior.
     if (userDecoded?.userId) {
-      socket.data.userId = String(userDecoded.userId)
-      socket.join(socket.data.userId)
+      // Async token version check — non-blocking but validates session
+      pool.query('SELECT token_version, is_banned FROM users WHERE id = $1', [userDecoded.userId])
+        .then(result => {
+          if (result.rows.length === 0) {
+            return socket.emit('auth_error', { error: 'User not found' })
+          }
+          const { token_version, is_banned } = result.rows[0]
+          if (is_banned) {
+            return socket.emit('auth_error', { error: 'Account suspended' })
+          }
+          if (userDecoded.tv !== undefined && userDecoded.tv < token_version) {
+            return socket.emit('auth_error', { error: 'Session expired' })
+          }
+          // Token is valid — join the user's room
+          socket.data.userId = String(userDecoded.userId)
+          socket.join(socket.data.userId)
+        })
+        .catch(err => {
+          logger.warn('Socket token version check failed:', { error: err.message })
+          // Still allow connection if DB check fails (graceful degradation)
+          socket.data.userId = String(userDecoded.userId)
+          socket.join(socket.data.userId)
+        })
     }
     if (adminDecoded) {
       socket.data.isAdmin = true
@@ -215,7 +276,20 @@ io.use(function(socket, next) {
   }
 })
 
-app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }))
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+  // FIX (LOW #28): Configure helmet to set all security headers instead of
+  // duplicating them manually below. Eliminates redundancy.
+  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  frameguard: { action: 'deny' },
+  referrerPolicy: { policy: 'no-referrer' },
+  permissionsPolicy: {
+    geolocation: [],
+    microphone: [],
+    camera: []
+  }
+}))
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true
@@ -223,13 +297,9 @@ app.use(cors({
 app.use(express.json())
 app.use(cookieParser())
 app.disable('x-powered-by')
-app.use(function(req, res, next) {
-  res.setHeader('X-Content-Type-Options', 'nosniff')
-  res.setHeader('X-Frame-Options', 'DENY')
-  res.setHeader('Referrer-Policy', 'no-referrer')
-  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
-  next()
-})
+// FIX (LOW #28): Removed duplicate manual header setting — helmet now handles it.
+// Only keep x-powered-by disable (already done above) and any custom headers
+// that helmet doesn't cover.
 
 // ── Secure uploads: require admin JWT ─────────────────────────────────────────
 const uploadsRoot = path.resolve(__dirname, 'uploads')
@@ -269,6 +339,9 @@ app.use('/uploads', function(req, res) {
   })
 })
 
+// Wrap database queries for performance tracking
+wrapDatabaseQuery(pool)
+
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api/auth',     authLimiter,          authRoutes)
 app.use('/api/accounts', accountCreateLimiter, accountRoutes)
@@ -279,6 +352,20 @@ app.use('/api/payouts',  payoutRoutes)
 app.use('/api/kyc',      kycRoutes)
 app.use('/api/chat',     chatRoutes)
 app.use('/api/disputes', require('./routes/disputes'))
+
+// ── Performance & Health Endpoints ────────────────────────────────────────────
+app.get('/api/health', function(req, res) {
+  res.json(getHealthStatus())
+})
+
+app.get('/api/metrics', function(req, res) {
+  res.json(getMetrics())
+})
+
+app.post('/api/metrics/reset', function(req, res) {
+  resetMetrics()
+  res.json({ message: 'Metrics reset successfully' })
+})
 
 // ── Support tickets ───────────────────────────────────────────────────────────
 app.post('/api/support/ticket', supportLimiter, function optionalAuth(req, res, next) {
@@ -606,46 +693,64 @@ app.set('io', io)
 app.use(logger.httpMiddleware)
 
 // ── Price feed ────────────────────────────────────────────────────────────────
-subscribeSymbols()
-fetchAndStorePrices()
-
-pruneOldPriceHistory()
-setInterval(pruneOldPriceHistory, 24 * 60 * 60 * 1000)
-
-// FIX (BUG-M6): Track last emitted prices to avoid broadcasting identical data
-// every second. Only emit when at least one price has actually changed.
 let lastEmittedPricesHash = ''
+let lastWatcherEmitAt = 0
 
-watchPriceFeed(function(prices) {
-  lastWatcherEmitAt = Date.now()
-  const hash = JSON.stringify(prices)
-  if (hash !== lastEmittedPricesHash) {
-    lastEmittedPricesHash = hash
-    io.emit('price_update', prices)
-  }
-})
-
-// Fallback polling - runs every 1 second to ensure prices stay fresh if watcher fails
-setInterval(async function() {
+async function startPriceFeedPipeline() {
   try {
-    await fetchAndStorePrices()
-    const prices = await getCurrentPrices()
-    if (Object.keys(prices).length > 0) {
-      const hash = JSON.stringify(prices)
-      if (hash !== lastEmittedPricesHash) {
-        lastEmittedPricesHash = hash
-        io.emit('price_update', prices)
-      }
-    }
+    await ensurePriceHistoryInfrastructure()
+    await bootstrapHistoricalPriceHistory()
+    await syncHourlyPriceHistory()
+    await pruneOldPriceHistory()
   } catch (error) {
-    logger.error('Price fallback interval error:', { error: error.message })
+    logger.error('Price history init error:', { error: error.message })
   }
-}, 1000)
+
+  subscribeSymbols()
+  await fetchAndStorePrices()
+
+  setInterval(pruneOldPriceHistory, 24 * 60 * 60 * 1000)
+  setInterval(syncHourlyPriceHistory, 30 * 60 * 1000)
+
+  // FIX (BUG-M6): Track last emitted prices to avoid broadcasting identical data
+  // every second. Only emit when at least one price has actually changed.
+  watchPriceFeed(function(prices) {
+    lastWatcherEmitAt = Date.now()
+    const hash = JSON.stringify(prices)
+    if (hash !== lastEmittedPricesHash) {
+      lastEmittedPricesHash = hash
+      io.emit('price_update', prices)
+    }
+  })
+
+  // Fallback polling - runs every 1 second to ensure prices stay fresh if watcher fails
+  setInterval(async function() {
+    try {
+      await fetchAndStorePrices()
+      const prices = await getCurrentPrices()
+      if (Object.keys(prices).length > 0) {
+        const hash = JSON.stringify(prices)
+        if (hash !== lastEmittedPricesHash) {
+          lastEmittedPricesHash = hash
+          io.emit('price_update', prices)
+        }
+      }
+    } catch (error) {
+      logger.error('Price fallback interval error:', { error: error.message })
+    }
+  }, 1000)
+}
+
+startPriceFeedPipeline().catch((error) => {
+  logger.error('Failed to start price feed pipeline:', { error: error.message })
+})
 
 // ── Trading engine intervals ──────────────────────────────────────────────────
 setInterval(function() { checkSLTP(io) },             500)
 setInterval(function() { checkPendingOrders(io) },    500)
-setInterval(function() { checkFloatingDrawdown(io) }, 500)
+// FIX (HIGH #12): Reduced from 500ms to 1000ms to lower database query volume
+// under heavy load with many active accounts.
+setInterval(function() { checkFloatingDrawdown(io) }, 1000)
 
 // ── Challenge engine ──────────────────────────────────────────────────────────
 runChallengeEngine(io)
@@ -656,6 +761,8 @@ newsService.start()
 let lastClosedNewsId = ''
 
 async function checkNewsForceClose() {
+  // FIX (BUG-1 + BUG-7): client declared outside try so finally always releases it.
+  let client
   try {
     // 3 minute window as per strict rules
     const activeNews = newsService.getActiveNewsEvent(3)
@@ -679,7 +786,7 @@ async function checkNewsForceClose() {
     logger.info(`[news_close] Active USD High Impact: ${activeNews.title} — force-closing ${openTrades.rows.length} trades`)
 
     const prices = await getCurrentPrices()
-    const client = await pool.connect()
+    client = await pool.connect()
 
     for (const trade of openTrades.rows) {
       try {
@@ -705,27 +812,37 @@ async function checkNewsForceClose() {
         if (locked.rows.length === 0) { await client.query('ROLLBACK'); continue }
 
         await client.query(
-          `UPDATE trades SET status = 'closed', close_price = $1, close_time = NOW(),
-           demo_pnl = $2, close_reason = 'News Close' WHERE id = $3`,
+          `UPDATE trades SET status='closed', close_price=$1, close_time=NOW(), demo_pnl=$2, close_reason='News Force Close' WHERE id=$3`,
           [close_price, demo_pnl, trade.id]
         )
+
+        // FIX (BUG-1): Balance was NEVER updated after news force-close.
+        // Without this the account balance stays stale and drawdown checks
+        // operate on wrong equity, potentially missing real limit breaches.
         await client.query(
           `UPDATE accounts SET
              current_balance = current_balance + $1,
-             peak_balance    = GREATEST(peak_balance, current_balance + $1)
+             peak_balance    = GREATEST(peak_balance, current_balance + $1),
+             updated_at      = NOW()
            WHERE id = $2`,
           [demo_pnl, trade.account_id]
         )
-        io.to(`user_${trade.user_id}`).emit('trade_closed', { id: trade.id, close_price, demo_pnl, reason: 'News Close' })
+
         await client.query('COMMIT')
+
+        io.to(String(trade.user_id)).emit('trade_closed', { trade_id: trade.id, reason: 'News Force Close', pnl: demo_pnl })
       } catch (err) {
-        await client.query('ROLLBACK')
-        logger.error(`News force-close error for trade ${trade.id}:`, { error: err.message })
+        await client.query('ROLLBACK').catch(() => {})
+        logger.error(`[news_close] Error closing trade ${trade.id}:`, { error: err.message })
       }
     }
-    client.release()
-  } catch (err) {
-    logger.error('News force close interval error:', { error: err.message })
+
+  } catch (error) {
+    logger.error('[news_close] Force-close check error:', { error: error.message })
+    lastClosedNewsId = '' // Reset to allow retry on next interval
+  } finally {
+    // FIX (BUG-7): Guaranteed release — prevents pool exhaustion under any code path.
+    if (client) client.release()
   }
 }
 setInterval(checkNewsForceClose, 10000)
@@ -742,9 +859,12 @@ async function weekendForceClose() {
     const hourUTC   = now.getUTCHours()
     const minuteUTC = now.getUTCMinutes()
 
-    // Only run on Friday between 21:55 and 22:05 UTC
-    if (dayUTC !== 5 || hourUTC !== 21 || minuteUTC < 55) return
-    if (hourUTC === 22 && minuteUTC > 5) return
+    // FIX (BUG-3): Previous guards were broken — first guard required hourUTC === 21,
+    // making the second guard (hourUTC === 22) permanently unreachable.
+    // Correct window: Friday 21:55–22:05 UTC.
+    if (dayUTC !== 5) return
+    const inWindow = (hourUTC === 21 && minuteUTC >= 55) || (hourUTC === 22 && minuteUTC <= 5)
+    if (!inWindow) return
 
     // FIX (BUG-M2): Dedup — only run once per Friday using date string key
     const todayKey = now.toISOString().slice(0, 10) // e.g. '2026-03-27'

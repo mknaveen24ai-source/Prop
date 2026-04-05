@@ -5,7 +5,7 @@ import axios from 'axios';
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 // All valid account sizes supported by the platform
-const ALL_SIZES = [1000, 2500, 5000, 10000, 25000, 50000, 100000, 200000];
+const ALL_SIZES = [1000, 2000, 2500, 5000, 10000, 25000, 50000, 100000, 200000];
 
 /* Animated number counter */
 function CountUp({ value, duration = 800 }) {
@@ -20,7 +20,7 @@ function CountUp({ value, duration = 800 }) {
       const prog = Math.min((now - startTime) / duration, 1);
       const ease = 1 - Math.pow(1 - prog, 3);
       const current = start + (end - start) * ease;
-      setDisplay(Math.round(current).toLocaleString());
+      setDisplay(Math.round(current).toLocaleString('en-US'));
       if (prog < 1) requestAnimationFrame(animate);
       else prevValue.current = end;
     };
@@ -58,22 +58,29 @@ function mergeWithDefaults(apiData) {
   });
 }
 
-export default function LandingCalculator() {
+export default function LandingCalculator({ onStartAssessment }) {
   const navigate = useNavigate();
   const [accounts, setAccounts] = useState(() => mergeWithDefaults([]));
   const [selected, setSelected] = useState(0);
   const [loadingAPI, setLoadingAPI] = useState(true);
+  const [availabilitySource, setAvailabilitySource] = useState('config');
 
   useEffect(() => {
     async function fetchSizes() {
       try {
-        const res = await axios.get(`${API_URL}/api/accounts/available-sizes`, { timeout: 5000 });
+        const res = await axios.get(`${API_URL}/api/accounts/available-sizes-public`, {
+          timeout: 5000,
+          params: { _t: Date.now() },
+          headers: { 'Cache-Control': 'no-cache' }
+        });
         const merged = mergeWithDefaults(res.data);
         setAccounts(merged);
+        setAvailabilitySource('config');
         // Auto-select the first unlocked size
         const firstUnlocked = merged.findIndex(s => !s.locked);
         if (firstUnlocked >= 0) setSelected(firstUnlocked);
-      } catch {
+      } catch (_err) {
+        setAvailabilitySource('offline');
         // Backend offline — show all sizes as locked until data loads
         setAccounts(mergeWithDefaults([]));
       } finally {
@@ -81,7 +88,9 @@ export default function LandingCalculator() {
       }
     }
     fetchSizes();
-    const iv = setInterval(fetchSizes, 30000);
+    const iv = setInterval(() => {
+      fetchSizes();
+    }, 30000);
     return () => clearInterval(iv);
   }, []);
 
@@ -110,6 +119,13 @@ export default function LandingCalculator() {
             All accounts are <span style={{ color: '#00c896', fontWeight: 700 }}>completely free</span>.
             Limited spots available each month, backed by real liquidity.
           </p>
+          {availabilitySource !== 'live' && (
+            <p className="mp-reveal mp-delay-250" style={{ margin: '14px auto 0', color: 'rgba(255,255,255,0.48)', maxWidth: '740px', fontSize: '13px' }}>
+              {availabilitySource === 'config'
+                ? 'Tier availability on this page follows admin-configured quotas and refreshes automatically.'
+                : 'Live availability is temporarily unavailable. You can still register and claim the next open tier.'}
+            </p>
+          )}
 
           {/* Summary pill */}
           <div className="mp-reveal mp-delay-300" style={{ marginTop: '24px', display: 'inline-flex', gap: '24px', padding: '12px 28px', background: 'rgba(255,255,255,0.03)', borderRadius: '100px', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -118,7 +134,7 @@ export default function LandingCalculator() {
             </span>
             <span style={{ width: '1px', background: 'rgba(255,255,255,0.08)' }} />
             <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)' }}>
-              Open Slots: <span style={{ color: totalRemaining > 0 ? '#00c896' : '#f0b90b', fontWeight: 600, fontFamily: 'DM Mono, monospace' }}>{loadingAPI ? '...' : totalRemaining}</span>
+              Configured Slots: <span style={{ color: totalRemaining > 0 ? '#00c896' : '#f0b90b', fontWeight: 600, fontFamily: 'DM Mono, monospace' }}>{loadingAPI ? '...' : totalRemaining}</span>
             </span>
           </div>
         </div>
@@ -135,7 +151,8 @@ export default function LandingCalculator() {
             const isSelected = selected === i;
             const isSoldOut = a.locked || a.quota === 0;
             const pct = a.quota > 0 ? Math.max(0, Math.min(100, ((a.remaining ?? 0) / a.quota) * 100)) : 0;
-            const isUnlimited = a.quota >= 999999;
+            // FIX: Remove "unlimited" logic - always show actual quota values from admin panel
+            const isUnlimited = false;
 
             return (
               <div
@@ -192,7 +209,7 @@ export default function LandingCalculator() {
                   {sizeLabel(a.size)}
                 </div>
                 <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 'clamp(20px,2vw,28px)', fontWeight: 800, color: isSoldOut ? 'rgba(255,255,255,0.25)' : '#fff', marginBottom: '14px' }}>
-                  ${a.size.toLocaleString()}
+                  ${a.size.toLocaleString('en-US')}
                 </div>
 
                 {/* FREE / FULL badge */}
@@ -211,13 +228,13 @@ export default function LandingCalculator() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>AVAILABLE</span>
                     <span style={{ fontSize: '10px', color: isSoldOut ? '#ff4757' : pct > 50 ? '#00c896' : '#f0b90b', fontFamily: 'DM Mono, monospace', fontWeight: 700 }}>
-                      {isSoldOut ? '0.00%' : isUnlimited ? '100%' : `${pct.toFixed(1)}%`}
+                      {isSoldOut ? '0/0' : `${a.remaining ?? 0}/${a.quota}`}
                     </span>
                   </div>
                   <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
                     <div style={{
                       height: '100%',
-                      width: isUnlimited ? '100%' : `${pct}%`,
+                      width: `${pct}%`,
                       background: isSoldOut ? '#ff4757' : pct > 50 ? '#00c896' : pct > 20 ? '#f0b90b' : '#ff4757',
                       borderRadius: '4px', transition: 'width 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
                       boxShadow: isSelected ? `0 0 10px ${isSoldOut ? '#ff4757' : pct > 50 ? '#00c896' : '#f0b90b'}` : 'none'
@@ -299,7 +316,14 @@ export default function LandingCalculator() {
                   </div>
                 ) : (
                   <>
-                    <button className="mp-btn-primary" style={{ padding: '22px 48px', minWidth: '240px' }} onClick={() => navigate('/register')}>
+                    <button
+                      className="mp-btn-primary"
+                      style={{ padding: '22px 48px', minWidth: '240px' }}
+                      onClick={() => {
+                        if (onStartAssessment) onStartAssessment(acc.size);
+                        navigate('/register');
+                      }}
+                    >
                       Start Assessment
                     </button>
                     <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', textAlign: 'center', fontWeight: 500 }}>Immediate institutional access</p>

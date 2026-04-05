@@ -4,9 +4,13 @@ import io from 'socket.io-client'
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000'
 
-let socket = null
+// FIX (HIGH #8): Use module-level ref tracking to prevent socket connection leaks
+// when component mounts/unmounts rapidly during navigation.
+let socketInstance = null
+let socketRefCount = 0
 
 function Chat() {
+  const socketRef = useRef(null) // Track this component's socket reference
   const [conversations, setConversations] = useState([])
   const [selectedConversation, setSelectedConversation] = useState(null)
   const [messages, setMessages] = useState([])
@@ -15,23 +19,29 @@ function Chat() {
   const [showNewChat, setShowNewChat] = useState(false)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
-  const [typingTimeout, setTypingTimeout] = useState(null)
   const [isTyping, setIsTyping] = useState(false)
+  // FIX (MEDIUM #23): Use useRef for typing timeout instead of useState.
+  // useState can lead to stale closures where clearTimeout uses an outdated timeout ID.
+  const typingTimeoutRef = useRef(null)
   const [chatStats, setChatStats] = useState(null)
   const messagesEndRef = useRef(null)
 
   // Initialize socket connection
   useEffect(() => {
-    socket = io(API_URL, {
-      withCredentials: true,
-      transports: ['websocket', 'polling']
-    })
+    // FIX (HIGH #8): Use reference counting to prevent connection leaks
+    socketRefCount++
+    if (!socketInstance) {
+      socketInstance = io(API_URL, {
+        withCredentials: true,
+        transports: ['websocket', 'polling']
+      })
+      socketInstance.on('connect', () => {
+        console.log('Chat socket connected:', socketInstance.id)
+      })
+    }
+    socketRef.current = socketInstance
 
-    socket.on('connect', () => {
-      console.log('Chat socket connected:', socket.id)
-    })
-
-    socket.on('chat_new_message', (data) => {
+    socketRef.current.on('chat_new_message', (data) => {
       if (selectedConversation && data.conversation_id === selectedConversation.id) {
         setMessages(prev => [...prev, data.message])
         scrollToBottom()
@@ -40,7 +50,7 @@ function Chat() {
       loadConversations()
     })
 
-    socket.on('chat_message_received', (data) => {
+    socketRef.current.on('chat_message_received', (data) => {
       if (selectedConversation && data.conversation_id === selectedConversation.id) {
         setMessages(prev => {
           // Avoid duplicate messages
@@ -52,31 +62,36 @@ function Chat() {
       }
     })
 
-    socket.on('user_typing', (data) => {
+    socketRef.current.on('user_typing', (data) => {
       if (selectedConversation && data.conversation_id === selectedConversation.id) {
         // Could show typing indicator here
       }
     })
 
     return () => {
-      if (socket) {
-        socket.off('connect')
-        socket.off('chat_new_message')
-        socket.off('chat_message_received')
-        socket.off('user_typing')
-        socket.disconnect()
+      // FIX (HIGH #8): Only disconnect when last Chat component unmounts
+      socketRefCount--
+      if (socketRef.current) {
+        socketRef.current.off('chat_new_message')
+        socketRef.current.off('chat_message_received')
+        socketRef.current.off('user_typing')
       }
+      if (socketRefCount === 0 && socketInstance) {
+        socketInstance.disconnect()
+        socketInstance = null
+      }
+      socketRef.current = null
     }
   }, [selectedConversation])
 
   // Join chat room when conversation is selected
   useEffect(() => {
-    if (selectedConversation && socket) {
-      socket.emit('join_chat', selectedConversation.id)
+    if (selectedConversation && socketRef.current) {
+      socketRef.current.emit('join_chat', selectedConversation.id)
     }
     return () => {
-      if (selectedConversation && socket) {
-        socket.emit('leave_chat', selectedConversation.id)
+      if (selectedConversation && socketRef.current) {
+        socketRef.current.emit('leave_chat', selectedConversation.id)
       }
     }
   }, [selectedConversation])
@@ -225,30 +240,29 @@ function Chat() {
 
   const handleTyping = (e) => {
     setNewMessage(e.target.value)
-    
+
     // Emit typing indicator
-    if (socket && selectedConversation) {
+    if (socketRef.current && selectedConversation) {
       if (!isTyping) {
         setIsTyping(true)
-        socket.emit('typing_start', {
+        socketRef.current.emit('typing_start', {
           conversationId: selectedConversation.id,
           isTyping: true
         })
       }
 
+      // FIX (MEDIUM #23): Use ref for timeout to prevent stale closure issues
       // Clear previous timeout
-      if (typingTimeout) clearTimeout(typingTimeout)
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
 
       // Set new timeout to stop typing indicator
-      const timeout = setTimeout(() => {
+      typingTimeoutRef.current = setTimeout(() => {
         setIsTyping(false)
-        socket.emit('typing_start', {
+        socketRef.current.emit('typing_start', {
           conversationId: selectedConversation.id,
           isTyping: false
         })
       }, 1000)
-
-      setTypingTimeout(timeout)
     }
   }
 

@@ -11,9 +11,6 @@ const CONTRACT_SIZES = {
   XAGUSD: 5000
 }
 
-// Valid account sizes
-const VALID_SIZES = [5000, 10000, 25000, 50000, 100000]
-
 // Account types
 const ACCOUNT_TYPES = {
   PHASE1: 'phase1',
@@ -85,7 +82,7 @@ const UPLOAD_SETTINGS = {
   MAX_FILE_SIZE: 5 * 1024 * 1024, // 5MB
   ALLOWED_ID_EXTENSIONS: ['jpg', 'png', 'pdf'],
   ALLOWED_SELFIE_EXTENSIONS: ['jpg', 'png'],
-  PRICE_HISTORY_RETAIN_DAYS: 7
+  PRICE_HISTORY_RETAIN_DAYS: 90
 }
 
 // Time settings (all in UTC)
@@ -97,7 +94,9 @@ const TIME_SETTINGS = {
 
 module.exports = {
   CONTRACT_SIZES,
-  VALID_SIZES,
+  // FIX (BUG-4): VALID_SIZES removed from constants.js — accounts.js is the
+  // single authoritative source (includes $1k, $2k, $2.5k sizes that this
+  // file was missing). Any file needing VALID_SIZES should import from accounts.js.
   ACCOUNT_TYPES,
   ACCOUNT_STATUSES,
   TRADE_STATUSES,

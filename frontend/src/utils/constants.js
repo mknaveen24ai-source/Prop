@@ -4,6 +4,9 @@
  */
 
 // Contract sizes (units per 1 lot) - must match backend
+// FIX (LOW #26): This is the single source of truth for frontend.
+// Backend CONTRACT_SIZES defined in backend/constants.js
+// Always update here when backend adds new instruments.
 export const CONTRACT_SIZES = {
   EURUSD: 100000,
   GBPUSD: 100000,
@@ -103,7 +106,11 @@ export const INSTRUMENT_GROUPS = {
 }
 
 // Valid account sizes
-export const VALID_ACCOUNT_SIZES = [5000, 10000, 25000, 50000, 100000]
+// FIX (LOW #25): Synced with backend VALID_SIZES in accounts.js
+// Backend supports: [1000, 2000, 2500, 5000, 10000, 25000, 50000, 100000, 200000]
+// Note: Frontend should rely on API response from /api/accounts/available-sizes
+// instead of this hardcoded list, which is kept for reference only.
+export const VALID_ACCOUNT_SIZES = [1000, 2000, 2500, 5000, 10000, 25000, 50000, 100000, 200000]
 
 // Default platform settings
 export const DEFAULT_PLATFORM_SETTINGS = {

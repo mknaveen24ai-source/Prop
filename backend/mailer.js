@@ -70,18 +70,27 @@ async function send(to, subject, html, text) {
 // ─────────────────────────────────────────────────────────────────────────────
 // PASSWORD RESET
 // ─────────────────────────────────────────────────────────────────────────────
-async function sendPasswordReset(toEmail, resetLink) {
+async function sendPasswordReset(toEmail, resetLink, resetToken) {
   const subject = `${FIRM()} — Password Reset Request`
+  // FIX (CRITICAL #2): Token is displayed in email body for manual copy-paste,
+  // NOT embedded in the URL. This prevents token leakage via browser history,
+  // server logs, referrer headers, etc.
   const html = htmlWrap('Password Reset Request', `
-    <p>You requested a password reset. Click the button below to set a new password.</p>
+    <p>You requested a password reset. Go to the link below and enter the code to set a new password.</p>
     <p style="margin:28px 0;">
       <a href="${resetLink}" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">
-        Reset My Password
+        Go to Reset Page
       </a>
     </p>
-    <p style="color:#888;font-size:13px;">This link expires in <strong>1 hour</strong>. If you did not request this, ignore this email.</p>
+    ${resetToken ? `
+    <div style="background:#1e2d3d;border:1px solid #c9a84c;border-radius:6px;padding:16px;text-align:center;margin:20px 0;">
+      <p style="color:#aaa;font-size:13px;margin:0 0 8px;">Your reset code:</p>
+      <p style="font-size:24px;font-weight:700;color:#c9a84c;letter-spacing:2px;margin:0;font-family:monospace;">${resetToken}</p>
+    </div>
+    <p style="color:#888;font-size:13px;">This code expires in <strong>1 hour</strong>. If you did not request this, ignore this email.</p>
+    ` : `<p style="color:#888;font-size:13px;">This link expires in <strong>1 hour</strong>. If you did not request this, ignore this email.</p>`}
   `)
-  return send(toEmail, subject, html, `Reset your password: ${resetLink}`)
+  return send(toEmail, subject, html, `Reset your password: ${resetLink}${resetToken ? ` (Code: ${resetToken})` : ''}`)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

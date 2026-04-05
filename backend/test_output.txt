@@ -1,0 +1,68 @@
+[dotenv@17.3.1] injecting env (11) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+2026-04-04 19:46:26 [[32minfo[39m]: [progression] Creating Phase 2 for user u1: size=$10000 target=8% ($800) maxDD=9% days=20
+2026-04-04 19:46:26 [[32minfo[39m]: [progression] Creating Funded account for user u2: size=$5000 maxDD=4%
+2026-04-04 19:46:26 [[32minfo[39m]: [progression] Creating Phase 2 for user u3: size=$2000 target=10% ($200) maxDD=10% days=30
+✔ authenticateToken accepts cookie token (5.2407ms)
+✔ authenticateAdmin accepts admin_token cookie (0.8911ms)
+✔ authenticateAdmin rejects non-admin role (0.625ms)
+✔ validatePendingOrderPrice enforces proper side of market (0.4264ms)
+✔ validatePendingOrderPrice rejects invalid pending price (0.1494ms)
+✔ validatePendingOrderPrice rejects when live price is unavailable (0.1878ms)
+✔ normalizeProgressionSettings applies defaults (0.3338ms)
+✔ buildPromotionPlan creates phase2 plan for phase1 account (5.2749ms)
+✔ buildPromotionPlan creates funded plan for phase2 account (0.6618ms)
+✔ promotePassedAccount runs insert and bbook update (1.1626ms)
+▶ Backend Utilities - validation.js
+  ▶ isValidEmail
+    ✔ accepts valid emails (0.3698ms)
+    ✔ rejects invalid emails (0.1502ms)
+  ✔ isValidEmail (0.7881ms)
+  ▶ isValidPhone
+    ✔ accepts valid phone numbers (0.2276ms)
+    ✔ rejects clearly invalid phone numbers (0.1154ms)
+  ✔ isValidPhone (0.4387ms)
+  ▶ isValidCountry
+    ✔ accepts valid country codes (0.3518ms)
+    ✔ rejects invalid country codes (0.2125ms)
+  ✔ isValidCountry (1.066ms)
+  ▶ isValidNumber
+    ✔ accepts valid numbers in range (0.2372ms)
+    ✔ rejects numbers out of range (0.0969ms)
+    ✖ handles decimal validation (1.0955ms)
+  ✖ isValidNumber (1.624ms)
+  ▶ isValidLotSize
+    ✔ accepts valid lot sizes (0.2151ms)
+    ✔ rejects invalid lot sizes (0.1332ms)
+  ✔ isValidLotSize (0.4672ms)
+✖ Backend Utilities - validation.js (5.0116ms)
+ℹ tests 21
+ℹ suites 6
+ℹ pass 20
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10421.5349
+
+✖ failing tests:
+
+test at test\validation.test.js:66:5
+✖ handles decimal validation (1.0955ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at TestContext.<anonymous> (c:\propfirm\backend\test\validation.test.js:71:14)
+      at Test.runInAsyncScope (node:async_hooks:214:14)
+      at Test.run (node:internal/test_runner/test:1103:25)
+      at Suite.processPendingSubtests (node:internal/test_runner/test:785:18)
+      at Test.postRun (node:internal/test_runner/test:1232:19)
+      at Test.run (node:internal/test_runner/test:1160:12)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:785:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -126,7 +126,7 @@ export default function Dispute({ user, accounts }) {
                       <option value="">— Select account —</option>
                       {eligibleAccounts.map(acc => (
                         <option key={acc.id} value={acc.id}>
-                          {acc.account_type.toUpperCase()} ${parseFloat(acc.account_size).toLocaleString()} — {acc.status.toUpperCase()}
+                          {acc.account_type.toUpperCase()} ${parseFloat(acc.account_size).toLocaleString('en-US')} — {acc.status.toUpperCase()}
                           {acc.phase_end_date ? ` (ended ${new Date(acc.phase_end_date).toLocaleDateString()})` : ''}
                           {` · ID: ${acc.account_uid || acc.id}`}
                         </option>

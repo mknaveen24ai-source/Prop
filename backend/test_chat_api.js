@@ -12,7 +12,7 @@ async function testChatAPI() {
     console.log('✓ Price status endpoint works')
     console.log('  Healthy:', res.data.healthy)
   } catch (err) {
-    console.log('✗ Price status endpoint failed:', err.response?.data?.error || err.message)
+    console.warn('✗ Price status endpoint failed:', err.response?.data?.error || err.message)
   }
 
   // Test 2: Chat without auth (should fail with 401)
@@ -23,7 +23,7 @@ async function testChatAPI() {
     if (err.response?.status === 401) {
       console.log('✓ Chat endpoint correctly requires authentication')
     } else {
-      console.log('✗ Chat endpoint error:', err.response?.status, err.response?.data?.error)
+      console.warn('✗ Chat endpoint unexpected response:', err.response?.status, err.response?.data?.error)
     }
   }
 
@@ -35,7 +35,7 @@ async function testChatAPI() {
     if (err.response?.status === 401) {
       console.log('✓ Admin chat stats correctly requires authentication')
     } else {
-      console.log('✗ Admin chat stats error:', err.response?.status, err.response?.data?.error)
+      console.warn('✗ Admin chat stats unexpected response:', err.response?.status, err.response?.data?.error)
     }
   }
 
@@ -44,7 +44,7 @@ async function testChatAPI() {
   console.log('1. Make sure backend is running: npm run start (in backend/)')
   console.log('2. Login as a user in the frontend')
   console.log('3. Try creating a chat conversation')
-  console.log('4. Check browser console for detailed error messages')
+  console.log('4. Verify API responses in the terminal output above')
 }
 
 testChatAPI().catch(console.error)

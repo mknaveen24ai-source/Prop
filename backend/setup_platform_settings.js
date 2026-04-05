@@ -59,10 +59,10 @@ async function setupPlatformSettings() {
     
   } catch (err) {
     console.error('Setup error:', err.message)
-    console.error(err.stack)
   }
   
   process.exit(0)
 }
 
 setupPlatformSettings()
+

@@ -1,17 +1,20 @@
-const express = require('express')
-const router = express.Router()
-const bcrypt = require('bcryptjs')
-const jwt = require('jsonwebtoken')
+const express  = require('express')
+const router   = express.Router()
+const bcrypt   = require('bcryptjs')
+const jwt      = require('jsonwebtoken')
 const { v4: uuidv4 } = require('uuid')
-const crypto = require('crypto')
-const pool = require('../db')
-const { authenticateToken } = require('./middleware')
+const crypto   = require('crypto')
+const qrcode   = require('qrcode')
+const pool     = require('../db')
+const { authenticateToken, authenticatePre2FA } = require('./middleware')
 const rateLimit = require('express-rate-limit')
 const { sendPasswordReset } = require('../mailer')
 const { passwordResetLimiter } = require('../utils/security')
 const { isValidEmail, isValidPassword, sanitizeString } = require('../utils/validation')
-const logger = require('../utils/logger')
+const logger   = require('../utils/logger')
+const totp     = require('../utils/totp')
 require('dotenv').config()
+
 
 const BLOCKED_COUNTRIES = ['United States', 'Canada', 'Iran', 'North Korea', 'Cuba', 'Syria']
 
@@ -211,7 +214,7 @@ router.post('/login', loginLimiter, async function(req, res) {
 
     const result = await pool.query(
       'SELECT id, email, password_hash, full_name, country, kyc_status, is_banned,' +
-      ' affiliate_code, trader_uid, token_version FROM users WHERE email = $1',
+      ' affiliate_code, trader_uid, token_version, totp_enabled FROM users WHERE email = $1',
       [email.toLowerCase()]
     )
 
@@ -220,8 +223,6 @@ router.post('/login', loginLimiter, async function(req, res) {
     }
 
     const user = result.rows[0]
-
-    // FIX: trader_uid backfill handled in server.js startup â€” not on every login
     const traderUid = user.trader_uid
 
     if (user.is_banned) {
@@ -233,6 +234,19 @@ router.post('/login', loginLimiter, async function(req, res) {
       return res.status(401).json({ error: 'Invalid email or password' })
     }
 
+    // ── 2FA check ─────────────────────────────────────────────────────────────
+    if (user.totp_enabled) {
+      // Issue a short-lived pre_2fa token — NOT a full session token.
+      // This token only works with POST /api/auth/2fa/validate.
+      const pre2faToken = jwt.sign(
+        { userId: user.id, email: user.email, type: 'pre_2fa' },
+        process.env.JWT_SECRET,
+        { expiresIn: '5m' }
+      )
+      return res.json({ requires2FA: true, pre2faToken })
+    }
+
+    // ── Normal login (no 2FA) ─────────────────────────────────────────────────
     const tokenVersion = user.token_version || 1
     const token = jwt.sign(
       { userId: user.id, email: user.email, tv: tokenVersion },
@@ -242,7 +256,7 @@ router.post('/login', loginLimiter, async function(req, res) {
 
     setAuthCookie(res, token)
 
-    // IP logging â€” non-fatal
+    // IP logging — non-fatal
     try {
       const loginIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown'
       await pool.query(
@@ -344,9 +358,13 @@ router.post('/forgot-password', passwordResetLimiter, async function(req, res) {
       [tokenHash, expiresAt, user.id]
     )
 
-    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${rawToken}&email=${encodeURIComponent(user.email)}`
+    // FIX (CRITICAL #2): Don't expose reset token in URL query string.
+    // Send a link to the reset-password page WITHOUT the token in the URL.
+    // The user will enter the token manually on that page, preventing token
+    // leakage via browser history, server logs, referrer headers, etc.
+    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password`
 
-    await sendPasswordReset(user.email, resetLink)
+    await sendPasswordReset(user.email, resetLink, rawToken)
 
     if (process.env.NODE_ENV !== 'production') {
       logger.debug('Password reset link:', { email: user.email, link: resetLink })
@@ -529,3 +547,275 @@ router.patch('/theme', authenticateToken, async function(req, res) {
 })
 
 module.exports = router
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DB Migration — run at startup (idempotent)
+// Adds all 2FA columns to the users table.
+// ─────────────────────────────────────────────────────────────────────────────
+;(async () => {
+  try {
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret      TEXT    DEFAULT NULL`)
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled     BOOLEAN DEFAULT FALSE`)
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_temp_secret TEXT    DEFAULT NULL`)
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_backup_codes TEXT   DEFAULT NULL`)
+  } catch (e) {
+    // logger may not be ready yet — use console
+    console.warn('[auth_2fa] Could not run 2FA migrations:', e.message)
+  }
+})()
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rate limiter for 2FA validate — 10 attempts per 15 min per IP
+// ─────────────────────────────────────────────────────────────────────────────
+const twoFaValidateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many 2FA attempts. Please wait 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/auth/2fa/status — returns totp_enabled for the logged-in user
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/2fa/status', authenticateToken, async function(req, res) {
+  try {
+    const r = await pool.query(
+      `SELECT totp_enabled FROM users WHERE id = $1`,
+      [req.user.userId]
+    )
+    if (r.rows.length === 0) return res.status(404).json({ error: 'User not found' })
+    res.json({ totp_enabled: !!r.rows[0].totp_enabled })
+  } catch (err) {
+    logger.error('[2fa/status] error:', { error: err.message })
+    res.status(500).json({ error: 'Could not fetch 2FA status' })
+  }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/auth/2fa/setup
+//
+// Generates a new TOTP secret, stores it in totp_temp_secret (NOT enabled yet),
+// and returns a base64 QR-code image URL + plain secret for manual entry.
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/2fa/setup', authenticateToken, async function(req, res) {
+  try {
+    const userRow = await pool.query(
+      `SELECT email, totp_enabled FROM users WHERE id = $1`,
+      [req.user.userId]
+    )
+    if (userRow.rows.length === 0) return res.status(404).json({ error: 'User not found' })
+
+    const { email, totp_enabled } = userRow.rows[0]
+    if (totp_enabled) {
+      return res.status(400).json({ error: '2FA is already enabled. Disable it first.' })
+    }
+
+    const { base32, otpauthUrl } = totp.generateSecret(email)
+    const qrDataUrl = await qrcode.toDataURL(otpauthUrl)
+
+    // Store temp secret (encrypted) — NOT live yet
+    const encryptedTemp = totp.encryptSecret(base32)
+    await pool.query(
+      `UPDATE users SET totp_temp_secret = $1 WHERE id = $2`,
+      [encryptedTemp, req.user.userId]
+    )
+
+    res.json({
+      qr: qrDataUrl,        // base64 data URL for <img>
+      secret: base32,       // plain text for manual entry in authenticator app
+    })
+  } catch (err) {
+    logger.error('[2fa/setup] error:', { error: err.message })
+    res.status(500).json({ error: 'Could not set up 2FA' })
+  }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/auth/2fa/verify-setup
+//
+// Verifies the first TOTP code from the user's authenticator app.
+// If valid: promotes temp → live secret, enables 2FA, generates backup codes.
+// Returns backup codes (shown ONCE — never again).
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/2fa/verify-setup', authenticateToken, async function(req, res) {
+  try {
+    const { token } = req.body
+    if (!token) return res.status(400).json({ error: 'token required' })
+
+    const userRow = await pool.query(
+      `SELECT totp_temp_secret, totp_enabled FROM users WHERE id = $1`,
+      [req.user.userId]
+    )
+    if (userRow.rows.length === 0) return res.status(404).json({ error: 'User not found' })
+
+    const { totp_temp_secret, totp_enabled } = userRow.rows[0]
+    if (totp_enabled) return res.status(400).json({ error: '2FA is already active' })
+    if (!totp_temp_secret) return res.status(400).json({ error: 'Run /2fa/setup first' })
+
+    const plainTemp = totp.decryptSecret(totp_temp_secret)
+    const valid     = totp.verifyToken(plainTemp, token)
+    if (!valid) return res.status(401).json({ error: 'Invalid code. Please try again.' })
+
+    // Generate 8 one-time backup codes
+    const { plain, hashes } = await totp.generateBackupCodes()
+    const backupJson = JSON.stringify(hashes.map(h => ({ hash: h, used: false })))
+
+    // Promote temp → live secret, enable 2FA, store backup code hashes
+    const encryptedLive = totp.encryptSecret(plainTemp)
+    await pool.query(
+      `UPDATE users SET
+         totp_secret      = $1,
+         totp_enabled     = TRUE,
+         totp_temp_secret = NULL,
+         totp_backup_codes = $2
+       WHERE id = $3`,
+      [encryptedLive, backupJson, req.user.userId]
+    )
+
+    logger.info(`[2fa] User ${req.user.userId} enabled 2FA`)
+    res.json({
+      message:      '2FA enabled successfully',
+      backup_codes: plain,  // shown ONCE — user must save these
+    })
+  } catch (err) {
+    logger.error('[2fa/verify-setup] error:', { error: err.message })
+    res.status(500).json({ error: 'Could not activate 2FA' })
+  }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/auth/2fa/validate
+//
+// Called after /login when requires2FA === true.
+// Accepts the pre2faToken (Authorization: Bearer <token>) + 6-digit OTP.
+// If valid: issues the full session cookie & returns the user object.
+// Also accepts backup codes (same endpoint — tries TOTP first, then backup).
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/2fa/validate', twoFaValidateLimiter, authenticatePre2FA, async function(req, res) {
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown'
+
+  // Per-IP rate limit check (5 failures → 15 min lock)
+  const rl = totp.checkRateLimit(ip)
+  if (rl.blocked) {
+    return res.status(429).json({ error: `Too many failed attempts. Try again in ${rl.remaining} minute(s).` })
+  }
+
+  try {
+    const { token } = req.body
+    if (!token) return res.status(400).json({ error: 'token required' })
+
+    const { userId } = req.pre2fa
+    const userRow = await pool.query(
+      `SELECT id, email, full_name, country, kyc_status, affiliate_code, trader_uid,
+              token_version, totp_enabled, totp_secret, totp_backup_codes
+       FROM users WHERE id = $1`,
+      [userId]
+    )
+    if (userRow.rows.length === 0) return res.status(404).json({ error: 'User not found' })
+
+    const user = userRow.rows[0]
+    if (!user.totp_enabled || !user.totp_secret) {
+      return res.status(400).json({ error: '2FA is not enabled on this account' })
+    }
+
+    const plainSecret = totp.decryptSecret(user.totp_secret)
+    let validated     = totp.verifyToken(plainSecret, token)
+
+    // Try backup code if TOTP fails
+    if (!validated && user.totp_backup_codes) {
+      let codes
+      try { codes = JSON.parse(user.totp_backup_codes) } catch { codes = [] }
+      const { matched, updated } = await totp.consumeBackupCode(token, codes)
+      if (matched) {
+        await pool.query(
+          `UPDATE users SET totp_backup_codes = $1 WHERE id = $2`,
+          [JSON.stringify(updated), userId]
+        )
+        validated = true
+      }
+    }
+
+    if (!validated) {
+      totp.recordFailure(ip)
+      return res.status(401).json({ error: 'Invalid code. Please try again.' })
+    }
+
+    // Success — clear failure counter, issue full session
+    totp.clearAttempts(ip)
+
+    const tokenVersion = user.token_version || 1
+    const fullToken = jwt.sign(
+      { userId: user.id, email: user.email, tv: tokenVersion },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    )
+    setAuthCookie(res, fullToken)
+
+    res.json({
+      message: 'Login successful',
+      user: {
+        id:            user.id,
+        trader_id:     user.id,
+        trader_uid:    user.trader_uid,
+        email:         user.email,
+        full_name:     user.full_name,
+        country:       user.country,
+        kyc_status:    user.kyc_status,
+        affiliate_code: user.affiliate_code,
+      }
+    })
+  } catch (err) {
+    logger.error('[2fa/validate] error:', { error: err.message })
+    res.status(500).json({ error: 'Could not verify 2FA token' })
+  }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/auth/2fa/disable
+//
+// Requires BOTH the user's account password AND a valid TOTP token.
+// Clears totp_secret, sets totp_enabled = false.
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/2fa/disable', authenticateToken, async function(req, res) {
+  try {
+    const { token, password } = req.body
+    if (!token || !password) {
+      return res.status(400).json({ error: 'Both password and 2FA token are required' })
+    }
+
+    const userRow = await pool.query(
+      `SELECT password_hash, totp_enabled, totp_secret FROM users WHERE id = $1`,
+      [req.user.userId]
+    )
+    if (userRow.rows.length === 0) return res.status(404).json({ error: 'User not found' })
+
+    const user = userRow.rows[0]
+    if (!user.totp_enabled) return res.status(400).json({ error: '2FA is not enabled' })
+
+    // Verify password
+    const pwValid = await bcrypt.compare(password, user.password_hash)
+    if (!pwValid) return res.status(401).json({ error: 'Incorrect password' })
+
+    // Verify TOTP
+    const plainSecret = totp.decryptSecret(user.totp_secret)
+    const codeValid   = totp.verifyToken(plainSecret, token)
+    if (!codeValid) return res.status(401).json({ error: 'Invalid 2FA code' })
+
+    await pool.query(
+      `UPDATE users SET
+         totp_enabled      = FALSE,
+         totp_secret       = NULL,
+         totp_temp_secret  = NULL,
+         totp_backup_codes = NULL
+       WHERE id = $1`,
+      [req.user.userId]
+    )
+
+    logger.info(`[2fa] User ${req.user.userId} disabled 2FA`)
+    res.json({ message: '2FA disabled successfully' })
+  } catch (err) {
+    logger.error('[2fa/disable] error:', { error: err.message })
+    res.status(500).json({ error: 'Could not disable 2FA' })
+  }
+})

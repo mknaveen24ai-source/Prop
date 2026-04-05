@@ -14,10 +14,15 @@ class SecurityAuditor {
     this.issues = [];
     this.warnings = [];
     this.passed = [];
+    this.seenIssues = new Set();
   }
 
   // Add issue to report
   addIssue(severity, category, description, recommendation, file = null, line = null) {
+    const dedupeKey = `${severity}|${category}|${description}|${file || ''}|${line || ''}`;
+    if (this.seenIssues.has(dedupeKey)) return;
+    this.seenIssues.add(dedupeKey);
+
     this.issues.push({
       severity,
       category,
@@ -58,10 +63,9 @@ class SecurityAuditor {
     console.log('🔍 Checking for SQL injection vulnerabilities...');
     
     const sqlPatterns = [
-      { pattern: /\$\{.*\}/, type: 'Template literal injection' },
-      { pattern: /\+.*\+.*WHERE/, type: 'String concatenation in SQL' },
-      { pattern: /concat\(.*WHERE/, type: 'Concat function in SQL' },
-      { pattern: /SELECT.*\+.*FROM/, type: 'String concatenation in SELECT' },
+      { pattern: /\$\{\s*(req|request)\.(params|query|body)[^}]*\}/i, type: 'Request data interpolated into SQL template literal' },
+      { pattern: /(?:SELECT|INSERT|UPDATE|DELETE|WHERE|ORDER BY|LIMIT|OFFSET).*\+\s*(req|request)\.(params|query|body)/i, type: 'Request data concatenated into SQL string' },
+      { pattern: /(?:ORDER BY|LIMIT|OFFSET)\s+\$\{\s*(req|request)\.(params|query|body)[^}]*\}/i, type: 'Dynamic SQL clause built from request data' },
     ];
 
     this.scanFiles('**/*.js', sqlPatterns, (match, filePath, line) => {
@@ -103,31 +107,62 @@ class SecurityAuditor {
   checkDependencies() {
     console.log('🔍 Checking for insecure dependencies...');
     
+    let auditRaw = '';
     try {
-      const auditResult = execSync('npm audit --json', { encoding: 'utf8' });
-      const audit = JSON.parse(auditResult);
-      
-      if (audit.vulnerabilities) {
-        Object.entries(audit.vulnerabilities).forEach(([pkg, vuln]) => {
-          vuln.forEach(v => {
-            this.addIssue(
-              v.severity === 'high' ? 'HIGH' : v.severity === 'moderate' ? 'MEDIUM' : 'LOW',
-              'Insecure Dependencies',
-              `Vulnerable package: ${pkg} (${v.severity}) - ${v.title}`,
-              `Run: npm audit fix`,
-              'package.json'
-            );
-          });
-        });
-      }
+      auditRaw = execSync('npm audit --json', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
     } catch (error) {
-      this.addIssue(
-        'LOW',
-        'Dependency Check Failed',
-        'Could not run npm audit',
-        'Ensure npm is installed and package.json exists'
-      );
+      // npm audit exits non-zero when vulnerabilities are found.
+      auditRaw = String(error.stdout || error.stderr || '').trim();
+      if (!auditRaw || !auditRaw.includes('{')) {
+        this.warnings.push({
+          category: 'Dependency Check',
+          message: 'Could not run npm audit in current environment'
+        });
+        return;
+      }
     }
+
+    let audit;
+    try {
+      audit = JSON.parse(auditRaw);
+    } catch {
+      this.warnings.push({
+        category: 'Dependency Check',
+        message: 'npm audit output was not valid JSON'
+      });
+      return;
+    }
+
+    const vulnerabilities = audit?.vulnerabilities || {};
+    Object.entries(vulnerabilities).forEach(([pkg, vuln]) => {
+      const viaEntries = Array.isArray(vuln?.via)
+        ? vuln.via.filter(v => v && typeof v === 'object')
+        : [];
+
+      if (viaEntries.length === 0) {
+        if (vuln?.severity) {
+          this.addIssue(
+            vuln.severity === 'high' ? 'HIGH' : vuln.severity === 'moderate' ? 'MEDIUM' : 'LOW',
+            'Insecure Dependencies',
+            `Vulnerable package: ${pkg} (${vuln.severity})`,
+            'Run: npm audit fix',
+            'package.json'
+          );
+        }
+        return;
+      }
+
+      viaEntries.forEach(v => {
+        const severity = v.severity || vuln.severity || 'low';
+        this.addIssue(
+          severity === 'high' ? 'HIGH' : severity === 'moderate' ? 'MEDIUM' : 'LOW',
+          'Insecure Dependencies',
+          `Vulnerable package: ${pkg} (${severity}) - ${v.title || 'advisory'}`,
+          'Run: npm audit fix',
+          'package.json'
+        );
+      });
+    });
   }
 
   // Check for insecure configurations
@@ -190,7 +225,20 @@ class SecurityAuditor {
   // Scan files for patterns
   scanFiles(pattern, searchPatterns, callback) {
     const glob = require('glob');
-    const files = glob.sync(pattern, { ignore: ['node_modules/**', 'logs/**'] });
+    const files = glob.sync(pattern, {
+      ignore: [
+        '**/node_modules/**',
+        '**/logs/**',
+        '**/build/**',
+        '**/coverage/**',
+        '**/dist/**',
+        '**/test/**',
+        '**/tests/**',
+        '**/*.test.js',
+        '**/scripts/**',
+        '**/tools/**'
+      ]
+    });
     
     files.forEach(filePath => {
       try {
@@ -214,6 +262,15 @@ class SecurityAuditor {
   checkFilePermissions() {
     console.log('🔍 Checking file permissions...');
     
+    // Windows ACLs do not map cleanly to POSIX mode bits.
+    if (process.platform === 'win32') {
+      this.warnings.push({
+        category: 'File Permissions',
+        message: 'Permission checks are limited on Windows'
+      });
+      return;
+    }
+
     const sensitiveFiles = ['.env', 'config.json', 'private.key'];
     
     sensitiveFiles.forEach(file => {
@@ -303,6 +360,13 @@ class SecurityAuditor {
       console.log(`  - Plan to fix ${mediumIssues.length} medium severity issues`);
       console.log(`  - Consider fixing ${lowIssues.length} low severity issues`);
     }
+
+    if (this.warnings.length > 0) {
+      console.log('\n⚠️ WARNINGS:');
+      this.warnings.forEach(w => {
+        console.log(`  - [${w.category}] ${w.message}`);
+      });
+    }
     
     // Save report to file
     const reportPath = path.join(process.cwd(), 'logs', 'security-audit.json');
@@ -315,9 +379,11 @@ class SecurityAuditor {
         total: this.issues.length,
       },
       issues: this.issues,
+      warnings: this.warnings,
     };
     
     try {
+      fs.mkdirSync(path.dirname(reportPath), { recursive: true });
       fs.writeFileSync(reportPath, JSON.stringify(reportData, null, 2));
       console.log(`\n📁 Detailed report saved to: ${reportPath}`);
     } catch (error) {

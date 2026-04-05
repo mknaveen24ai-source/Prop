@@ -68,8 +68,9 @@ async function expireAccount(acc, io) {
             : parseFloat(priceData.ask)
 
           const demo_pnl = calculatePnL(
-            trade.direction, parseFloat(trade.open_price, parseFloat(trade.commission || 0)),
-            close_price, parseFloat(trade.lot_size), trade.instrument
+            trade.direction, parseFloat(trade.open_price),
+            close_price, parseFloat(trade.lot_size), trade.instrument,
+            parseFloat(trade.commission || 0)
           )
           totalPnl += demo_pnl
 
@@ -194,7 +195,7 @@ async function failAccount(acc, reason, io) {
 
         const demo_pnl = calculatePnL(
           trade.direction,
-          parseFloat(trade.open_price, parseFloat(trade.commission || 0)),
+          parseFloat(trade.open_price),
           close_price,
           parseFloat(trade.lot_size),
           trade.instrument,
@@ -456,14 +457,27 @@ async function runChallengeEngine(io) {
       }
     }
 
-    // ── Cross-account opposing trade detection ─────────────────────────────
+    // FIX (BUG-6): detectRapidOpposingTrades must run BEFORE detectOpposingTrades.
+    // detectOpposingTrades sets matching accounts to status='locked'. The rapid
+    // check queries WHERE status='active' — running it afterwards always found 0
+    // results because the accounts were already locked. Swapping the order ensures
+    // both functions operate on still-active accounts.
+
+    // ── Rapid opposing trade detection (must run first — needs active accounts) ─
+    try {
+      await detectRapidOpposingTradesGlobal()
+    } catch (rapidErr) {
+      logger.error('[rapid_opposing] Detection error:', { error: rapidErr.message })
+    }
+
+    // ── Cross-account opposing trade detection (locks accounts) ────────────────
     try {
       await detectOpposingTrades(io)
     } catch (oppErr) {
       logger.error('[opposing_trades] Detection error:', { error: oppErr.message })
     }
 
-    // ── IP-based multi-account detection ───────────────────────────────────
+    // ── IP-based multi-account detection ───────────────────────────────────────
     try {
       await detectIPMultiAccounts()
     } catch (ipErr) {
@@ -534,6 +548,32 @@ async function detectRapidOpposingTrades(userId, instrument, accountIds, io) {
   }
 }
 
+// FIX (BUG-6): Global entry point for rapid opposing trade detection.
+// Scans all active users who have recent closed trades in both directions
+// on the same instrument, then delegates to the per-user checker.
+// Must be called BEFORE detectOpposingTrades so accounts are still 'active'.
+async function detectRapidOpposingTradesGlobal() {
+  try {
+    const result = await pool.query(`
+      SELECT a.user_id, t.instrument,
+             array_agg(DISTINCT a.id) AS account_ids
+      FROM trades t
+      JOIN accounts a ON t.account_id = a.id
+      WHERE t.status = 'closed'
+        AND t.close_time > NOW() - INTERVAL '24 hours'
+        AND a.status = 'active'
+      GROUP BY a.user_id, t.instrument
+      HAVING
+        COUNT(t.id) FILTER (WHERE t.direction = 'buy')  > 0
+        AND COUNT(t.id) FILTER (WHERE t.direction = 'sell') > 0
+    `)
+    for (const row of result.rows) {
+      await detectRapidOpposingTrades(row.user_id, row.instrument, row.account_ids, null)
+    }
+  } catch (err) {
+    logger.error('[rapid_opposing_global] Scan error:', { error: err.message })
+  }
+}
 
 async function detectOpposingTrades(io) {
   if (!reviewFlagColumnsReady) {
