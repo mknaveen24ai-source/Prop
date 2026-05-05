@@ -1,8 +1,10 @@
 import React, { useState } from 'react'
 import axios from 'axios'
+import { useBranding } from '../BrandingContext'
+import { buildTenantPath, getTenantHeaders } from '../utils/tenant'
 
 // FIX Step 1: Use env variable instead of hardcoded localhost:5000
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 // ── Password strength checker ─────────────────────────────────────────────────
 function getPasswordStrength(password) {
@@ -21,6 +23,7 @@ function getPasswordStrength(password) {
 }
 
 function Register({ onLogin }) {
+  const { tenant } = useBranding()
   const [form, setForm] = useState({
     full_name: '',
     email: '',
@@ -58,7 +61,7 @@ function Register({ onLogin }) {
     setLoading(true)
 
     try {
-      const response = await axios.post(`${API_URL}/api/auth/register`, form)
+      const response = await axios.post(`${API_URL}/api/auth/register`, form, { headers: getTenantHeaders() })
       onLogin(response.data.user)
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed')
@@ -88,8 +91,10 @@ function Register({ onLogin }) {
               ⚡
             </div>
           </div>
-          <h1 style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: '8px' }}>Create an account.</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Join the premium prop firm today</p>
+          <h1 style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: '8px' }}>
+            Create your {tenant?.name || 'trading'} account.
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>{tenant?.brand?.tagline || 'Join the premium prop firm today'}</p>
         </div>
 
         {error && <div className="error">{error}</div>}
@@ -270,7 +275,7 @@ function Register({ onLogin }) {
 
         <p style={{ textAlign: 'center', marginTop: '24px', color: '#888', fontSize: '14px' }}>
           Already have an account?{' '}
-          <a href="/login" style={{ color: '#949494' }}>Sign in here</a>
+          <a href={buildTenantPath('/login')} style={{ color: '#949494' }}>Sign in here</a>
         </p>
       </div>
     </div>

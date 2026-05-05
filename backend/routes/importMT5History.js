@@ -17,23 +17,21 @@
 //   3. Bulk-insert all ticks in batches of 1000 (fast — handles 100k+ rows)
 //   4. Update PRICE_HISTORY_RETAIN_DAYS in your .env to match imported range
 // ─────────────────────────────────────────────────────────────────────────────
-require('dotenv').config()
+require('../loadEnv')
 const { Pool } = require('pg')
 const fs = require('fs')
 const path = require('path')
+const { DEFAULT_SPREADS } = require('../constants')
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 
+if (!process.env.DWX_PATH) {
+  console.error('DWX_PATH is not configured in .env')
+  process.exit(1)
+}
+
 const DWX_PATH    = process.env.DWX_PATH
 const EXPORT_FILE = path.join(DWX_PATH, 'DWX_History_Export.json')
-
-// Default spreads per instrument (used if bar.s is missing)
-const DEFAULT_SPREADS = {
-  EURUSD: 0.00012,
-  GBPUSD: 0.00014,
-  XAUUSD: 0.30,
-  XAGUSD: 0.03,
-}
 
 // Bulk insert rows in batches to avoid hitting PostgreSQL parameter limits (~65k)
 // Each tick has 4 params → batch of 1000 ticks = 4000 params (safe)

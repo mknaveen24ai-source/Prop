@@ -12,6 +12,8 @@ const metrics = {
     total: 0,
     byEndpoint: {},
     byMethod: {},
+    byStatusCode: {},
+    errorResponses: [],
     slowRequests: []
   },
   database: {
@@ -34,7 +36,7 @@ const SLOW_QUERY_THRESHOLD = 200 // ms
 const MEMORY_SAMPLE_INTERVAL = 60000 // 1 minute
 
 // Memory monitoring
-setInterval(() => {
+const memoryMonitor = setInterval(() => {
   const memUsage = process.memoryUsage()
   metrics.memory.samples.push({
     timestamp: Date.now(),
@@ -53,6 +55,9 @@ setInterval(() => {
   metrics.memory.peakRss = Math.max(metrics.memory.peakRss, memUsage.rss)
   metrics.memory.peakHeapUsed = Math.max(metrics.memory.peakHeapUsed, memUsage.heapUsed)
 }, MEMORY_SAMPLE_INTERVAL)
+if (typeof memoryMonitor.unref === 'function') {
+  memoryMonitor.unref()
+}
 
 /**
  * Performance monitoring middleware
@@ -70,6 +75,22 @@ function performanceMonitor(req, res, next) {
   res.on('finish', () => {
     const duration = Date.now() - start
     const statusCode = res.statusCode
+
+    metrics.requests.byStatusCode[statusCode] = (metrics.requests.byStatusCode[statusCode] || 0) + 1
+
+    if (statusCode >= 500) {
+      metrics.requests.errorResponses.push({
+        method,
+        endpoint,
+        statusCode,
+        timestamp: new Date().toISOString(),
+        timestampMs: Date.now()
+      })
+
+      if (metrics.requests.errorResponses.length > 100) {
+        metrics.requests.errorResponses = metrics.requests.errorResponses.slice(-100)
+      }
+    }
 
     // Track slow requests
     if (duration > SLOW_REQUEST_THRESHOLD) {
@@ -160,6 +181,7 @@ function wrapDatabaseQuery(pool) {
 function getMetrics() {
   const uptime = Date.now() - metrics.startTime
   const memUsage = process.memoryUsage()
+  const uptimeSeconds = uptime > 0 ? uptime / 1000 : 0
   const avgQueryTime = metrics.database.queries > 0
     ? metrics.database.totalQueryTime / metrics.database.queries
     : 0
@@ -172,15 +194,18 @@ function getMetrics() {
     },
     requests: {
       total: metrics.requests.total,
-      perSecond: (metrics.requests.total / (uptime / 1000)).toFixed(2),
+      perSecond: uptimeSeconds > 0 ? (metrics.requests.total / uptimeSeconds).toFixed(2) : '0.00',
       slowCount: metrics.requests.slowRequests.length,
       byMethod: metrics.requests.byMethod,
+      byStatusCode: metrics.requests.byStatusCode,
+      recent5xxCount: metrics.requests.errorResponses.filter((entry) => entry.statusCode >= 500).length,
       topEndpoints: Object.entries(metrics.requests.byEndpoint)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10)
         .reduce((obj, [key, val]) => ({ ...obj, [key]: val }), {})
     },
     database: {
+      queries: metrics.database.queries,
       totalQueries: metrics.database.queries,
       avgQueryTime: avgQueryTime.toFixed(2),
       slowQueryCount: metrics.database.slowQueries.length,
@@ -209,10 +234,13 @@ function resetMetrics() {
   metrics.requests.total = 0
   metrics.requests.byEndpoint = {}
   metrics.requests.byMethod = {}
+  metrics.requests.byStatusCode = {}
+  metrics.requests.errorResponses = []
   metrics.requests.slowRequests = []
   metrics.database.queries = 0
   metrics.database.slowQueries = []
   metrics.database.totalQueryTime = 0
+  metrics.database.avgQueryTime = 0
   metrics.memory.samples = []
   metrics.memory.peakRss = 0
   metrics.memory.peakHeapUsed = 0

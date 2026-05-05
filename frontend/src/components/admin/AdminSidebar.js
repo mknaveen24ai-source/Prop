@@ -1,14 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import React, { useEffect, useState } from 'react'
+import { ChevronLeft, ChevronRight, Shield } from 'lucide-react'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { renderIcon } from '../../utils/iconMap'
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-const adminAxios = axios.create({ baseURL: API_URL, withCredentials: true });
-
-// Socket logic must assume the socket client is passed or imported if global.
-// Given constraints, we will accept a socket prop injected by AdminLayout.
-export default function AdminSidebar({ isCollapsed, onToggleCollapse, isMobileOpen, onMobileClose, socket }) {
-  const navigate = useNavigate();
+export default function AdminSidebar({
+  adminAxios,
+  session,
+  isCollapsed,
+  onToggleCollapse,
+  isMobileOpen,
+  onMobileClose,
+  socket
+}) {
+  const navigate = useNavigate()
   const [counts, setCounts] = useState({
     users: 0,
     kyc: 0,
@@ -16,123 +20,173 @@ export default function AdminSidebar({ isCollapsed, onToggleCollapse, isMobileOp
     funded: 0,
     payouts: 0,
     disputes: 0,
-    chatUnread: 0
-  });
+    chatUnread: 0,
+    violations: 0
+  })
+
+  const isSuperAdmin = session?.role === 'super_admin'
 
   useEffect(() => {
-    adminAxios.get('/api/admin/overview')
-      .then(res => {
-        const d = res.data || {};
-        setCounts(prev => ({
-          ...prev,
-          users: d.total_users || 0,
-          kyc: d.pending_kyc || 0,
-          challenges: d.active_challenges || 0,
-          funded: d.funded_accounts || 0,
-          payouts: d.pending_payouts || 0,
-          disputes: d.open_disputes || 0
-        }));
-      })
-      .catch(() => {}); // Silently degrade — sidebar badges are non-critical
-  }, []);
+    if (!adminAxios) return undefined
 
-  // Socket.io bindings
+    const refreshCounts = () => {
+      Promise.all([
+        adminAxios.get('/api/admin/overview').catch(() => ({ data: {} })),
+        adminAxios.get('/api/admin/violations/summary').catch(() => ({ data: { totals: {} } }))
+      ])
+        .then(([overviewRes, violationsRes]) => {
+          const overview = overviewRes.data || {}
+          const totals = violationsRes.data?.totals || {}
+          setCounts((current) => ({
+            ...current,
+            users: overview.total_users || 0,
+            kyc: overview.pending_kyc || 0,
+            challenges: overview.active_challenges || 0,
+            funded: overview.funded_accounts || 0,
+            payouts: overview.pending_payouts || 0,
+            disputes: overview.open_disputes || 0,
+            violations: totals.total_open || 0
+          }))
+        })
+        .catch(() => {})
+    }
+
+    refreshCounts()
+
+    if (!socket) return undefined
+
+    socket.on('admin_violation_updated', refreshCounts)
+    socket.on('admin_enforcement_event', refreshCounts)
+    socket.on('admin_command_center_updated', refreshCounts)
+    socket.on('opposing_trade_detected', refreshCounts)
+
+    return () => {
+      socket.off('admin_violation_updated', refreshCounts)
+      socket.off('admin_enforcement_event', refreshCounts)
+      socket.off('admin_command_center_updated', refreshCounts)
+      socket.off('opposing_trade_detected', refreshCounts)
+    }
+  }, [adminAxios, socket])
+
   useEffect(() => {
-    if (!socket) return;
-    
+    if (!socket) return undefined
+
     const handleCountUpdate = (data) => {
-      // Assuming socket emits { type: 'kyc_submitted' } etc
-      if (data.type === 'kyc') setCounts(c => ({ ...c, kyc: c.kyc + 1 }));
-      if (data.type === 'payout') setCounts(c => ({ ...c, payouts: c.payouts + 1 }));
-      if (data.type === 'dispute') setCounts(c => ({ ...c, disputes: c.disputes + 1 }));
-      if (data.type === 'chat') setCounts(c => ({ ...c, chatUnread: c.chatUnread + 1 }));
-    };
+      if (data.type === 'kyc') setCounts((current) => ({ ...current, kyc: current.kyc + 1 }))
+      if (data.type === 'payout') setCounts((current) => ({ ...current, payouts: current.payouts + 1 }))
+      if (data.type === 'dispute') setCounts((current) => ({ ...current, disputes: current.disputes + 1 }))
+      if (data.type === 'chat') setCounts((current) => ({ ...current, chatUnread: current.chatUnread + 1 }))
+      if (data.type === 'violation') setCounts((current) => ({ ...current, violations: current.violations + 1 }))
+    }
 
-    socket.on('admin_alert', handleCountUpdate);
-    return () => socket.off('admin_alert', handleCountUpdate);
-  }, [socket]);
+    socket.on('admin_alert', handleCountUpdate)
+    return () => socket.off('admin_alert', handleCountUpdate)
+  }, [socket])
+
+  const profileName = session?.full_name || session?.email || 'Administrator'
+  const profileRole = isSuperAdmin
+    ? 'Platform Owner'
+    : session?.tenantId
+      ? `Tenant Admin • Tenant #${session.tenantId}`
+      : 'Tenant Admin'
+  const initials = profileName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('') || 'AD'
 
   return (
     <>
-      <div className={`admin-sidebar-overlay ${isMobileOpen ? 'active' : ''}`} onClick={onMobileClose} style={{ display: isMobileOpen ? 'block' : 'none' }}></div>
+      <div className={`admin-sidebar-overlay ${isMobileOpen ? 'active' : ''}`} onClick={onMobileClose} style={{ display: isMobileOpen ? 'block' : 'none' }} />
       <aside className={`admin-sidebar ${isCollapsed ? 'collapsed' : ''} ${isMobileOpen ? 'mobile-open' : ''}`}>
-        
         <div className="admin-sidebar-header">
           <div className="admin-sidebar-logo">
-            <span style={{ color: 'var(--admin-accent)', fontSize: '20px' }}>⚡</span>
-            {!isCollapsed && <span>PropFirm Admin</span>}
+            <Shield size={18} color="var(--admin-accent)" />
+            {!isCollapsed && <span>{isSuperAdmin ? 'Platform Admin' : 'Tenant Admin'}</span>}
           </div>
         </div>
 
         <div className="admin-sidebar-scroll">
           <div className="admin-nav-group">
             <div className="admin-nav-label">Overview</div>
-            <NavItem to="/admin" icon="🏠" label="Dashboard" end />
+            <NavItem to="/admin" icon="dashboard" label="Dashboard" end />
           </div>
 
           <div className="admin-nav-group">
             <div className="admin-nav-label">Traders</div>
-            <NavItem to="/admin/users" icon="👥" label="All Users" badge={counts.users > 0 ? { val: counts.users, color: 'neutral' } : null} />
-            <NavItem to="/admin/kyc" icon="🪪" label="KYC Approvals" badge={counts.kyc > 0 ? { val: counts.kyc, color: 'amber' } : null} />
-            <NavItem to="/admin/challenges" icon="🏆" label="Challenges" badge={counts.challenges > 0 ? { val: counts.challenges, color: 'neutral' } : null} />
-            <NavItem to="/admin/funded" icon="💎" label="Funded Accounts" badge={counts.funded > 0 ? { val: counts.funded, color: 'gold' } : null} />
+            <NavItem to="/admin/users" icon="users" label="All Users" badge={counts.users > 0 ? { val: counts.users, color: 'neutral' } : null} />
+            <NavItem to="/admin/kyc" icon="kyc" label="KYC Approvals" badge={counts.kyc > 0 ? { val: counts.kyc, color: 'amber' } : null} />
+            <NavItem to="/admin/challenges" icon="challenges" label="Challenges" badge={counts.challenges > 0 ? { val: counts.challenges, color: 'neutral' } : null} />
+            <NavItem to="/admin/funded" icon="funded" label="Funded Accounts" badge={counts.funded > 0 ? { val: counts.funded, color: 'gold' } : null} />
           </div>
 
           <div className="admin-nav-group">
             <div className="admin-nav-label">Trading</div>
-            <NavItem to="/admin/trades" icon="📊" label="All Trades" />
-            <NavItem to="/admin/copier" icon="🔁" label="Trade Copier" />
+            <NavItem to="/admin/trades" icon="trades" label="All Trades" />
+            <NavItem to="/admin/copier" icon="copier" label="Trade Copier" />
           </div>
 
           <div className="admin-nav-group">
             <div className="admin-nav-label">Finance</div>
-            <NavItem to="/admin/payouts" icon="💸" label="Payouts" badge={counts.payouts > 0 ? { val: counts.payouts, color: 'amber' } : null} />
-            <NavItem to="/admin/pnl" icon="📈" label="Platform P&L" />
+            <NavItem to="/admin/payouts" icon="payouts" label="Payouts" badge={counts.payouts > 0 ? { val: counts.payouts, color: 'amber' } : null} />
+            {isSuperAdmin && <NavItem to="/admin/pnl" icon="pnl" label="Platform P&L" />}
           </div>
 
           <div className="admin-nav-group">
             <div className="admin-nav-label">Platform</div>
-            <NavItem to="/admin/settings" icon="⚙️" label="Settings" />
-            <NavItem to="/admin/disputes" icon="⚖️" label="Disputes" badge={counts.disputes > 0 ? { val: counts.disputes, color: 'red' } : null} />
-            <NavItem to="/admin/chat" icon="💬" label="Support Chat" badge={counts.chatUnread > 0 ? { val: counts.chatUnread, color: 'red' } : null} />
-            <NavItem to="/admin/leaderboard" icon="🏅" label="Leaderboard" />
+            {isSuperAdmin && <NavItem to="/admin/command-center" icon="command" label="Command Center" />}
+            {isSuperAdmin && <NavItem to="/admin/tenants" icon="tenant" label="White Label" />}
+            <NavItem to="/admin/access" icon="key" label="Access & Security" />
+            <NavItem to="/admin/settings" icon="settings" label="Settings" />
+            <NavItem to="/admin/violations" icon="violations" label="Violations" badge={counts.violations > 0 ? { val: counts.violations, color: 'red' } : null} />
+            <NavItem to="/admin/disputes" icon="dispute" label="Disputes" badge={counts.disputes > 0 ? { val: counts.disputes, color: 'red' } : null} />
+            <NavItem to="/admin/chat" icon="chat" label="Support Chat" badge={counts.chatUnread > 0 ? { val: counts.chatUnread, color: 'red' } : null} />
+            <NavItem to="/admin/leaderboard" icon="leaderboard" label="Leaderboard" />
           </div>
         </div>
 
         <div className="admin-sidebar-footer">
           <div className="admin-user-profile" onClick={() => navigate('/admin/settings')}>
-            <div className="admin-avatar">AD</div>
+            <div className="admin-avatar">{initials}</div>
             {!isCollapsed && (
               <div style={{ flex: 1, overflow: 'hidden' }}>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: '#fff' }}>Administrator</div>
-                <div style={{ fontSize: '11px', color: 'var(--admin-text-faint)' }}>System Access</div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#fff' }}>{profileName}</div>
+                <div style={{ fontSize: '11px', color: 'var(--admin-text-faint)' }}>{profileRole}</div>
               </div>
             )}
           </div>
           <button className="admin-sidebar-toggle" onClick={onToggleCollapse}>
-            {isCollapsed ? '▶' : '◀ Collapse'}
+            {isCollapsed
+              ? <ChevronRight size={14} color="var(--admin-text-faint)" />
+              : <><ChevronLeft size={14} color="var(--admin-text-faint)" /><span>Collapse</span></>}
           </button>
         </div>
-
       </aside>
     </>
-  );
+  )
 }
 
 function NavItem({ to, icon, label, badge, end = false }) {
   return (
-    <NavLink 
-      to={to} 
+    <NavLink
+      to={to}
       end={end}
       className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}
     >
-      <span className="admin-nav-icon">{icon}</span>
-      <span className="admin-nav-text">{label}</span>
-      {badge && (
-        <span className={`admin-nav-badge ${badge.color}`} style={{ marginLeft: 'auto' }}>
-          {badge.val > 99 ? '99+' : badge.val}
-        </span>
+      {({ isActive }) => (
+        <>
+          <span className="admin-nav-icon">
+            {renderIcon(icon, { size: 16, color: isActive ? 'var(--admin-accent)' : 'var(--admin-text-faint)' })}
+          </span>
+          <span className="admin-nav-text">{label}</span>
+          {badge && (
+            <span className={`admin-nav-badge ${badge.color}`} style={{ marginLeft: 'auto' }}>
+              {badge.val > 99 ? '99+' : badge.val}
+            </span>
+          )}
+        </>
       )}
     </NavLink>
-  );
+  )
 }

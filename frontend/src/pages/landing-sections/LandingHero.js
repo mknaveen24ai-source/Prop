@@ -1,5 +1,8 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getMemoryItem, setMemoryItem } from '../../utils/memoryStore';
+import { useBranding } from '../../BrandingContext';
+import { getTenantLandingCopy } from '../../utils/tenantMarketing';
 
 /* ══════════════════════════════════════════════════════════════
    3D PARTICLE CANVAS — Connected nodes + floating orbs
@@ -234,6 +237,8 @@ function useMagnetic(ref, strength = 0.4) {
    ══════════════════════════════════════════════════════════════ */
 export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
   const navigate = useNavigate();
+  const { tenant } = useBranding();
+  const landingCopy = getTenantLandingCopy(tenant);
   const heroRef = useRef(null);
   const magneticBtnRef = useRef(null);
   useMagnetic(magneticBtnRef, 0.35);
@@ -269,17 +274,16 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
         <div style={{ maxWidth: '950px', position: 'relative', zIndex: 10 }}>
           <div className="mp-badge mp-reveal mp-active" style={{ marginBottom: '32px' }}>
             <span className="mp-badge-dot"></span>
-            <ScrambleText text="free funded accounts — limited spots monthly" delay={500} />
+            <ScrambleText text={landingCopy.heroBadge} delay={500} />
           </div>
           
           <h1 className="mp-h1 mp-reveal mp-delay-100 mp-active" style={{ textWrap: 'balance' }}>
-            Get Funded for <span className="mp-glow-text mp-shimmer" style={{ whiteSpace: 'nowrap' }}>Free.</span><br />
+            {landingCopy.heroTitleLead} <span className="mp-glow-text mp-shimmer" style={{ whiteSpace: 'nowrap' }}>{landingCopy.heroTitleHighlight}</span><br />
             Trade with <span style={{ color: '#00c896', textShadow: '0 0 30px rgba(0,200,150,0.4)' }}>Firm-Backed</span> Capital.
           </h1>
           
           <p className="mp-p-lead mp-reveal mp-delay-200 mp-active" style={{ textWrap: 'balance' }}>
-            No evaluation fees. No hidden costs. Pass our 2-phase institutional assessment 
-            and move into real liquidity-backed deployment. Limited accounts released monthly.
+            {landingCopy.heroSubtitle}
           </p>
           
           <div className="mp-reveal mp-delay-300 mp-active" style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -287,19 +291,34 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
               ref={magneticBtnRef}
               className="mp-btn-primary" 
               onClick={() => {
+                // Save pending challenge intent in memory so
+                // Login.js / Register.js can auto-create the account after authentication.
+                // Default size 10000; overridden by the pricing section if a size was selected.
+                const selectedSize = parseInt(getMemoryItem('heroSelectedSize') || '10000')
+                setMemoryItem('pendingChallenge', JSON.stringify({
+                  accountSize: selectedSize,
+                  accountType: 'phase1'
+                }))
                 if (onPrimaryCta) onPrimaryCta();
-                navigate('/register');
+                navigate('/login');
               }}
               style={{ padding: '22px 54px', fontSize: '18px', transition: 'transform 0.1s ease-out' }}
             >
-              Claim Free Account
+              {landingCopy.heroPrimaryCta}
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
             <button className="mp-btn-secondary" onClick={() => {
               if (onSecondaryCta) onSecondaryCta();
-              document.getElementById('mp-calculator')?.scrollIntoView({ behavior: 'smooth' });
+              const target = document.getElementById('mp-calculator');
+              const nav = document.querySelector('.nav-transparent');
+              const navRect = nav ? nav.getBoundingClientRect() : { top: 0, height: 72 };
+              const headerOffset = (navRect.top || 0) + navRect.height;
+              if (target) {
+                const top = window.pageYOffset + target.getBoundingClientRect().top - headerOffset - 28;
+                window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+              }
             }} style={{ padding: '20px 40px' }}>
               View Account Sizes
             </button>
@@ -308,8 +327,8 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
           {/* Trust Stats */}
           <div className="mp-reveal mp-delay-400 mp-active mp-stat-counter">
             <div className="mp-stat-item">
-              <span style={{ color: '#f0b90b', fontFamily: 'DM Mono, monospace', fontSize: '14px', fontWeight: 700 }}>100%</span>
-              <span className="mp-stat-number">&nbsp;Free</span>
+              <span style={{ color: '#f0b90b', fontFamily: 'DM Mono, monospace', fontSize: '14px', fontWeight: 700 }}>{landingCopy.heroStatsLead}</span>
+              <span className="mp-stat-number">&nbsp;{landingCopy.heroStatsLeadSuffix}</span>
             </div>
             <div className="mp-stat-divider" />
             <div className="mp-stat-item">

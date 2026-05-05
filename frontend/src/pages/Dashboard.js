@@ -1,29 +1,24 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { Suspense, lazy, useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import { io } from 'socket.io-client'
+import toast from 'react-hot-toast'
 import ThemeToggle from '../components/ThemeToggle'
 import Sidebar from '../components/Sidebar'
-import TradingPanel from '../components/TradingPanel'
 import DashboardHome from './DashboardHome'
-import Analytics from './Analytics'
+import ChallengeRules from './ChallengeRules'
 import Onboarding, { shouldShowOnboarding } from './Onboarding'
 import Support from './Support'
 import Dispute from './Dispute'
 import Chat from './Chat'
+import { calculatePnL } from '../utils/instruments'
+import { createIdempotencyHeaders, normalizeApiError } from '../services/api'
+import useStore from '../store/useStore'
+import { renderIcon } from '../utils/iconMap'
+import { calculatePayoutPreview, calculateRealizedProfit, formatCurrency, toMoneyNumber } from '../utils/finance'
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000'
-
-const CONTRACT_SIZES = {
-  EURUSD: 100000, GBPUSD: 100000, USDJPY: 100000,
-  USDCHF: 100000, AUDUSD: 100000, USDCAD: 100000,
-  XAUUSD: 100, XAGUSD: 5000, US30: 1, NAS100: 1
-}
-
-function calculatePnL(direction, openPrice, currentPrice, lots, instrument, commission = 0) {
-  const contractSize = CONTRACT_SIZES[instrument] || 100000;
-  const priceDiff = direction === 'buy' ? currentPrice - openPrice : openPrice - currentPrice;
-  return parseFloat(((priceDiff * lots * contractSize) - commission).toFixed(2));
-}
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+const TradingPanel = lazy(() => import('../components/TradingPanel'))
+const Analytics = lazy(() => import('./Analytics'))
 
 function getStatusColor(status) {
   const c = {
@@ -34,19 +29,76 @@ function getStatusColor(status) {
   return c[status] || 'var(--text-muted)'
 }
 
+function enrichTradesWithPrices(trades = [], currentPrices = {}) {
+  return trades.map(trade => {
+    if (trade.status === 'pending') return trade
+    const priceData = currentPrices[trade.instrument]
+    if (!priceData || trade.open_price == null) return trade
+
+    const currentPrice = trade.direction === 'buy'
+      ? parseFloat(priceData.bid)
+      : parseFloat(priceData.ask)
+
+    const floatingPnl = calculatePnL(
+      trade.direction,
+      parseFloat(trade.open_price),
+      currentPrice,
+      parseFloat(trade.lot_size),
+      trade.instrument,
+      parseFloat(trade.commission || 0)
+    )
+
+    return {
+      ...trade,
+      floating_pnl: floatingPnl,
+      current_price: currentPrice
+    }
+  })
+}
+
+function formatMoney(value) {
+  return toMoneyNumber(value).toFixed(2)
+}
+
+function DashboardSectionFallback({ label = 'Loading module...' }) {
+  return (
+    <div
+      className="card ui-surface ui-empty-state"
+      style={{
+        padding: '32px',
+        minHeight: '220px',
+        color: 'var(--text-muted)'
+      }}
+    >
+      {label}
+    </div>
+  )
+}
+
 function Dashboard({ user, onLogout }) {
-  const [accounts, setAccounts] = useState([])
-  const [selectedAccount, setSelectedAccount] = useState(null)
   const [stats, setStats] = useState(null)
-  const [openTrades, setOpenTrades] = useState([])
+  const [accountRules, setAccountRules] = useState(null)
   const [tradeHistory, setTradeHistory] = useState([])
-  const [prices, setPrices] = useState({})
   const [payouts, setPayouts] = useState([])
   const [connected, setConnected] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [activePage, setActivePage] = useState('dashboard')
-  const [orderForm, setOrderForm] = useState({ instrument: 'EURUSD', lots: '0.01', stop_loss: '', take_profit: '' })
+  const [orderForm, setOrderForm] = useState({
+    instrument: 'EURUSD',
+    lots: '0.01',
+    stop_loss: '',
+    take_profit: '',
+    strategy_tag: '',
+    journal_note: '',
+    journal_tags: '',
+    trailing_step_pips: '',
+    trailing_activation_price: '',
+    breakeven_trigger_pips: '',
+    oco_enabled: false,
+    oco_order_type: 'sell_stop',
+    oco_pending_price: ''
+  })
   const [payoutForm, setPayoutForm] = useState({ amount_requested: '', payment_method: 'crypto', payment_details: '' })
   const [kycStatus, setKycStatus] = useState(user?.kyc_status || 'not_submitted')
   const [idDocument, setIdDocument] = useState(null)
@@ -54,6 +106,10 @@ function Dashboard({ user, onLogout }) {
   const [kycUploading, setKycUploading] = useState(false)
   const [accountLoading, setAccountLoading] = useState(false)
   const [profitSharePct, setProfitSharePct] = useState(80)
+  const [accountSubmitting, setAccountSubmitting] = useState(false)
+  const [tradeSubmitting, setTradeSubmitting] = useState(false)
+  const [closingTradeIds, setClosingTradeIds] = useState([])
+  const [payoutSubmitting, setPayoutSubmitting] = useState(false)
 
   // ── Quota state: set when the backend returns quota_full on account creation ──
   const [quotaFull, setQuotaFull] = useState(false)
@@ -75,14 +131,30 @@ function Dashboard({ user, onLogout }) {
   const [announcement, setAnnouncement] = useState(null)
   const [announcementDismissed, setAnnouncementDismissed] = useState(false)
 
+  const {
+    activeAccount: selectedAccount,
+    allAccounts: accounts,
+    setActiveAccount,
+    setAllAccounts,
+    switchAccount,
+    prices,
+    updatePrice,
+    updatePrices,
+    openPositions: openTrades,
+    setOpenPositions,
+    updatePositionPnL,
+    addPosition,
+    removePosition,
+  } = useStore()
+
   useEffect(() => {
     // Fetch on mount
-    axios.get(`${API_URL}/api/admin/announcement`)
+    axios.get(`${API_URL}/api/announcement`)
       .then(res => { if (res.data) setAnnouncement(res.data) })
       .catch(() => {})
     // Re-poll every 5 minutes
     const iv = setInterval(() => {
-      axios.get(`${API_URL}/api/admin/announcement`)
+      axios.get(`${API_URL}/api/announcement`)
         .then(res => {
           setAnnouncement(res.data || null)
           if (!res.data) setAnnouncementDismissed(false)
@@ -94,11 +166,24 @@ function Dashboard({ user, onLogout }) {
 
   const socketRef = useRef(null)
   const selectedAccountRef = useRef(null)
-  // FIX (BUG-L4): pricesRef always holds the latest prices, avoiding stale closure
-  // in fetchOpenTrades which would capture an empty {} at function definition time.
   const pricesRef = useRef({})
+  const closingTradesRef = useRef(new Set())
 
   useEffect(() => { selectedAccountRef.current = selectedAccount }, [selectedAccount])
+  useEffect(() => { pricesRef.current = prices }, [prices])
+
+  function setSelectedAccount(account) {
+    if (!account) {
+      setActiveAccount(null)
+      return
+    }
+
+    switchAccount(account.id)
+
+    if (useStore.getState().activeAccount?.id !== account.id) {
+      setActiveAccount(account)
+    }
+  }
 
   useEffect(() => {
     // FIX: include 'polling' as fallback — works behind proxies/firewalls that
@@ -110,24 +195,83 @@ function Dashboard({ user, onLogout }) {
       if (user?.id) socket.emit('join_account', String(user.id))
     })
     socket.on('disconnect', () => setConnected(false))
-    socket.on('price_update', (newPrices) => {
-      setPrices(newPrices)
-      pricesRef.current = newPrices  // FIX (BUG-L4): keep ref in sync with state
-      setOpenTrades(prev => prev.map(trade => {
-        if (trade.status === 'pending') return trade
-        const pd = newPrices[trade.instrument]
-        if (!pd) return trade
-        const currentPrice = trade.direction === 'buy' ? parseFloat(pd.bid) : parseFloat(pd.ask)
-        const floating_pnl = calculatePnL(
-          trade.direction,
-          parseFloat(trade.open_price),
-          currentPrice,
-          parseFloat(trade.lot_size),
-          trade.instrument,
-          parseFloat(trade.commission || 0)
-        )
-        return { ...trade, floating_pnl, current_price: currentPrice }
-      }))
+    socket.on('price_update', (payload) => {
+      const mergedPrices = payload?.instrument
+        ? { ...pricesRef.current, [payload.instrument]: payload }
+        : payload
+
+      if (!mergedPrices || typeof mergedPrices !== 'object') return
+
+      if (payload?.instrument) {
+        updatePrice(payload.instrument, payload)
+      } else {
+        updatePrices(mergedPrices)
+      }
+
+      pricesRef.current = mergedPrices
+      setOpenPositions(enrichTradesWithPrices(useStore.getState().openPositions, mergedPrices))
+    })
+    socket.on('position_update', (data) => {
+      const tradeId = data?.tradeId ?? data?.trade_id
+      const floatingPnl = data?.floatingPnL ?? data?.floating_pnl ?? 0
+      if (tradeId == null) return
+      updatePositionPnL(tradeId, floatingPnl)
+    })
+    socket.on('trade_closed', (data) => {
+      const tradeId = data?.tradeId ?? data?.trade_id
+      const existingTrade = useStore.getState().openPositions.find(trade => trade.id === tradeId)
+      if (tradeId == null) return
+      const instrument = data?.instrument || existingTrade?.instrument || 'Trade'
+      const pnl = Number(data?.pnl ?? data?.demo_pnl ?? 0)
+      const profit = pnl >= 0
+      toast(
+        `${instrument} closed ${profit ? '+' : ''}$${formatMoney(pnl)}`,
+        {
+          icon: renderIcon(profit ? 'approve' : 'reject', { size: 16, color: profit ? 'var(--accent-green)' : 'var(--accent-red)' }),
+          style: {
+            borderLeft: `3px solid ${profit ? '#00FF88' : '#FF3B5C'}`
+          }
+        }
+      )
+      removePosition(tradeId)
+    })
+    socket.on('trade_opened', (data) => {
+      if (!data?.position) return
+      const openedPosition = enrichTradesWithPrices([data.position], pricesRef.current)[0]
+      addPosition(openedPosition)
+      toast(`Trade opened: ${openedPosition.instrument} ${openedPosition.direction}`, {
+        icon: renderIcon('trade', { size: 16, color: 'var(--accent)' }),
+        style: { borderLeft: '3px solid #00D4FF' }
+      })
+    })
+    socket.on('account_passed', (data) => {
+      toast.success(`Congratulations! You passed ${data?.phase || 'your challenge'}!`, {
+        duration: 8000,
+        icon: renderIcon('leaderboard', { size: 16, color: 'var(--accent-gold)' }),
+        style: { borderLeft: '3px solid #FFD700' }
+      })
+    })
+    socket.on('payout_approved', (data) => {
+      toast.success(`Payout of $${formatMoney(data?.amount)} approved!`, {
+        duration: 8000,
+        icon: renderIcon('payouts', { size: 16, color: 'var(--accent-gold)' }),
+        style: { borderLeft: '3px solid #FFD700' }
+      })
+    })
+    socket.on('sl_triggered', (data) => {
+      const slipMsg = Number(data?.slippage_pips || 0) > 0
+        ? ` (${data.slippage_pips} pip slippage)`
+        : ''
+      toast(`SL triggered on ${data?.instrument || 'trade'}${slipMsg}`, {
+        icon: renderIcon('warning', { size: 16, color: 'var(--accent-red)' }),
+        style: { borderLeft: '3px solid #FF3B5C' }
+      })
+    })
+    socket.on('tp_triggered', (data) => {
+      toast.success(`TP hit on ${data?.instrument || 'trade'}! +$${formatMoney(data?.pnl)}`, {
+        icon: renderIcon('target', { size: 16, color: 'var(--accent-green)' }),
+        style: { borderLeft: '3px solid #00FF88' }
+      })
     })
     socket.on('account_update', (data) => {
       if (data?.message) {
@@ -135,8 +279,17 @@ function Dashboard({ user, onLogout }) {
         pushNotification(data.message + (data.pnl != null ? ` P&L: $${data.pnl}` : ''),
           data.event === 'account_failed' ? 'error' : (data.event === 'phase1_passed' || data.event === 'phase2_passed') ? 'success' : 'info')
       }
+      if (data?.event === 'phase1_passed' || data?.event === 'phase2_passed') {
+        const phaseLabel = data?.event === 'phase1_passed' ? 'Phase 1' : 'Phase 2'
+        toast.success(`Congratulations! You passed ${phaseLabel}!`, {
+          duration: 8000,
+          icon: renderIcon('leaderboard', { size: 16, color: 'var(--accent-gold)' }),
+          style: { borderLeft: '3px solid #FFD700' }
+        })
+      }
       if (selectedAccountRef.current) {
         fetchStats(selectedAccountRef.current.id)
+        fetchAccountRules(selectedAccountRef.current.id)
         fetchOpenTrades(selectedAccountRef.current.id)
         fetchTradeHistory(selectedAccountRef.current.id)
       }
@@ -156,11 +309,18 @@ function Dashboard({ user, onLogout }) {
     // ── Drawdown warning alerts (50% / 75% / 90% of limit) ───────────────────
     socket.on('drawdown_warning', (data) => {
       if (!data?.message) return
-      const type = data.warning_level >= 90 ? 'error'
-        : data.warning_level >= 75 ? 'warning'
+      const percentage = data?.percentage ?? data?.warning_level ?? 0
+      const type = percentage >= 90 ? 'error'
+        : percentage >= 75 ? 'warning'
         : 'info'
       pushNotification(data.message, type)
-      // Also surface as a toast so the trader sees it immediately while trading
+      toast.error(
+        `Warning: ${percentage}% drawdown used. Trade carefully.`,
+        {
+          duration: 10000,
+          icon: renderIcon('warning', { size: 16, color: 'var(--accent-red)' }),
+        }
+      )
       setError(data.message)
     })
     return () => socket.disconnect()
@@ -171,11 +331,13 @@ function Dashboard({ user, onLogout }) {
   useEffect(() => {
     if (selectedAccount) {
       setAccountLoading(true)
-      setOpenTrades([])
+      setOpenPositions([])
       setStats(null)
+      setAccountRules(null)
       setTradeHistory([])
       Promise.all([
         fetchStats(selectedAccount.id),
+        fetchAccountRules(selectedAccount.id),
         fetchOpenTrades(selectedAccount.id),
         fetchTradeHistory(selectedAccount.id)
       ]).finally(() => setAccountLoading(false))
@@ -207,14 +369,24 @@ function Dashboard({ user, onLogout }) {
   async function fetchAccounts() {
     try {
       const res = await axios.get(`${API_URL}/api/accounts/my-accounts`)
-      setAccounts(res.data)
-      if (res.data.length > 0 && !selectedAccountRef.current) setSelectedAccount(res.data[0])
+      const latestAccounts = Array.isArray(res.data) ? res.data : []
+      setAllAccounts(latestAccounts)
+      if (selectedAccountRef.current?.id) {
+        const refreshed = latestAccounts.find(account => account.id === selectedAccountRef.current.id)
+        setActiveAccount(refreshed || latestAccounts[0] || null)
+      } else if (latestAccounts.length > 0) {
+        setActiveAccount(latestAccounts[0])
+      }
       return res.data
     } catch { setError('Could not fetch accounts') }
   }
 
   async function fetchPrices() {
-    try { const res = await axios.get(`${API_URL}/api/prices`); setPrices(res.data) } catch {}
+    try {
+      const res = await axios.get(`${API_URL}/api/prices`)
+      updatePrices(res.data)
+      pricesRef.current = res.data
+    } catch {}
   }
 
   async function fetchStats(id) {
@@ -227,28 +399,24 @@ function Dashboard({ user, onLogout }) {
     }
   }
 
+  async function fetchAccountRules(id) {
+    try {
+      const res = await axios.get(`${API_URL}/api/accounts/rules/${id}`)
+      setAccountRules(res.data)
+    } catch {}
+  }
+
   async function fetchOpenTrades(id) {
     try {
-      const res = await axios.get(`${API_URL}/api/trades/open`, { params: { account_id: id } })
-      // FIX (BUG-L4): Read from pricesRef (always current) not the prices closure
-      // which was stale at function-definition time.
-      const currentPrices = pricesRef.current
-      const enriched = res.data.map(trade => {
-        if (trade.status === 'pending') return trade
-        const pd = currentPrices[trade.instrument]
-        if (!pd || trade.open_price == null) return trade
-        const currentPrice = trade.direction === 'buy' ? parseFloat(pd.bid) : parseFloat(pd.ask)
-        const floating_pnl = calculatePnL(
-          trade.direction,
-          parseFloat(trade.open_price),
-          currentPrice,
-          parseFloat(trade.lot_size),
-          trade.instrument,
-          parseFloat(trade.commission || 0)
-        )
-        return { ...trade, floating_pnl, current_price: currentPrice }
-      })
-      setOpenTrades(enriched)
+      const [openRes, pendingRes] = await Promise.all([
+        axios.get(`${API_URL}/api/trades/open`, { params: { account_id: id } }),
+        axios.get(`${API_URL}/api/trades/pending`, { params: { account_id: id } })
+      ])
+      const mergedTrades = [
+        ...(Array.isArray(openRes.data) ? openRes.data : []),
+        ...(Array.isArray(pendingRes.data) ? pendingRes.data : [])
+      ]
+      setOpenPositions(enrichTradesWithPrices(mergedTrades, pricesRef.current))
     } catch {}
   }
 
@@ -304,12 +472,20 @@ function Dashboard({ user, onLogout }) {
     } catch {}
   }
 
-  async function createAccount(size) {
+  async function createAccount(size, options = {}) {
+    if (accountSubmitting) return
+    setAccountSubmitting(true)
     try {
       // Clear any previous quota state before trying
       setQuotaFull(false)
       setQuotaNextOpen(null)
-      await axios.post(`${API_URL}/api/accounts/create`, { account_size: size })
+      const payload = { account_size: size }
+      if (options.challengeOrderId) {
+        payload.challenge_order_id = options.challengeOrderId
+      }
+      await axios.post(`${API_URL}/api/accounts/create`, payload, {
+        headers: createIdempotencyHeaders('accounts:create')
+      })
       setSuccess('Challenge account created!')
       fetchAccounts()
     } catch (err) {
@@ -319,12 +495,27 @@ function Dashboard({ user, onLogout }) {
         setQuotaFull(true)
         setQuotaNextOpen(data.next_open || null)
       } else {
-        setError(data?.error || 'Could not create account')
+        setError(normalizeApiError(err, 'Could not create account').message)
       }
+    } finally {
+      setAccountSubmitting(false)
     }
   }
 
-  async function openTrade({ direction, orderType, pendingPrice }) {
+  async function openTrade({
+    direction,
+    orderType,
+    pendingPrice,
+    strategyTag,
+    journalNote,
+    journalTags,
+    trailingStepPips,
+    trailingActivationPrice,
+    breakevenTriggerPips,
+    ocoSibling
+  }) {
+    if (tradeSubmitting) return
+    setTradeSubmitting(true)
     try {
       setError('')
       const payload = {
@@ -337,22 +528,57 @@ function Dashboard({ user, onLogout }) {
       if (pendingPrice) payload.pending_price = pendingPrice
       if (orderForm.stop_loss) payload.stop_loss = parseFloat(orderForm.stop_loss)
       if (orderForm.take_profit) payload.take_profit = parseFloat(orderForm.take_profit)
-      await axios.post(`${API_URL}/api/trades/open`, payload)
+      if (strategyTag) payload.strategy_tag = strategyTag
+      if (journalNote) payload.trader_note = journalNote
+      if (journalTags) payload.tags = journalTags
+      if (trailingStepPips) payload.trailing_step_pips = parseInt(trailingStepPips, 10)
+      if (trailingActivationPrice) payload.trailing_activation_price = parseFloat(trailingActivationPrice)
+      if (breakevenTriggerPips) payload.breakeven_trigger_pips = parseFloat(breakevenTriggerPips)
+      if (ocoSibling) payload.oco_sibling = ocoSibling
+      await axios.post(`${API_URL}/api/trades/open`, payload, {
+        headers: createIdempotencyHeaders('trades:open')
+      })
       setSuccess(`${orderType === 'market' ? direction.toUpperCase() : orderType.replace(/_/g, ' ').toUpperCase()} order placed on ${orderForm.instrument}`)
-      setOrderForm(f => ({ ...f, stop_loss: '', take_profit: '' }))
+      setOrderForm(f => ({
+        ...f,
+        stop_loss: '',
+        take_profit: '',
+        journal_note: '',
+        journal_tags: '',
+        trailing_step_pips: '',
+        trailing_activation_price: '',
+        breakeven_trigger_pips: '',
+        oco_enabled: false,
+        oco_order_type: 'sell_stop',
+        oco_pending_price: ''
+      }))
       fetchOpenTrades(selectedAccount.id)
       fetchStats(selectedAccount.id)
-    } catch (err) { setError(err.response?.data?.error || 'Could not open trade') }
+    } catch (err) {
+      setError(normalizeApiError(err, 'Could not open trade').message)
+    } finally {
+      setTradeSubmitting(false)
+    }
   }
 
-  async function closeTrade(tradeId) {
+  async function closeTrade(tradeId, options = {}) {
+    if (closingTradesRef.current.has(tradeId)) return
+    closingTradesRef.current.add(tradeId)
+    setClosingTradeIds((current) => (current.includes(tradeId) ? current : [...current, tradeId]))
     try {
-      const res = await axios.post(`${API_URL}/api/trades/close`, { trade_id: tradeId })
+      const payload = { trade_id: tradeId }
+      if (options.closeLots) payload.close_lots = options.closeLots
+      const res = await axios.post(`${API_URL}/api/trades/close`, payload)
       setSuccess(`Trade closed. P&L: $${res.data.pnl}`)
       fetchOpenTrades(selectedAccount.id)
       fetchStats(selectedAccount.id)
       fetchTradeHistory(selectedAccount.id)
-    } catch (err) { setError(err.response?.data?.error || 'Could not close trade') }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Could not close trade')
+    } finally {
+      closingTradesRef.current.delete(tradeId)
+      setClosingTradeIds((current) => current.filter((id) => id !== tradeId))
+    }
   }
 
   async function cancelOrder(tradeId) {
@@ -367,6 +593,7 @@ function Dashboard({ user, onLogout }) {
     if (selectedAccount) {
       fetchOpenTrades(selectedAccount.id)
       fetchStats(selectedAccount.id)
+      fetchTradeHistory(selectedAccount.id)
     }
   }
 
@@ -392,26 +619,34 @@ function Dashboard({ user, onLogout }) {
 
   async function requestPayout(e) {
     e.preventDefault()
+    if (payoutSubmitting) return
+    setPayoutSubmitting(true)
     try {
       await axios.post(`${API_URL}/api/payouts/request`, {
         account_id: selectedAccount.id,
         amount_requested: parseFloat(payoutForm.amount_requested),
         payment_method: payoutForm.payment_method,
         payment_details: payoutForm.payment_details
+      }, {
+        headers: createIdempotencyHeaders('payouts:request')
       })
       setSuccess('Payout request submitted!')
       setPayoutForm({ amount_requested: '', payment_method: 'crypto', payment_details: '' })
       fetchPayouts()
-    } catch (err) { setError(err.response?.data?.error || 'Could not submit payout') }
+    } catch (err) {
+      setError(normalizeApiError(err, 'Could not submit payout').message)
+    } finally {
+      setPayoutSubmitting(false)
+    }
   }
 
   const fundedAccount = accounts.find(a => a.account_type === 'funded' && a.status === 'active')
   const availableProfit = fundedAccount
-    ? Math.max(0, parseFloat(fundedAccount.current_balance) - parseFloat(fundedAccount.starting_balance))
+    ? Math.max(0, calculateRealizedProfit(fundedAccount.current_balance, fundedAccount.starting_balance))
     : 0
 
   return (
-    <div className="dashboard-layout">
+    <div className="mode-trader ui-shell dashboard-layout">
 
       {/* ── Onboarding walkthrough — shown on first login ── */}
       {showOnboarding && (
@@ -428,10 +663,10 @@ function Dashboard({ user, onLogout }) {
       {announcement && !announcementDismissed && (() => {
         // FIX (BUG-L3): All four types rendered identical grey shades; now uses proper semantic colors
         const colors = {
-          info:    { bg: 'rgba(100, 180, 255, 0.10)', border: 'rgba(100, 180, 255, 0.4)', text: '#60b4ff', icon: 'ℹ️' },
-          warning: { bg: 'rgba(255, 180, 50, 0.10)',  border: 'rgba(255, 180, 50, 0.4)',  text: '#ffb432', icon: '⚠️' },
-          success: { bg: 'rgba(80, 200, 120, 0.10)',  border: 'rgba(80, 200, 120, 0.4)',  text: '#50c878', icon: '✅' },
-          error:   { bg: 'rgba(240, 80, 80, 0.10)',   border: 'rgba(240, 80, 80, 0.4)',   text: '#f05050', icon: '🚨' },
+          info:    { bg: 'rgba(100, 180, 255, 0.10)', border: 'rgba(100, 180, 255, 0.4)', text: '#60b4ff', icon: 'info' },
+          warning: { bg: 'rgba(255, 180, 50, 0.10)',  border: 'rgba(255, 180, 50, 0.4)',  text: '#ffb432', icon: 'warning' },
+          success: { bg: 'rgba(80, 200, 120, 0.10)',  border: 'rgba(80, 200, 120, 0.4)',  text: '#50c878', icon: 'approve' },
+          error:   { bg: 'rgba(240, 80, 80, 0.10)',   border: 'rgba(240, 80, 80, 0.4)',   text: '#f05050', icon: 'reject' },
         }
         const c = colors[announcement.type] || colors.info
         return (
@@ -441,7 +676,9 @@ function Dashboard({ user, onLogout }) {
             display: 'flex', alignItems: 'center', gap: '10px',
             position: 'sticky', top: '57px', zIndex: 90
           }}>
-            <span>{c.icon}</span>
+            <span style={{ display: 'inline-flex' }}>
+              {renderIcon(c.icon, { size: 16, color: c.text })}
+            </span>
             <span style={{ flex: 1, fontSize: '13px', color: c.text, fontWeight: '500' }}>
               {announcement.message}
             </span>
@@ -449,7 +686,7 @@ function Dashboard({ user, onLogout }) {
               onClick={() => setAnnouncementDismissed(true)}
               style={{ background: 'none', border: 'none', color: c.text, cursor: 'pointer', fontSize: '16px', opacity: 0.7, padding: '0 4px' }}
             >
-              ×
+              {renderIcon('close', { size: 16, color: c.text })}
             </button>
           </div>
         )
@@ -466,29 +703,46 @@ function Dashboard({ user, onLogout }) {
       {/* Main Content */}
       <div className="dashboard-main animate-fade-up" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         {/* Top Nav */}
-      <div className="nav" style={{ 
+      <div className="nav dashboard-topbar" style={{ 
         margin: '16px 24px', 
         borderRadius: '16px', 
-        background: 'rgba(17, 24, 39, 0.7)', 
+        background: 'var(--bg-surface)', 
         backdropFilter: 'blur(16px)',
         border: '1px solid var(--border)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.2)' 
+        boxShadow: 'var(--shadow-surface)' 
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ display: 'inline-flex' }}>
+            {renderIcon('activity', { size: 14, color: connected ? 'var(--accent-green)' : 'var(--accent-red)' })}
+          </span>
           <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Terminal Status</span>
           <span className={`badge ${connected ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '10px', padding: '4px 10px', boxShadow: connected ? '0 0 10px rgba(16,185,129,0.3)' : '0 0 10px rgba(239,68,68,0.3)' }}>
-            {connected ? '● LIVE SYNC' : '○ OFFLINE'}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              {renderIcon(connected ? 'activity' : 'close', { size: 10, color: 'currentColor' })}
+              <span>{connected ? 'LIVE SYNC' : 'OFFLINE'}</span>
+            </span>
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500' }}>{user?.full_name || 'Trader'}</span>
           {kycStatus !== 'approved' && (
             <span className={`badge ${kycStatus === 'pending' ? 'badge-warning' : 'badge-danger'}`} onClick={() => setActivePage('kyc')} style={{ cursor: 'pointer' }}>
-              {kycStatus === 'pending' ? '⏳ KYC Pending' : '⚠️ Complete KYC'}
+              <span style={{ display: 'inline-flex', marginRight: '6px', verticalAlign: 'middle' }}>
+                {renderIcon(kycStatus === 'pending' ? 'timer' : 'warning', {
+                  size: 12,
+                  color: kycStatus === 'pending' ? 'var(--accent-gold)' : 'var(--accent-red)'
+                })}
+              </span>
+              {kycStatus === 'pending' ? 'KYC Pending' : 'Complete KYC'}
             </span>
           )}
           {kycStatus === 'approved' && (
-            <span className="badge badge-success">✅ KYC Verified</span>
+            <span className="badge badge-success">
+              <span style={{ display: 'inline-flex', marginRight: '6px', verticalAlign: 'middle' }}>
+                {renderIcon('approve', { size: 12, color: 'var(--accent-green)' })}
+              </span>
+              KYC Verified
+            </span>
           )}
 
           {/* ── Notification Bell ── */}
@@ -502,7 +756,7 @@ function Dashboard({ user, onLogout }) {
               }}
               className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '16px' }}
             >
-              🔔
+              {renderIcon('bell', { size: 16, color: 'var(--text-primary)' })}
               {notifications.filter(n => !n.read).length > 0 && (
                 <span className="badge badge-danger" style={{
                   position: 'absolute', top: '-6px', right: '-6px',
@@ -548,11 +802,15 @@ function Dashboard({ user, onLogout }) {
           </div>
 
           <ThemeToggle />
-          <button className="btn btn-danger" onClick={onLogout} style={{ padding: '6px 12px', fontSize: '12px' }}>Logout</button>
+          <button className="btn btn-danger" onClick={onLogout} style={{ padding: '6px 12px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            {renderIcon('logout', { size: 14, color: 'currentColor' })}
+            <span>Logout</span>
+          </button>
         </div>
       </div>
 
-      {/* Main Content Pages */}        {error && <div className="error">{error}</div>}
+      <div className="dashboard-page-content dashboard-page-stack ui-shell-section">
+        {error && <div className="error">{error}</div>}
         {success && <div className="success">{success}</div>}
 
         {/* Dashboard Page */}
@@ -560,6 +818,7 @@ function Dashboard({ user, onLogout }) {
           <DashboardHome
             user={user}
             stats={stats}
+            openTrades={openTrades}
             accounts={accounts}
             selectedAccount={selectedAccount}
             setSelectedAccount={setSelectedAccount}
@@ -568,6 +827,17 @@ function Dashboard({ user, onLogout }) {
             profitSharePct={profitSharePct}
             quotaFull={quotaFull}
             quotaNextOpen={quotaNextOpen}
+            onOpenRulesPage={() => setActivePage('rules')}
+          />
+        )}
+
+        {activePage === 'rules' && (
+          <ChallengeRules
+            selectedAccount={selectedAccount}
+            accountRules={accountRules}
+            stats={stats}
+            openTrades={openTrades}
+            onTradeNow={() => setActivePage('trade')}
           />
         )}
 
@@ -575,39 +845,46 @@ function Dashboard({ user, onLogout }) {
         {activePage === 'trade' && (
           kycStatus !== 'approved' ? (
             <div className="card" style={{ textAlign: 'center', padding: '48px' }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>🪪</div>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+                {renderIcon('kyc', { size: 48, color: 'var(--accent)' })}
+              </div>
               <h3 className="page-title" style={{ marginBottom: '12px', fontSize: '20px' }}>KYC Required</h3>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>Complete your identity verification to start trading.</p>
               <button className="btn btn-primary" onClick={() => setActivePage('kyc')} style={{ padding: '12px 32px' }}>Complete KYC</button>
             </div>
           ) : (
-            <TradingPanel
-              prices={prices}
-              selectedAccount={selectedAccount}
-              accounts={accounts}
-              setSelectedAccount={setSelectedAccount}
-              openTrades={openTrades}
-              tradeHistory={tradeHistory}
-              orderForm={orderForm}
-              setOrderForm={setOrderForm}
-              onOpenTrade={openTrade}
-              onCloseTrade={closeTrade}
-              onCancelOrder={cancelOrder}
-              getStatusColor={getStatusColor}
-              stats={stats}
-              
-              onTradeModified={handleTradeModified}
-              accountLoading={accountLoading}
-            />
+            <Suspense fallback={<DashboardSectionFallback label="Loading trading terminal..." />}>
+              <TradingPanel
+                prices={prices}
+                selectedAccount={selectedAccount}
+                accounts={accounts}
+                setSelectedAccount={setSelectedAccount}
+                openTrades={openTrades}
+                tradeHistory={tradeHistory}
+                orderForm={orderForm}
+                setOrderForm={setOrderForm}
+                onOpenTrade={openTrade}
+                onCloseTrade={closeTrade}
+                closingTradeIds={closingTradeIds}
+                onCancelOrder={cancelOrder}
+                getStatusColor={getStatusColor}
+                stats={stats}
+                
+                onTradeModified={handleTradeModified}
+                accountLoading={accountLoading}
+              />
+            </Suspense>
           )
         )}
 
         {/* Analytics Page */}
         {activePage === 'analytics' && (
-          <Analytics
-            selectedAccount={selectedAccount}
-            
-          />
+          <Suspense fallback={<DashboardSectionFallback label="Loading analytics..." />}>
+            <Analytics
+              selectedAccount={selectedAccount}
+              
+            />
+          </Suspense>
         )}
 
         {/* KYC Page */}
@@ -616,13 +893,17 @@ function Dashboard({ user, onLogout }) {
             <h2 style={{ fontFamily: 'Inter, serif', color: 'var(--accent)', marginBottom: '24px', fontSize: '22px' }}>Identity Verification</h2>
             {kycStatus === 'approved' ? (
               <div className="card" style={{ textAlign: 'center', padding: '48px', maxWidth: '500px' }}>
-                <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+                  {renderIcon('approve', { size: 48, color: 'var(--accent-green)' })}
+                </div>
                 <h3 style={{ color: 'var(--green)', marginBottom: '12px' }}>KYC Verified</h3>
                 <p style={{ color: 'var(--text-muted)' }}>Your identity has been verified. You can start trading.</p>
               </div>
             ) : kycStatus === 'pending' ? (
               <div className="card" style={{ textAlign: 'center', padding: '48px', maxWidth: '500px' }}>
-                <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+                  {renderIcon('timer', { size: 48, color: 'var(--accent-gold)' })}
+                </div>
                 <h3 style={{ color: 'var(--accent)', marginBottom: '12px' }}>KYC Under Review</h3>
                 <p style={{ color: 'var(--text-muted)' }}>Your documents have been submitted. Admin will review within 24 hours.</p>
               </div>
@@ -630,7 +911,9 @@ function Dashboard({ user, onLogout }) {
               <div>
                 {kycStatus === 'rejected' && (
                   <div className="card" style={{ textAlign: 'center', padding: '24px', marginBottom: '20px', border: '1px solid var(--red)', maxWidth: '600px' }}>
-                    <div style={{ fontSize: '32px', marginBottom: '8px' }}>❌</div>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
+                      {renderIcon('reject', { size: 32, color: 'var(--accent-red)' })}
+                    </div>
                     <h3 style={{ color: 'var(--red)', marginBottom: '8px' }}>KYC Rejected</h3>
                     <p style={{ color: 'var(--text-muted)' }}>Your documents were rejected. Please re-submit.</p>
                     {user?.kyc_rejection_reason && (
@@ -660,7 +943,9 @@ function Dashboard({ user, onLogout }) {
             <h2 style={{ fontFamily: 'Inter, serif', color: 'var(--accent)', marginBottom: '24px', fontSize: '22px' }}>Payouts</h2>
             {!fundedAccount ? (
               <div className="card" style={{ textAlign: 'center', padding: '48px', maxWidth: '500px' }}>
-                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏆</div>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+                  {renderIcon('payouts', { size: 48, color: 'var(--accent-gold)' })}
+                </div>
                 <h3 style={{ color: 'var(--accent)', marginBottom: '12px' }}>No Funded Account Yet</h3>
                 <p style={{ color: 'var(--text-muted)' }}>Complete Phase 1 and Phase 2 to unlock payouts.</p>
               </div>
@@ -668,7 +953,7 @@ function Dashboard({ user, onLogout }) {
               <div>
                 <div className="grid-2" style={{ marginBottom: '20px', maxWidth: '600px' }}>
                   <div className="stat-card">
-                    <div className="stat-value" style={{ color: 'var(--green)' }}>${availableProfit.toFixed(2)}</div>
+                    <div className="stat-value" style={{ color: 'var(--green)' }}>{formatCurrency(availableProfit)}</div>
                     <div className="stat-label">Available Profit</div>
                   </div>
                   <div className="stat-card">
@@ -685,10 +970,10 @@ function Dashboard({ user, onLogout }) {
                         <label>Amount to Withdraw ($)</label>
                         <input type="number" value={payoutForm.amount_requested}
                           onChange={e => setPayoutForm({ ...payoutForm, amount_requested: e.target.value })}
-                          placeholder={`Max $${availableProfit.toFixed(2)}`} min="50" max={availableProfit} step="0.01" required />
+                          placeholder={`Max ${formatCurrency(availableProfit)}`} min="50" max={availableProfit} step="0.01" required />
                         {payoutForm.amount_requested && (
                           <p style={{ fontSize: '13px', color: 'var(--green-light)', marginTop: '6px' }}>
-                            You will receive: ${(parseFloat(payoutForm.amount_requested || 0) * (profitSharePct / 100)).toFixed(2)} ({profitSharePct}% share)
+                            You will receive: {formatCurrency(calculatePayoutPreview(payoutForm.amount_requested || 0, profitSharePct))} ({profitSharePct}% share)
                           </p>
                         )}
                         <label>Payment Method</label>
@@ -738,7 +1023,10 @@ function Dashboard({ user, onLogout }) {
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                           title="Download your payout statement as HTML (printable / save as PDF)"
                         >
-                          ⬇ Download Statement
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            {renderIcon('download', { size: 14, color: 'currentColor' })}
+                            <span>Download Statement</span>
+                          </span>
                         </button>
                       )}
                     </div>
@@ -777,13 +1065,16 @@ function Dashboard({ user, onLogout }) {
             )}
           </div>
         )}
+      </div>
         {/* Account History Page */}
         {activePage === 'history' && (
           <div>
             <h2 style={{ fontFamily: 'Inter, serif', color: 'var(--accent)', marginBottom: '24px', fontSize: '22px' }}>Account History</h2>
             {accountHistory.length === 0 ? (
               <div className="card" style={{ textAlign: 'center', padding: '48px', maxWidth: '500px' }}>
-                <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+                  {renderIcon('file', { size: 48, color: 'var(--accent)' })}
+                </div>
                 <h3 style={{ color: 'var(--accent)', marginBottom: '12px' }}>No History Yet</h3>
                 <p style={{ color: 'var(--text-muted)' }}>Your challenge history will appear here once you complete or start a challenge.</p>
               </div>
@@ -937,20 +1228,27 @@ function KYCUploadForm({ onSubmit, idDocument, setIdDocument, selfie, setSelfie,
             >
               {idDocument ? (
                 <div>
-                  <div style={{ fontSize: '24px', marginBottom: '8px' }}>📄</div>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
+                    {renderIcon('file', { size: 24, color: 'var(--accent-green)' })}
+                  </div>
                   <div style={{ fontSize: '13px', color: 'var(--green-light)' }}>{idDocument.name}</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>{(idDocument.size / 1024).toFixed(0)} KB</div>
                 </div>
               ) : (
                 <div>
-                  <div style={{ fontSize: '24px', marginBottom: '8px' }}>📁</div>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
+                    {renderIcon('folder', { size: 24, color: 'var(--text-secondary)' })}
+                  </div>
                   <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Click to upload</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>JPG, PNG or PDF · max 5MB</div>
                 </div>
               )}
             </div>
             {idError && (
-              <p style={{ color: 'var(--red)', fontSize: '12px', marginTop: '6px' }}>⚠ {idError}</p>
+              <p style={{ color: 'var(--red)', fontSize: '12px', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {renderIcon('warning', { size: 14, color: 'var(--accent-red)' })}
+                <span>{idError}</span>
+              </p>
             )}
             <input id="id_doc_input" type="file" accept=".jpg,.jpeg,.png,.pdf" style={{ display: 'none' }} onChange={handleIdChange} />
           </div>
@@ -971,20 +1269,27 @@ function KYCUploadForm({ onSubmit, idDocument, setIdDocument, selfie, setSelfie,
             >
               {selfie ? (
                 <div>
-                  <div style={{ fontSize: '24px', marginBottom: '8px' }}>🤳</div>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
+                    {renderIcon('selfie', { size: 24, color: 'var(--accent-green)' })}
+                  </div>
                   <div style={{ fontSize: '13px', color: 'var(--green-light)' }}>{selfie.name}</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>{(selfie.size / 1024).toFixed(0)} KB</div>
                 </div>
               ) : (
                 <div>
-                  <div style={{ fontSize: '24px', marginBottom: '8px' }}>📁</div>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
+                    {renderIcon('folder', { size: 24, color: 'var(--text-secondary)' })}
+                  </div>
                   <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Click to upload (JPG or PNG only)</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>max 5MB</div>
                 </div>
               )}
             </div>
             {selfieError && (
-              <p style={{ color: 'var(--red)', fontSize: '12px', marginTop: '6px' }}>⚠ {selfieError}</p>
+              <p style={{ color: 'var(--red)', fontSize: '12px', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {renderIcon('warning', { size: 14, color: 'var(--accent-red)' })}
+                <span>{selfieError}</span>
+              </p>
             )}
             <input id="selfie_input" type="file" accept=".jpg,.jpeg,.png" style={{ display: 'none' }} onChange={handleSelfieChange} />
           </div>
@@ -996,8 +1301,9 @@ function KYCUploadForm({ onSubmit, idDocument, setIdDocument, selfie, setSelfie,
           border: '1px solid var(--navy-border)',
           borderRadius: '8px', marginBottom: '20px'
         }}>
-          <p style={{ margin: '0', fontSize: '13px', color: 'var(--text-muted)' }}>
-            ⚠️ Your documents are securely stored and only used for identity verification. We accept government-issued IDs only.
+          <p style={{ margin: '0', fontSize: '13px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {renderIcon('warning', { size: 14, color: 'var(--accent-gold)' })}
+            <span>Your documents are securely stored and only used for identity verification. We accept government-issued IDs only.</span>
           </p>
         </div>
 

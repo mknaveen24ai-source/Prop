@@ -1,15 +1,25 @@
-import React, { useState, useEffect } from 'react'
-import MultiChartGrid from './MultiChartGrid'
+import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import OrderPanel from './OrderPanel'
 import SimulatedTradingDisclaimer from './SimulatedTradingDisclaimer'
 import RiskWarningBanner from './RiskWarningBanner'
 import api from '../services/api'
+import useStore from '../store/useStore'
+import { renderIcon } from '../utils/iconMap'
+import {
+  getAvailableInstrumentList,
+  formatPrice,
+  getInputStepString,
+  getPriceDecimals,
+} from '../utils/instruments'
+import {
+  calculateEquity,
+  calculatePercent,
+  calculateRealizedProfit,
+  calculateTargetRemaining,
+  sumMoney,
+} from '../utils/finance'
 
-const SUPPORTED_INSTRUMENTS = ['EURUSD', 'GBPUSD', 'XAUUSD', 'XAGUSD']
-function getDecimals(instrument) {
-  if (instrument === 'XAUUSD' || instrument === 'XAGUSD') return 2
-  return 5
-}
+const MultiChartGrid = lazy(() => import('./MultiChartGrid'))
 
 // ── Phase timer helpers ────────────────────────────────────────────────────────
 function getTimeRemaining(endDateStr) {
@@ -40,8 +50,8 @@ function exportTradesToCSV(trades, accountType, accountSize) {
     t.instrument,
     t.direction,
     parseFloat(t.lot_size).toFixed(2),
-    t.open_price  ? parseFloat(t.open_price).toFixed(5)  : '',
-    t.close_price ? parseFloat(t.close_price).toFixed(5) : '',
+    t.open_price  ? formatPrice(t.open_price, t.instrument)  : '',
+    t.close_price ? formatPrice(t.close_price, t.instrument) : '',
     t.open_time   ? new Date(t.open_time).toISOString()  : '',
     t.close_time  ? new Date(t.close_time).toISOString() : '',
     t.demo_pnl    ? parseFloat(t.demo_pnl).toFixed(2)    : '0.00',
@@ -71,29 +81,129 @@ function exportTradesToCSV(trades, accountType, accountSize) {
   URL.revokeObjectURL(url)
 }
 
+function formatBatchActionLabel(actionType) {
+  if (actionType === 'close_winning') return 'Close Winners'
+  if (actionType === 'close_losing') return 'Close Losers'
+  if (actionType === 'breakeven_winning') return 'Breakeven Winners'
+  return actionType.replace(/_/g, ' ')
+}
+
+function formatDuration(seconds) {
+  if (!seconds || seconds <= 0) return '0s'
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
+  if (minutes < 60) return remainingSeconds ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+  return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`
+}
+
+function buildBatchFeedback(actionType, data) {
+  const skipped = data?.skipped || {}
+  const details = []
+
+  if (typeof data?.affected === 'number') details.push(`${data.affected} updated`)
+  if (skipped.min_hold) details.push(`${skipped.min_hold} waiting for ${formatDuration(data?.minHoldSeconds || 0)} hold`)
+  if (skipped.no_match) details.push(`${skipped.no_match} unmatched`)
+  if (skipped.price_unavailable) details.push(`${skipped.price_unavailable} no live price`)
+  if (skipped.locked) details.push(`${skipped.locked} busy`)
+
+  return {
+    type: data?.affected > 0 ? 'success' : 'warning',
+    title: formatBatchActionLabel(actionType),
+    message: data?.message || 'Batch action completed.',
+    detail: details.join(' • ')
+  }
+}
+
+function ChartFallback() {
+  return (
+    <div
+      className="card"
+      style={{
+        minHeight: '400px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'var(--text-muted)',
+        background: 'rgba(255,255,255,0.02)'
+      }}
+    >
+      Loading chart workspace...
+    </div>
+  )
+}
+
 export default function TradingPanel({
-  prices, selectedAccount, accounts, setSelectedAccount,
-  openTrades, tradeHistory, orderForm, setOrderForm,
-  onOpenTrade, onCloseTrade, onCancelOrder, getStatusColor, stats,
+  prices: propPrices,
+  selectedAccount: propSelectedAccount,
+  accounts: propAccounts,
+  setSelectedAccount: propSetSelectedAccount,
+  openTrades: propOpenTrades,
+  tradeHistory,
+  orderForm,
+  setOrderForm,
+  onOpenTrade, onCloseTrade, closingTradeIds = [], onCancelOrder, getStatusColor, stats,
   onTradeModified, accountLoading
 }) {
+  const {
+    prices: storePrices,
+    openPositions: storeOpenPositions,
+    activeAccount: storeActiveAccount,
+    allAccounts: storeAccounts,
+    setActiveAccount,
+  } = useStore()
   const [positionView, setPositionView] = useState('all')
   const [partialForm, setPartialForm] = useState(null)
+  const [batchActionPending, setBatchActionPending] = useState('')
+  const [batchFeedback, setBatchFeedback] = useState(null)
+  const [knownAvailableInstruments, setKnownAvailableInstruments] = useState([])
+
+  const prices = Object.keys(storePrices || {}).length > 0 ? storePrices : (propPrices || {})
+  const liveAvailableInstruments = useMemo(() => getAvailableInstrumentList(prices), [prices])
+  const closingTradeSet = useMemo(() => new Set(closingTradeIds), [closingTradeIds])
+  const availableInstruments = knownAvailableInstruments.length > 0
+    ? knownAvailableInstruments
+    : liveAvailableInstruments
+  const openTrades = storeOpenPositions.length > 0 ? storeOpenPositions : (propOpenTrades || [])
+  const selectedAccount = storeActiveAccount || propSelectedAccount
+  const accounts = storeAccounts.length > 0 ? storeAccounts : (propAccounts || [])
+  const setSelectedAccount = useCallback((account) => {
+    if (!account) return
+    setActiveAccount(account)
+    if (typeof propSetSelectedAccount === 'function') {
+      propSetSelectedAccount(account)
+    }
+  }, [propSetSelectedAccount, setActiveAccount])
 
   async function handleBatchAction(actionType) {
     if (!window.confirm('Are you sure you want to execute batch action: ' + actionType.replace('_', ' ') + '?')) return
     try {
+      setBatchActionPending(actionType)
+      setBatchFeedback(null)
       const res = await api.post('/api/trades/batch-action', { action: actionType, account_id: selectedAccount.id })
-      alert(res.data.message + ' (Affected: ' + res.data.affected + ')')
+      setBatchFeedback(buildBatchFeedback(actionType, res.data))
+      if (onTradeModified && res.data?.affected > 0) onTradeModified()
     } catch (err) {
-      alert(err.response?.data?.error || 'Batch action failed')
+      setBatchFeedback({
+        type: 'error',
+        title: formatBatchActionLabel(actionType),
+        message: err.response?.data?.error || 'Batch action failed',
+        detail: ''
+      })
+    } finally {
+      setBatchActionPending('')
     }
   }
 
   async function handlePartialClose(tradeId, currentLots, closeLots) {
     try {
       if (!closeLots || parseFloat(closeLots) <= 0 || parseFloat(closeLots) > parseFloat(currentLots)) return alert('Invalid lot fraction')
-      await api.post('/api/trades/close', { trade_id: tradeId, close_lots: parseFloat(closeLots) })
+      await api.post('/api/trades/close', {
+        trade_id: tradeId,
+        close_lots: parseFloat(closeLots)
+      })
       setPartialForm(null)
       if (onTradeModified) onTradeModified()
     } catch (err) {
@@ -101,7 +211,13 @@ export default function TradingPanel({
     }
   }
   const [modifyingTradeId, setModifyingTradeId] = useState(null)
-  const [modifyForm, setModifyForm] = useState({ stop_loss: '', take_profit: '' })
+  const [modifyForm, setModifyForm] = useState({
+    stop_loss: '',
+    take_profit: '',
+    trailing_step_pips: '',
+    trailing_activation_price: '',
+    breakeven_trigger_pips: ''
+  })
   const [modifyError, setModifyError] = useState('')
   const [modifySuccess, setModifySuccess] = useState('')
   const [priceStatus, setPriceStatus] = useState({ healthy: true, instruments: {} })
@@ -121,10 +237,34 @@ export default function TradingPanel({
     return () => clearInterval(interval)
   }, [])
 
+  useEffect(() => {
+    setBatchFeedback(null)
+    setBatchActionPending('')
+  }, [selectedAccount?.id])
+
+  useEffect(() => {
+    if (liveAvailableInstruments.length > 0) {
+      setKnownAvailableInstruments(liveAvailableInstruments)
+    }
+  }, [liveAvailableInstruments])
+
+  useEffect(() => {
+    if (!Array.isArray(availableInstruments) || availableInstruments.length === 0) return
+    if (availableInstruments.includes(orderForm?.instrument)) return
+
+    setOrderForm((current) => ({
+      ...current,
+      instrument: availableInstruments[0],
+      stop_loss: '',
+      take_profit: ''
+    }))
+  }, [availableInstruments, orderForm?.instrument, setOrderForm])
+
   // ── Trade journal notes ────────────────────────────────────────────────────
   const [editingNoteId, setEditingNoteId] = useState(null)
   const [noteText, setNoteText]           = useState('')
   const [noteTags, setNoteTags]           = useState('')
+  const [noteStrategyTag, setNoteStrategyTag] = useState('')
   const [noteSaved, setNoteSaved]         = useState(false)
   const [noteSaving, setNoteSaving]       = useState(false)  // FIX: guard against double-save
  
@@ -138,7 +278,12 @@ export default function TradingPanel({
     if (noteSaving) return  // FIX: prevent double-save on rapid clicks
     setNoteSaving(true)
     try {
-      await api.patch('/api/trades/note', { trade_id: tradeId, note: noteText, tags: noteTags })
+      await api.patch('/api/trades/note', {
+        trade_id: tradeId,
+        note: noteText,
+        tags: noteTags,
+        strategy_tag: noteStrategyTag
+      })
       setNoteSaved(true)
       // Update the trade in-place so the 📝 icon reflects the new note state
       if (onTradeModified) onTradeModified()
@@ -172,7 +317,10 @@ export default function TradingPanel({
     setModifyingTradeId(trade.id)
     setModifyForm({
       stop_loss:   trade.stop_loss   ? parseFloat(trade.stop_loss).toString()   : '',
-      take_profit: trade.take_profit ? parseFloat(trade.take_profit).toString() : ''
+      take_profit: trade.take_profit ? parseFloat(trade.take_profit).toString() : '',
+      trailing_step_pips: trade.trailing_step_pips ? String(trade.trailing_step_pips) : '',
+      trailing_activation_price: trade.trailing_activation_price ? parseFloat(trade.trailing_activation_price).toString() : '',
+      breakeven_trigger_pips: trade.breakeven_trigger_pips ? parseFloat(trade.breakeven_trigger_pips).toString() : ''
     })
     setModifyError('')
     setModifySuccess('')
@@ -180,7 +328,13 @@ export default function TradingPanel({
 
   function cancelModify() {
     setModifyingTradeId(null)
-    setModifyForm({ stop_loss: '', take_profit: '' })
+    setModifyForm({
+      stop_loss: '',
+      take_profit: '',
+      trailing_step_pips: '',
+      trailing_activation_price: '',
+      breakeven_trigger_pips: ''
+    })
     setModifyError('')
     setModifySuccess('')
   }
@@ -191,6 +345,9 @@ export default function TradingPanel({
       const payload = { trade_id: trade.id }
       payload.stop_loss   = modifyForm.stop_loss   === '' ? null : parseFloat(modifyForm.stop_loss)
       payload.take_profit = modifyForm.take_profit === '' ? null : parseFloat(modifyForm.take_profit)
+      payload.trailing_step_pips = modifyForm.trailing_step_pips === '' ? null : parseInt(modifyForm.trailing_step_pips, 10)
+      payload.trailing_activation_price = modifyForm.trailing_activation_price === '' ? null : parseFloat(modifyForm.trailing_activation_price)
+      payload.breakeven_trigger_pips = modifyForm.breakeven_trigger_pips === '' ? null : parseFloat(modifyForm.breakeven_trigger_pips)
 
       await api.patch('/api/trades/modify', payload)
 
@@ -207,27 +364,259 @@ export default function TradingPanel({
     }
   }
 
-  const currentBalance = stats ? parseFloat(stats.account?.current_balance || 0) : 0
-  const floatingProfit = openTrades.reduce((sum, trade) => {
-    if (trade.status !== 'open') return sum
-    return sum + parseFloat(trade.floating_pnl || 0)
-  }, 0)
-  const floatingBalance = currentBalance + floatingProfit
-  const startingBalance = stats ? parseFloat(stats.account?.starting_balance || selectedAccount?.starting_balance || 0) : 0
-  const profitTargetAmount = stats ? parseFloat(stats.account?.profit_target || 0) : 0
-  const realizedProfit = currentBalance - startingBalance
-  const equityProfit = floatingBalance - startingBalance
-  const targetProgressPct = profitTargetAmount > 0
-    ? Math.min(Math.max((realizedProfit / profitTargetAmount) * 100, 0), 100)
-    : 0
-  const targetRemaining = Math.max(0, profitTargetAmount - realizedProfit)
+  async function moveTradeToBreakeven(trade) {
+    try {
+      setModifyError('')
+      await api.patch('/api/trades/modify', {
+        trade_id: trade.id,
+        move_to_breakeven: true
+      })
+      setModifySuccess('Moved to breakeven')
+      setTimeout(() => {
+        setModifySuccess('')
+        if (onTradeModified) onTradeModified()
+      }, 900)
+    } catch (err) {
+      setModifyError(err.response?.data?.error || 'Could not move trade to breakeven')
+    }
+  }
+
+  function openNoteEditor(trade) {
+    setEditingNoteId(trade.id)
+    setNoteText(trade.trader_note || '')
+    setNoteTags(Array.isArray(trade.tags) ? trade.tags.join(', ') : (trade.tags || ''))
+    setNoteStrategyTag(trade.strategy_tag || '')
+    setNoteSaved(false)
+  }
+
+  function closeNoteEditor() {
+    setEditingNoteId(null)
+    setNoteText('')
+    setNoteTags('')
+    setNoteStrategyTag('')
+    setNoteSaved(false)
+  }
+
+  const handleTradeLineAdjust = useCallback(async (tradeId, changeSet) => {
+    try {
+      await api.patch('/api/trades/modify', { trade_id: tradeId, ...changeSet })
+      if (onTradeModified) onTradeModified()
+    } catch (err) {
+      setModifyError(err.response?.data?.error || 'Could not update trade from chart')
+    }
+  }, [onTradeModified])
+
+  async function handleCloseTrade(trade) {
+    if (closingTradeSet.has(trade.id)) return
+    await onCloseTrade(trade.id)
+  }
+
+  async function handleOpenTrade(payload) {
+    await onOpenTrade(payload)
+  }
+
+  function getTradeTags(trade) {
+    if (Array.isArray(trade?.tags)) {
+      return trade.tags.filter(Boolean)
+    }
+    if (typeof trade?.tags === 'string') {
+      return trade.tags.split(',').map((tag) => tag.trim()).filter(Boolean)
+    }
+    return []
+  }
+
+  function renderTradeMetaBadges(trade) {
+    const tags = getTradeTags(trade).slice(0, 2)
+    const badges = []
+
+    if (trade.strategy_tag) {
+      badges.push({
+        key: 'strategy',
+        label: trade.strategy_tag,
+        color: 'var(--accent)',
+        background: 'rgba(37, 99, 235, 0.14)',
+        border: 'rgba(37, 99, 235, 0.28)'
+      })
+    }
+
+    tags.forEach((tag, index) => {
+      badges.push({
+        key: `tag-${index}`,
+        label: `#${tag}`,
+        color: 'var(--text-muted)',
+        background: 'rgba(148, 148, 148, 0.08)',
+        border: 'rgba(148, 148, 148, 0.18)'
+      })
+    })
+
+    if (trade.trailing_step_pips) {
+      badges.push({
+        key: 'trail',
+        label: `Trail ${trade.trailing_step_pips}p`,
+        color: 'var(--green)',
+        background: 'rgba(0, 200, 153, 0.1)',
+        border: 'rgba(0, 200, 153, 0.25)'
+      })
+    }
+
+    if (trade.breakeven_trigger_pips) {
+      badges.push({
+        key: 'be',
+        label: `BE ${trade.breakeven_trigger_pips}p`,
+        color: 'var(--accent-gold, #fbbf24)',
+        background: 'rgba(251, 191, 36, 0.1)',
+        border: 'rgba(251, 191, 36, 0.25)'
+      })
+    }
+
+    if (badges.length === 0) return null
+
+    return (
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+        {badges.map((badge) => (
+          <span
+            key={badge.key}
+            style={{
+              padding: '2px 7px',
+              borderRadius: '999px',
+              fontSize: '10px',
+              fontWeight: '700',
+              letterSpacing: '0.03em',
+              color: badge.color,
+              background: badge.background,
+              border: `1px solid ${badge.border}`
+            }}
+          >
+            {badge.label}
+          </span>
+        ))}
+      </div>
+    )
+  }
+
+  function renderTradeNoteEditor(trade, colSpan = 8) {
+    return (
+      <tr>
+        <td colSpan={colSpan} style={{ padding: '0', borderBottom: '1px solid var(--navy-border)' }}>
+          <div style={{
+            padding: '12px 16px',
+            background: 'rgba(148, 148, 148, 0.04)',
+            borderTop: '1px solid rgba(148, 148, 148, 0.15)'
+          }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '8px', letterSpacing: '0.08em' }}>
+              TRADE JOURNAL — {trade.instrument} {trade.direction?.toUpperCase()} {parseFloat(trade.lot_size).toFixed(2)} lots
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+              <input
+                type="text"
+                placeholder="Strategy tag"
+                value={noteStrategyTag}
+                onChange={(e) => { setNoteStrategyTag(e.target.value); setNoteSaved(false) }}
+                style={{ width: '100%', fontSize: '13px', background: 'var(--navy)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 12px', color: 'var(--text)' }}
+              />
+              <input
+                type="text"
+                placeholder="Tags (comma separated, e.g. A+ Setup, Revenge)"
+                value={noteTags}
+                onChange={(e) => { setNoteTags(e.target.value); setNoteSaved(false) }}
+                style={{ width: '100%', fontSize: '13px', background: 'var(--navy)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 12px', color: 'var(--accent)', fontFamily: 'DM Sans, sans-serif' }}
+              />
+            </div>
+            <textarea
+              value={noteText}
+              onChange={(e) => { setNoteText(e.target.value); setNoteSaved(false) }}
+              placeholder="Add your trade notes here — strategy used, lessons learned, market context..."
+              maxLength={1000}
+              rows={3}
+              style={{
+                width: '100%', fontSize: '13px', resize: 'vertical',
+                background: 'var(--navy)', border: '1px solid var(--navy-border)',
+                borderRadius: '6px', padding: '8px 12px',
+                color: 'var(--text)', fontFamily: 'DM Sans, sans-serif',
+                lineHeight: '1.5', marginBottom: '8px'
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{noteText.length}/1000</span>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                {noteSaved && (
+                  <span style={{ fontSize: '11px', color: 'var(--green)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                    {renderIcon('approve', { size: 11, color: 'var(--accent-green)' })}
+                    <span>Saved</span>
+                  </span>
+                )}
+                <button
+                  onClick={() => saveNote(trade.id)}
+                  disabled={noteSaving}
+                  style={{
+                    background: noteSaving ? 'var(--navy-border)' : 'var(--accent)',
+                    color: noteSaving ? 'var(--text-muted)' : 'var(--navy)',
+                    border: 'none', borderRadius: '6px',
+                    padding: '6px 16px', fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: noteSaving ? 'not-allowed' : 'pointer',
+                    fontFamily: 'DM Sans, sans-serif'
+                  }}
+                >
+                  {noteSaving ? 'Saving...' : 'Save Note'}
+                </button>
+                <button
+                  onClick={closeNoteEditor}
+                  style={{
+                    background: 'transparent', border: '1px solid var(--navy-border)',
+                    borderRadius: '6px', padding: '6px 12px',
+                    fontSize: '12px', color: 'var(--text-muted)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </td>
+      </tr>
+    )
+  }
+
+  const currentBalance = stats ? Number(stats.account?.current_balance || 0) : 0
+  const floatingProfit = openTrades
+    .filter(trade => trade.status === 'open')
+    .reduce((sum, trade) => sumMoney([sum, trade.floating_pnl || 0]), 0)
+  const floatingBalance = calculateEquity(currentBalance, floatingProfit)
+  const startingBalance = stats ? Number(stats.account?.starting_balance || selectedAccount?.starting_balance || 0) : 0
+  const profitTargetAmount = stats ? Number(stats.account?.profit_target || 0) : 0
+  const realizedProfit = calculateRealizedProfit(currentBalance, startingBalance)
+  const equityProfit = calculateRealizedProfit(floatingBalance, startingBalance)
+  const targetProgressPct = calculatePercent(realizedProfit, profitTargetAmount, {
+    clampMin: 0,
+    clampMax: 100,
+    decimalPlaces: 1
+  })
+  const targetRemaining = calculateTargetRemaining(profitTargetAmount, realizedProfit)
   const openPositions = openTrades.filter(trade => trade.status === 'open')
   const pendingOrders = openTrades.filter(trade => trade.status === 'pending')
+  const closedTrades = tradeHistory.filter(trade => trade.status === 'closed')
+  const cancelledTrades = tradeHistory.filter(trade => trade.status === 'cancelled')
+  const realizedHistoryPnl = closedTrades.reduce((sum, trade) => sum + parseFloat(trade.demo_pnl || 0), 0)
   const visibleOpenTrades = positionView === 'open'
     ? openPositions
     : positionView === 'pending'
       ? pendingOrders
       : openTrades
+  const priceStatusState = priceStatus?.status || (priceStatus?.healthy ? 'healthy' : 'unhealthy')
+  const priceFeedLive = priceStatusState === 'healthy'
+  const priceFeedDegraded = priceStatusState === 'degraded'
+  const priceFeedColor = priceFeedLive ? 'var(--green)' : (priceFeedDegraded ? 'var(--warning, #f59e0b)' : 'var(--red)')
+  const priceFeedBackground = priceFeedLive
+    ? 'rgba(0, 200, 153, 0.1)'
+    : (priceFeedDegraded ? 'rgba(245, 158, 11, 0.12)' : 'rgba(255, 71, 87, 0.1)')
+  const priceFeedBorder = priceFeedLive
+    ? 'rgba(0, 200, 153, 0.3)'
+    : (priceFeedDegraded ? 'rgba(245, 158, 11, 0.28)' : 'rgba(255, 71, 87, 0.3)')
+  const priceFeedLabel = priceFeedLive ? 'Live' : (priceFeedDegraded ? 'Degraded' : 'Delayed')
 
   return (
     <div>
@@ -242,21 +631,21 @@ export default function TradingPanel({
           gap: '8px',
           padding: '8px 14px',
           borderRadius: '8px',
-          background: priceStatus.healthy ? 'rgba(0, 200, 153, 0.1)' : 'rgba(255, 71, 87, 0.1)',
-          border: `1px solid ${priceStatus.healthy ? 'rgba(0, 200, 153, 0.3)' : 'rgba(255, 71, 87, 0.3)'}`,
+          background: priceFeedBackground,
+          border: `1px solid ${priceFeedBorder}`,
           fontSize: '12px'
         }}>
           <span style={{
             width: '8px',
             height: '8px',
             borderRadius: '50%',
-            background: priceStatus.healthy ? 'var(--green)' : 'var(--red)',
-            animation: priceStatus.healthy ? 'none' : 'pulse 1.5s infinite'
+            background: priceFeedColor,
+            animation: priceFeedLive ? 'none' : 'pulse 1.5s infinite'
           }} />
-          <span style={{ color: priceStatus.healthy ? 'var(--green)' : 'var(--red)', fontWeight: 500 }}>
-            {priceStatus.healthy ? '● Live' : '● Delayed'}
+          <span style={{ color: priceFeedColor, fontWeight: 500 }}>
+            {`● ${priceFeedLabel}`}
           </span>
-          {!priceStatus.healthy && priceStatus.message && (
+          {!priceFeedLive && priceStatus.message && (
             <span style={{ color: 'var(--text-muted)', marginLeft: '4px', fontSize: '11px' }}>
               {priceStatus.message}
             </span>
@@ -288,13 +677,18 @@ export default function TradingPanel({
         </div>
       )}
 
-      {/* Price Ticker */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', overflowX: 'auto', paddingBottom: '4px' }}>
-        {SUPPORTED_INSTRUMENTS.map(instrument => {
+      {/* Symbol Selector */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))',
+        gap: '8px',
+        marginBottom: '20px'
+      }}>
+        {availableInstruments.map(instrument => {
           const data = prices[instrument]
-          if (!data) return null
-          const decimals = getDecimals(instrument)
           const isSelected = orderForm.instrument === instrument
+          const bidText = data ? formatPrice(data.bid, instrument) : '--'
+          const askText = data ? formatPrice(data.ask, instrument) : '--'
           return (
             <div
               key={instrument}
@@ -303,20 +697,19 @@ export default function TradingPanel({
                 background:  'var(--navy-card)',
                 border:      isSelected ? '1px solid var(--accent)' : '1px solid var(--navy-border)',
                 borderRadius:'8px',
-                padding:     '10px 14px',
+                padding:     '10px 12px',
                 cursor:      'pointer',
-                minWidth:    '110px',
-                flexShrink:  0,
                 transition:  'all 0.15s',
-                boxShadow:   isSelected ? '0 0 12px rgba(148, 148, 148, 0.2)' : 'none'
+                boxShadow:   isSelected ? '0 0 12px rgba(148, 148, 148, 0.2)' : 'none',
+                minHeight:   '78px'
               }}
             >
               <div style={{ fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.08em', marginBottom: '4px' }}>{instrument}</div>
               <div style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--accent)', fontFamily: 'DM Mono, monospace' }}>
-                {parseFloat(data.bid).toFixed(decimals)}
+                {bidText}
               </div>
               <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '2px' }}>
-                {parseFloat(data.ask).toFixed(decimals)}
+                {askText}
               </div>
             </div>
           )
@@ -326,7 +719,9 @@ export default function TradingPanel({
       {/* No account yet */}
       {accounts.length === 0 && (
         <div className="card" style={{ textAlign: 'center', padding: '48px' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>📈</div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+            {renderIcon('trade', { size: 48, color: 'var(--accent)' })}
+          </div>
           <h3 style={{ color: 'var(--accent)', marginBottom: '12px' }}>No Trading Account</h3>
           <p style={{ color: 'var(--text-muted)' }}>Go to Dashboard to create your challenge account first.</p>
         </div>
@@ -335,7 +730,9 @@ export default function TradingPanel({
       {/* Locked account */}
       {selectedAccount?.status === 'locked' && (
         <div className="card" style={{ textAlign: 'center', padding: '32px', border: '1px solid #8a8a8a', marginBottom: '20px' }}>
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>🔒</div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+            {renderIcon('lock', { size: 40, color: 'var(--text-secondary)' })}
+          </div>
           <h3 style={{ color: '#8a8a8a', marginBottom: '8px' }}>Account Locked</h3>
           <p style={{ color: 'var(--text-muted)' }}>This account has been locked by admin. Contact support.</p>
         </div>
@@ -343,8 +740,9 @@ export default function TradingPanel({
 
       {/* Loading state */}
       {accountLoading && (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '14px' }}>
-          ⏳ Loading account data...
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+          {renderIcon('timer', { size: 16, color: 'var(--text-secondary)' })}
+          <span>Loading account data...</span>
         </div>
       )}
 
@@ -434,10 +832,10 @@ export default function TradingPanel({
 
               const level = usedPct >= 90 ? 'critical' : usedPct >= 75 ? 'high' : usedPct >= 50 ? 'medium' : 'low'
               const levelColors = {
-                critical: { bg: 'rgba(97, 97, 97, 0.15)', border: 'var(--red)',   bar: '#7a7a7a', text: 'var(--red)',   icon: '🚨' },
-                high:     { bg: 'rgba(122, 122, 122, 0.10)', border: '#7a7a7a',      bar: '#7a7a7a', text: '#7a7a7a',     icon: '⚠️' },
-                medium:   { bg: 'rgba(139, 139, 139, 0.10)', border: '#8b8b8b',     bar: '#8b8b8b', text: '#8b8b8b',     icon: '📊' },
-                low:      { bg: 'rgba(148, 148, 148, 0.06)', border: 'rgba(148, 148, 148, 0.3)', bar: 'var(--accent)', text: 'var(--text-muted)', icon: '📉' },
+                critical: { bg: 'rgba(97, 97, 97, 0.15)', border: 'var(--red)',   bar: '#7a7a7a', text: 'var(--red)',   icon: 'risk-alerts' },
+                high:     { bg: 'rgba(122, 122, 122, 0.10)', border: '#7a7a7a',      bar: '#7a7a7a', text: '#7a7a7a',     icon: 'warning' },
+                medium:   { bg: 'rgba(139, 139, 139, 0.10)', border: '#8b8b8b',     bar: '#8b8b8b', text: '#8b8b8b',     icon: 'analytics' },
+                low:      { bg: 'rgba(148, 148, 148, 0.06)', border: 'rgba(148, 148, 148, 0.3)', bar: 'var(--accent)', text: 'var(--text-muted)', icon: 'floating_down' },
               }
               const c = levelColors[level]
 
@@ -450,7 +848,9 @@ export default function TradingPanel({
                   {/* Header row */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>{c.icon}</span>
+                      <span style={{ display: 'inline-flex' }}>
+                        {renderIcon(c.icon, { size: 14, color: c.text })}
+                      </span>
                       <span style={{ fontSize: '12px', fontWeight: '600', color: c.text }}>
                         Drawdown {level === 'critical' ? '— CRITICAL' : level === 'high' ? '— HIGH' : level === 'medium' ? '— WARNING' : ''}
                       </span>
@@ -475,8 +875,9 @@ export default function TradingPanel({
 
                   {/* Critical message */}
                   {level === 'critical' && (
-                    <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--red)', fontWeight: '600' }}>
-                      ⚡ Account will fail if drawdown reaches {maxDrawdownPct}%. Close losing trades immediately.
+                    <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--red)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {renderIcon('warning', { size: 12, color: 'var(--accent-red)' })}
+                      <span>Account will fail if drawdown reaches {maxDrawdownPct}%. Close losing trades immediately.</span>
                     </div>
                   )}
                 </div>
@@ -484,14 +885,26 @@ export default function TradingPanel({
             })()}
 
 
-            <div style={{ width: '100%', height: '400px', marginBottom: '16px' }}>
-              <MultiChartGrid
-                selectedInstrument={orderForm.instrument}
-                openTrades={openTrades}
-                tradeHistory={tradeHistory}
-                prices={prices}
-              />
-            </div>
+              <div style={{ width: '100%', height: '400px', marginBottom: '16px' }}>
+                <Suspense fallback={<ChartFallback />}>
+                  <MultiChartGrid
+                    selectedInstrument={orderForm.instrument}
+                    availableInstruments={availableInstruments}
+                    openTrades={openTrades}
+                    tradeHistory={tradeHistory}
+                    prices={prices}
+                    selectedAccount={selectedAccount}
+                    stats={stats}
+                    onTradeLineAdjust={handleTradeLineAdjust}
+                    onPrimaryInstrumentChange={(instrument) => setOrderForm((current) => ({
+                      ...current,
+                      instrument,
+                      stop_loss: '',
+                      take_profit: ''
+                    }))}
+                  />
+                </Suspense>
+              </div>
 
             {/* ── Phase Countdown Timer ── */}
             {timeRemaining && (
@@ -504,8 +917,14 @@ export default function TradingPanel({
                 border: `1px solid ${timeRemaining.urgent ? 'var(--red)' : 'rgba(148, 148, 148, 0.25)'}`,
                 borderRadius: '8px'
               }}>
-                <span style={{ fontSize: '18px' }}>
-                  {timeRemaining.expired ? '⏰' : timeRemaining.urgent ? '🚨' : '⏱️'}
+                <span style={{ display: 'inline-flex' }}>
+                  {renderIcon(
+                    timeRemaining.expired ? 'timer' : timeRemaining.urgent ? 'warning' : 'timer',
+                    {
+                      size: 18,
+                      color: timeRemaining.expired || timeRemaining.urgent ? 'var(--accent-red)' : 'var(--accent)'
+                    }
+                  )}
                 </span>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
@@ -546,20 +965,60 @@ export default function TradingPanel({
                 )}
               </div>
             )}
+            <div className="trade-desk-stack">
             {openTrades.length > 0 && (
-              <div className="card" style={{ marginBottom: '20px' }}>
+              <div className="card trade-section-card">
+                <div className="trade-section-pills" style={{ marginBottom: '14px' }}>
+                  <span className="trade-summary-pill">{openPositions.length} Open</span>
+                  <span className="trade-summary-pill">{pendingOrders.length} Pending</span>
+                  <span className="trade-summary-pill" style={{ color: floatingProfit >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                    {floatingProfit >= 0 ? '+' : ''}${floatingProfit.toFixed(2)} Floating
+                  </span>
+                </div>
+                {batchFeedback && (
+                  <div className={`trade-feedback trade-feedback-${batchFeedback.type}`}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+                      <div>
+                        <div className="trade-feedback-title">{batchFeedback.title}</div>
+                        <div className="trade-feedback-message">{batchFeedback.message}</div>
+                      </div>
+                      <button type="button" className="trade-feedback-dismiss" onClick={() => setBatchFeedback(null)}>
+                        Dismiss
+                      </button>
+                    </div>
+                    {batchFeedback.detail && <div className="trade-feedback-detail">{batchFeedback.detail}</div>}
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '10px', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                     <h3 style={{ marginBottom: 0, color: 'var(--accent)', fontSize: '15px' }}>
                       Open Positions & Orders ({visibleOpenTrades.length})
                     </h3>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button onClick={() => handleBatchAction('close_winning')} className="btn" style={{ fontSize: '10px', padding: '4px 8px', background: 'rgba(0, 200, 153, 0.2)', color: 'var(--green)', border: '1px solid var(--green)' }}>Close Winners</button>
-                      <button onClick={() => handleBatchAction('close_losing')} className="btn" style={{ fontSize: '10px', padding: '4px 8px', background: 'rgba(255, 71, 87, 0.2)', color: 'var(--red)', border: '1px solid var(--red)' }}>Close Losers</button>
-                      <button onClick={() => handleBatchAction('breakeven_winning')} className="btn" style={{ fontSize: '10px', padding: '4px 8px', background: 'rgba(0, 229, 255, 0.2)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>Breakeven All</button>
+                    <div className="trade-batch-actions">
+                      <button
+                        onClick={() => handleBatchAction('close_winning')}
+                        className="btn trade-action-btn trade-action-btn-success"
+                        disabled={!!batchActionPending}
+                      >
+                        {batchActionPending === 'close_winning' ? 'Closing Winners...' : 'Close Winners'}
+                      </button>
+                      <button
+                        onClick={() => handleBatchAction('close_losing')}
+                        className="btn trade-action-btn trade-action-btn-danger"
+                        disabled={!!batchActionPending}
+                      >
+                        {batchActionPending === 'close_losing' ? 'Closing Losers...' : 'Close Losers'}
+                      </button>
+                      <button
+                        onClick={() => handleBatchAction('breakeven_winning')}
+                        className="btn trade-action-btn trade-action-btn-accent"
+                        disabled={!!batchActionPending}
+                      >
+                        {batchActionPending === 'breakeven_winning' ? 'Moving To Breakeven...' : 'Breakeven Winners'}
+                      </button>
                     </div>
                   </div>
-                  <div style={{ display: 'inline-flex', border: '1px solid var(--navy-border)', borderRadius: '8px', overflow: 'hidden' }}>
+                  <div className="terminal-filter-group">
                     {[
                       { id: 'all', label: `All (${openTrades.length})` },
                       { id: 'open', label: `Open (${openPositions.length})` },
@@ -568,15 +1027,11 @@ export default function TradingPanel({
                       <button
                         key={view.id}
                         onClick={() => setPositionView(view.id)}
+                        className="terminal-filter-btn"
                         style={{
-                          border: 'none',
-                          padding: '7px 11px',
-                          fontSize: '11px',
-                          cursor: 'pointer',
                           background: positionView === view.id ? 'var(--accent)' : 'var(--navy-card)',
                           color: positionView === view.id ? 'var(--navy)' : 'var(--text-muted)',
-                          fontWeight: positionView === view.id ? '700' : '500',
-                          transition: 'all 0.15s ease'
+                          boxShadow: positionView === view.id ? '0 10px 24px rgba(37, 99, 235, 0.22)' : 'none'
                         }}
                       >
                         {view.label}
@@ -584,8 +1039,11 @@ export default function TradingPanel({
                     ))}
                   </div>
                 </div>
-                <div className="table-wrap">
-                  <table>
+                <div className="trade-batch-hint">
+                  Batch close follows your trading rules, including minimum hold time and live market availability.
+                </div>
+                <div className="table-wrapper trading-table-wrapper">
+                  <table className="data-table trading-table">
                     <thead>
                       <tr>
                         <th>Symbol</th><th>Type</th><th>Lots</th><th>Open / Target</th>
@@ -594,7 +1052,7 @@ export default function TradingPanel({
                     </thead>
                     <tbody>
                       {visibleOpenTrades.map(trade => {
-                        const dec = getDecimals(trade.instrument)
+                        const dec = getPriceDecimals(trade.instrument)
                         const isPending  = trade.status === 'pending'
                         const isModifying = modifyingTradeId === trade.id
 
@@ -612,6 +1070,7 @@ export default function TradingPanel({
                                     PENDING
                                   </span>
                                 )}
+                                {renderTradeMetaBadges(trade)}
                               </td>
                               <td style={{ color: trade.direction === 'buy' ? 'var(--green)' : 'var(--red)', fontWeight: '600' }}>
                                 {isPending
@@ -647,7 +1106,7 @@ export default function TradingPanel({
                                 }
                               </td>
                               <td>
-                                <div style={{ display: 'flex', gap: '5px' }}>
+                                <div className="trade-actions">
                                   {isPending ? (
                                     <button
                                       className="btn btn-red"
@@ -670,15 +1129,28 @@ export default function TradingPanel({
                                       </button>
                                       <button
                                         className="btn"
+                                        onClick={() => editingNoteId === trade.id ? closeNoteEditor() : openNoteEditor(trade)}
+                                        style={{
+                                          padding: '5px 10px',
+                                          fontSize: '11px',
+                                          background: editingNoteId === trade.id ? 'var(--navy-border)' : 'transparent',
+                                          border: '1px solid var(--navy-border)',
+                                          color: trade.trader_note ? 'var(--accent)' : 'var(--text-muted)'
+                                        }}>
+                                        Journal
+                                      </button>
+                                      <button
+                                        className="btn"
                                         onClick={() => setPartialForm({ id: trade.id, lots: parseFloat(trade.lot_size).toFixed(2) })}
                                         style={{ padding: '5px 10px', fontSize: '11px', background: 'var(--navy-border)', color: 'var(--text-muted)' }}>
                                         Partial
                                       </button>
                                       <button
                                         className="btn btn-red"
-                                        onClick={() => onCloseTrade(trade.id)}
-                                        style={{ padding: '5px 10px', fontSize: '11px' }}>
-                                        Close
+                                        onClick={() => handleCloseTrade(trade)}
+                                        disabled={closingTradeSet.has(trade.id)}
+                                        style={{ padding: '5px 10px', fontSize: '11px', opacity: closingTradeSet.has(trade.id) ? 0.6 : 1, cursor: closingTradeSet.has(trade.id) ? 'not-allowed' : 'pointer' }}>
+                                        {closingTradeSet.has(trade.id) ? 'Closing...' : 'Close'}
                                       </button>
                                     </>
                                   )}
@@ -690,11 +1162,41 @@ export default function TradingPanel({
                             {!isPending && partialForm?.id === trade.id && (
                               <tr>
                                 <td colSpan="9" style={{ padding: '0' }}>
-                                  <div style={{ background: 'var(--navy-card)', border: '1px dashed var(--accent)', borderRadius: '8px', padding: '12px 16px', margin: '4px 0 8px 0', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                    <span style={{ fontSize: '12px', color: 'var(--text)' }}>Close Fraction (Current: {parseFloat(trade.lot_size).toFixed(2)}):</span>
-                                    <input type="number" step="0.01" max={trade.lot_size} value={partialForm.val || ''} onChange={e => setPartialForm({ ...partialForm, val: e.target.value })} style={{ width: '80px', padding: '4px 8px', fontSize: '12px' }} />
-                                    <button onClick={() => handlePartialClose(trade.id, trade.lot_size, partialForm.val)} className="btn btn-accent" style={{ padding: '4px 12px', fontSize: '11px' }}>Confirm Partial Close</button>
-                                    <button onClick={() => setPartialForm(null)} className="btn" style={{ padding: '4px 12px', fontSize: '11px', background: 'transparent', border: '1px solid var(--navy-border)' }}>Cancel</button>
+                                  <div style={{ background: 'var(--navy-card)', border: '1px dashed var(--accent)', borderRadius: '8px', padding: '12px 16px', margin: '4px 0 8px 0', display: 'grid', gap: '10px' }}>
+                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                      <span style={{ fontSize: '12px', color: 'var(--text)' }}>Close Fraction (Current: {parseFloat(trade.lot_size).toFixed(2)}):</span>
+                                      <input type="number" step="0.01" max={trade.lot_size} value={partialForm.val || ''} onChange={e => setPartialForm({ ...partialForm, val: e.target.value })} style={{ width: '80px', padding: '4px 8px', fontSize: '12px' }} />
+                                      <button onClick={() => handlePartialClose(trade.id, trade.lot_size, partialForm.val)} className="btn btn-accent" style={{ padding: '4px 12px', fontSize: '11px' }}>Confirm Partial Close</button>
+                                      <button onClick={() => setPartialForm(null)} className="btn" style={{ padding: '4px 12px', fontSize: '11px', background: 'transparent', border: '1px solid var(--navy-border)' }}>Cancel</button>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                      {[0.25, 0.5, 0.75].map((ratio) => {
+                                        const currentLots = parseFloat(trade.lot_size)
+                                        const closeLots = Math.floor(currentLots * ratio * 100) / 100
+                                        const remainingLots = Math.round((currentLots - closeLots) * 100) / 100
+                                        const invalid = closeLots < 0.01 || remainingLots < 0.01
+                                        return (
+                                          <button
+                                            key={ratio}
+                                            type="button"
+                                            disabled={invalid}
+                                            onClick={() => handlePartialClose(trade.id, trade.lot_size, closeLots.toFixed(2))}
+                                            style={{
+                                              padding: '6px 10px',
+                                              borderRadius: '999px',
+                                              border: '1px solid var(--navy-border)',
+                                              background: invalid ? 'rgba(255,255,255,0.03)' : 'rgba(37,99,235,0.08)',
+                                              color: invalid ? 'var(--text-dim)' : 'var(--accent)',
+                                              cursor: invalid ? 'not-allowed' : 'pointer',
+                                              fontSize: '11px',
+                                              fontWeight: '700'
+                                            }}
+                                          >
+                                            Close {Math.round(ratio * 100)}%
+                                          </button>
+                                        )
+                                      })}
+                                    </div>
                                   </div>
                                 </td>
                               </tr>
@@ -725,7 +1227,7 @@ export default function TradingPanel({
                                           value={modifyForm.stop_loss}
                                           onChange={e => setModifyForm(f => ({ ...f, stop_loss: e.target.value }))}
                                           placeholder={`e.g. ${trade.current_price ? (parseFloat(trade.current_price) * (trade.direction === 'buy' ? 0.999 : 1.001)).toFixed(dec) : '—'}`}
-                                          step={trade.instrument.includes('XAU') || trade.instrument.includes('XAG') ? '0.01' : '0.00001'}
+                                          step={getInputStepString(trade.instrument)}
                                           style={{ width: '140px', fontSize: '13px', padding: '7px 10px' }}
                                         />
                                       </div>
@@ -738,8 +1240,47 @@ export default function TradingPanel({
                                           value={modifyForm.take_profit}
                                           onChange={e => setModifyForm(f => ({ ...f, take_profit: e.target.value }))}
                                           placeholder={`e.g. ${trade.current_price ? (parseFloat(trade.current_price) * (trade.direction === 'buy' ? 1.001 : 0.999)).toFixed(dec) : '—'}`}
-                                          step={trade.instrument.includes('XAU') || trade.instrument.includes('XAG') ? '0.01' : '0.00001'}
+                                          step={getInputStepString(trade.instrument)}
                                           style={{ width: '140px', fontSize: '13px', padding: '7px 10px' }}
+                                        />
+                                      </div>
+                                      <div>
+                                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                                          Trailing Step (pips)
+                                        </label>
+                                        <input
+                                          type="number"
+                                          value={modifyForm.trailing_step_pips}
+                                          onChange={e => setModifyForm(f => ({ ...f, trailing_step_pips: e.target.value }))}
+                                          placeholder="10"
+                                          step="1"
+                                          style={{ width: '120px', fontSize: '13px', padding: '7px 10px' }}
+                                        />
+                                      </div>
+                                      <div>
+                                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                                          Trail Activation
+                                        </label>
+                                        <input
+                                          type="number"
+                                          value={modifyForm.trailing_activation_price}
+                                          onChange={e => setModifyForm(f => ({ ...f, trailing_activation_price: e.target.value }))}
+                                          placeholder="Activation price"
+                                          step={getInputStepString(trade.instrument)}
+                                          style={{ width: '140px', fontSize: '13px', padding: '7px 10px' }}
+                                        />
+                                      </div>
+                                      <div>
+                                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                                          Breakeven Trigger
+                                        </label>
+                                        <input
+                                          type="number"
+                                          value={modifyForm.breakeven_trigger_pips}
+                                          onChange={e => setModifyForm(f => ({ ...f, breakeven_trigger_pips: e.target.value }))}
+                                          placeholder="Pips to BE"
+                                          step="0.1"
+                                          style={{ width: '120px', fontSize: '13px', padding: '7px 10px' }}
                                         />
                                       </div>
                                       <div style={{ display: 'flex', gap: '8px' }}>
@@ -748,6 +1289,12 @@ export default function TradingPanel({
                                           onClick={() => submitModify(trade)}
                                           style={{ padding: '7px 20px', fontSize: '12px' }}>
                                           Save
+                                        </button>
+                                        <button
+                                          className="btn"
+                                          onClick={() => moveTradeToBreakeven(trade)}
+                                          style={{ padding: '7px 16px', fontSize: '12px', border: '1px solid var(--accent)', color: 'var(--accent)' }}>
+                                          Move To BE
                                         </button>
                                         <button
                                           className="btn"
@@ -761,12 +1308,16 @@ export default function TradingPanel({
                                       <div style={{ color: 'var(--red)', fontSize: '12px', marginTop: '8px' }}>{modifyError}</div>
                                     )}
                                     {modifySuccess && (
-                                      <div style={{ color: 'var(--green)', fontSize: '12px', marginTop: '8px' }}>✅ {modifySuccess}</div>
+                                      <div style={{ color: 'var(--green)', fontSize: '12px', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        {renderIcon('approve', { size: 12, color: 'var(--accent-green)' })}
+                                        <span>{modifySuccess}</span>
+                                      </div>
                                     )}
                                   </div>
                                 </td>
                               </tr>
                             )}
+                            {!isPending && editingNoteId === trade.id && renderTradeNoteEditor(trade, 9)}
                           </React.Fragment>
                         ) 
                       })}
@@ -787,10 +1338,17 @@ export default function TradingPanel({
 
             {/* Trade History */}
             {tradeHistory.length > 0 && (
-              <div className="card">
+              <div className="card trade-section-card trade-history-card">
+                <div className="trade-section-pills" style={{ marginBottom: '14px' }}>
+                  <span className="trade-summary-pill">{closedTrades.length} Closed</span>
+                  <span className="trade-summary-pill">{cancelledTrades.length} Cancelled</span>
+                  <span className="trade-summary-pill" style={{ color: realizedHistoryPnl >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                    {realizedHistoryPnl >= 0 ? '+' : ''}${realizedHistoryPnl.toFixed(2)} Realized
+                  </span>
+                </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
                   <h3 style={{ color: 'var(--accent)', fontSize: '15px', margin: 0 }}>
-                    Trade History ({tradeHistory.length})
+                    Closed Trades & History ({tradeHistory.length})
                   </h3>
                   <div style={{ display: 'flex', gap: '8px' }}>
                     {/* ── Repeat Last Trade ── */}
@@ -806,6 +1364,14 @@ export default function TradingPanel({
                               lots:       parseFloat(lastClosed.lot_size).toFixed(2),
                               stop_loss:  lastClosed.stop_loss  ? parseFloat(lastClosed.stop_loss).toString()  : '',
                               take_profit: lastClosed.take_profit ? parseFloat(lastClosed.take_profit).toString() : '',
+                              strategy_tag: lastClosed.strategy_tag || '',
+                              journal_note: lastClosed.trader_note || '',
+                              journal_tags: Array.isArray(lastClosed.tags)
+                                ? lastClosed.tags.join(', ')
+                                : (typeof lastClosed.tags === 'string' ? lastClosed.tags : ''),
+                              trailing_step_pips: lastClosed.trailing_step_pips ? String(lastClosed.trailing_step_pips) : '',
+                              trailing_activation_price: lastClosed.trailing_activation_price ? parseFloat(lastClosed.trailing_activation_price).toString() : '',
+                              breakeven_trigger_pips: lastClosed.breakeven_trigger_pips ? parseFloat(lastClosed.breakeven_trigger_pips).toString() : '',
                             }))
                           }}
                           style={{
@@ -823,7 +1389,8 @@ export default function TradingPanel({
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                           title={`Repeat: ${lastClosed.instrument} ${lastClosed.direction?.toUpperCase()} ${parseFloat(lastClosed.lot_size).toFixed(2)} lots`}
                         >
-                          🔄 Repeat Last
+                          {renderIcon('repeat', { size: 12, color: 'currentColor' })}
+                          <span>Repeat Last</span>
                         </button>
                       )
                     })()}
@@ -848,27 +1415,31 @@ export default function TradingPanel({
                       onMouseLeave={e => { e.target.style.borderColor = 'var(--navy-border)'; e.target.style.color = 'var(--text-muted)' }}
                       title="Download trade history as CSV"
                     >
-                      ⬇ Export CSV
+                      {renderIcon('download', { size: 12, color: 'currentColor' })}
+                      <span>Export CSV</span>
                     </button>
                   </div>
                 </div>
-                <div className="table-wrap">
-                  <table>
+                <div className="table-wrapper trading-table-wrapper">
+                  <table className="data-table trading-table">
                     <thead>
                       <tr>
                         <th>Symbol</th><th>Type</th><th>Lots</th>
-                        <th>Open Price</th><th>Close Price</th><th>Reason</th><th>P&L</th><th>📝</th>
+                        <th>Open Price</th><th>Close Price</th><th>Reason</th><th>P&L</th><th>{renderIcon('journal', { size: 12, color: 'var(--text-secondary)' })}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {tradeHistory.map(trade => {
-                        const dec = getDecimals(trade.instrument)
+                        const dec = getPriceDecimals(trade.instrument)
                         const isCancelled = trade.status === 'cancelled'
                         const isEditingNote = editingNoteId === trade.id
                         return (
                           <React.Fragment key={trade.id}>
                             <tr style={{ opacity: isCancelled ? 0.6 : 1 }}>
-                              <td style={{ fontWeight: '600' }}>{trade.instrument}</td>
+                              <td style={{ fontWeight: '600' }}>
+                                {trade.instrument}
+                                {renderTradeMetaBadges(trade)}
+                              </td>
                               <td style={{ color: trade.direction === 'buy' ? 'var(--green)' : 'var(--red)', fontWeight: '600' }}>
                                 {trade.order_type && trade.order_type !== 'market'
                                   ? trade.order_type.replace(/_/g, ' ').toUpperCase()
@@ -901,33 +1472,28 @@ export default function TradingPanel({
                                 <button
                                   onClick={() => {
                                     if (isEditingNote) {
-                                      setEditingNoteId(null)
+                                      closeNoteEditor()
                                     } else {
-                                      setEditingNoteId(trade.id)
-                                      setNoteText(trade.trader_note || '')
-                                      setNoteTags(trade.tags ? (typeof trade.tags === 'string' ? trade.tags : JSON.stringify(trade.tags)) : '')
-                                      setNoteSaved(false)
+                                      openNoteEditor(trade)
                                     }
                                   }}
+                                  className="trade-note-btn"
                                   style={{
-                                    background: 'transparent',
-                                    border: `1px solid ${trade.trader_note ? 'var(--accent)' : 'var(--navy-border)'}`,
-                                    borderRadius: '4px',
-                                    padding: '3px 6px',
-                                    cursor: 'pointer',
-                                    fontSize: '11px',
-                                    color: trade.trader_note ? 'var(--accent)' : 'var(--text-dim)',
-                                    title: trade.trader_note ? 'View/edit note' : 'Add note'
+                                    borderColor: trade.trader_note ? 'var(--accent)' : 'var(--navy-border)',
+                                    color: trade.trader_note ? 'var(--accent)' : 'var(--text-dim)'
                                   }}
                                   title={trade.trader_note ? 'View/edit note' : 'Add note'}
                                 >
-                                  {trade.trader_note ? '📝' : '＋'}
+                                  {renderIcon(trade.trader_note ? 'journal' : 'plus', {
+                                    size: 12,
+                                    color: trade.trader_note ? 'var(--accent)' : 'var(--text-secondary)'
+                                  })}
                                 </button>
                               </td>
                             </tr>
 
                             {/* Inline note editor row */}
-                            {isEditingNote && (
+                            {null && (
                               <tr>
                                 <td colSpan={8} style={{ padding: '0', borderBottom: '1px solid var(--navy-border)' }}>
                                   <div style={{
@@ -956,7 +1522,12 @@ export default function TradingPanel({
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                       <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{noteText.length}/1000</span>
                                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                        {noteSaved && <span style={{ fontSize: '11px', color: 'var(--green)' }}>✓ Saved</span>}
+                                        {noteSaved && (
+                                          <span style={{ fontSize: '11px', color: 'var(--green)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                                            {renderIcon('approve', { size: 11, color: 'var(--accent-green)' })}
+                                            <span>Saved</span>
+                                          </span>
+                                        )}
                                          <button
                                           onClick={() => saveNote(trade.id)}
                                           disabled={noteSaving}
@@ -989,6 +1560,7 @@ export default function TradingPanel({
                                 </td>
                               </tr>
                             )}
+                            {isEditingNote && renderTradeNoteEditor(trade, 8)}
                           </React.Fragment>
                         )
                       })}
@@ -997,6 +1569,7 @@ export default function TradingPanel({
                 </div>
               </div>
             )}
+            </div>
           </div>
 
           {/* Right — Order Panel */}
@@ -1005,7 +1578,8 @@ export default function TradingPanel({
               prices={prices}
               selectedAccount={selectedAccount}
               floatingBalance={floatingBalance}
-              onOpenTrade={onOpenTrade}
+              availableInstruments={availableInstruments}
+              onOpenTrade={handleOpenTrade}
               orderForm={orderForm}
               setOrderForm={setOrderForm}
             />
@@ -1019,8 +1593,18 @@ export default function TradingPanel({
           textAlign: 'center', padding: '48px',
           border: `1px solid ${selectedAccount.status === 'passed' ? 'var(--green)' : 'var(--red)'}`
         }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>
-            {selectedAccount.status === 'passed' ? '🏆' : selectedAccount.status === 'expired' ? '⏰' : '❌'}
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+            {renderIcon(
+              selectedAccount.status === 'passed'
+                ? 'leaderboard'
+                : selectedAccount.status === 'expired'
+                  ? 'timer'
+                  : 'reject',
+              {
+                size: 48,
+                color: selectedAccount.status === 'passed' ? 'var(--accent-gold)' : 'var(--accent-red)'
+              }
+            )}
           </div>
           <h3 style={{ color: selectedAccount.status === 'passed' ? 'var(--green)' : 'var(--red)', marginBottom: '12px' }}>
             {selectedAccount.status === 'passed'  && 'Challenge Passed!'}

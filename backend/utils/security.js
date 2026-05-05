@@ -143,12 +143,15 @@ const ABUSIVE_IP_TTL = 60 * 60 * 1000 // 1 hour
 // freely set to any value to manipulate the abuse detector.
 const ipRequestCounts = new Map()
 const IP_BLOCK_THRESHOLD = 600 // requests per minute before auto-block
-setInterval(() => { ipRequestCounts.clear() }, 60 * 1000) // reset every minute
+const ipRequestCountsResetTimer = setInterval(() => { ipRequestCounts.clear() }, 60 * 1000) // reset every minute
+if (typeof ipRequestCountsResetTimer.unref === 'function') {
+  ipRequestCountsResetTimer.unref()
+}
 
 // FIX (HIGH #5): Periodic cleanup of expired abusive IP entries to prevent
 // unbounded memory growth in long-running servers.
 const ABUSIVE_IPS_CLEANUP_INTERVAL = 10 * 60 * 1000 // 10 minutes
-setInterval(() => {
+const abusiveIpsCleanupTimer = setInterval(() => {
   const now = Date.now()
   let cleaned = 0
   for (const [ip, entry] of abusiveIPs.entries()) {
@@ -161,6 +164,9 @@ setInterval(() => {
     logger.info('Abusive IPs periodic cleanup:', { cleaned, remaining: abusiveIPs.size })
   }
 }, ABUSIVE_IPS_CLEANUP_INTERVAL)
+if (typeof abusiveIpsCleanupTimer.unref === 'function') {
+  abusiveIpsCleanupTimer.unref()
+}
 
 const abuseDetector = (req, res, next) => {
   const clientIP = req.ip || 'unknown'

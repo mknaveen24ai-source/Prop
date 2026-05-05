@@ -1,3 +1,0 @@
-Total: 15264
-Recent: 15264
-Latest: {"id":522460,"instrument":"XAGUSD","bid":"80.89200","ask":"80.91000","recorded_at":"2026-03-17T09:55:24.203Z"}

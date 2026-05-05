@@ -1,14 +1,14 @@
 import React, { useEffect } from 'react';
+import { renderIcon } from '../../utils/iconMap';
 
-export default function AdminModal({ 
-  isOpen, 
-  onClose, 
-  title, 
-  size = 'md', // sm, md, lg, xl, fullscreen
-  footer, 
-  children 
+export default function AdminModal({
+  isOpen,
+  onClose,
+  title,
+  size = 'md',
+  footer,
+  children
 }) {
-  // Prevent body scroll when modal is open
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -24,15 +24,17 @@ export default function AdminModal({
 
   return (
     <div className="admin-modal-overlay" onMouseDown={onClose}>
-      <div 
-        className={`admin-modal ${size}`} 
-        onMouseDown={e => e.stopPropagation()} // Prevent click-through closing
+      <div
+        className={`admin-modal ${size}`}
+        onMouseDown={e => e.stopPropagation()}
       >
         <div className="admin-modal-header">
           <h3 className="admin-modal-title">{title}</h3>
-          <button className="admin-modal-close" onClick={onClose}>✕</button>
+          <button className="admin-modal-close" onClick={onClose}>
+            {renderIcon('close', { size: 16, color: 'var(--admin-text-faint)' })}
+          </button>
         </div>
-        
+
         <div className="admin-modal-body">
           {children}
         </div>

@@ -1,3 +1,8 @@
 node_modules
 .env
 .DS_Store
+logs/
+db-out.txt
+test_output.txt
+FINAL_SECURITY_REPORT.md
+SECURITY_FIXES_SUMMARY.md

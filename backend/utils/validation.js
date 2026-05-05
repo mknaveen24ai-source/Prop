@@ -43,8 +43,17 @@ function isValidCountry(country) {
 
 // Validate numeric input within range
 function isValidNumber(value, min, max, allowDecimal = true) {
-  const num = allowDecimal ? parseFloat(value) : parseInt(value);
-  return !isNaN(num) && num >= min && num <= max;
+  const raw = String(value).trim();
+  if (!raw) return false;
+
+  const numberRegex = allowDecimal
+    ? /^[+-]?\d+(\.\d+)?$/
+    : /^[+-]?\d+$/;
+
+  if (!numberRegex.test(raw)) return false;
+
+  const num = Number(raw);
+  return Number.isFinite(num) && num >= min && num <= max;
 }
 
 // Validate lot size (0.01 to 1000 in steps of 0.01)

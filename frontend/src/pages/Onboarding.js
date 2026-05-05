@@ -1,4 +1,7 @@
 import React, { useState } from 'react'
+import { getMemoryItem, setMemoryItem } from '../utils/memoryStore'
+import { TRADABLE_INSTRUMENTS_SUMMARY } from '../utils/instruments'
+import { useBranding } from '../BrandingContext'
 
 // ── Onboarding steps ──────────────────────────────────────────────────────────
 const STEPS = [
@@ -34,7 +37,7 @@ const STEPS = [
             ['Forex Leverage',   '1:30'],
             ['Gold/Silver Lev.', '1:10'],
             ['Min Lot Size',     '0.01'],
-            ['Instruments',      'EURUSD, GBPUSD, XAUUSD, XAGUSD'],
+            ['Instruments',      TRADABLE_INSTRUMENTS_SUMMARY],
           ].map(([label, val]) => (
             <div key={label} style={{
               background: 'rgba(148, 148, 148, 0.06)',
@@ -75,7 +78,7 @@ const STORAGE_KEY = 'onboarding_completed'
 
 export function shouldShowOnboarding() {
   try {
-    return !localStorage.getItem(STORAGE_KEY)
+    return !getMemoryItem(STORAGE_KEY)
   } catch {
     return false
   }
@@ -83,14 +86,37 @@ export function shouldShowOnboarding() {
 
 export function markOnboardingComplete() {
   try {
-    localStorage.setItem(STORAGE_KEY, '1')
+    setMemoryItem(STORAGE_KEY, '1')
   } catch {}
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function Onboarding({ onComplete, onNavigate }) {
+  const { tenant } = useBranding()
   const [step, setStep] = useState(0)
-  const current = STEPS[step]
+  const requiresPayment = tenant?.settings?.requires_payment === 'true'
+  const tenantName = tenant?.name || 'Prop Firm'
+  const effectiveSteps = STEPS.map((stepItem) => {
+    if (stepItem.title === 'Welcome to Prop Firm!') {
+      return {
+        ...stepItem,
+        title: `Welcome to ${tenantName}!`,
+        body: requiresPayment
+          ? `This platform runs paid trader evaluations. Complete the challenge rules, pass the phases, and unlock a funded account.`
+          : `This platform runs a free trader evaluation model. Prove your trading skill across two phases and earn a funded account.`
+      }
+    }
+    if (stepItem.title === 'Step 2 — Start a Challenge') {
+      return {
+        ...stepItem,
+        body: requiresPayment
+          ? `Choose an account size from the Dashboard. Your challenge begins after checkout is completed for the selected plan.`
+          : `Choose an account size from the Dashboard. Your Phase 1 challenge begins immediately after you claim an available slot.`
+      }
+    }
+    return stepItem
+  })
+  const current = effectiveSteps[step]
   const isLast  = step === STEPS.length - 1
   const isFirst = step === 0
 
@@ -156,7 +182,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
 
         {/* Step dots */}
         <div style={{ display: 'flex', gap: '6px', marginBottom: '28px' }}>
-          {STEPS.map((_, i) => (
+          {effectiveSteps.map((_, i) => (
             <button
               key={i}
               onClick={() => goToStep(i)}

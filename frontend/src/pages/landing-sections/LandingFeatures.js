@@ -1,6 +1,10 @@
 import React, { useRef, useEffect } from 'react';
+import { useBranding } from '../../BrandingContext';
+import { getTenantLandingCopy } from '../../utils/tenantMarketing';
 
 export default function LandingFeatures() {
+  const { tenant } = useBranding();
+  const landingCopy = getTenantLandingCopy(tenant);
   const gridRef = useRef(null);
 
   // 3D tilt + Proximity Glow (Torch) effect
@@ -53,8 +57,8 @@ export default function LandingFeatures() {
   const bentoItems = [
     {
       colSpan: '1 / -1',
-      title: '100% Free Funded Accounts',
-      desc: 'No evaluation fees. No hidden costs. No credit card required. We fund elite traders from our own liquid capital reserves — pass the institutional assessment and start trading.',
+      title: landingCopy.featuresHeadline.includes('Free') ? '100% Free Funded Accounts' : 'Live Challenge Access',
+      desc: landingCopy.featuresSubtitle,
       iconColor: '#00c896',
       glowColor: 'rgba(0, 200, 150, 0.15)',
       icon: (
@@ -67,7 +71,7 @@ export default function LandingFeatures() {
     {
       colSpan: 'span 6',
       title: 'Institutional Evaluation',
-      desc: 'Clear, documented rules for both phases. Reach the profit target without breaching dynamic or daily drawdown limits. Pure skill-based selection.',
+      desc: 'Clear, documented rules for both phases. Reach the profit target without breaching the maximum drawdown limit. Pure skill-based selection.',
       iconColor: '#2962ff',
       glowColor: 'rgba(41, 98, 255, 0.15)',
       icon: (
@@ -141,10 +145,9 @@ export default function LandingFeatures() {
             <span className="mp-badge-dot"></span>
             The Standard
           </div>
-          <h2 className="mp-h2 mp-reveal mp-delay-100">Institutional Grade. <span className="mp-shimmer">Completely Free.</span></h2>
+          <h2 className="mp-h2 mp-reveal mp-delay-100">{landingCopy.featuresHeadline}</h2>
           <p className="mp-p-lead mp-reveal mp-delay-200" style={{ margin: '0 auto', maxWidth: '800px' }}>
-            We bridge the gap between retail skill and institutional capital. Transform your edge 
-            into a funded career without the barrier of entry fees.
+            {landingCopy.featuresSubtitle}
           </p>
         </div>
 

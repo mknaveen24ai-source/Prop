@@ -3,22 +3,37 @@
  * Centralizes configuration to avoid duplication across files
  */
 
-// Contract sizes per instrument
-const CONTRACT_SIZES = {
-  EURUSD: 100000,
-  GBPUSD: 100000,
-  XAUUSD: 100,
-  XAGUSD: 5000
-}
+const {
+  INSTRUMENT_DEFINITIONS,
+  INSTRUMENT_CATALOG,
+  INSTRUMENTS,
+  FOREX_INSTRUMENTS,
+  COMMODITY_INSTRUMENTS,
+  INDEX_INSTRUMENTS,
+  CONTRACT_SIZES,
+  LEVERAGE,
+  TWELVE_DATA_SYMBOLS,
+  DEFAULT_SPREADS,
+  getInstrumentConfig,
+  getPriceDecimals,
+  getInputStep,
+  getInputStepString,
+  getPipSize,
+  getMinDistance,
+  getPointMultiplier,
+  getSpreadPoints,
+  getWideSpreadThreshold,
+  getQuickMoveThreshold,
+  roundPrice,
+  formatPrice
+} = require('./instruments')
 
-// Account types
 const ACCOUNT_TYPES = {
   PHASE1: 'phase1',
   PHASE2: 'phase2',
   FUNDED: 'funded'
 }
 
-// Account statuses
 const ACCOUNT_STATUSES = {
   ACTIVE: 'active',
   PASSED: 'passed',
@@ -26,21 +41,18 @@ const ACCOUNT_STATUSES = {
   EXPIRED: 'expired'
 }
 
-// Trade statuses
 const TRADE_STATUSES = {
   OPEN: 'open',
   CLOSED: 'closed',
   PENDING: 'pending'
 }
 
-// KYC statuses
 const KYC_STATUSES = {
   PENDING: 'pending',
   APPROVED: 'approved',
   REJECTED: 'rejected'
 }
 
-// Payout statuses
 const PAYOUT_STATUSES = {
   PENDING: 'pending',
   APPROVED: 'approved',
@@ -48,7 +60,6 @@ const PAYOUT_STATUSES = {
   REJECTED: 'rejected'
 }
 
-// Default platform settings
 const DEFAULT_PLATFORM_SETTINGS = {
   phase1_profit_target_pct: 10,
   phase1_max_drawdown_pct: 10,
@@ -63,40 +74,55 @@ const DEFAULT_PLATFORM_SETTINGS = {
   payout_processing_days: 3
 }
 
-// Rate limiting defaults
 const RATE_LIMITS = {
-  AUTH_WINDOW_MS: 15 * 60 * 1000, // 15 minutes
+  AUTH_WINDOW_MS: 15 * 60 * 1000,
   AUTH_MAX: 10,
-  ACCOUNT_CREATE_WINDOW_MS: 24 * 60 * 60 * 1000, // 24 hours
+  ACCOUNT_CREATE_WINDOW_MS: 24 * 60 * 60 * 1000,
   ACCOUNT_CREATE_MAX: 5,
-  TRADE_WINDOW_MS: 60 * 1000, // 1 minute
+  TRADE_WINDOW_MS: 60 * 1000,
   TRADE_MAX: 30,
-  KYC_UPLOAD_WINDOW_MS: 60 * 60 * 1000, // 1 hour
+  KYC_UPLOAD_WINDOW_MS: 60 * 60 * 1000,
   KYC_UPLOAD_MAX: 5,
-  PAYOUT_REQUEST_WINDOW_MS: 60 * 60 * 1000, // 1 hour
+  PAYOUT_REQUEST_WINDOW_MS: 60 * 60 * 1000,
   PAYOUT_REQUEST_MAX: 3
 }
 
-// File upload settings
 const UPLOAD_SETTINGS = {
-  MAX_FILE_SIZE: 5 * 1024 * 1024, // 5MB
+  MAX_FILE_SIZE: 5 * 1024 * 1024,
   ALLOWED_ID_EXTENSIONS: ['jpg', 'png', 'pdf'],
   ALLOWED_SELFIE_EXTENSIONS: ['jpg', 'png'],
   PRICE_HISTORY_RETAIN_DAYS: 90
 }
 
-// Time settings (all in UTC)
 const TIME_SETTINGS = {
-  MARKET_CLOSE_FRIDAY_UTC: 22, // 22:00 UTC
+  MARKET_CLOSE_FRIDAY_UTC: 22,
   WEEKEND_CLOSE_BUFFER_MINUTES: 5,
   SESSION_TIMEOUT_HOURS: 24
 }
 
 module.exports = {
+  INSTRUMENT_DEFINITIONS,
+  INSTRUMENT_CATALOG,
+  INSTRUMENTS,
+  FOREX_INSTRUMENTS,
+  COMMODITY_INSTRUMENTS,
+  INDEX_INSTRUMENTS,
   CONTRACT_SIZES,
-  // FIX (BUG-4): VALID_SIZES removed from constants.js — accounts.js is the
-  // single authoritative source (includes $1k, $2k, $2.5k sizes that this
-  // file was missing). Any file needing VALID_SIZES should import from accounts.js.
+  LEVERAGE,
+  TWELVE_DATA_SYMBOLS,
+  DEFAULT_SPREADS,
+  getInstrumentConfig,
+  getPriceDecimals,
+  getInputStep,
+  getInputStepString,
+  getPipSize,
+  getMinDistance,
+  getPointMultiplier,
+  getSpreadPoints,
+  getWideSpreadThreshold,
+  getQuickMoveThreshold,
+  roundPrice,
+  formatPrice,
   ACCOUNT_TYPES,
   ACCOUNT_STATUSES,
   TRADE_STATUSES,

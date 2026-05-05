@@ -1,84 +1,114 @@
-// This test file was previously using the stale CRA template test
-// ('learn react' text) which never existed in this app and always failed.
-// Replaced with a basic smoke test that just verifies the app renders
-// without crashing — the most useful baseline test for a React app.
-
-import { render, waitFor } from '@testing-library/react'
+import React from 'react'
+import { render, screen, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 
-// Mock react-router-dom for test environments where package resolution can fail
-// under Jest + react-scripts. We only need a shallow router shell for smoke tests.
-jest.mock('react-router-dom', () => {
-  const React = require('react')
-  return {
-    BrowserRouter: ({ children }) => React.createElement(React.Fragment, null, children),
-    Routes: ({ children }) => React.createElement(React.Fragment, null, children),
-    Route: ({ element }) => element || null,
-    Navigate: () => null
-  }
-}, { virtual: true })
+const authState = {
+  user: null,
+  authChecked: true,
+  login: vi.fn(),
+  logout: vi.fn()
+}
 
-jest.mock('lightweight-charts', () => ({
-  createChart: jest.fn(() => ({
-    addSeries: jest.fn(() => ({
-      setData: jest.fn(),
-      update: jest.fn()
-    })),
-    timeScale: jest.fn(() => ({
-      fitContent: jest.fn(),
-      applyOptions: jest.fn()
-    })),
-    applyOptions: jest.fn(),
-    remove: jest.fn()
-  })),
-  CandlestickSeries: {}
-}), { virtual: true })
+vi.mock('./providers/AuthProvider', () => ({
+  useAuth: () => authState
+}))
 
-// Mock axios to avoid real network calls during tests
-jest.mock('axios', () => {
-  const apiClient = {
-    get: jest.fn(() => Promise.reject(new Error('network'))),
-    post: jest.fn(() => Promise.reject(new Error('network'))),
-    patch: jest.fn(() => Promise.reject(new Error('network'))),
-    delete: jest.fn(() => Promise.reject(new Error('network'))),
-    put: jest.fn(() => Promise.reject(new Error('network'))),
-    defaults: { withCredentials: false },
-    interceptors: {
-      request: { use: jest.fn(() => 0), eject: jest.fn() },
-      response: { use: jest.fn(() => 0), eject: jest.fn() }
-    }
-  }
+vi.mock('./pages/Landing', () => ({
+  default: () => <div>landing-page</div>
+}))
+vi.mock('./pages/Login', () => ({
+  default: () => <div>login-page</div>
+}))
+vi.mock('./pages/Register', () => ({
+  default: () => <div>register-page</div>
+}))
+vi.mock('./pages/ResetPasswordPage', () => ({
+  default: () => <div>reset-password-page</div>
+}))
+vi.mock('./pages/Dashboard', () => ({
+  default: () => <div>dashboard-page</div>
+}))
+vi.mock('./pages/TermsOfService', () => ({
+  default: () => <div>terms-page</div>
+}))
+vi.mock('./pages/PrivacyPolicy', () => ({
+  default: () => <div>privacy-page</div>
+}))
+vi.mock('./pages/Leaderboard', () => ({
+  default: () => <div>leaderboard-page</div>
+}))
+vi.mock('./pages/TraderProfile', () => ({
+  default: () => <div>trader-profile-page</div>
+}))
+vi.mock('./pages/Chat', () => ({
+  default: () => <div>chat-page</div>
+}))
+vi.mock('./pages/admin/AdminLayout', () => ({
+  default: () => <div>admin-layout</div>
+}))
+vi.mock('./pages/admin/AdminDashboard', () => ({
+  default: () => <div>admin-dashboard</div>
+}))
+vi.mock('./pages/admin/AdminUsers', () => ({ default: () => <div>admin-users</div> }))
+vi.mock('./pages/admin/AdminKYC', () => ({ default: () => <div>admin-kyc</div> }))
+vi.mock('./pages/admin/AdminChallenges', () => ({ default: () => <div>admin-challenges</div> }))
+vi.mock('./pages/admin/AdminFunded', () => ({ default: () => <div>admin-funded</div> }))
+vi.mock('./pages/admin/AdminTrades', () => ({ default: () => <div>admin-trades</div> }))
+vi.mock('./pages/admin/AdminPayouts', () => ({ default: () => <div>admin-payouts</div> }))
+vi.mock('./pages/admin/AdminPlatformPnL', () => ({ default: () => <div>admin-pnl</div> }))
+vi.mock('./pages/admin/AdminSettings', () => ({ default: () => <div>admin-settings</div> }))
+vi.mock('./pages/admin/AdminDisputes', () => ({ default: () => <div>admin-disputes</div> }))
+vi.mock('./pages/admin/AdminChat', () => ({ default: () => <div>admin-chat</div> }))
+vi.mock('./pages/admin/AdminLeaderboard', () => ({ default: () => <div>admin-leaderboard</div> }))
+vi.mock('./pages/admin/AdminTradeCopier', () => ({ default: () => <div>admin-copier</div> }))
+vi.mock('./pages/admin/AdminAccountDetail', () => ({ default: () => <div>admin-account-detail</div> }))
+vi.mock('./pages/admin/AdminViolations', () => ({ default: () => <div>admin-violations</div> }))
+vi.mock('./pages/admin/AdminTenants', () => ({ default: () => <div>admin-tenants</div> }))
+vi.mock('./pages/admin/AdminCommandCenter', () => ({ default: () => <div>admin-command-center</div> }))
 
-  return {
-    get: jest.fn(() => Promise.reject(new Error('network'))),
-    post: jest.fn(() => Promise.reject(new Error('network'))),
-    patch: jest.fn(() => Promise.reject(new Error('network'))),
-    delete: jest.fn(() => Promise.reject(new Error('network'))),
-    put: jest.fn(() => Promise.reject(new Error('network'))),
-    create: jest.fn(() => apiClient),
-    defaults: { withCredentials: false },
-    interceptors: {
-      request: { use: jest.fn(() => 0), eject: jest.fn() },
-      response: { use: jest.fn(() => 0), eject: jest.fn() }
-    }
-  }
-})
+describe('App routing', () => {
+  beforeEach(() => {
+    authState.user = null
+    authState.authChecked = true
+    window.history.pushState({}, '', '/')
+  })
 
-// Mock socket.io-client to avoid WebSocket errors in jsdom
-jest.mock('socket.io-client', () => {
-  const mockSocket = {
-    on: jest.fn(),
-    emit: jest.fn(),
-    disconnect: jest.fn(),
-  }
-  return jest.fn(() => mockSocket)
-})
+  it('renders landing at the root route when logged out', async () => {
+    render(<App />)
 
-test('app renders without crashing', async () => {
-  // If this throws, there is a fundamental render error in App or one of its
-  // top-level providers (ThemeProvider, Router, etc.)
-  const { container } = render(<App />)
-  await waitFor(() => {
-    expect(container).toBeTruthy()
+    await waitFor(() => {
+      expect(screen.getByText('landing-page')).toBeInTheDocument()
+    })
+  })
+
+  it('renders the dedicated reset-password route when logged out', async () => {
+    window.history.pushState({}, '', '/reset-password?token=abc&email=test@example.com')
+
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByText('reset-password-page')).toBeInTheDocument()
+    })
+  })
+
+  it('redirects protected dashboard access to login when logged out', async () => {
+    window.history.pushState({}, '', '/dashboard')
+
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByText('login-page')).toBeInTheDocument()
+    })
+  })
+
+  it('redirects authenticated users from root to dashboard', async () => {
+    authState.user = { id: 'u1', email: 'trader@example.com' }
+
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByText('dashboard-page')).toBeInTheDocument()
+    })
   })
 })

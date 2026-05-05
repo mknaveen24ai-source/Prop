@@ -1,141 +1,583 @@
-import React, { useState, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
-import AdminDataTable from '../../components/admin/AdminDataTable';
-import AdminFilterBar from '../../components/admin/AdminFilterBar';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import AdminBadge from '../../components/admin/AdminBadge';
+import AdminDataTable from '../../components/admin/AdminDataTable';
+import AdminEntityDrawer from '../../components/admin/AdminEntityDrawer';
+import AdminFilterBar from '../../components/admin/AdminFilterBar';
+import AdminListToolbar from '../../components/admin/AdminListToolbar';
 import AdminModal from '../../components/admin/AdminModal';
+import AdminStatCard from '../../components/admin/AdminStatCard';
 import { useToast } from '../../components/admin/AdminToast';
+import { exportAdminResource, normalizeAdminListResponse } from '../../utils/adminList';
+
+const DEFAULT_FILTERS = {
+  status: 'all',
+  reviewFlagged: 'all'
+};
+
+const ALL_COLUMN_KEYS = ['account', 'trader', 'status', 'size', 'balance', 'payouts', 'split', 'risk', 'tags', 'created'];
+
+function formatMoney(value) {
+  return `$${(parseFloat(value || 0) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function buildViewConfig({ search, filters, sort, visibleColumnKeys, density }) {
+  return {
+    search,
+    filters,
+    sort,
+    columns: visibleColumnKeys,
+    density
+  };
+}
 
 export default function AdminFunded() {
-  const { adminAxios } = useOutletContext();
+  const { adminAxios, socket } = useOutletContext();
+  const navigate = useNavigate();
   const toast = useToast();
 
   const [loading, setLoading] = useState(true);
-  const [accounts, setAccounts] = useState([]);
+  const [listData, setListData] = useState({
+    summary: {},
+    rows: [],
+    pagination: { current: 1, total: 1, total_items: 0, page_size: 25 }
+  });
+  const [views, setViews] = useState([]);
+  const [activeViewId, setActiveViewId] = useState('');
   const [search, setSearch] = useState('');
-  
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [page, setPage] = useState(1);
+  const [sort, setSort] = useState({ key: 'created_at', direction: 'desc' });
+  const [density, setDensity] = useState('comfortable');
+  const [visibleColumnKeys, setVisibleColumnKeys] = useState(ALL_COLUMN_KEYS);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [drawerRow, setDrawerRow] = useState(null);
   const [selectedAcc, setSelectedAcc] = useState(null);
-  const [showOverrideModal, setShowOverrideModal] = useState(false);
+  const [showManageModal, setShowManageModal] = useState(false);
+  const [overrideReason, setOverrideReason] = useState('');
+  const [adjustAmount, setAdjustAmount] = useState('');
+  const [adjustReason, setAdjustReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchViews = async () => {
+    try {
+      const res = await adminAxios.get('/api/admin/saved-views', { params: { resource: 'funded' } });
+      setViews(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setViews([]);
+    }
+  };
+
+  const fetchAccounts = async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
+    try {
+      const res = await adminAxios.get('/api/admin/accounts', {
+        params: {
+          format: 'list',
+          page,
+          page_size: 25,
+          search,
+          sort: sort.key,
+          order: sort.direction,
+          account_type: 'funded',
+          status: filters.status !== 'all' ? filters.status : undefined,
+          review_flagged: filters.reviewFlagged === 'all' ? undefined : filters.reviewFlagged === 'flagged'
+        }
+      });
+      const next = normalizeAdminListResponse(res.data);
+      next.rows = (next.rows || []).filter((row) => String(row.account_type || '').toLowerCase() === 'funded');
+      setListData(next);
+      setSelectedIds((current) => current.filter((id) => next.rows.some((row) => String(row.id) === id)));
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Failed to load funded accounts');
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchAccounts();
+    fetchViews();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [page, sort]);
 
-  const fetchAccounts = async () => {
-    setLoading(true);
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setPage(1);
+      fetchAccounts({ silent: true });
+    }, 150);
+    return () => clearTimeout(timeout);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, filters]);
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    const refresh = () => fetchAccounts({ silent: true });
+    socket.on('admin_command_center_updated', refresh);
+    socket.on('admin_enforcement_event', refresh);
+    return () => {
+      socket.off('admin_command_center_updated', refresh);
+      socket.off('admin_enforcement_event', refresh);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket, page, sort, search, filters]);
+
+  function openManageModal(account) {
+    setSelectedAcc(account);
+    setOverrideReason('');
+    setAdjustAmount('');
+    setAdjustReason('');
+    setShowManageModal(true);
+  }
+
+  async function executeOverride(action) {
+    if (!selectedAcc || submitting) return;
+    setSubmitting(true);
     try {
-      const res = await adminAxios.get('/api/admin/accounts');
-      const allAccs = res.data || [];
-      // Filter ONLY funded accounts
-      setAccounts(allAccs.filter(a => a.status === 'funded'));
-    } catch {
-      toast.error('Failed to load funded master accounts');
-    }
-    setLoading(false);
-  };
-
-  const handleAction = (action, acc) => {
-    if (action === 'view') {
-      setSelectedAcc(acc);
-      setShowOverrideModal(true);
-    } else if (action === 'sync_mt5') {
-      toast.success(`MT5 sync command sent for Account #${String(acc.id).padStart(5, '0')}`);
-    }
-  };
-
-  const executeRevoke = async () => {
-    if (!selectedAcc) return;
-    try {
-      await adminAxios.post(`/api/admin/accounts/${selectedAcc.id}/override`, { action: 'revoke_funded' });
-      toast.success(`Account ID ${selectedAcc.id} funding revoked.`);
-      setShowOverrideModal(false);
-      fetchAccounts();
+      const res = await adminAxios.post(`/api/admin/accounts/${selectedAcc.id}/override`, {
+        action,
+        reason: overrideReason
+      });
+      toast.success(res.data?.message || 'Admin action applied');
+      await fetchAccounts({ silent: true });
+      setShowManageModal(false);
     } catch (err) {
-      toast.error('Failed to revoke funding');
+      toast.error(err.response?.data?.error || 'Failed to apply admin action');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function applyBalanceAdjustment() {
+    if (!selectedAcc || submitting) return;
+    setSubmitting(true);
+    try {
+      const res = await adminAxios.post(`/api/admin/accounts/${selectedAcc.id}/adjust-balance`, {
+        amount: parseFloat(adjustAmount),
+        reason: adjustReason
+      });
+      toast.success(res.data?.message || 'Balance adjusted successfully');
+      await fetchAccounts({ silent: true });
+      setShowManageModal(false);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to adjust balance');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const rows = listData.rows || [];
+  const summary = listData.summary || {};
+  const pagination = listData.pagination || { current: 1, total: 1 };
+
+  const toggleRowSelection = (rowId) => {
+    setSelectedIds((current) => (
+      current.includes(String(rowId))
+        ? current.filter((id) => id !== String(rowId))
+        : [...current, String(rowId)]
+    ));
+  };
+
+  const handleSortChange = (sortKey) => {
+    setSort((current) => ({
+      key: sortKey,
+      direction: current.key === sortKey && current.direction === 'desc' ? 'asc' : 'desc'
+    }));
+  };
+
+  const toggleColumn = (columnKey) => {
+    setVisibleColumnKeys((current) => (
+      current.includes(columnKey)
+        ? current.filter((key) => key !== columnKey)
+        : [...current, columnKey]
+    ));
+  };
+
+  const saveView = async () => {
+    const name = window.prompt('Name this funded view', 'Funded Risk Review');
+    if (!name) return;
+    try {
+      await adminAxios.post('/api/admin/saved-views', {
+        resource: 'funded',
+        name,
+        config: buildViewConfig({ search, filters, sort, visibleColumnKeys, density })
+      });
+      toast.success('Saved view created');
+      fetchViews();
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Could not save view');
     }
   };
 
-  const columns = [
-    { header: 'Account ID', key: 'id', isMono: true, render: a => `#${String(a.id).padStart(5, '0')}` },
-    { header: 'Trader', key: 'user_id', render: a => a.user_email || `User #${a.user_id}` },
-    { header: 'Status', key: 'status', render: () => <AdminBadge status="funded" label="MASTER" /> },
-    { header: 'Size', key: 'size', isMono: true, render: a => `$${(a.size || 0).toLocaleString()}` },
-    { header: 'Balance', key: 'balance', isMono: true, render: a => `$${(a.balance || 0).toFixed(2)}` },
-    { header: 'Total Payouts', key: 'payouts', isMono: true, render: a => `$${(a.total_payouts || 0).toFixed(2)}` },
-    { header: 'Profit Split', key: 'split', render: a => `${a.profit_split || 80}/${100 - (a.profit_split || 80)}` },
-    { header: 'MT5 ID', key: 'mt5', isMono: true, render: a => a.mt5_login || 'Pending Sync' },
-    { header: 'Funded Date', key: 'created_at', render: a => new Date(a.created_at).toLocaleDateString() }, // Note: assuming created_at or updated_at for funded date
-  ];
+  const updateView = async (view) => {
+    try {
+      await adminAxios.patch(`/api/admin/saved-views/${view.id}`, {
+        config: buildViewConfig({ search, filters, sort, visibleColumnKeys, density })
+      });
+      toast.success('Saved view updated');
+      fetchViews();
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Could not update view');
+    }
+  };
 
-  const getRowActions = (acc) => [
-    { label: 'View Master Details', icon: '🔍', onClick: () => handleAction('view', acc) },
-    { label: 'Edit Profit Split %', icon: '⚙️', onClick: () => {} },
-    { label: 'Request MT5 Sync', icon: '🔁', onClick: () => handleAction('sync_mt5', acc) },
-    { label: 'Revoke Funding', icon: '🚫', onClick: () => handleAction('view', acc), danger: true },
-  ];
+  const deleteView = async (view) => {
+    if (!window.confirm(`Delete saved view "${view.name}"?`)) return;
+    try {
+      await adminAxios.delete(`/api/admin/saved-views/${view.id}`);
+      setActiveViewId('');
+      toast.success('Saved view deleted');
+      fetchViews();
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Could not delete view');
+    }
+  };
 
-  const filtered = accounts.filter(a => {
-    if (search && !String(a.id).includes(search) && !(a.user_email || '').toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+  const selectView = (viewId) => {
+    setActiveViewId(viewId);
+    if (!viewId) {
+      setSearch('');
+      setFilters(DEFAULT_FILTERS);
+      setSort({ key: 'created_at', direction: 'desc' });
+      setVisibleColumnKeys(ALL_COLUMN_KEYS);
+      setDensity('comfortable');
+      setPage(1);
+      return;
+    }
+    const selectedView = views.find((view) => String(view.id) === String(viewId));
+    const config = selectedView?.config_json || {};
+    setSearch(config.search || '');
+    setFilters({ ...DEFAULT_FILTERS, ...(config.filters || {}) });
+    setSort(config.sort || { key: 'created_at', direction: 'desc' });
+    setVisibleColumnKeys(Array.isArray(config.columns) && config.columns.length > 0 ? config.columns : ALL_COLUMN_KEYS);
+    setDensity(config.density || 'comfortable');
+    setPage(1);
+  };
+
+  const applyTagToSelection = async () => {
+    if (selectedIds.length === 0) return;
+    const tag = window.prompt(`Tag ${selectedIds.length} selected funded accounts`, 'fast-payout');
+    if (!tag) return;
+    try {
+      await adminAxios.post('/api/admin/tags/assign', {
+        entity_type: 'account',
+        ids: selectedIds,
+        tags: [tag],
+        mode: 'add'
+      });
+      toast.success('Tags updated');
+      fetchAccounts({ silent: true });
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Failed to tag funded accounts');
+    }
+  };
+
+  const exportCurrentView = async () => {
+    try {
+      await exportAdminResource(adminAxios, 'accounts', {
+        search,
+        sort: sort.key,
+        order: sort.direction,
+        filters: {
+          account_type: 'funded',
+          status: filters.status !== 'all' ? filters.status : null,
+          review_flagged: filters.reviewFlagged === 'all' ? null : filters.reviewFlagged === 'flagged'
+        }
+      });
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Could not export funded accounts');
+    }
+  };
+
+  const columns = useMemo(() => {
+    const allColumns = [
+      {
+        header: 'Account',
+        key: 'account',
+        sortKey: 'created_at',
+        render: (account) => (
+          <div>
+            <div className="admin-td-mono">#{String(account.id).padStart(5, '0')}</div>
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>
+              {account.account_uid ? account.account_uid.slice(0, 10) : 'No UID'}
+            </div>
+          </div>
+        )
+      },
+      {
+        header: 'Trader',
+        key: 'trader',
+        sortKey: 'user_email',
+        render: (account) => (
+          <div>
+            <div style={{ color: 'var(--admin-text)' }}>{account.full_name || 'Unnamed Trader'}</div>
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>{account.user_email || account.email}</div>
+          </div>
+        )
+      },
+      {
+        header: 'Status',
+        key: 'status',
+        sortKey: 'status',
+        render: (account) => <AdminBadge status={account.status} label={`${account.status?.toUpperCase()} / FUNDED`} />
+      },
+      {
+        header: 'Size',
+        key: 'size',
+        sortKey: 'account_size',
+        isMono: true,
+        render: (account) => `$${parseFloat(account.account_size || 0).toLocaleString()}`
+      },
+      {
+        header: 'Balance',
+        key: 'balance',
+        sortKey: 'current_balance',
+        isMono: true,
+        render: (account) => formatMoney(account.current_balance)
+      },
+      {
+        header: 'Payouts',
+        key: 'payouts',
+        isMono: true,
+        render: (account) => formatMoney(account.total_payouts)
+      },
+      {
+        header: 'Split',
+        key: 'split',
+        render: (account) => {
+          const split = parseFloat(account.profit_split || 80);
+          return `${split.toFixed(0)} / ${(100 - split).toFixed(0)}`;
+        }
+      },
+      {
+        header: 'Risk',
+        key: 'risk',
+        render: (account) => (
+          <div>
+            {account.risk_tier ? <AdminBadge status={account.risk_tier === 'critical' ? 'danger' : account.risk_tier === 'high' ? 'warning' : 'info'} label={account.risk_tier} /> : <span style={{ color: 'var(--admin-text-faint)' }}>-</span>}
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px', marginTop: '6px' }}>
+              {account.review_flagged ? 'Review flagged' : account.classification || 'No classification'}
+            </div>
+          </div>
+        )
+      },
+      {
+        header: 'Tags',
+        key: 'tags',
+        render: (account) => (
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {(account.tags || []).slice(0, 3).map((tag) => (
+              <span key={tag} className="admin-tag-pill static">{tag}</span>
+            ))}
+            {(!account.tags || account.tags.length === 0) && <span style={{ color: 'var(--admin-text-faint)' }}>-</span>}
+          </div>
+        )
+      },
+      {
+        header: 'Created',
+        key: 'created',
+        sortKey: 'created_at',
+        render: (account) => new Date(account.created_at).toLocaleDateString()
+      }
+    ];
+
+    return allColumns.filter((column) => visibleColumnKeys.includes(column.key));
+  }, [visibleColumnKeys]);
+
+  const currentView = views.find((view) => String(view.id) === String(activeViewId));
+  const allSelected = rows.length > 0 && selectedIds.length === rows.length;
+  const someSelected = selectedIds.length > 0 && selectedIds.length < rows.length;
+
+  const rowActions = (account) => [
+    { label: 'Preview', icon: 'info', onClick: () => setDrawerRow(account) },
+    { label: 'Manage Funded Account', icon: 'settings', onClick: () => openManageModal(account) },
+    { label: 'Open Account Detail', icon: 'info', onClick: () => navigate(`/admin/accounts/${account.id}`) }
+  ];
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', gap: '16px', flexWrap: 'wrap' }}>
         <div>
           <h1 className="admin-h1">Funded Accounts</h1>
-          <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>Monitor live multi-asset Master accounts.</p>
+          <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+            Manage funded balances, review flags, and post-evaluation risk actions from one operator queue.
+          </p>
         </div>
       </div>
 
-      <AdminFilterBar searchPlaceholder="Search via Account ID or user email..." searchValue={search} onSearchChange={setSearch} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        <AdminStatCard icon="funded" label="Funded Accounts" value={summary.funded || rows.length} />
+        <AdminStatCard icon="activity" label="Active Funded" value={summary.active || 0} />
+        <AdminStatCard icon="warning" label="Review Flagged" value={summary.review_flagged || 0} />
+        <AdminStatCard icon="wallet" label="Open Trades" value={summary.open_trades || 0} />
+      </div>
+
+      <AdminFilterBar searchPlaceholder="Search by account ID, UID, or trader email..." searchValue={search} onSearchChange={setSearch}>
+        {['all', 'active', 'locked', 'failed'].map((value) => (
+          <button
+            key={value}
+            className={`admin-filter-chip ${filters.status === value ? 'active' : ''}`}
+            onClick={() => setFilters((current) => ({ ...current, status: value }))}
+          >
+            {value === 'all' ? 'All Statuses' : value.toUpperCase()}
+          </button>
+        ))}
+        {['all', 'flagged', 'clear'].map((value) => (
+          <button
+            key={value}
+            className={`admin-filter-chip ${filters.reviewFlagged === value ? 'active' : ''}`}
+            onClick={() => setFilters((current) => ({ ...current, reviewFlagged: value }))}
+          >
+            {value === 'all' ? 'All Review States' : value === 'flagged' ? 'Flagged' : 'Clear'}
+          </button>
+        ))}
+      </AdminFilterBar>
+
+      <AdminListToolbar
+        resourceLabel="funded accounts"
+        views={views}
+        activeViewId={activeViewId}
+        onSelectView={selectView}
+        onSaveView={saveView}
+        onUpdateView={currentView ? () => updateView(currentView) : null}
+        onDeleteView={currentView ? () => deleteView(currentView) : null}
+        columns={ALL_COLUMN_KEYS.map((key) => ({ key, header: key.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()) }))}
+        visibleColumnKeys={visibleColumnKeys}
+        onToggleColumn={toggleColumn}
+        density={density}
+        onDensityChange={setDensity}
+        onExport={exportCurrentView}
+        selectionLabel={selectedIds.length > 0 ? `${selectedIds.length} selected` : ''}
+        extraActions={selectedIds.length > 0 ? (
+          <button className="admin-btn admin-btn-ghost" onClick={applyTagToSelection}>
+            Tag Selection
+          </button>
+        ) : null}
+      />
 
       <div className="admin-card" style={{ padding: 0 }}>
-        <AdminDataTable 
+        <AdminDataTable
           columns={columns}
-          data={filtered}
+          data={rows}
           loading={loading}
-          rowActions={getRowActions}
-          pagination={{ current: 1, total: 1 }}
-          onPageChange={() => {}}
+          rowActions={rowActions}
+          pagination={pagination}
+          onPageChange={setPage}
+          sort={sort}
+          onSortChange={handleSortChange}
+          density={density}
+          onRowClick={(row) => setDrawerRow(row)}
+          selection={{
+            selectedIds,
+            allSelected,
+            someSelected,
+            onToggleAll: () => {
+              if (allSelected) {
+                setSelectedIds([]);
+                return;
+              }
+              setSelectedIds(rows.map((row) => String(row.id)));
+            },
+            onToggleRow: (row) => toggleRowSelection(row.id)
+          }}
         />
       </div>
 
+      <AdminEntityDrawer
+        open={!!drawerRow}
+        entityType="account"
+        row={drawerRow}
+        title={drawerRow ? `Funded Account #${String(drawerRow.id).padStart(5, '0')}` : ''}
+        adminAxios={adminAxios}
+        quickActions={drawerRow ? [
+          { label: 'Manage Account', onClick: () => openManageModal(drawerRow) },
+          { label: 'Open Detail', onClick: () => navigate(`/admin/accounts/${drawerRow.id}`) }
+        ] : []}
+        onClose={() => setDrawerRow(null)}
+        onRefresh={() => fetchAccounts({ silent: true })}
+      />
+
       <AdminModal
-        isOpen={showOverrideModal}
-        onClose={() => setShowOverrideModal(false)}
-        title={`Master Account: #${String(selectedAcc?.id || '').padStart(5, '0')}`}
-        size="md"
-        footer={<>
-          <button className="admin-btn admin-btn-ghost" onClick={() => setShowOverrideModal(false)}>Close</button>
-        </>}
+        isOpen={showManageModal}
+        onClose={() => setShowManageModal(false)}
+        title={`Funded Account #${String(selectedAcc?.id || '').padStart(5, '0')}`}
+        size="lg"
+        footer={(
+          <>
+            <button className="admin-btn admin-btn-ghost" onClick={() => setShowManageModal(false)} disabled={submitting}>
+              Close
+            </button>
+          </>
+        )}
       >
         {selectedAcc && (
-          <div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
-              <div style={{ background: 'var(--admin-bg)', padding: '16px', borderRadius: '8px', border: '1px solid var(--admin-border)' }}>
-                <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Current Balance</div>
-                <div style={{ fontSize: '24px', fontFamily: 'var(--admin-font-mono)', fontWeight: 700, color: 'var(--admin-text)' }}>
-                  ${(selectedAcc.balance || 0).toFixed(2)}
+          <div style={{ display: 'grid', gap: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+              {[
+                { label: 'Status', value: selectedAcc.status?.toUpperCase() },
+                { label: 'Balance', value: formatMoney(selectedAcc.current_balance) },
+                { label: 'Peak', value: formatMoney(selectedAcc.peak_balance) },
+                { label: 'Paid Out', value: formatMoney(selectedAcc.total_payouts) }
+              ].map((card) => (
+                <div key={card.label} style={{ background: 'var(--admin-bg)', padding: '16px', borderRadius: '10px', border: '1px solid var(--admin-border)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>{card.label}</div>
+                  <div style={{ marginTop: '6px', fontSize: '22px', fontFamily: 'var(--admin-font-mono)', fontWeight: 700 }}>
+                    {card.value}
+                  </div>
                 </div>
-              </div>
-              <div style={{ background: 'var(--admin-bg)', padding: '16px', borderRadius: '8px', border: '1px solid var(--admin-border)' }}>
-                <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Total Payouts Released</div>
-                <div style={{ fontSize: '24px', fontFamily: 'var(--admin-font-mono)', fontWeight: 700, color: 'var(--admin-gold)' }}>
-                  ${(selectedAcc.total_payouts || 0).toFixed(2)}
-                </div>
+              ))}
+            </div>
+
+            <div className="admin-card" style={{ margin: 0 }}>
+              <h3 className="admin-h3">Action Reason</h3>
+              <textarea
+                className="admin-input"
+                value={overrideReason}
+                onChange={(e) => setOverrideReason(e.target.value)}
+                placeholder="Why are you closing or revoking this funded account?"
+                rows={3}
+                style={{ resize: 'vertical', minHeight: '96px' }}
+              />
+            </div>
+
+            <div className="admin-card" style={{ margin: 0 }}>
+              <h3 className="admin-h3">Funded Controls</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+                <button className="admin-btn admin-btn-primary" onClick={() => executeOverride('force_close_open_trades')} disabled={submitting}>
+                  Force Close Open Trades
+                </button>
+                <button className="admin-btn admin-btn-danger" onClick={() => executeOverride('revoke_funded')} disabled={submitting}>
+                  Revoke And Lock Funded Account
+                </button>
               </div>
             </div>
 
-            <h3 className="admin-h3" style={{ borderBottom: '1px solid var(--admin-border)', paddingBottom: '8px', marginBottom: '16px' }}>Master Controls</h3>
-            <div style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.2)', padding: '16px', borderRadius: '8px' }}>
-              <p style={{ fontSize: '12px', color: 'var(--admin-text-muted)', marginBottom: '16px' }}>
-                Revoking funding will instantly disconnect this account from the MT5 trade copier bridge and lock trade execution.
+            <div className="admin-card" style={{ margin: 0 }}>
+              <h3 className="admin-h3">Balance Adjustment</h3>
+              <p style={{ color: 'var(--admin-text-muted)', fontSize: '12px', marginBottom: '16px' }}>
+                Use a positive amount to credit or a negative amount to debit the funded balance.
               </p>
-              <button className="admin-btn admin-btn-danger" style={{ width: '100%' }} onClick={executeRevoke}>
-                🚫 Revoke Master Access
-              </button>
+              <div style={{ display: 'grid', gap: '12px' }}>
+                <input
+                  className="admin-input admin-font-mono"
+                  type="number"
+                  step="0.01"
+                  value={adjustAmount}
+                  onChange={(e) => setAdjustAmount(e.target.value)}
+                  placeholder="e.g. 250.00 or -100.00"
+                />
+                <textarea
+                  className="admin-input"
+                  value={adjustReason}
+                  onChange={(e) => setAdjustReason(e.target.value)}
+                  placeholder="Reason for this funded balance adjustment"
+                  rows={3}
+                  style={{ resize: 'vertical', minHeight: '88px' }}
+                />
+                <button className="admin-btn admin-btn-primary" onClick={applyBalanceAdjustment} disabled={submitting}>
+                  Apply Balance Adjustment
+                </button>
+              </div>
             </div>
           </div>
         )}

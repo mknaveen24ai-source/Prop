@@ -5,19 +5,18 @@ export const MASTERPIECE_CSS = `
    Deep Navy (authority) · Electric Blue (trust) · Gold (wealth) · Emerald (growth)
    ==========================================================================
   */
-  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=Sora:wght@300;400;500;600;700;800&family=DM+Mono:wght@300;400;500&display=swap');
-
-  :root {
+  .mode-public,
+  .masterpiece-landing {
     /* — Color Psychology Palette — */
-    --mp-navy-deep: #0a0e17;
-    --mp-navy-mid: #0d1220;
-    --mp-navy-card: #111827;
-    --mp-navy-elevated: #1a2332;
+    --mp-navy-deep: var(--color-bg-deep);
+    --mp-navy-mid: var(--color-bg-subtle);
+    --mp-navy-card: var(--color-surface-solid);
+    --mp-navy-elevated: var(--color-surface-elevated);
 
-    --mp-accent: #2962ff;
-    --mp-accent-bright: #4d82ff;
-    --mp-accent-glow: rgba(41, 98, 255, 0.25);
-    --mp-accent-subtle: rgba(41, 98, 255, 0.08);
+    --mp-accent: var(--brand-primary);
+    --mp-accent-bright: var(--brand-primary-strong);
+    --mp-accent-glow: var(--brand-primary-glow);
+    --mp-accent-subtle: var(--brand-primary-soft);
 
     --mp-gold: #f0b90b;
     --mp-gold-light: #fcd535;
@@ -34,37 +33,38 @@ export const MASTERPIECE_CSS = `
     --mp-red: #ff4757;
     --mp-red-glow: rgba(255, 71, 87, 0.2);
 
-    --mp-cyan: #00e5ff;
-    --mp-cyan-glow: rgba(0, 229, 255, 0.2);
+    --mp-cyan: var(--brand-accent);
+    --mp-cyan-glow: var(--brand-accent-glow);
 
-    --mp-border: rgba(255, 255, 255, 0.06);
-    --mp-border-hover: rgba(255, 255, 255, 0.12);
+    --mp-border: var(--border);
+    --mp-border-hover: var(--border-strong);
     --mp-border-glow: rgba(255, 255, 255, 0.18);
 
-    --mp-text: #ffffff;
-    --mp-text-secondary: rgba(255, 255, 255, 0.75);
-    --mp-text-muted: rgba(255, 255, 255, 0.50);
-    --mp-text-dim: rgba(255, 255, 255, 0.30);
+    --mp-text: var(--color-text-primary);
+    --mp-text-secondary: var(--color-text-secondary);
+    --mp-text-muted: var(--color-text-secondary);
+    --mp-text-dim: var(--color-text-muted);
 
     --mp-glass-bg: rgba(17, 24, 39, 0.60);
-    --mp-glass-bg-solid: rgba(17, 24, 39, 0.85);
+    --mp-glass-bg-solid: rgba(12, 18, 32, 0.86);
     --mp-glass-blur: blur(24px);
 
-    --mp-gradient-hero: linear-gradient(135deg, #2962ff 0%, #7b61ff 50%, #00c896 100%);
+    --mp-gradient-hero: linear-gradient(135deg, var(--brand-primary) 0%, #5b7cff 50%, #00c896 100%);
     --mp-gradient-gold: linear-gradient(135deg, #f0b90b 0%, #fcd535 100%);
     --mp-gradient-text: linear-gradient(180deg, #ffffff 0%, rgba(255,255,255,0.65) 100%);
-    --mp-gradient-blue: linear-gradient(135deg, #2962ff 0%, #4d82ff 100%);
+    --mp-gradient-blue: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-strong) 100%);
   }
 
   /* ══ RESET & BASE ══ */
   .masterpiece-landing {
     background: var(--mp-navy-deep);
     color: var(--mp-text);
-    font-family: 'Manrope', sans-serif;
+    font-family: var(--font-ui);
     overflow-x: hidden;
     position: relative;
     width: 100%;
     min-height: 100vh;
+    padding-top: var(--risk-warning-height, 0px);
   }
 
   .masterpiece-landing * {
@@ -250,6 +250,38 @@ export const MASTERPIECE_CSS = `
     box-shadow: 0 8px 24px rgba(0,0,0,0.3);
   }
 
+  .masterpiece-landing.has-sticky-cta main {
+    padding-bottom: 128px;
+  }
+
+  .mp-sticky-cta {
+    position: fixed;
+    left: 24px;
+    right: 24px;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    z-index: 1100;
+    pointer-events: none;
+  }
+
+  .mp-sticky-cta-inner {
+    width: min(1120px, 100%);
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 16px 18px;
+    border-radius: 20px;
+    background:
+      linear-gradient(180deg, rgba(12, 18, 32, 0.96) 0%, rgba(9, 14, 26, 0.98) 100%),
+      radial-gradient(circle at top left, rgba(41, 98, 255, 0.16), transparent 45%);
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 20px 48px rgba(0,0,0,0.4), 0 0 0 1px rgba(41, 98, 255, 0.06);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    pointer-events: auto;
+  }
+
   /* ══ GLASS CARD ══ */
   .mp-glass-card {
     background: var(--mp-glass-bg);
@@ -328,6 +360,10 @@ export const MASTERPIECE_CSS = `
   .mp-section {
     padding: 140px 0;
     position: relative;
+  }
+
+  .masterpiece-landing [id] {
+    scroll-margin-top: calc(120px + var(--risk-warning-height, 0px));
   }
 
   .mp-section-divider {
@@ -594,6 +630,19 @@ export const MASTERPIECE_CSS = `
     .mp-timeline-content { padding-left: 90px; }
     .mp-glass-card { padding: 24px; border-radius: 16px; }
     .mp-bento-item { padding: 24px; border-radius: 16px; }
+    .masterpiece-landing.has-sticky-cta main { padding-bottom: 184px; }
+    .mp-sticky-cta {
+      left: 12px;
+      right: 12px;
+      bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    }
+    .mp-sticky-cta-inner {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 14px;
+      padding: 14px;
+      border-radius: 18px;
+    }
   }
 
   /* ══ 3D HERO CANVAS ══ */

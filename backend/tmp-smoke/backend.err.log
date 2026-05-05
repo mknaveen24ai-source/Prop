@@ -1,0 +1,48 @@
+[env] Missing recommended vars: PRICE_HISTORY_RETAIN_DAYS, PRICE_HISTORY_1H_RETAIN_DAYS, SMTP_HOST, SMTP_USER, SMTP_PASS
+2026-05-01 19:20:45 [[33mwarn[39m]: DWX command channel is not writable; shared feed will remain in read-only mode. {"sourceKey":"shared","commandsFile":"E:\\MT5_Data\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Files\\DWX\\DWX_Commands_0.txt","error":"EPERM: operation not permitted, open 'E:\\MT5_Data\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Files\\DWX\\DWX_Commands_0.txt'"}
+2026-05-01 19:20:45 [[33mwarn[39m]: DWX market data file not found or not readable; shared feed is running without live MT5 ticks. {"sourceKey":"shared","marketDataFile":"E:\\MT5_Data\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Files\\DWX\\DWX_Market_Data.txt"}
+2026-05-01 19:20:45 [[33mwarn[39m]: DWX market data file not found, watcher will retry. {"sourceKey":"shared","marketDataFile":"E:\\MT5_Data\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Files\\DWX\\DWX_Market_Data.txt","retryInMs":5000}
+2026-05-01 19:20:45 [[31merror[39m]: [PERFORMANCE] Failed query: 0ms {"duration":0,"sql":"SELECT id, user_id FROM accounts\n         WHERE user_id = ANY($1::int[])\n           AND tenant_id = ","error":"operator does not exist: uuid = integer"}
+2026-05-01 19:20:45 [[31merror[39m]: [ip_detection] Error: {"error":"operator does not exist: uuid = integer"}
+2026-05-01 19:20:45 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"USDJPY"}
+2026-05-01 19:20:45 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"USDCHF"}
+2026-05-01 19:20:45 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"AUDUSD"}
+2026-05-01 19:20:45 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"USDCAD"}
+2026-05-01 19:20:45 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"NZDUSD"}
+2026-05-01 19:20:45 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"EURGBP"}
+2026-05-01 19:20:45 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"EURJPY"}
+2026-05-01 19:20:45 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"GBPJPY"}
+2026-05-01 19:20:45 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"AUDJPY"}
+2026-05-01 19:20:45 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"CADJPY"}
+2026-05-01 19:20:45 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"CHFJPY"}
+2026-05-01 19:20:45 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"NZDJPY"}
+2026-05-01 19:20:46 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"EURAUD"}
+2026-05-01 19:20:46 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"EURCAD"}
+2026-05-01 19:20:46 [[33mwarn[39m]: Price feed has stale data: {"staleCount":31,"total":31}
+2026-05-01 19:20:46 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"EURCHF"}
+2026-05-01 19:20:46 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"EURNZD"}
+[mail] Failed to send "PropFirm - KYC Verified" to copier.smoke.1777643445801@example.com: 
+2026-05-01 19:20:46 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"GBPAUD"}
+2026-05-01 19:20:46 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"GBPCAD"}
+2026-05-01 19:20:46 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"GBPCHF"}
+2026-05-01 19:20:46 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"GBPNZD"}
+2026-05-01 19:20:46 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"AUDCAD"}
+2026-05-01 19:20:46 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"AUDCHF"}
+2026-05-01 19:20:46 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"AUDNZD"}
+2026-05-01 19:20:46 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"CADCHF"}
+2026-05-01 19:20:46 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"NZDCAD"}
+2026-05-01 19:20:46 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"NZDCHF"}
+2026-05-01 19:20:46 [[33mwarn[39m]: Price feed has stale data: {"staleCount":30,"total":31}
+2026-05-01 19:20:46 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"US30"}
+2026-05-01 19:20:46 [[33mwarn[39m]: No MT5 history export rows found for instrument. {"instrument":"NAS100"}
+2026-05-01 19:20:51 [[33mwarn[39m]: Price feed has stale data: {"staleCount":31,"total":31}
+2026-05-01 19:20:52 [[31merror[39m]: NewsService: ForexFactory fetch failed, falling back to DB cache {"error":""}
+2026-05-01 19:21:04 [[33mwarn[39m]: [PERFORMANCE] Slow database query: 18298ms {"duration":18298,"sql":"INSERT INTO price_feed_history_1h\n         (instrument, bucket_time, open, high, low, close, ticks, "}
+2026-05-01 19:21:15 [[31merror[39m]: [PERFORMANCE] Failed query: 1ms {"duration":1,"sql":"SELECT id, user_id FROM accounts\n         WHERE user_id = ANY($1::int[])\n           AND tenant_id = ","error":"operator does not exist: uuid = integer"}
+2026-05-01 19:21:15 [[31merror[39m]: [ip_detection] Error: {"error":"operator does not exist: uuid = integer"}
+2026-05-01 19:21:45 [[31merror[39m]: [PERFORMANCE] Failed query: 1ms {"duration":1,"sql":"SELECT id, user_id FROM accounts\n         WHERE user_id = ANY($1::int[])\n           AND tenant_id = ","error":"operator does not exist: uuid = integer"}
+2026-05-01 19:21:45 [[31merror[39m]: [ip_detection] Error: {"error":"operator does not exist: uuid = integer"}
+2026-05-01 19:21:45 [[33mwarn[39m]: DWX market data file not found, watcher will retry. {"sourceKey":"shared","marketDataFile":"E:\\MT5_Data\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Files\\DWX\\DWX_Market_Data.txt","retryInMs":5000}
+2026-05-01 19:21:45 [[33mwarn[39m]: DWX market data file not found or not readable; shared feed is running without live MT5 ticks. {"sourceKey":"shared","marketDataFile":"E:\\MT5_Data\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Files\\DWX\\DWX_Market_Data.txt"}
+2026-05-01 19:21:51 [[33mwarn[39m]: Price feed has stale data: {"staleCount":31,"total":31}
+2026-05-01 19:21:52 [[33mwarn[39m]: Price feed has stale data: {"staleCount":30,"total":31}

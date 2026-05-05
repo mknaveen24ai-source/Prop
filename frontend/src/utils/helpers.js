@@ -1,3 +1,8 @@
+import {
+  calculatePnL as calculateInstrumentPnL,
+  calculateMargin as calculateInstrumentMargin,
+} from './instruments'
+
 /**
  * @typedef {Object} User
  * @property {string} id - User UUID
@@ -85,13 +90,7 @@
  * @returns {number} PnL in USD
  */
 export function calculatePnL(direction, openPrice, currentPrice, lots, instrument) {
-  const CONTRACT_SIZES = {
-    EURUSD: 100000, GBPUSD: 100000, USDJPY: 100000, USDCHF: 100000,
-    AUDUSD: 100000, USDCAD: 100000, XAUUSD: 100, XAGUSD: 5000
-  }
-  const contractSize = CONTRACT_SIZES[instrument] || 100000
-  const priceDiff = direction === 'buy' ? currentPrice - openPrice : openPrice - currentPrice
-  return parseFloat((priceDiff * lots * contractSize).toFixed(2))
+  return calculateInstrumentPnL(direction, openPrice, currentPrice, lots, instrument)
 }
 
 /**
@@ -101,15 +100,7 @@ export function calculatePnL(direction, openPrice, currentPrice, lots, instrumen
  * @returns {number} Required margin in USD
  */
 export function calculateMargin(instrument, lots) {
-  const CONTRACT_SIZES = {
-    EURUSD: 100000, GBPUSD: 100000, XAUUSD: 100, XAGUSD: 5000
-  }
-  const LEVERAGE = {
-    EURUSD: 30, GBPUSD: 30, XAUUSD: 10, XAGUSD: 10
-  }
-  const contractSize = CONTRACT_SIZES[instrument] || 100000
-  const leverage = LEVERAGE[instrument] || 30
-  return parseFloat(((lots * contractSize) / leverage).toFixed(2))
+  return calculateInstrumentMargin(instrument, lots)
 }
 
 /**

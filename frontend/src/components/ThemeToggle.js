@@ -1,9 +1,10 @@
 import React from 'react'
+import { Moon, Sun } from 'lucide-react'
 import { useTheme } from '../ThemeContext'
 
 export default function ThemeToggle() {
   const { theme, toggleTheme } = useTheme()
-  const isDark = theme === 'dark';
+  const isDark = theme === 'dark'
 
   return (
     <button
@@ -28,8 +29,7 @@ export default function ThemeToggle() {
         outline: 'none'
       }}
     >
-      {/* Sliding indicator */}
-      <div 
+      <div
         style={{
           position: 'absolute',
           top: '50%',
@@ -44,31 +44,30 @@ export default function ThemeToggle() {
           zIndex: 1
         }}
       />
-      
-      {/* Icons */}
-      <div style={{
-          zIndex: 2, 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center', 
-          width: '50%', 
-          fontSize: '12px',
-          color: isDark ? 'var(--text-muted)' : 'var(--bg-hover)',
+
+      <div
+        style={{
+          zIndex: 2,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          width: '50%',
           transition: 'color 0.3s'
-      }}>
-        ☀️
+        }}
+      >
+        <Sun size={12} color={isDark ? 'var(--text-muted)' : 'var(--bg-hover)'} />
       </div>
-      <div style={{
-          zIndex: 2, 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center', 
-          width: '50%', 
-          fontSize: '10px',
-          color: isDark ? '#fff' : 'var(--text-muted)',
+      <div
+        style={{
+          zIndex: 2,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          width: '50%',
           transition: 'color 0.3s'
-      }}>
-        🌙
+        }}
+      >
+        <Moon size={10} color={isDark ? 'var(--text-primary)' : 'var(--text-muted)'} />
       </div>
     </button>
   )

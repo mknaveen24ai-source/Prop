@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { renderIcon } from '../../utils/iconMap';
 
 export default function AdminActionMenu({ actions, row }) {
   const [open, setOpen] = useState(false);
@@ -18,11 +19,11 @@ export default function AdminActionMenu({ actions, row }) {
 
   return (
     <div className="admin-action-menu-wrap" ref={menuRef}>
-      <button 
+      <button
         className="admin-action-btn"
         onClick={(e) => { e.stopPropagation(); setOpen(p => !p); }}
       >
-        •••
+        {renderIcon('menu', { size: 16, color: 'var(--admin-text-faint)' })}
       </button>
 
       {open && (
@@ -39,7 +40,12 @@ export default function AdminActionMenu({ actions, row }) {
                 action.onClick(row);
               }}
             >
-              <span style={{ width: '16px', textAlign: 'center' }}>{action.icon}</span>
+              <span style={{ width: '16px', textAlign: 'center', display: 'inline-flex', justifyContent: 'center' }}>
+                {renderIcon(action.icon, {
+                  size: 14,
+                  color: action.danger ? 'var(--admin-danger)' : 'var(--admin-text-faint)'
+                })}
+              </span>
               {action.label}
             </button>
           ))}

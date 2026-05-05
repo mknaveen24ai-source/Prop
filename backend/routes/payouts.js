@@ -3,21 +3,37 @@ const router = express.Router()
 const pool = require('../db')
 const { authenticateToken } = require('./middleware')
 const rateLimit = require('express-rate-limit')
+const { ipKeyGenerator } = require('express-rate-limit')
 const logger = require('../utils/logger')
 const Decimal = require('decimal.js')
+const { CONTRACT_SIZES } = require('../constants')
+const { getTenantSettings } = require('../services/tenantPolicyService')
+const {
+  abandonIdempotentRequest,
+  beginIdempotentRequest,
+  completeIdempotentRequest,
+  getIdempotencyKey
+} = require('../utils/idempotency')
 
-// Contract sizes for floating PnL calculation
-const CONTRACT_SIZES = {
-  EURUSD: 100000, GBPUSD: 100000, USDJPY: 100000, USDCHF: 100000,
-  AUDUSD: 100000, USDCAD: 100000, XAUUSD: 100, XAGUSD: 5000
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
+// FIX (H3): Withdrawal rate limiting - prevent spam of payout requests
 const payoutRequestLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 5,
-  message: { error: 'Too many payout requests. Try again later.' },
+  windowMs: 24 * 60 * 60 * 1000,  // 24 hours
+  max: 1,                          // 1 request per 24 hours per user
+  message: { error: 'You can submit one payout request per 24 hours. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => {
+    return req.user?.userId ? `user:${req.user.userId}` : ipKeyGenerator(req)
+  }
 })
 // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 // POST /api/payouts/request Ã¢â‚¬â€ funded traders only
@@ -31,9 +47,11 @@ const payoutRequestLimiter = rateLimit({
 // FIX 2: All four flag-check queries are now batched into a single SQL query
 // instead of four sequential round-trips.
 // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-router.post('/request', payoutRequestLimiter, authenticateToken, async function(req, res) {
+router.post('/request', authenticateToken, payoutRequestLimiter, async function(req, res) {
+  let idempotencyClaim = null
   try {
     const { account_id, amount_requested, payment_method, payment_details } = req.body
+    const tenantId = req.user?.tenantId || req.tenant?.id || 1
 
     if (!account_id || !amount_requested || !payment_method || !payment_details) {
       return res.status(400).json({ error: 'All fields are required' })
@@ -74,8 +92,12 @@ router.post('/request', payoutRequestLimiter, authenticateToken, async function(
       const account = await client.query(
         `SELECT id, user_id, account_type, account_size, current_balance, starting_balance,
                 peak_balance, status, created_at
-         FROM accounts WHERE id = $1 AND user_id = $2 FOR UPDATE`,
-        [accountIdStr, req.user.userId]
+         FROM accounts
+         WHERE id = $1
+           AND user_id = $2
+           AND COALESCE(tenant_id, $3) = $3
+         FOR UPDATE`,
+        [accountIdStr, req.user.userId, tenantId]
       )
 
       if (account.rows.length === 0) {
@@ -92,8 +114,8 @@ router.post('/request', payoutRequestLimiter, authenticateToken, async function(
 
       // FIX: KYC must be approved before payout
       const userKyc = await client.query(
-        `SELECT kyc_status FROM users WHERE id = $1`,
-        [req.user.userId]
+        `SELECT kyc_status FROM users WHERE id = $1 AND COALESCE(tenant_id, $2) = $2`,
+        [req.user.userId, tenantId]
       )
       if (userKyc.rows.length === 0 || userKyc.rows[0].kyc_status !== 'approved') {
         await client.query('ROLLBACK')
@@ -156,7 +178,9 @@ router.post('/request', payoutRequestLimiter, authenticateToken, async function(
         ? parseFloat(settingsResult.rows[0].value) / 100
         : 0.80
 
-      const amount_payable = parseFloat((amountNum * profitSharePct).toFixed(2))
+      const payoutSettings = await getTenantSettings(tenantId, ['profit_share_pct'])
+      const effectiveProfitSharePct = parseFloat(payoutSettings.profit_share_pct || (profitSharePct * 100) || 80) / 100
+      const amount_payable = parseFloat((amountNum * effectiveProfitSharePct).toFixed(2))
 
       // Ã¢â€â‚¬Ã¢â€â‚¬ Flag checks Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
       let is_flagged = false
@@ -231,20 +255,41 @@ router.post('/request', payoutRequestLimiter, authenticateToken, async function(
         logger.error('[payouts] Flag check error:', { error: flagErr.message })
       }
 
+      const idempotencyResult = await beginIdempotentRequest(pool, {
+        scope: 'payouts:request',
+        tenantId,
+        actorId: req.user.userId,
+        idempotencyKey: getIdempotencyKey(req)
+      })
+      if (idempotencyResult.replay) {
+        await client.query('ROLLBACK')
+        return res.status(idempotencyResult.responseStatus).json(idempotencyResult.responseBody)
+      }
+      if (idempotencyResult.inProgress) {
+        await client.query('ROLLBACK')
+        return res.status(409).json({ error: 'This payout request is already being processed.' })
+      }
+      idempotencyClaim = idempotencyResult.claimId || null
+
       const payout = await client.query(
         `INSERT INTO payouts
-         (user_id, account_id, amount_requested, amount_payable, payment_method, payment_details, status, is_flagged, flag_reason)
-         VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8)
+         (tenant_id, user_id, account_id, amount_requested, amount_payable, payment_method, payment_details, status, is_flagged, flag_reason)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9)
          RETURNING *`,
-        [req.user.userId, accountIdStr, amountNum, amount_payable, payment_method, paymentDetailsStr, is_flagged, flagReasons.join(' | ') || null]
+        [tenantId, req.user.userId, accountIdStr, amountNum, amount_payable, payment_method, paymentDetailsStr, is_flagged, flagReasons.join(' | ') || null]
       )
 
       await client.query('COMMIT')
 
-      res.status(201).json({
+      const responseBody = {
         message: 'Payout request submitted successfully',
         payout: payout.rows[0]
-      })
+      }
+      if (idempotencyClaim) {
+        await completeIdempotentRequest(pool, idempotencyClaim, 201, responseBody)
+        idempotencyClaim = null
+      }
+      res.status(201).json(responseBody)
     } catch (txErr) {
       await client.query('ROLLBACK').catch(() => {})
       throw txErr
@@ -253,6 +298,9 @@ router.post('/request', payoutRequestLimiter, authenticateToken, async function(
     }
 
   } catch (error) {
+    if (idempotencyClaim) {
+      await abandonIdempotentRequest(pool, idempotencyClaim).catch(() => {})
+    }
     logger.error('Payout request error:', { error: error.message })
     res.status(500).json({ error: 'Could not submit payout request' })
   }
@@ -261,13 +309,15 @@ router.post('/request', payoutRequestLimiter, authenticateToken, async function(
 // GET /api/payouts/my-payouts
 router.get('/my-payouts', authenticateToken, async function(req, res) {
   try {
+    const tenantId = req.user?.tenantId || req.tenant?.id || 1
     const result = await pool.query(
       `SELECT p.*, a.account_type, a.account_size, a.account_uid
        FROM payouts p
        JOIN accounts a ON p.account_id = a.id
        WHERE p.user_id = $1
+         AND COALESCE(a.tenant_id, $2) = $2
        ORDER BY p.requested_at DESC`,
-      [req.user.userId]
+      [req.user.userId, tenantId]
     )
     res.json(result.rows)
   } catch (error) {
@@ -276,15 +326,122 @@ router.get('/my-payouts', authenticateToken, async function(req, res) {
   }
 })
 
+router.get('/statement', authenticateToken, async function(req, res) {
+  try {
+    const tenantId = req.user?.tenantId || req.tenant?.id || 1
+    const result = await pool.query(
+      `SELECT p.id, p.account_id, p.amount_requested, p.amount_payable,
+              p.payment_method, p.status, p.requested_at, p.paid_at,
+              p.transaction_id, a.account_uid, a.account_size
+       FROM payouts p
+       JOIN accounts a ON p.account_id = a.id
+       WHERE p.user_id = $1
+         AND COALESCE(a.tenant_id, $2) = $2
+       ORDER BY p.requested_at DESC`,
+      [req.user.userId, tenantId]
+    )
+
+    const rows = result.rows
+    const totalRequested = rows.reduce((sum, row) => sum + (parseFloat(row.amount_requested) || 0), 0)
+    const totalPaid = rows.reduce((sum, row) => {
+      if (row.status !== 'paid') return sum
+      return sum + (parseFloat(row.amount_payable) || 0)
+    }, 0)
+    const formatDateTime = value => {
+      if (!value) return '-'
+      const date = new Date(value)
+      if (Number.isNaN(date.getTime())) return '-'
+      return date.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
+    }
+
+    const rowHtml = rows.length > 0
+      ? rows.map(row => `
+          <tr>
+            <td>PAY-${String(row.id).padStart(5, '0')}</td>
+            <td>${escapeHtml(row.account_uid || row.account_id)}</td>
+            <td>$${(parseFloat(row.amount_requested) || 0).toFixed(2)}</td>
+            <td>$${(parseFloat(row.amount_payable) || 0).toFixed(2)}</td>
+            <td>${escapeHtml(String(row.payment_method || 'N/A').replace(/_/g, ' '))}</td>
+            <td>${escapeHtml(row.status || 'unknown')}</td>
+            <td>${escapeHtml(formatDateTime(row.requested_at))}</td>
+            <td>${escapeHtml(formatDateTime(row.paid_at))}</td>
+            <td>${escapeHtml(row.transaction_id || '-')}</td>
+          </tr>
+        `).join('')
+      : `
+        <tr>
+          <td colspan="9" class="empty">No payout records found.</td>
+        </tr>
+      `
+
+    res.set('Cache-Control', 'no-store')
+    res.type('html').send(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Payout Statement</title>
+  <style>
+    body { font-family: Arial, sans-serif; color: #111827; margin: 32px; }
+    h1 { margin: 0 0 8px; }
+    p { margin: 0; color: #4b5563; }
+    .summary { display: flex; gap: 16px; margin: 24px 0; }
+    .card { border: 1px solid #d1d5db; border-radius: 10px; padding: 16px; min-width: 200px; }
+    .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; }
+    .value { font-size: 28px; font-weight: 700; margin-top: 6px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border-bottom: 1px solid #e5e7eb; text-align: left; padding: 12px; font-size: 14px; }
+    th { color: #374151; background: #f9fafb; }
+    .empty { text-align: center; color: #6b7280; padding: 32px 12px; }
+    @media print { body { margin: 0; } .summary { break-inside: avoid; } }
+  </style>
+</head>
+<body>
+  <h1>Payout Statement</h1>
+  <p>Generated ${escapeHtml(formatDateTime(new Date()))}</p>
+  <div class="summary">
+    <div class="card">
+      <div class="label">Total Requested</div>
+      <div class="value">$${totalRequested.toFixed(2)}</div>
+    </div>
+    <div class="card">
+      <div class="label">Total Paid</div>
+      <div class="value">$${totalPaid.toFixed(2)}</div>
+    </div>
+    <div class="card">
+      <div class="label">Records</div>
+      <div class="value">${rows.length}</div>
+    </div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Request</th>
+        <th>Account</th>
+        <th>Requested</th>
+        <th>Payable</th>
+        <th>Method</th>
+        <th>Status</th>
+        <th>Requested At</th>
+        <th>Paid At</th>
+        <th>Transaction</th>
+      </tr>
+    </thead>
+    <tbody>${rowHtml}</tbody>
+  </table>
+</body>
+</html>`)
+  } catch (error) {
+    logger.error('Payout statement error:', { error: error.message })
+    res.status(500).send('Could not generate payout statement')
+  }
+})
+
 // GET /api/payouts/settings
 router.get('/settings', authenticateToken, async function(req, res) {
   try {
-    const result = await pool.query(
-      `SELECT key, value FROM platform_settings WHERE key = 'profit_share_pct'`
-    )
-    const profit_share_pct = result.rows.length > 0
-      ? parseFloat(result.rows[0].value)
-      : 80
+    const tenantId = req.user?.tenantId || req.tenant?.id || 1
+    const settings = await getTenantSettings(tenantId, ['profit_share_pct'])
+    const profit_share_pct = parseFloat(settings.profit_share_pct || 80)
     res.json({ profit_share_pct })
   } catch (error) {
     logger.error('Payout settings error:', { error: error.message })

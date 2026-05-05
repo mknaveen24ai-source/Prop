@@ -1,0 +1,49 @@
+.mode-operator,
+.mode-operator .admin-layout,
+.admin-layout.mode-operator {
+  --admin-bg: var(--color-bg-deep);
+  --admin-surface: var(--color-surface-operator);
+  --admin-elevated: var(--color-surface-operator-alt);
+  --admin-border: var(--color-border-operator);
+  --admin-border-strong: var(--color-border-strong);
+  --admin-accent: var(--brand-primary);
+  --admin-accent-hover: var(--brand-primary-strong);
+  --admin-accent-glow: var(--brand-primary-glow);
+  --admin-accent-bg: var(--brand-primary-soft);
+  --admin-success: var(--color-success);
+  --admin-danger: var(--color-danger);
+  --admin-warning: var(--color-warning);
+  --admin-info: var(--brand-accent);
+  --admin-gold: var(--color-warning);
+  --admin-text: var(--color-text-primary);
+  --admin-text-muted: var(--color-text-secondary);
+  --admin-text-faint: var(--color-text-faint);
+}
+
+.mode-operator .admin-layout {
+  background:
+    radial-gradient(circle at top, rgba(var(--brand-primary-rgb), 0.08), transparent 28%),
+    linear-gradient(180deg, var(--color-bg-deep) 0%, #090d18 100%);
+}
+
+.mode-operator .admin-sidebar,
+.mode-operator .admin-topbar,
+.mode-operator .admin-card,
+.mode-operator .admin-table-card,
+.mode-operator .admin-dropdown {
+  box-shadow: var(--shadow-operator);
+}
+
+.mode-operator .admin-topbar {
+  background: rgba(9, 14, 25, 0.86);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.mode-operator .admin-nav-item.active {
+  box-shadow: inset 0 0 0 1px rgba(var(--brand-primary-rgb), 0.12);
+}
+
+.mode-operator .admin-card {
+  border-radius: var(--radius-xl);
+}

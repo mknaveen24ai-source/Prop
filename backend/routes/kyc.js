@@ -1,6 +1,8 @@
 const express = require('express')
 const router = express.Router()
 const multer = require('multer')
+const rateLimit = require('express-rate-limit')
+const { ipKeyGenerator } = require('express-rate-limit')
 const path = require('path')
 const fs = require('fs')
 const pool = require('../db')
@@ -113,10 +115,23 @@ function deleteOldKycFile(relativePath) {
   }
 }
 
+// FIX (H3): KYC submission rate limiting - prevent flooding with uploads
+const kycUploadLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000,  // 24 hours
+  max: 3,                          // 3 uploads per 24 hours per user
+  message: { error: 'You can submit KYC documents 3 times per 24 hours. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    return req.user?.userId ? `user:${req.user.userId}` : ipKeyGenerator(req)
+  }
+})
+
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/kyc/upload
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/upload',
+  kycUploadLimiter,
   authenticateToken,
   function(req, res, next) {
     upload.fields([

@@ -39,6 +39,10 @@ async function setupPlatformSettings() {
       ['commodity_lots_per_1k', '0.02'],
       ['min_lot_size', '0.01'],
       ['max_trades_per_1k', '5'],
+      ['max_daily_trades', '20'],
+      ['weekend_holding_enabled', 'true'],
+      ['inactivity_auto_fail_enabled', 'true'],
+      ['inactivity_fail_days', '30'],
       ['drawdown_type', 'trailing'],
       ['price_history_retain_days', '7']
     ]

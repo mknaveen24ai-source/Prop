@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
 import ThemeToggle from '../components/ThemeToggle'
+import { PageWrapper } from '../App'
+import { renderIcon } from '../utils/iconMap'
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 export default function Leaderboard() {
   const [leaders, setLeaders] = useState([])
@@ -11,24 +13,25 @@ export default function Leaderboard() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    axios.get(`${API_URL}/api/admin/leaderboard`)
+    axios.get(`${API_URL}/api/leaderboard`)
       .then(res => setLeaders(res.data))
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
 
-  const medals = ['🥇', '🥈', '🥉']
-
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--navy)' }}>
-      <div className="nav">
-        <span className="nav-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>PROP FIRM</span>
-        <ThemeToggle />
-      </div>
+    <PageWrapper>
+      <div style={{ minHeight: '100vh', background: 'var(--navy)' }}>
+        <div className="nav">
+          <span className="nav-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>PROP FIRM</span>
+          <ThemeToggle />
+        </div>
 
-      <div className="container" style={{ maxWidth: '800px', marginTop: '48px' }}>
+        <div className="container" style={{ maxWidth: '800px', marginTop: '48px' }}>
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <div style={{ fontSize: '48px', marginBottom: '12px' }}>🏆</div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+            {renderIcon('leaderboard', { size: 48, color: 'var(--accent-gold)' })}
+          </div>
           <h1 style={{ fontFamily: 'Inter, serif', color: 'var(--accent)', fontSize: '28px', marginBottom: '8px' }}>
             Leaderboard
           </h1>
@@ -41,7 +44,9 @@ export default function Leaderboard() {
           <div style={{ textAlign: 'center', padding: '80px', color: 'var(--text-muted)' }}>Loading...</div>
         ) : leaders.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', padding: '64px' }}>
-            <div style={{ fontSize: '40px', marginBottom: '16px' }}>📊</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+              {renderIcon('analytics', { size: 40, color: 'var(--accent)' })}
+            </div>
             <p style={{ color: 'var(--text-muted)' }}>No funded traders yet. Be the first!</p>
           </div>
         ) : (
@@ -65,8 +70,15 @@ export default function Leaderboard() {
                 onMouseLeave={e => e.currentTarget.style.background = idx === 0 ? 'rgba(157, 157, 157, 0.04)' : 'var(--navy-card)'}
               >
                 {/* Rank */}
-                <div style={{ fontSize: '22px', minWidth: '36px', textAlign: 'center' }}>
-                  {medals[idx] || <span style={{ color: 'var(--text-dim)', fontSize: '14px', fontWeight: '700' }}>#{idx + 1}</span>}
+                <div style={{ minWidth: '36px', textAlign: 'center', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }}>
+                  {idx < 3 ? (
+                    <>
+                      {renderIcon('leaderboard', { size: 18, color: idx === 0 ? 'var(--accent-gold)' : 'var(--text-secondary)' })}
+                      <span style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '700' }}>{idx + 1}</span>
+                    </>
+                  ) : (
+                    <span style={{ color: 'var(--text-dim)', fontSize: '14px', fontWeight: '700' }}>#{idx + 1}</span>
+                  )}
                 </div>
 
                 {/* Name & Country */}
@@ -102,7 +114,8 @@ export default function Leaderboard() {
             Rankings update in real-time · Shows top 20 active funded accounts
           </p>
         </div>
+        </div>
       </div>
-    </div>
+    </PageWrapper>
   )
 }

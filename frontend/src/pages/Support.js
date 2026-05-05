@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import axios from 'axios'
+import { renderIcon } from '../utils/iconMap'
 
 
 
@@ -12,15 +13,15 @@ function formatTime(dstr) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 }
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 const CATEGORIES = [
-  { value: 'account',   label: '📋 Account Issue' },
-  { value: 'trading',   label: '📈 Trading Problem' },
-  { value: 'kyc',       label: '🪪 KYC / Verification' },
-  { value: 'payout',    label: '💰 Payout Request' },
-  { value: 'technical', label: '🔧 Technical Bug' },
-  { value: 'other',     label: '💬 Other' },
+  { value: 'account',   label: 'Account Issue' },
+  { value: 'trading',   label: 'Trading Problem' },
+  { value: 'kyc',       label: 'KYC / Verification' },
+  { value: 'payout',    label: 'Payout Request' },
+  { value: 'technical', label: 'Technical Bug' },
+  { value: 'other',     label: 'Other' },
 ]
 
 export default function Support({ user }) {
@@ -119,7 +120,14 @@ export default function Support({ user }) {
               <textarea value={form.message} onChange={e => setForm({...form, message: e.target.value})} placeholder="Describe your issue..." rows={6} maxLength={2000} style={{ width: '100%', fontSize: '14px', resize: 'vertical', background: 'var(--navy)', border: '1px solid var(--navy-border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text)', fontFamily: 'DM Sans, sans-serif', lineHeight: '1.6' }} />
             </div>
 
-            <button onClick={handleCreate} disabled={submitting} className="btn" style={{ padding: '12px 32px', fontSize: '14px', fontWeight: '700', cursor: submitting ? 'not-allowed' : 'pointer', background: submitting ? 'var(--navy-border)' : 'var(--accent)' }}>{submitting ? '⏳ Submitting...' : '📨 Submit Ticket'}</button>
+            <button onClick={handleCreate} disabled={submitting} className="btn" style={{ padding: '12px 32px', fontSize: '14px', fontWeight: '700', cursor: submitting ? 'not-allowed' : 'pointer', background: submitting ? 'var(--navy-border)' : 'var(--accent)' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                {submitting
+                  ? renderIcon('timer', { size: 14, color: 'currentColor' })
+                  : renderIcon('message', { size: 14, color: 'currentColor' })}
+                <span>{submitting ? 'Submitting...' : 'Submit Ticket'}</span>
+              </span>
+            </button>
           </div>
         ) : (
           <div className="card" style={{ padding: '0', overflow:'hidden' }}>
@@ -211,7 +219,9 @@ function TicketChat({ ticket, user, onBack }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '65vh', border:'1px solid var(--navy-border)', borderRadius:'12px', background:'var(--navy-card)', overflow:'hidden' }}>
       <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--navy-border)', display: 'flex', alignItems: 'center', background:'rgba(16, 24, 40, 0.4)' }}>
-        <button onClick={onBack} style={{ background:'transparent', border:'none', color:'var(--text-muted)', cursor:'pointer', marginRight:'16px', fontSize:'24px', lineHeight:'1' }}>‹</button>
+        <button onClick={onBack} style={{ background:'transparent', border:'none', color:'var(--text-muted)', cursor:'pointer', marginRight:'16px', fontSize:'24px', lineHeight:'1', display: 'inline-flex', alignItems: 'center' }}>
+          {renderIcon('arrow', { size: 18, color: 'currentColor', style: { transform: 'rotate(180deg)' } })}
+        </button>
         <div>
           <h3 style={{ margin: 0, color: 'var(--text)', fontSize:'16px' }}>{ticket.subject}</h3>
           <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop:'4px' }}>Ticket #{ticket.id} • {ticket.status.toUpperCase()}</div>

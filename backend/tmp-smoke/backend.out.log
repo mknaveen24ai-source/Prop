@@ -1,0 +1,6 @@
+2026-05-01 19:20:45 [[32minfo[39m]: [startup] Express trust proxy configured {"trustProxy":false}
+2026-05-01 19:20:45 [[32minfo[39m]: NewsService started — 30-min refresh cycle, 15-min pre-event protection window
+2026-05-01 19:20:45 [[32minfo[39m]: Redis connected for token caching
+2026-05-01 19:20:45 [[32minfo[39m]: [kafka] Kafka disabled; continuing without event streaming
+2026-05-01 19:20:45 [[32minfo[39m]: Server started: {"port":"5000","env":"development"}
+2026-05-01 19:20:45 [[32minfo[39m]: NewsService: news_cache table ready

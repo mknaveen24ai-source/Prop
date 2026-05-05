@@ -1,100 +1,142 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Outlet } from 'react-router-dom';
-import axios from 'axios';
-import './admin.css';
-import { AdminToastProvider } from '../../components/admin/AdminToast';
-import AdminSidebar from '../../components/admin/AdminSidebar';
-import AdminTopBar from '../../components/admin/AdminTopBar';
-// If your App.js exposes a global socket, you can pass it via context or import it.
-// For now, we'll keep the socket prop placeholder to connect securely.
+import React, { useEffect, useRef, useState } from 'react'
+import { Outlet } from 'react-router-dom'
+import './admin.css'
+import { AdminToastProvider, useToast } from '../../components/admin/AdminToast'
+import AdminSidebar from '../../components/admin/AdminSidebar'
+import AdminTopBar from '../../components/admin/AdminTopBar'
+import { useAdminSession } from '../../providers/AdminSessionProvider'
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-const adminAxios = axios.create({ baseURL: API_URL, withCredentials: true });
+function formatViolationLabel(value) {
+  return String(value || 'critical violation')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
+function AdminRealtimeAlerts({ socket }) {
+  const toast = useToast()
+  const seenViolationKeys = useRef(new Set())
+
+  useEffect(() => {
+    if (!socket) return undefined
+
+    const handleViolation = (violation) => {
+      if (!violation) return
+      if (String(violation.status || '').toLowerCase() !== 'open') return
+      if (String(violation.severity || '').toLowerCase() !== 'critical') return
+      if (Number(violation.hit_count || 1) > 1) return
+
+      const dedupeKey = `${violation.id}:${violation.last_detected_at || ''}`
+      if (seenViolationKeys.current.has(dedupeKey)) return
+      seenViolationKeys.current.add(dedupeKey)
+
+      const accountPart = violation.account_id ? `Account ${violation.account_id}` : 'Platform'
+      const instrumentPart = violation.instrument ? ` • ${violation.instrument}` : ''
+      const message = violation.message || `${accountPart}${instrumentPart} triggered ${formatViolationLabel(violation.violation_type)}.`
+
+      toast.error(message, `Critical: ${formatViolationLabel(violation.violation_type)}`)
+    }
+
+    socket.on('admin_violation_updated', handleViolation)
+    return () => socket.off('admin_violation_updated', handleViolation)
+  }, [socket, toast])
+
+  return null
+}
 
 function AdminLoginScreen({ onLoginSuccess }) {
-  const [step, setStep] = useState('password'); // 'password' | 'totp'
-  const [password, setPassword] = useState('');
-  const [pre2faToken, setPre2faToken] = useState('');
-  const [totpDigits, setTotpDigits] = useState(['', '', '', '', '', '']);
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const { adminAxios } = useAdminSession()
+  const [step, setStep] = useState('password')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [pre2faToken, setPre2faToken] = useState('')
+  const [totpDigits, setTotpDigits] = useState(['', '', '', '', '', ''])
+  const [loading, setLoading] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
 
-  // Rules of Hooks: each ref must be declared at the top level, not in a loop/callback
-  const tr0 = useRef(null);
-  const tr1 = useRef(null);
-  const tr2 = useRef(null);
-  const tr3 = useRef(null);
-  const tr4 = useRef(null);
-  const tr5 = useRef(null);
-  const totpRefs = [tr0, tr1, tr2, tr3, tr4, tr5];
+  const tr0 = useRef(null)
+  const tr1 = useRef(null)
+  const tr2 = useRef(null)
+  const tr3 = useRef(null)
+  const tr4 = useRef(null)
+  const tr5 = useRef(null)
+  const totpRefs = [tr0, tr1, tr2, tr3, tr4, tr5]
 
-  const handlePasswordSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setErrorMsg('');
+  const handlePasswordSubmit = async (event) => {
+    event.preventDefault()
+    setLoading(true)
+    setErrorMsg('')
+
     try {
-      const res = await adminAxios.post('/api/admin/login', { password });
-      if (res.data.requires2FA) {
-        setPre2faToken(res.data.pre2faToken);
-        setStep('totp');
-        setTimeout(() => totpRefs[0]?.current?.focus(), 50);
+      const payload = email.trim()
+        ? { email: email.trim(), password }
+        : { password }
+      const response = await adminAxios.post('/api/admin/login', payload)
+
+      if (response.data.requires2FA) {
+        setPre2faToken(response.data.pre2faToken)
+        setStep('totp')
+        setTimeout(() => totpRefs[0]?.current?.focus(), 50)
       } else {
-        onLoginSuccess();
+        await onLoginSuccess()
       }
-    } catch (err) {
-      setErrorMsg('Invalid admin password');
+    } catch (error) {
+      setErrorMsg(error?.response?.data?.error || 'Could not log in')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false);
-  };
+  }
 
   const handleTotpVerify = async (code) => {
-    setLoading(true);
-    setErrorMsg('');
+    setLoading(true)
+    setErrorMsg('')
+
     try {
-      await adminAxios.post('/api/admin/2fa/validate', 
+      await adminAxios.post(
+        '/api/admin/2fa/validate',
         { token: code },
         { headers: { Authorization: `Bearer ${pre2faToken}` } }
-      );
-      onLoginSuccess();
-    } catch (err) {
-      setErrorMsg(err?.response?.data?.error || 'Invalid code');
+      )
+      await onLoginSuccess()
+    } catch (error) {
+      setErrorMsg(error?.response?.data?.error || 'Invalid code')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false);
-  };
+  }
 
   const handleTotpInput = (index, value) => {
-    const d = value.replace(/\D/g, '').slice(0, 1);
-    const next = [...totpDigits];
-    next[index] = d;
-    setTotpDigits(next);
-    
-    if (d && index < 5) totpRefs[index + 1].current?.focus();
-    if (d && index === 5) {
-      const code = [...next.slice(0, 5), d].join('');
-      if (code.length === 6) handleTotpVerify(code);
-    }
-  };
+    const digit = value.replace(/\D/g, '').slice(0, 1)
+    const next = [...totpDigits]
+    next[index] = digit
+    setTotpDigits(next)
 
-  const handleTotpKeyDown = (index, e) => {
-    if (e.key === 'Backspace' && !totpDigits[index] && index > 0) {
-      totpRefs[index - 1].current?.focus();
+    if (digit && index < 5) totpRefs[index + 1].current?.focus()
+    if (digit && index === 5) {
+      const code = [...next.slice(0, 5), digit].join('')
+      if (code.length === 6) handleTotpVerify(code)
     }
-    if (e.key === 'Enter') {
-      const code = totpDigits.join('');
-      if (code.length === 6) handleTotpVerify(code);
+  }
+
+  const handleTotpKeyDown = (index, event) => {
+    if (event.key === 'Backspace' && !totpDigits[index] && index > 0) {
+      totpRefs[index - 1].current?.focus()
     }
-  };
+    if (event.key === 'Enter') {
+      const code = totpDigits.join('')
+      if (code.length === 6) handleTotpVerify(code)
+    }
+  }
 
   return (
-    <div className="admin-layout" style={{ justifyContent: 'center', alignItems: 'center' }}>
-      <div className="admin-card" style={{ width: '400px', padding: '40px', position: 'relative', zIndex: 10 }}>
+    <div className="mode-operator admin-layout" style={{ justifyContent: 'center', alignItems: 'center' }}>
+      <div className="admin-card ui-surface ui-auth-card" style={{ position: 'relative', zIndex: 10 }}>
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--admin-accent-bg)', color: 'var(--admin-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: '24px' }}>
             {step === 'totp' ? '🔐' : '⚡'}
           </div>
           <h1 className="admin-h1">Admin Portal</h1>
           <p style={{ color: 'var(--admin-text-muted)' }}>
-            {step === 'totp' ? 'Enter your authenticator code' : 'Prop Firm Control Centre'}
+            {step === 'totp' ? 'Enter your authenticator code' : 'DB-backed platform and tenant admin access'}
           </p>
         </div>
 
@@ -107,12 +149,25 @@ function AdminLoginScreen({ onLoginSuccess }) {
         {step === 'password' && (
           <form onSubmit={handlePasswordSubmit}>
             <div className="admin-form-group">
+              <label className="admin-label">Admin Email</label>
+              <input
+                type="email"
+                className="admin-input"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="admin@yourfirm.com"
+              />
+              <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--admin-text-muted)' }}>
+                Required for DB-backed platform admins and tenant admins. Leave blank only for one-time legacy bootstrap access before the first platform admin exists.
+              </div>
+            </div>
+            <div className="admin-form-group">
               <label className="admin-label">Admin Password</label>
-              <input 
-                type="password" 
-                className="admin-input" 
+              <input
+                type="password"
+                className="admin-input"
                 value={password}
-                onChange={e => setPassword(e.target.value)}
+                onChange={(event) => setPassword(event.target.value)}
                 placeholder="••••••••"
                 required
               />
@@ -125,45 +180,53 @@ function AdminLoginScreen({ onLoginSuccess }) {
 
         {step === 'totp' && (
           <div>
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', margin: '24px 0' }}
-                 onPaste={e => {
-                   const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-                   if (pasted.length === 6) { 
-                     setTotpDigits(pasted.split('')); 
-                     handleTotpVerify(pasted);
-                   }
-                 }}>
-              {totpDigits.map((d, i) => (
+            <div
+              style={{ display: 'flex', gap: '8px', justifyContent: 'center', margin: '24px 0' }}
+              onPaste={(event) => {
+                const pasted = event.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+                if (pasted.length === 6) {
+                  setTotpDigits(pasted.split(''))
+                  handleTotpVerify(pasted)
+                }
+              }}
+            >
+              {totpDigits.map((digit, index) => (
                 <input
-                  key={i}
-                  ref={totpRefs[i]}
+                  key={index}
+                  ref={totpRefs[index]}
                   type="text"
                   inputMode="numeric"
                   maxLength={1}
-                  value={d}
-                  onChange={e => handleTotpInput(i, e.target.value)}
-                  onKeyDown={e => handleTotpKeyDown(i, e)}
+                  value={digit}
+                  onChange={(event) => handleTotpInput(index, event.target.value)}
+                  onKeyDown={(event) => handleTotpKeyDown(index, event)}
                   style={{
-                    width: '44px', height: '52px', textAlign: 'center',
-                    fontSize: '24px', fontFamily: 'var(--admin-font-mono)', fontWeight: 700,
+                    width: '44px',
+                    height: '52px',
+                    textAlign: 'center',
+                    fontSize: '24px',
+                    fontFamily: 'var(--admin-font-mono)',
+                    fontWeight: 700,
                     background: 'var(--admin-bg)',
-                    border: `1px solid ${d ? 'var(--admin-accent)' : 'var(--admin-border)'}`,
-                    borderRadius: '8px', color: 'var(--admin-text)', outline: 'none',
+                    border: `1px solid ${digit ? 'var(--admin-accent)' : 'var(--admin-border)'}`,
+                    borderRadius: '8px',
+                    color: 'var(--admin-text)',
+                    outline: 'none'
                   }}
                 />
               ))}
             </div>
-            <button 
-              className="admin-btn admin-btn-primary" 
+            <button
+              className="admin-btn admin-btn-primary"
               onClick={() => handleTotpVerify(totpDigits.join(''))}
               disabled={loading || totpDigits.join('').length < 6}
               style={{ width: '100%' }}
             >
               {loading ? 'Verifying...' : 'Verify Code'}
             </button>
-            <button 
+            <button
               onClick={() => setStep('password')}
-              className="admin-btn admin-btn-ghost" 
+              className="admin-btn admin-btn-ghost"
               style={{ width: '100%', marginTop: '12px' }}
             >
               ← Back to password
@@ -172,70 +235,47 @@ function AdminLoginScreen({ onLoginSuccess }) {
         )}
       </div>
     </div>
-  );
+  )
 }
 
-
 export default function AdminLayout() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [checking, setChecking] = useState(true);
-  const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  // Setup interceptors to catch 401s within the admin panel and logout
-  useEffect(() => {
-    const interceptor = adminAxios.interceptors.response.use(
-      res => res,
-      err => {
-        if (err.response?.status === 401 || err.response?.status === 403) {
-          setIsAuthenticated(false);
-        }
-        return Promise.reject(err);
-      }
-    );
-    return () => adminAxios.interceptors.response.eject(interceptor);
-  }, []);
-
-  useEffect(() => {
-    const verifySession = async () => {
-      try {
-        await adminAxios.get('/api/admin/overview');
-        setIsAuthenticated(true);
-      } catch (err) {
-        setIsAuthenticated(false);
-      } finally {
-        setChecking(false);
-      }
-    };
-    verifySession();
-  }, []);
+  const { adminAxios, checking, isAuthenticated, session, socket, refreshSession, logout } = useAdminSession()
+  const [isSidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [isMobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   if (checking) {
-    return <div className="admin-layout" style={{ justifyContent: 'center', alignItems: 'center' }}>Connecting secure tunnel...</div>;
+    return <div className="mode-operator admin-layout" style={{ justifyContent: 'center', alignItems: 'center' }}>Connecting secure tunnel...</div>
   }
 
   if (!isAuthenticated) {
-    return <AdminLoginScreen onLoginSuccess={() => setIsAuthenticated(true)} />;
+    return <AdminLoginScreen onLoginSuccess={refreshSession} />
   }
 
   return (
     <AdminToastProvider>
-      <div className="admin-layout">
-        <AdminSidebar 
-          isCollapsed={isSidebarCollapsed} 
+      <AdminRealtimeAlerts socket={socket} />
+      <div className="mode-operator admin-layout">
+        <AdminSidebar
+          adminAxios={adminAxios}
+          session={session}
+          isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!isSidebarCollapsed)}
           isMobileOpen={isMobileMenuOpen}
           onMobileClose={() => setMobileMenuOpen(false)}
+          socket={socket}
         />
-        
+
         <div className="admin-main-wrapper">
-          <AdminTopBar onMobileMenuClick={() => setMobileMenuOpen(true)} />
+          <AdminTopBar
+            session={session}
+            onLogout={logout}
+            onMobileMenuClick={() => setMobileMenuOpen(true)}
+          />
           <main className="admin-content" id="admin-scroll-container">
-            {/* The Outlet renders whatever child route is active */}
-            <Outlet context={{ adminAxios }} />
+            <Outlet context={{ adminAxios, socket, session }} />
           </main>
         </div>
       </div>
     </AdminToastProvider>
-  );
+  )
 }

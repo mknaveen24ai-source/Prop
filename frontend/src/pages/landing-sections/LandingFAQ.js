@@ -1,13 +1,19 @@
 import React, { useState } from 'react';
+import { TRADABLE_INSTRUMENTS_SUMMARY } from '../../utils/instruments';
+import { useBranding } from '../../BrandingContext';
+import { getTenantLandingCopy, isPaidTenant } from '../../utils/tenantMarketing';
 
 export default function LandingFAQ() {
+  const { tenant } = useBranding();
+  const landingCopy = getTenantLandingCopy(tenant);
+  const paidTenant = isPaidTenant(tenant);
   const [openIndex, setOpenIndex] = useState(null);
 
   const faqs = [
     {
       category: "General",
-      q: "Is this really 100% free?",
-      a: "Yes. There are absolutely no fees, no hidden charges, and no credit card required. You register, claim an account, and start trading. We fund accounts from our own capital based on available liquidity."
+      q: paidTenant ? "How do I start a challenge?" : "Is this really 100% free?",
+      a: landingCopy.faqItems[0]?.a || "Select an account size, start your challenge, and trade under the published rules."
     },
     {
       category: "General",
@@ -27,7 +33,7 @@ export default function LandingFAQ() {
     {
       category: "Rules",
       q: "What are the evaluation rules?",
-      a: "Both Phase 1 and Phase 2 have identical rules: hit the profit target within 30 calendar days without breaching the daily drawdown or maximum drawdown limits. The rules are exactly the same across both phases — no surprises."
+      a: "Both Phase 1 and Phase 2 have identical core rules: hit the profit target within 30 calendar days without breaching the maximum drawdown limit. The rules are exactly the same across both phases — no surprises."
     },
     {
       category: "Rules",
@@ -47,7 +53,7 @@ export default function LandingFAQ() {
     {
       category: "Rules",
       q: "What instruments can I trade?",
-      a: "You can trade Forex majors, minors, and exotics, as well as Gold (XAUUSD) and Silver (XAGUSD). Additional instruments may be added in the future."
+      a: `You can trade ${TRADABLE_INSTRUMENTS_SUMMARY}.`
     },
     {
       category: "Rules",
@@ -107,7 +113,7 @@ export default function LandingFAQ() {
           </div>
           <h2 className="mp-h2 mp-reveal mp-delay-100">Frequently Asked Questions</h2>
           <p className="mp-p-lead mp-reveal mp-delay-200" style={{ margin: '0 auto' }}>
-            Everything you need to know about our free funded accounts.
+            {landingCopy.faqLead}
           </p>
         </div>
 

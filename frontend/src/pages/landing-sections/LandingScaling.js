@@ -1,6 +1,11 @@
 import React from 'react';
+import { useBranding } from '../../BrandingContext';
+import { getChallengeFeeDisplay, isPaidTenant } from '../../utils/tenantMarketing';
 
 export default function LandingScaling() {
+  const { tenant } = useBranding();
+  const requiresPayment = isPaidTenant(tenant);
+  const challengeFeeDisplay = getChallengeFeeDisplay(tenant);
   const steps = [
     {
       num: "01", title: "Register & Claim Your Account", diff: "Sign Up",
@@ -38,7 +43,9 @@ export default function LandingScaling() {
             From Sign-Up to <span className="mp-glow-text">Funded</span>
           </h2>
           <p className="mp-p-lead mp-reveal mp-delay-200" style={{ margin: '0 auto' }}>
-            A transparent, straightforward path. Two phases, same rules, zero fees.
+            {requiresPayment
+              ? `A transparent, straightforward path. Two phases, same rules, and challenge access starting from ${challengeFeeDisplay}.`
+              : 'A transparent, straightforward path. Two phases, same rules, zero fees.'}
           </p>
         </div>
 

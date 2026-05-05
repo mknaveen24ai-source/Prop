@@ -216,14 +216,14 @@ function fixOpposingTradeDetection() {
 async function detectRapidOpposingTrades(userId, instrument, accountIds, io) {
   try {
     const recentTrades = await pool.query(\`
-      SELECT t.*, a.id as account_id
+      SELECT t.*, a.user_id, a.id as acc_id
       FROM trades t
       JOIN accounts a ON t.account_id = a.id
-      WHERE t.user_id = \$1
+      WHERE a.user_id = \$1
         AND t.instrument = \$2
         AND t.status = 'closed'
-        AND t.closed_at > NOW() - INTERVAL '24 hours'
-      ORDER BY t.closed_at DESC
+        AND t.close_time > NOW() - INTERVAL '24 hours'
+      ORDER BY t.close_time DESC
       LIMIT 50
     \`, [userId, instrument])
 
@@ -241,7 +241,7 @@ async function detectRapidOpposingTrades(userId, instrument, accountIds, io) {
       let rapidCount = 0
       for (const buy of buys) {
         for (const sell of sells) {
-          const timeDiff = Math.abs(new Date(buy.opened_at) - new Date(sell.opened_at))
+          const timeDiff = Math.abs(new Date(buy.open_time) - new Date(sell.open_time))
           if (timeDiff < 5 * 60 * 1000) { // Within 5 minutes
             rapidCount++
           }
@@ -255,7 +255,7 @@ async function detectRapidOpposingTrades(userId, instrument, accountIds, io) {
           UPDATE accounts
           SET review_flagged = true,
               review_flag_reason = COALESCE(review_flag_reason, '') || ' | Rapid opposing trades detected on ' || \$1
-          WHERE id = ANY(\$2::int[]) AND status = 'active'
+          WHERE id = ANY(\$2::uuid[]) AND status = 'active'
         \`, [instrument, accountIds])
       }
     }

@@ -65,9 +65,9 @@ describe('Backend Utilities - validation.js', () => {
 
     it('handles decimal validation', () => {
       assert.strictEqual(isValidNumber(50.5, 0, 100, true), true)
-      // parseInt(50.5) = 50, which is in range, so this passes
-      assert.strictEqual(isValidNumber(50.5, 0, 100, false), true)
-      // Use a value that clearly fails parseInt validation
+      // Integer-only validation should reject decimals outright.
+      assert.strictEqual(isValidNumber(50.5, 0, 100, false), false)
+      assert.strictEqual(isValidNumber('50', 0, 100, false), true)
       assert.strictEqual(isValidNumber('50.5abc', 0, 100, false), false)
     })
   })

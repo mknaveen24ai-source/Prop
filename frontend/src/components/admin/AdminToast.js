@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
+import { renderIcon } from '../../utils/iconMap';
 
 const ToastContext = createContext(null);
 
@@ -10,7 +11,6 @@ export function AdminToastProvider({ children }) {
     const id = ++idCounter.current;
     setToasts(prev => [...prev, { id, title, message, type }]);
 
-    // Auto dismiss after 4s
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 4000);
@@ -26,6 +26,12 @@ export function AdminToastProvider({ children }) {
     warning: (msg, title) => addToast(title || 'Warning', msg, 'warning'),
   };
 
+  const iconMap = {
+    success: renderIcon('approve', { size: 18, color: 'var(--accent-green)' }),
+    error: renderIcon('reject', { size: 18, color: 'var(--accent-red)' }),
+    warning: renderIcon('warning', { size: 18, color: 'var(--accent-gold)' }),
+  };
+
   return (
     <ToastContext.Provider value={value}>
       {children}
@@ -33,15 +39,15 @@ export function AdminToastProvider({ children }) {
         {toasts.map(toast => (
           <div key={toast.id} className={`admin-toast ${toast.type}`}>
             <div className="admin-toast-icon">
-              {toast.type === 'success' && '✓'}
-              {toast.type === 'error' && '✕'}
-              {toast.type === 'warning' && '⚠'}
+              {iconMap[toast.type]}
             </div>
             <div className="admin-toast-content">
               <div className="admin-toast-title">{toast.title}</div>
               {toast.message && <div className="admin-toast-message">{toast.message}</div>}
             </div>
-            <button className="admin-toast-close" onClick={() => removeToast(toast.id)}>✕</button>
+            <button className="admin-toast-close" onClick={() => removeToast(toast.id)}>
+              {renderIcon('close', { size: 14, color: 'var(--admin-text-faint)' })}
+            </button>
           </div>
         ))}
       </div>

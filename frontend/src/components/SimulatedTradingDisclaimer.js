@@ -1,10 +1,11 @@
 import React, { useState } from 'react'
+import { renderIcon } from '../utils/iconMap'
 
 export default function SimulatedTradingDisclaimer() {
   const [expanded, setExpanded] = useState(false)
 
   return (
-    <div style={{
+    <div className="simulated-disclaimer" style={{
       background: 'rgba(148, 148, 148, 0.04)',
       border: '1px solid rgba(148, 148, 148, 0.15)',
       borderRadius: '8px',
@@ -62,7 +63,7 @@ export default function SimulatedTradingDisclaimer() {
               flexShrink: 0
             }}
           >
-            ×
+            {renderIcon('close', { size: 18, color: 'var(--text-secondary)' })}
           </button>
         )}
       </div>

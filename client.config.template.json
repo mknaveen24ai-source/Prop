@@ -1,0 +1,19 @@
+{
+  "_comment": "Copy this file to client.config.json and fill in all values. This drives the build-time brand injection.",
+  "firm_name": "YourFirmName",
+  "firm_slug": "yourfirm",
+  "domain": "app.yourfirm.com",
+  "support_email": "support@yourfirm.com",
+  "primary_color": "#0066ff",
+  "secondary_color": "#001133",
+  "accent_color": "#ffd700",
+  "logo_filename": "logo.png",
+  "favicon_filename": "favicon.ico",
+  "currency": "USD",
+  "language": "en",
+  "timezone_display": "UTC",
+  "smtp_host": "",
+  "smtp_port": 587,
+  "smtp_user": "",
+  "smtp_from_name": "YourFirmName Support"
+}

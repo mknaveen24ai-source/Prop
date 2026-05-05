@@ -1,5 +1,5 @@
 import React from 'react';
-import { ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { ResponsiveContainer } from 'recharts';
 
 export default function AdminChart({ 
   children,

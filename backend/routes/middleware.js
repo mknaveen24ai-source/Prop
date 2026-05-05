@@ -1,6 +1,92 @@
 const jwt  = require('jsonwebtoken')
 const pool = require('../db')
 const logger = require('../utils/logger')
+const { getCachedTokenData, cacheTokenData } = require('../utils/tokenCache')
+const { ensureTenantSettingsInfrastructure } = require('../utils/tenantSettings')
+const { updateDbContext } = require('../utils/dbContext')
+
+const SUPER_ADMIN_PERMISSIONS = [
+  'platform:*',
+  'tenant:*',
+  'trader:*',
+  'account:*',
+  'payout:*',
+  'kyc:*',
+  'violation:*',
+  'copier:*',
+  'command_center:*',
+  'bulk:*'
+]
+
+const TENANT_ADMIN_PERMISSIONS = [
+  'tenant:read',
+  'tenant:write:scoped',
+  'trader:read',
+  'trader:write:scoped',
+  'trader:moderate:scoped',
+  'account:read:scoped',
+  'payout:read:scoped',
+  'payout:review:scoped',
+  'kyc:review:scoped',
+  'violation:read:scoped',
+  'violation:resolve:scoped',
+  'copier:read:scoped',
+  'copier:write:scoped',
+  'dispute:read:scoped',
+  'chat:read:scoped'
+]
+
+function normalizePermission(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function getAdminPermissionsForRole(role) {
+  const normalizedRole = normalizePermission(role)
+  if (normalizedRole === 'super_admin') return [...SUPER_ADMIN_PERMISSIONS]
+  if (normalizedRole === 'tenant_admin') return [...TENANT_ADMIN_PERMISSIONS]
+  return []
+}
+
+async function getPlatformAdminById(adminId) {
+  const result = await pool.query(
+    `SELECT id, email, full_name, role, status, token_version,
+            totp_enabled, last_login_at
+       FROM platform_admins
+      WHERE id = $1`,
+    [adminId]
+  )
+  return result.rows[0] || null
+}
+
+function hasAdminCapability(admin, capability) {
+  if (!admin) return false
+  const normalizedCapability = normalizePermission(capability)
+  if (!normalizedCapability) return false
+
+  const permissions = Array.isArray(admin.permissions)
+    ? admin.permissions.map(normalizePermission).filter(Boolean)
+    : getAdminPermissionsForRole(admin.role)
+
+  if (permissions.includes('platform:*') || permissions.includes(normalizedCapability)) {
+    return true
+  }
+
+  return permissions.some((permission) => {
+    if (!permission.endsWith('*')) return false
+    const prefix = permission.slice(0, -1)
+    return prefix && normalizedCapability.startsWith(prefix)
+  })
+}
+
+function requireAdminCapability(capability) {
+  const normalizedCapability = normalizePermission(capability)
+  return function enforceAdminCapability(req, res, next) {
+    if (!hasAdminCapability(req.admin, normalizedCapability)) {
+      return res.status(403).json({ error: 'You do not have permission to perform this action' })
+    }
+    next()
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // authenticateToken
@@ -34,30 +120,59 @@ async function authenticateToken(req, res, next) {
     return res.status(403).json({ error: 'Invalid or expired token' })
   }
 
-  // Token version + ban check — always hits DB to ensure instant invalidation
-  try {
-    const result = await pool.query(
-      'SELECT token_version, is_banned FROM users WHERE id = $1',
-      [decoded.userId]
-    )
-    if (result.rows.length === 0) {
-      return res.status(403).json({ error: 'User not found' })
+  // FIX (C2): Token version + ban check with Redis caching
+  // Try cache first (5-minute TTL) to avoid DB hit on every request
+  let tokenData = await getCachedTokenData(decoded.userId)
+  
+  if (!tokenData) {
+    // Cache miss or Redis unavailable - query database
+    try {
+      const result = await pool.query(
+        'SELECT token_version, is_banned, tenant_id FROM users WHERE id = $1',
+        [decoded.userId]
+      )
+      if (result.rows.length === 0) {
+        return res.status(403).json({ error: 'User not found' })
+      }
+      
+      tokenData = result.rows[0]
+      // Populate cache for next request
+      await cacheTokenData(decoded.userId, tokenData.token_version, tokenData.is_banned, tokenData.tenant_id)
+    } catch (dbErr) {
+      logger.error('[auth] Token version check failed:', { error: dbErr.message })
+      return res.status(503).json({ error: 'Authentication service unavailable' })
     }
-    const { token_version, is_banned } = result.rows[0]
-
-    if (is_banned) {
-      return res.status(403).json({ error: 'Account has been suspended' })
-    }
-
-    if (decoded.tv !== undefined && decoded.tv < token_version) {
-      return res.status(401).json({ error: 'Session expired - please log in again' })
-    }
-  } catch (dbErr) {
-    logger.error('[auth] Token version check failed:', { error: dbErr.message })
-    return res.status(503).json({ error: 'Authentication service unavailable' })
   }
 
-  req.user = decoded
+  const { token_version, is_banned, tenant_id } = tokenData
+
+  if (is_banned) {
+    return res.status(403).json({ error: 'Account has been suspended' })
+  }
+
+  if (req.tenant?.status && !['active', 'trialing', 'past_due', 'default'].includes(String(req.tenant.status).toLowerCase())) {
+    return res.status(403).json({ error: 'This tenant portal is currently unavailable' })
+  }
+
+  if (req.tenant?.id && tenant_id && String(req.tenant.id) !== String(tenant_id)) {
+    return res.status(403).json({ error: 'This account belongs to a different tenant portal' })
+  }
+
+  if (decoded.tv !== undefined && decoded.tv < token_version) {
+    return res.status(401).json({ error: 'Session expired - please log in again' })
+  }
+
+  req.user = {
+    ...decoded,
+    tenantId: tenant_id || decoded.tid || req.tenant?.id || null,
+    tenantSlug: req.tenant?.slug || decoded.ts || null
+  }
+  updateDbContext({
+    tenantId: req.user.tenantId,
+    adminRole: 'user',
+    actorType: 'user',
+    bypassRls: false
+  })
   next()
 }
 
@@ -96,15 +211,95 @@ async function authenticateAdmin(req, res, next) {
   let decoded
   try {
     decoded = jwt.verify(token, process.env.ADMIN_JWT_SECRET)
-    if (decoded.role !== 'admin') {
+    if (!['admin', 'super_admin', 'tenant_admin'].includes(decoded.role)) {
       return res.status(403).json({ error: 'Admin access required' })
     }
   } catch {
     return res.status(403).json({ error: 'Invalid or expired admin token' })
   }
 
-  // FIX: DB-backed admin token version check for instant session invalidation
   try {
+    if (decoded.role === 'tenant_admin') {
+      await ensureTenantSettingsInfrastructure()
+      const result = await pool.query(
+        `SELECT id, tenant_id, email, full_name, role, status, token_version
+           FROM tenant_admins
+          WHERE id = $1`,
+        [decoded.adminId]
+      )
+      if (result.rows.length === 0) {
+        return res.status(403).json({ error: 'Tenant admin not found' })
+      }
+
+      const admin = result.rows[0]
+      if (admin.status !== 'active') {
+        return res.status(403).json({ error: 'Tenant admin account is inactive' })
+      }
+      if (decoded.tid && String(decoded.tid) !== String(admin.tenant_id)) {
+        return res.status(403).json({ error: 'Tenant admin token is invalid' })
+      }
+      if (req.tenant?.id && String(req.tenant.id) !== String(admin.tenant_id)) {
+        return res.status(403).json({ error: 'This admin account belongs to a different tenant portal' })
+      }
+      if (req.tenant?.status && !['active', 'trialing', 'past_due', 'default'].includes(String(req.tenant.status).toLowerCase())) {
+        return res.status(403).json({ error: 'This tenant portal is currently unavailable' })
+      }
+      if ((decoded.atv || 0) < parseInt(admin.token_version || 1, 10)) {
+        return res.status(401).json({ error: 'Admin session expired - please log in again' })
+      }
+
+      req.admin = {
+        ...decoded,
+        adminId: admin.id,
+        tenantId: admin.tenant_id,
+        email: admin.email,
+        full_name: admin.full_name,
+        role: admin.role || 'tenant_admin',
+        permissions: getAdminPermissionsForRole(admin.role || 'tenant_admin')
+      }
+      updateDbContext({
+        tenantId: admin.tenant_id,
+        adminRole: admin.role || 'tenant_admin',
+        actorType: 'admin',
+        bypassRls: false
+      })
+      return next()
+    }
+
+    const normalizedRole = decoded.role === 'admin' ? 'super_admin' : decoded.role
+    if (decoded.adminId) {
+      const platformAdmin = await getPlatformAdminById(decoded.adminId)
+      if (!platformAdmin) {
+        return res.status(403).json({ error: 'Platform admin not found' })
+      }
+      if (platformAdmin.status !== 'active') {
+        return res.status(403).json({ error: 'Platform admin account is inactive' })
+      }
+      if ((decoded.atv || 0) < parseInt(platformAdmin.token_version || 1, 10)) {
+        return res.status(401).json({ error: 'Admin session expired - please log in again' })
+      }
+
+      req.admin = {
+        ...decoded,
+        adminId: platformAdmin.id,
+        tenantId: null,
+        email: platformAdmin.email,
+        full_name: platformAdmin.full_name,
+        role: platformAdmin.role || normalizedRole,
+        auth_source: decoded.src || 'platform_admin',
+        totp_enabled: !!platformAdmin.totp_enabled,
+        permissions: getAdminPermissionsForRole(platformAdmin.role || normalizedRole)
+      }
+      updateDbContext({
+        tenantId: null,
+        adminRole: req.admin.role,
+        actorType: 'admin',
+        bypassRls: req.admin.role === 'super_admin'
+      })
+      return next()
+    }
+
+    // Legacy env-backed super-admin fallback token version check
     const result = await pool.query(
       `SELECT value FROM platform_settings WHERE key = 'admin_token_version'`
     )
@@ -115,17 +310,63 @@ async function authenticateAdmin(req, res, next) {
         return res.status(401).json({ error: 'Admin session expired - please log in again' })
       }
     }
-    // If the row doesn't exist yet, we allow the request (backwards-compatible)
   } catch (dbErr) {
     logger.error('[admin-auth] Token version check failed:', { error: dbErr.message })
     return res.status(503).json({ error: 'Authentication service unavailable' })
   }
 
-  req.admin = decoded
+  req.admin = {
+    ...decoded,
+    role: decoded.role === 'admin' ? 'super_admin' : decoded.role,
+    tenantId: decoded.tid || null,
+    email: decoded.email || process.env.ADMIN_EMAIL || null,
+    full_name: decoded.full_name || 'Platform Owner',
+    auth_source: decoded.src || 'env_fallback',
+    totp_enabled: false,
+    permissions: getAdminPermissionsForRole(decoded.role === 'admin' ? 'super_admin' : decoded.role)
+  }
+  updateDbContext({
+    tenantId: req.admin.tenantId,
+    adminRole: req.admin.role,
+    actorType: 'admin',
+    bypassRls: req.admin.role === 'super_admin'
+  })
   next()
 }
 
-module.exports = { authenticateToken, authenticateAdmin, authenticatePre2FA, authenticateAdminPre2FA }
+function requireTenantAdminOrSuperAdmin(req, res, next) {
+  if (!req.admin || !['tenant_admin', 'super_admin'].includes(String(req.admin.role || ''))) {
+    return res.status(403).json({ error: 'Admin access required' })
+  }
+  next()
+}
+
+function requireSuperAdmin(req, res, next) {
+  if (!req.admin || String(req.admin.role || '') !== 'super_admin') {
+    return res.status(403).json({ error: 'Super-admin access required' })
+  }
+  next()
+}
+
+function buildAdminSessionPayload(admin) {
+  const role = String(admin?.role || '')
+  return {
+    authenticated: !!admin,
+    adminId: admin?.adminId || null,
+    role: role || null,
+    tenantId: admin?.tenantId || null,
+    permissions: Array.isArray(admin?.permissions)
+      ? admin.permissions
+      : getAdminPermissionsForRole(role),
+    email: admin?.email || null,
+    full_name: admin?.full_name || null,
+    auth_source: admin?.auth_source || null,
+    totp_enabled: admin?.totp_enabled === true
+  }
+}
+
+// (Functions authenticatePre2FA and authenticateAdminPre2FA are defined below)
+// module.exports is at the bottom of this file after all definitions.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // authenticatePre2FA
@@ -152,6 +393,10 @@ async function authenticatePre2FA(req, res, next) {
 
   if (decoded.type !== 'pre_2fa') {
     return res.status(403).json({ error: 'Invalid token type' })
+  }
+
+  if (req.tenant?.id && decoded.tid && String(req.tenant.id) !== String(decoded.tid)) {
+    return res.status(403).json({ error: '2FA session belongs to a different tenant portal' })
   }
 
   req.pre2fa = decoded
@@ -188,4 +433,15 @@ async function authenticateAdminPre2FA(req, res, next) {
   next()
 }
 
-
+module.exports = {
+  authenticateToken,
+  authenticateAdmin,
+  authenticatePre2FA,
+  authenticateAdminPre2FA,
+  buildAdminSessionPayload,
+  getAdminPermissionsForRole,
+  hasAdminCapability,
+  requireAdminCapability,
+  requireSuperAdmin,
+  requireTenantAdminOrSuperAdmin
+}

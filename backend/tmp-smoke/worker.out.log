@@ -1,0 +1,5 @@
+2026-05-01 19:20:44 [[32minfo[39m]: NewsService started — 30-min refresh cycle, 15-min pre-event protection window
+2026-05-01 19:20:44 [[32minfo[39m]: [copier-worker] Connected to MT5 bridge 127.0.0.1:9999
+2026-05-01 19:20:44 [[32minfo[39m]: [copier-worker] Copier v2 worker started
+2026-05-01 19:20:44 [[32minfo[39m]: [copier-worker] Bridge compatibility mode: strict_ack
+2026-05-01 19:20:44 [[32minfo[39m]: NewsService: news_cache table ready

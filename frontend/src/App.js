@@ -1,140 +1,119 @@
-import React, { useState, useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import axios from 'axios'
-import Landing from './pages/Landing'
+import React, { Suspense, lazy } from 'react'
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Toaster } from 'react-hot-toast'
+import { ThemeProvider } from './ThemeContext'
 import Login from './pages/Login'
 import Register from './pages/Register'
-import Dashboard from './pages/Dashboard'
 import TermsOfService from './pages/TermsOfService'
 import PrivacyPolicy from './pages/PrivacyPolicy'
-import Leaderboard from './pages/Leaderboard'
-import TraderProfile from './pages/TraderProfile'
-import Chat from './pages/Chat'
-import { ThemeProvider } from './ThemeContext'
-import ErrorBoundary from './ErrorBoundary'
-// ── New Modular Admin Portal ──
-import AdminLayout from './pages/admin/AdminLayout'
-import AdminDashboard from './pages/admin/AdminDashboard'
-import AdminUsers from './pages/admin/AdminUsers'
-import AdminKYC from './pages/admin/AdminKYC'
-import AdminChallenges from './pages/admin/AdminChallenges'
-import AdminFunded from './pages/admin/AdminFunded'
-import AdminTrades from './pages/admin/AdminTrades'
-import AdminPayouts from './pages/admin/AdminPayouts'
-import AdminPlatformPnL from './pages/admin/AdminPlatformPnL'
-import AdminSettings from './pages/admin/AdminSettings'
-import AdminDisputes from './pages/admin/AdminDisputes'
-import AdminChat from './pages/admin/AdminChat'
-import AdminLeaderboard from './pages/admin/AdminLeaderboard'
-import AdminTradeCopier from './pages/admin/AdminTradeCopier'
+import ResetPasswordPage from './pages/ResetPasswordPage'
+import { useAuth } from './providers/AuthProvider'
 import './App.css'
 
-axios.defaults.withCredentials = true
+const Landing = lazy(() => import('./pages/Landing'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Leaderboard = lazy(() => import('./pages/Leaderboard'))
+const TraderProfile = lazy(() => import('./pages/TraderProfile'))
+const Chat = lazy(() => import('./pages/Chat'))
+const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'))
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
+const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'))
+const AdminKYC = lazy(() => import('./pages/admin/AdminKYC'))
+const AdminChallenges = lazy(() => import('./pages/admin/AdminChallenges'))
+const AdminFunded = lazy(() => import('./pages/admin/AdminFunded'))
+const AdminTrades = lazy(() => import('./pages/admin/AdminTrades'))
+const AdminPayouts = lazy(() => import('./pages/admin/AdminPayouts'))
+const AdminPlatformPnL = lazy(() => import('./pages/admin/AdminPlatformPnL'))
+const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'))
+const AdminAccess = lazy(() => import('./pages/admin/AdminAccess'))
+const AdminDisputes = lazy(() => import('./pages/admin/AdminDisputes'))
+const AdminChat = lazy(() => import('./pages/admin/AdminChat'))
+const AdminLeaderboard = lazy(() => import('./pages/admin/AdminLeaderboard'))
+const AdminTradeCopier = lazy(() => import('./pages/admin/AdminTradeCopier'))
+const AdminAccountDetail = lazy(() => import('./pages/admin/AdminAccountDetail'))
+const AdminViolations = lazy(() => import('./pages/admin/AdminViolations'))
+const AdminTenants = lazy(() => import('./pages/admin/AdminTenants'))
+const AdminCommandCenter = lazy(() => import('./pages/admin/AdminCommandCenter'))
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000'
-
-function App() {
-  const [user, setUser] = useState(null)
-  const [authChecked, setAuthChecked] = useState(false)
-
-  function handleLogin(newUser) {
-    setUser(newUser)
+const pageVariants = {
+  initial: { opacity: 0, y: 16 },
+  animate: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] }
+  },
+  exit: {
+    opacity: 0,
+    y: -8,
+    transition: { duration: 0.15 }
   }
+}
 
-  async function handleLogout() {
-    try { await axios.post(`${API_URL}/api/auth/logout`) } catch {}
-    setUser(null)
-  }
+export const PageWrapper = ({ children }) => (
+  <motion.div
+    variants={pageVariants}
+    initial="initial"
+    animate="animate"
+    exit="exit"
+    style={{ width: '100%', height: '100%' }}
+  >
+    {children}
+  </motion.div>
+)
 
-  // Global axios interceptor — automatically logs out on 401/403.
-  // Skips /api/admin routes because the Admin page manages its own auth state.
-  useEffect(() => {
-    const interceptor = axios.interceptors.response.use(
-      response => response,
-      error => {
-        const status = error.response?.status
-        const url    = error.config?.url || ''
+function RouteFallback() {
+  return (
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      color: 'var(--text-secondary)',
+      background: 'var(--bg-base)'
+    }}>
+      Loading...
+    </div>
+  )
+}
 
-        if ((status === 401 || status === 403) && !url.includes('/api/admin')) {
-          setUser(null)
-        }
-
-        return Promise.reject(error)
-      }
-    )
-
-    return () => axios.interceptors.response.eject(interceptor)
-  }, [])
-
-  useEffect(() => {
-    async function checkAuth() {
-      try {
-        const res = await axios.get(`${API_URL}/api/auth/me`)
-        setUser(res.data)
-      } catch {
-        setUser(null)
-      } finally {
-        setAuthChecked(true)
-      }
-    }
-    checkAuth()
-  }, [])
-
-  if (!authChecked) {
-    return null
-  }
+function AnimatedRoutes({ user, login, logout }) {
+  const location = useLocation()
 
   return (
-    // Pass user's DB theme preference so ThemeProvider syncs across devices
-    <ThemeProvider initialTheme={user?.theme_preference}>
-      <ErrorBoundary>
-        <Router>
-          <Routes>
-
-          {/* -- Public routes — logged-in users go straight to dashboard -- */}
-          <Route path="/"        element={user ? <Navigate to="/dashboard" replace /> : <Landing />} />
-          <Route path="/terms"   element={<TermsOfService />} />
+    <Suspense fallback={<RouteFallback />}>
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
+          <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Landing />} />
+          <Route path="/terms" element={<TermsOfService />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
 
-          {/* -- Auth routes — redirect to dashboard if already logged in -- */}
           <Route
             path="/login"
-            element={!user ? <Login onLogin={handleLogin} /> : <Navigate to="/dashboard" replace />}
+            element={!user ? <Login onLogin={login} /> : <Navigate to="/dashboard" replace />}
           />
           <Route
             path="/register"
-            element={!user ? <Register onLogin={handleLogin} /> : <Navigate to="/dashboard" replace />}
+            element={!user ? <Register onLogin={login} /> : <Navigate to="/dashboard" replace />}
           />
-
-          {/*
-            /reset-password route — Login.js detects ?token=&email= params
-            on mount and switches itself into "reset password" mode automatically.
-            Redirects to /dashboard if already logged in (no need to reset if authed).
-          */}
           <Route
             path="/reset-password"
-            element={!user ? <Login onLogin={handleLogin} /> : <Navigate to="/dashboard" replace />}
+            element={!user ? <ResetPasswordPage onLogin={login} /> : <Navigate to="/dashboard" replace />}
           />
 
-          {/* -- Protected routes — redirect to /login if not authenticated -- */}
           <Route
             path="/dashboard"
-            element={user ? <Dashboard user={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />}
+            element={user ? <Dashboard user={user} onLogout={logout} /> : <Navigate to="/login" replace />}
           />
           <Route
             path="/dashboard/*"
-            element={user ? <Dashboard user={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />}
+            element={user ? <Dashboard user={user} onLogout={logout} /> : <Navigate to="/login" replace />}
           />
           <Route
             path="/chat"
             element={user ? <Chat /> : <Navigate to="/login" replace />}
           />
 
-          {/*
-            Admin Portal — New modular architecture.
-            AdminLayout handles its own JWT session + login screen.
-            Each child route renders through the Outlet in AdminLayout.
-          */}
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
             <Route path="users" element={<AdminUsers />} />
@@ -145,33 +124,71 @@ function App() {
             <Route path="payouts" element={<AdminPayouts />} />
             <Route path="pnl" element={<AdminPlatformPnL />} />
             <Route path="settings" element={<AdminSettings />} />
+            <Route path="access" element={<AdminAccess />} />
+            <Route path="tenants" element={<AdminTenants />} />
+            <Route path="command-center" element={<AdminCommandCenter />} />
             <Route path="disputes" element={<AdminDisputes />} />
             <Route path="chat" element={<AdminChat />} />
             <Route path="leaderboard" element={<AdminLeaderboard />} />
             <Route path="copier" element={<AdminTradeCopier />} />
-            {/* Catch-all inside admin redirects to dashboard */}
+            <Route path="violations" element={<AdminViolations />} />
+            <Route path="accounts/:accountId" element={<AdminAccountDetail />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Route>
 
-          {/* -- Public pages -- */}
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/trader/:userId" element={<TraderProfile />} />
 
-          {/*
-            Catch-all 404 — redirect to a safe landing
-            Logged-in users -> /dashboard
-            Logged-out users -> /
-          */}
           <Route
             path="*"
             element={<Navigate to={user ? '/dashboard' : '/'} replace />}
           />
-
         </Routes>
-        </Router>
-      </ErrorBoundary>
+      </AnimatePresence>
+    </Suspense>
+  )
+}
+
+function AppRoutes() {
+  const { user, authChecked, login, logout } = useAuth()
+
+  if (!authChecked) {
+    return null
+  }
+
+  return (
+    <ThemeProvider initialTheme={user?.theme_preference}>
+      <Toaster
+        position="top-right"
+        gutter={8}
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#111E35',
+            color: '#F0F4FF',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '10px',
+            fontSize: '13px',
+            fontFamily: 'system-ui, sans-serif',
+            padding: '12px 16px',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
+            maxWidth: '360px',
+          },
+          success: {
+            iconTheme: { primary: '#00FF88', secondary: '#111E35' },
+          },
+          error: {
+            iconTheme: { primary: '#FF3B5C', secondary: '#111E35' },
+          },
+        }}
+      />
+      <Router>
+        <AnimatedRoutes user={user} login={login} logout={logout} />
+      </Router>
     </ThemeProvider>
   )
 }
 
-export default App
+export default function App() {
+  return <AppRoutes />
+}

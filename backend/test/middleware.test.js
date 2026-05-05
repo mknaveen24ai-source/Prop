@@ -37,7 +37,7 @@ test('authenticateAdmin accepts admin_token cookie', async () => {
 
   await authenticateAdmin(req, res, () => { called = true })
   assert.equal(called, true)
-  assert.equal(req.admin.role, 'admin')
+  assert.equal(req.admin.role, 'super_admin')
 })
 
 test('authenticateAdmin rejects non-admin role', async () => {

@@ -1,17 +1,14 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { createChart, CandlestickSeries } from 'lightweight-charts'
 import axios from 'axios'
+import { renderIcon } from '../utils/iconMap'
+import {
+  CHART_TIMEFRAMES,
+  DEFAULT_CHART_TIMEFRAME,
+  getChartTimeframeMinutes
+} from '../utils/chartTimeframes'
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000'
-
-const TIMEFRAMES = [
-  { label: '1M',  minutes: 1 },
-  { label: '5M',  minutes: 5 },
-  { label: '15M', minutes: 15 },
-  { label: '1H',  minutes: 60 },
-  { label: '4H',  minutes: 240 },
-  { label: '1D',  minutes: 1440 }
-]
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 function PriceChart({ instrument, prices }) {
   const chartContainerRef = useRef(null)
@@ -19,8 +16,8 @@ function PriceChart({ instrument, prices }) {
   const candleSeriesRef   = useRef(null)
   const currentCandleRef  = useRef(null)
   const candlesLoadedRef  = useRef(false)
-  const [selectedTF, setSelectedTF] = useState('5M')
-  const selectedTFRef               = useRef('5M')
+  const [selectedTF, setSelectedTF] = useState(DEFAULT_CHART_TIMEFRAME)
+  const selectedTFRef               = useRef(DEFAULT_CHART_TIMEFRAME)
   const [loading, setLoading]       = useState(false)
   const [error, setError]           = useState('')
   const [theme, setTheme]           = useState(
@@ -178,14 +175,12 @@ function PriceChart({ instrument, prices }) {
     const bid = parseFloat(prices[instrument].bid)
     if (isNaN(bid)) return
 
-    // FIX: guard against undefined timeframe — TIMEFRAMES.find can return
-    // undefined if selectedTFRef.current somehow contains an unrecognised value
-    // (e.g. after a hot-reload in dev). Without the guard, .minutes throws a
-    // TypeError that silently kills the price update effect for the session.
-    const tf = TIMEFRAMES.find(t => t.label === selectedTFRef.current)
-    if (!tf) return
+    // FIX: guard against an undefined timeframe mapping (for example after a
+    // hot-reload in development) so live candle updates do not crash.
+    const intervalMinutes = getChartTimeframeMinutes(selectedTFRef.current)
+    if (!intervalMinutes) return
 
-    const intervalSeconds = tf.minutes * 60
+    const intervalSeconds = intervalMinutes * 60
     const now             = Math.floor(Date.now() / 1000)
     const candleTime      = Math.floor(now / intervalSeconds) * intervalSeconds
 
@@ -207,7 +202,7 @@ function PriceChart({ instrument, prices }) {
     <div style={{ marginBottom: '20px' }}>
       {/* Timeframe selector */}
       <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', alignItems: 'center' }}>
-        {TIMEFRAMES.map(tf => (
+        {CHART_TIMEFRAMES.map(tf => (
           <button
             key={tf.label}
             onClick={() => setSelectedTF(tf.label)}
@@ -232,8 +227,9 @@ function PriceChart({ instrument, prices }) {
           </span>
         )}
         {error && (
-          <span style={{ fontSize: '11px', color: 'var(--red)', marginLeft: '8px' }}>
-            ⚠ {error}
+          <span style={{ fontSize: '11px', color: 'var(--red)', marginLeft: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            {renderIcon('warning', { size: 12, color: 'var(--accent-red)' })}
+            <span>{error}</span>
           </span>
         )}
       </div>

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import io from 'socket.io-client'
+import { renderIcon } from '../utils/iconMap'
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 // FIX (HIGH #8): Use module-level ref tracking to prevent socket connection leaks
 // when component mounts/unmounts rapidly during navigation.
@@ -288,7 +289,10 @@ function Chat() {
   return (
     <div className="chat-container">
       <div className="chat-header">
-        <h2>💬 Live Chat Support</h2>
+        <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {renderIcon('message', { size: 20, color: 'var(--accent)' })}
+          <span>Live Chat Support</span>
+        </h2>
         {chatStats && (
           <div className="chat-stats-badge">
             {chatStats.open_count} active
@@ -401,7 +405,13 @@ function Chat() {
                       <div className={`message ${msg.is_admin ? 'admin' : 'user'}`}>
                         <div className="message-header">
                           <span className="sender-name">
-                            {msg.is_admin ? '🎧 Support' : '👤 You'}
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                              {renderIcon(msg.is_admin ? 'support' : 'profile', {
+                                size: 12,
+                                color: msg.is_admin ? 'var(--accent)' : 'var(--text-secondary)'
+                              })}
+                              <span>{msg.is_admin ? 'Support' : 'You'}</span>
+                            </span>
                           </span>
                           <span className="message-time">{formatTime(msg.created_at)}</span>
                         </div>
@@ -442,9 +452,18 @@ function Chat() {
             <div className="no-chat-selected">
               <div className="welcome-chat">
                 <h3>Welcome to Live Chat Support</h3>
-                <p>💬 Real-time support from our team</p>
-                <p>⚡ Average response time: &lt; 5 minutes</p>
-                <p>🕒 Available 24/7</p>
+                <p style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  {renderIcon('message', { size: 14, color: 'var(--accent)' })}
+                  <span>Real-time support from our team</span>
+                </p>
+                <p style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  {renderIcon('activity', { size: 14, color: 'var(--accent-green)' })}
+                  <span>Average response time: &lt; 5 minutes</span>
+                </p>
+                <p style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  {renderIcon('timer', { size: 14, color: 'var(--text-secondary)' })}
+                  <span>Available 24/7</span>
+                </p>
                 <button onClick={() => setShowNewChat(true)}>
                   Start a New Conversation
                 </button>
@@ -470,27 +489,29 @@ function Chat() {
           align-items: center;
           margin-bottom: 20px;
           padding-bottom: 15px;
-          border-bottom: 1px solid #e0e0e0;
+          border-bottom: 1px solid var(--border);
         }
 
         .chat-header h2 {
           margin: 0;
           font-size: 24px;
-          color: #1a1a1a;
+          color: var(--text-primary);
         }
 
         .chat-stats-badge {
-          background: #4CAF50;
-          color: white;
+          background: var(--success-bg);
+          color: var(--success);
+          border: 1px solid rgba(16, 185, 129, 0.22);
           padding: 6px 12px;
           border-radius: 20px;
           font-size: 14px;
           position: relative;
+          font-weight: 600;
         }
 
         .unread-badge {
-          background: #ff4444;
-          color: white;
+          background: var(--danger);
+          color: #fff;
           border-radius: 50%;
           padding: 2px 6px;
           font-size: 11px;
@@ -502,14 +523,15 @@ function Chat() {
           flex: 1;
           gap: 20px;
           overflow: hidden;
-          background: white;
+          background: var(--bg-surface);
           border-radius: 12px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+          border: 1px solid var(--border);
+          box-shadow: var(--shadow-md);
         }
 
         .chat-sidebar {
           width: 320px;
-          border-right: 1px solid #e0e0e0;
+          border-right: 1px solid var(--border);
           display: flex;
           flex-direction: column;
           overflow: hidden;
@@ -517,7 +539,7 @@ function Chat() {
 
         .chat-sidebar-header {
           padding: 15px;
-          border-bottom: 1px solid #e0e0e0;
+          border-bottom: 1px solid var(--border);
           display: flex;
           justify-content: space-between;
           align-items: center;
@@ -526,11 +548,12 @@ function Chat() {
         .chat-sidebar-header h3 {
           margin: 0;
           font-size: 16px;
+          color: var(--text-primary);
         }
 
         .btn-new-chat {
-          background: #4CAF50;
-          color: white;
+          background: var(--accent);
+          color: #fff;
           border: none;
           padding: 8px 16px;
           border-radius: 6px;
@@ -540,12 +563,12 @@ function Chat() {
         }
 
         .btn-new-chat:hover {
-          background: #45a049;
+          background: var(--accent-hover);
         }
 
         .new-chat-form {
           padding: 15px;
-          border-bottom: 1px solid #e0e0e0;
+          border-bottom: 1px solid var(--border);
           display: flex;
           flex-direction: column;
           gap: 10px;
@@ -553,14 +576,16 @@ function Chat() {
 
         .new-chat-form input {
           padding: 10px;
-          border: 1px solid #ddd;
+          border: 1px solid var(--border);
           border-radius: 6px;
           font-size: 14px;
+          background: var(--input-bg);
+          color: var(--text-primary);
         }
 
         .new-chat-form button {
-          background: #4CAF50;
-          color: white;
+          background: var(--accent);
+          color: #fff;
           border: none;
           padding: 10px;
           border-radius: 6px;
@@ -569,19 +594,19 @@ function Chat() {
         }
 
         .new-chat-form button:disabled {
-          background: #ccc;
+          background: var(--text-disabled);
           cursor: not-allowed;
         }
 
         .loading, .no-conversations {
           padding: 30px;
           text-align: center;
-          color: #666;
+          color: var(--text-secondary);
         }
 
         .no-conversations .hint {
           font-size: 13px;
-          color: #999;
+          color: var(--text-muted);
           margin-top: 10px;
         }
 
@@ -592,18 +617,18 @@ function Chat() {
 
         .conversation-item {
           padding: 12px 15px;
-          border-bottom: 1px solid #f0f0f0;
+          border-bottom: 1px solid var(--border);
           cursor: pointer;
           transition: background 0.2s;
         }
 
         .conversation-item:hover {
-          background: #f5f5f5;
+          background: var(--bg-hover);
         }
 
         .conversation-item.active {
-          background: #e3f2fd;
-          border-left: 3px solid #2196F3;
+          background: rgba(37, 99, 235, 0.14);
+          border-left: 3px solid var(--accent);
         }
 
         .conversation-item.closed {
@@ -620,7 +645,7 @@ function Chat() {
         .conv-subject {
           font-weight: 500;
           font-size: 14px;
-          color: #333;
+          color: var(--text-primary);
         }
 
         .conv-status {
@@ -630,16 +655,16 @@ function Chat() {
           text-transform: uppercase;
         }
 
-        .status-open { background: #e3f2fd; color: #1976D2; }
-        .status-pending { background: #fff3e0; color: #F57C00; }
-        .status-resolved { background: #e8f5e9; color: #388E3C; }
-        .status-closed { background: #f5f5f5; color: #999; }
+        .status-open { background: rgba(37, 99, 235, 0.14); color: var(--accent-hover); }
+        .status-pending { background: var(--warning-bg); color: var(--warning); }
+        .status-resolved { background: var(--success-bg); color: var(--success); }
+        .status-closed { background: rgba(148, 163, 184, 0.14); color: var(--text-secondary); }
 
         .conv-preview {
           display: flex;
           justify-content: space-between;
           font-size: 12px;
-          color: #666;
+          color: var(--text-secondary);
         }
 
         .last-message {
@@ -655,8 +680,8 @@ function Chat() {
         }
 
         .unread-count {
-          background: #ff4444;
-          color: white;
+          background: var(--danger);
+          color: #fff;
           border-radius: 50%;
           padding: 2px 8px;
           font-size: 11px;
@@ -673,7 +698,7 @@ function Chat() {
 
         .chat-area-header {
           padding: 15px 20px;
-          border-bottom: 1px solid #e0e0e0;
+          border-bottom: 1px solid var(--border);
           display: flex;
           justify-content: space-between;
           align-items: center;
@@ -682,6 +707,7 @@ function Chat() {
         .chat-area-header h3 {
           margin: 0;
           font-size: 18px;
+          color: var(--text-primary);
         }
 
         .status-indicator {
@@ -692,9 +718,9 @@ function Chat() {
         }
 
         .btn-close-chat {
-          background: #ff4444;
-          color: white;
-          border: none;
+          background: var(--danger-bg);
+          color: var(--danger);
+          border: 1px solid rgba(239, 68, 68, 0.22);
           padding: 8px 16px;
           border-radius: 6px;
           cursor: pointer;
@@ -705,12 +731,12 @@ function Chat() {
           flex: 1;
           overflow-y: auto;
           padding: 20px;
-          background: #fafafa;
+          background: rgba(8, 12, 24, 0.26);
         }
 
         .message-date-separator {
           text-align: center;
-          color: #999;
+          color: var(--text-muted);
           font-size: 12px;
           margin: 15px 0;
           position: relative;
@@ -723,7 +749,7 @@ function Chat() {
           top: 50%;
           width: 30%;
           height: 1px;
-          background: #e0e0e0;
+          background: var(--border);
         }
 
         .message-date-separator::before { left: 0; }
@@ -755,32 +781,33 @@ function Chat() {
         }
 
         .message-time {
-          color: #999;
+          color: var(--text-muted);
           margin-left: 10px;
         }
 
         .message-body {
-          background: white;
+          background: var(--bg-elevated);
           padding: 12px;
           border-radius: 8px;
-          border: 1px solid #e0e0e0;
+          border: 1px solid var(--border);
+          color: var(--text-primary);
           word-wrap: break-word;
         }
 
         .message.admin .message-body {
-          background: #e3f2fd;
-          border-color: #bbdefb;
+          background: rgba(14, 165, 233, 0.12);
+          border-color: rgba(14, 165, 233, 0.22);
         }
 
         .message.user .message-body {
-          background: #4CAF50;
-          color: white;
-          border-color: #4CAF50;
+          background: var(--accent);
+          color: #fff;
+          border-color: var(--accent);
         }
 
         .message-input-form {
           padding: 15px 20px;
-          border-top: 1px solid #e0e0e0;
+          border-top: 1px solid var(--border);
           display: flex;
           gap: 10px;
         }
@@ -788,14 +815,16 @@ function Chat() {
         .message-input-form input {
           flex: 1;
           padding: 12px;
-          border: 1px solid #ddd;
+          border: 1px solid var(--border);
           border-radius: 8px;
           font-size: 14px;
+          background: var(--input-bg);
+          color: var(--text-primary);
         }
 
         .message-input-form button {
-          background: #4CAF50;
-          color: white;
+          background: var(--accent);
+          color: #fff;
           border: none;
           padding: 12px 24px;
           border-radius: 8px;
@@ -805,17 +834,17 @@ function Chat() {
         }
 
         .message-input-form button:disabled {
-          background: #ccc;
+          background: var(--text-disabled);
           cursor: not-allowed;
         }
 
         .closed-notice {
-          background: #fff3e0;
-          color: #F57C00;
+          background: var(--warning-bg);
+          color: var(--warning);
           padding: 10px 20px;
           text-align: center;
           font-size: 13px;
-          border-top: 1px solid #ffe0b2;
+          border-top: 1px solid rgba(245, 158, 11, 0.2);
         }
 
         .no-chat-selected {
@@ -823,7 +852,7 @@ function Chat() {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: #fafafa;
+          background: rgba(8, 12, 24, 0.26);
         }
 
         .welcome-chat {
@@ -834,18 +863,18 @@ function Chat() {
         .welcome-chat h3 {
           font-size: 22px;
           margin-bottom: 20px;
-          color: #333;
+          color: var(--text-primary);
         }
 
         .welcome-chat p {
-          color: #666;
+          color: var(--text-secondary);
           margin: 10px 0;
         }
 
         .welcome-chat button {
           margin-top: 20px;
-          background: #4CAF50;
-          color: white;
+          background: var(--accent);
+          color: #fff;
           border: none;
           padding: 12px 30px;
           border-radius: 8px;

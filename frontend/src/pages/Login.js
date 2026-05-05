@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
-import axios from 'axios'
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000'
+import { useBranding } from '../BrandingContext'
+import { buildTenantPath } from '../utils/tenant'
+import { authAPI } from '../services/api'
 
 // ── Same password strength checker as Register.js ─────────────────────────────
 function getPasswordStrength(password) {
@@ -140,8 +140,9 @@ function TotpInput({ onSubmit, onBack, loading, error }) {
   )
 }
 
-function Login({ onLogin }) {
-  const [mode, setMode]         = useState('login')  // 'login' | 'totp' | 'forgot' | 'reset'
+function Login({ onLogin, initialMode = 'login' }) {
+  const { tenant } = useBranding()
+  const [mode, setMode]         = useState(initialMode === 'reset' ? 'reset' : 'login')  // 'login' | 'totp' | 'forgot' | 'reset'
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [resetToken, setResetToken]   = useState('')
@@ -167,15 +168,17 @@ function Login({ onLogin }) {
       setResetToken(token)
       setManualToken(token) // Pre-fill if token is in URL (legacy support)
       setEmail(em)
+    } else if (initialMode === 'reset') {
+      setMode('reset')
     }
-  }, [])
+  }, [initialMode])
 
   async function handleLogin(e) {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
-      const response = await axios.post(`${API_URL}/api/auth/login`, { email, password }, { withCredentials: true })
+      const response = await authAPI.login(email, password)
 
       if (response.data.requires2FA) {
         // Password accepted — go to 2FA step
@@ -194,14 +197,7 @@ function Login({ onLogin }) {
     setError('')
     setLoading(true)
     try {
-      const response = await axios.post(
-        `${API_URL}/api/auth/2fa/validate`,
-        { token: code },
-        {
-          withCredentials: true,
-          headers: { Authorization: `Bearer ${pre2faToken}` }
-        }
-      )
+      const response = await authAPI.validateTwoFactor(pre2faToken, code)
       onLogin(response.data.user)
     } catch (err) {
       setError(err.response?.data?.error || 'Invalid code. Please try again.')
@@ -215,7 +211,7 @@ function Login({ onLogin }) {
     setSuccess('')
     setLoading(true)
     try {
-      const res = await axios.post(`${API_URL}/api/auth/forgot-password`, { email })
+      const res = await authAPI.forgotPassword(email)
       setSuccess(res.data.message)
       if (res.data.dev_reset_link) {
         setSuccess(`${res.data.message}\n\n[DEV] Reset link: ${res.data.dev_reset_link}`)
@@ -240,11 +236,7 @@ function Login({ onLogin }) {
     }
     setLoading(true)
     try {
-      const res = await axios.post(`${API_URL}/api/auth/reset-password`, {
-        email,
-        token: tokenToUse,
-        new_password: newPassword
-      })
+      const res = await authAPI.resetPassword(email, tokenToUse, newPassword)
       setSuccess(res.data.message)
       setTimeout(() => {
         window.history.replaceState({}, '', '/login')
@@ -284,9 +276,11 @@ function Login({ onLogin }) {
                 ⚡
               </div>
             </div>
-            <h1 style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: '8px' }}>Sign in to continue.</h1>
+            <h1 style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: '8px' }}>
+              Sign in to {tenant?.name || 'your portal'}.
+            </h1>
             <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-              {mode === 'login'  && 'Sign in to your account'}
+              {mode === 'login'  && (tenant?.brand?.tagline || 'Sign in to your account')}
               {mode === 'forgot' && 'Reset your password'}
               {mode === 'reset'  && 'Set new password'}
             </p>
@@ -495,7 +489,7 @@ function Login({ onLogin }) {
         {mode === 'login' && (
           <p style={{ textAlign: 'center', marginTop: '24px', color: 'var(--text-muted)', fontSize: '14px' }}>
             No account?{' '}
-            <a href="/register" style={{ color: 'var(--accent)' }}>Register here</a>
+            <a href={buildTenantPath('/register')} style={{ color: 'var(--accent)' }}>Register here</a>
           </p>
         )}
       </div>

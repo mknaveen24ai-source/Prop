@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-
-// All valid account sizes supported by the platform
-const ALL_SIZES = [1000, 2000, 2500, 5000, 10000, 25000, 50000, 100000, 200000];
+import { useBranding } from '../../BrandingContext';
+import { accountsAPI } from '../../services/api';
+import { buildUnavailableAvailabilityRows, normalizeAvailabilityRows, UNLIMITED_QUOTA } from '../../utils/accountAvailability';
+import { getTenantLandingCopy, isPaidTenant } from '../../utils/tenantMarketing';
+import { buildTenantPath } from '../../utils/tenant';
 
 /* Animated number counter */
 function CountUp({ value, duration = 800 }) {
@@ -41,26 +40,12 @@ function sizeLabel(size) {
   return 'Micro';
 }
 
-// Merge API data with all valid sizes so every size always shows
-function mergeWithDefaults(apiData) {
-  return ALL_SIZES.map(size => {
-    const found = apiData.find(a => Number(a.size) === size);
-    if (found) return found;
-    // Not in API response = admin hasn't set a quota = unavailable
-    return {
-      size,
-      quota: 0,
-      used: 0,
-      remaining: 0,
-      locked: true,
-      reason: 'Not currently available.',
-    };
-  });
-}
-
 export default function LandingCalculator({ onStartAssessment }) {
   const navigate = useNavigate();
-  const [accounts, setAccounts] = useState(() => mergeWithDefaults([]));
+  const { tenant } = useBranding();
+  const landingCopy = getTenantLandingCopy(tenant);
+  const paidTenant = isPaidTenant(tenant);
+  const [accounts, setAccounts] = useState(() => buildUnavailableAvailabilityRows());
   const [selected, setSelected] = useState(0);
   const [loadingAPI, setLoadingAPI] = useState(true);
   const [availabilitySource, setAvailabilitySource] = useState('config');
@@ -68,21 +53,17 @@ export default function LandingCalculator({ onStartAssessment }) {
   useEffect(() => {
     async function fetchSizes() {
       try {
-        const res = await axios.get(`${API_URL}/api/accounts/available-sizes-public`, {
-          timeout: 5000,
-          params: { _t: Date.now() },
-          headers: { 'Cache-Control': 'no-cache' }
-        });
-        const merged = mergeWithDefaults(res.data);
+        const res = await accountsAPI.getPublicAvailableSizes();
+        const merged = normalizeAvailabilityRows(res.data);
         setAccounts(merged);
-        setAvailabilitySource('config');
+        setAvailabilitySource('live');
         // Auto-select the first unlocked size
         const firstUnlocked = merged.findIndex(s => !s.locked);
         if (firstUnlocked >= 0) setSelected(firstUnlocked);
       } catch (_err) {
         setAvailabilitySource('offline');
         // Backend offline — show all sizes as locked until data loads
-        setAccounts(mergeWithDefaults([]));
+        setAccounts(buildUnavailableAvailabilityRows());
       } finally {
         setLoadingAPI(false);
       }
@@ -97,7 +78,10 @@ export default function LandingCalculator({ onStartAssessment }) {
   const acc = accounts[selected];
   const isLocked = !acc || acc.locked || acc.quota === 0;
   const totalEnabled = accounts.filter(a => a.quota > 0).length;
-  const totalRemaining = accounts.reduce((s, a) => s + (a.remaining || 0), 0);
+  const hasUnlimitedAvailability = accounts.some(a => !a.locked && a.quota >= UNLIMITED_QUOTA);
+  const totalRemaining = hasUnlimitedAvailability
+    ? null
+    : accounts.reduce((sum, account) => sum + (account.remaining || 0), 0);
 
   return (
     <section id="mp-accounts" className="mp-section" style={{
@@ -116,8 +100,7 @@ export default function LandingCalculator({ onStartAssessment }) {
           </div>
           <h2 className="mp-h2 mp-reveal mp-delay-100">Choose Your Account Size</h2>
           <p className="mp-p-lead mp-reveal mp-delay-200" style={{ margin: '0 auto' }}>
-            All accounts are <span style={{ color: '#00c896', fontWeight: 700 }}>completely free</span>.
-            Limited spots available each month, backed by real liquidity.
+            {landingCopy.calculatorLead}
           </p>
           {availabilitySource !== 'live' && (
             <p className="mp-reveal mp-delay-250" style={{ margin: '14px auto 0', color: 'rgba(255,255,255,0.48)', maxWidth: '740px', fontSize: '13px' }}>
@@ -134,7 +117,7 @@ export default function LandingCalculator({ onStartAssessment }) {
             </span>
             <span style={{ width: '1px', background: 'rgba(255,255,255,0.08)' }} />
             <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)' }}>
-              Configured Slots: <span style={{ color: totalRemaining > 0 ? '#00c896' : '#f0b90b', fontWeight: 600, fontFamily: 'DM Mono, monospace' }}>{loadingAPI ? '...' : totalRemaining}</span>
+              Remaining Slots: <span style={{ color: hasUnlimitedAvailability || totalRemaining > 0 ? '#00c896' : '#f0b90b', fontWeight: 600, fontFamily: 'DM Mono, monospace' }}>{loadingAPI ? '...' : hasUnlimitedAvailability ? 'Unlimited' : totalRemaining}</span>
             </span>
           </div>
         </div>
@@ -150,9 +133,12 @@ export default function LandingCalculator({ onStartAssessment }) {
           {accounts.map((a, i) => {
             const isSelected = selected === i;
             const isSoldOut = a.locked || a.quota === 0;
-            const pct = a.quota > 0 ? Math.max(0, Math.min(100, ((a.remaining ?? 0) / a.quota) * 100)) : 0;
-            // FIX: Remove "unlimited" logic - always show actual quota values from admin panel
-            const isUnlimited = false;
+            const isUnlimited = !isSoldOut && a.quota >= UNLIMITED_QUOTA;
+            const pct = isUnlimited
+              ? 100
+              : a.quota > 0
+                ? Math.max(0, Math.min(100, ((a.remaining ?? 0) / a.quota) * 100))
+                : 0;
 
             return (
               <div
@@ -220,7 +206,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                   borderRadius: '100px', color: isSoldOut ? '#ff4757' : '#00c896',
                   fontSize: '13px', fontWeight: 700, marginBottom: '16px',
                 }}>
-                  {isSoldOut ? 'SOLD OUT' : 'FREE'}
+                  {isSoldOut ? landingCopy.calculatorLocked : landingCopy.calculatorBadgeOpen}
                 </div>
 
                 {/* Availability bar */}
@@ -228,7 +214,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>AVAILABLE</span>
                     <span style={{ fontSize: '10px', color: isSoldOut ? '#ff4757' : pct > 50 ? '#00c896' : '#f0b90b', fontFamily: 'DM Mono, monospace', fontWeight: 700 }}>
-                      {isSoldOut ? '0/0' : `${a.remaining ?? 0}/${a.quota}`}
+                      {isSoldOut ? '0/0' : isUnlimited ? 'OPEN' : `${a.remaining ?? 0}/${a.quota}`}
                     </span>
                   </div>
                   <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
@@ -259,7 +245,7 @@ export default function LandingCalculator({ onStartAssessment }) {
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '20px' }}>
                   {[
-                    { label: 'Evaluation Fee', value: isLocked ? 'Locked' : '0.00 USD',     color: isLocked ? '#ff4757' : '#00c896', isShimmer: !isLocked },
+                    { label: paidTenant ? 'Challenge Access' : 'Evaluation Fee', value: isLocked ? 'Locked' : landingCopy.calculatorFeeLabel,     color: isLocked ? '#ff4757' : '#00c896', isShimmer: !isLocked },
                     { label: 'Evaluation Mode', value: 'Phase 1 + 2',                      color: '#2962ff' },
                     { label: 'Standard Leverage',value: '1:30 (Max)',                      color: '#fff' },
                     { label: 'Availability',   value: isLocked ? 'Closed' : acc.quota >= 999999 ? 'Institutional' : 'Limited Spots', color: isLocked ? '#ff4757' : '#f0b90b' },
@@ -275,7 +261,7 @@ export default function LandingCalculator({ onStartAssessment }) {
               {/* Circular indicator */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '28px', flex: '0 0 auto' }}>
                 {(() => {
-                  const isUnlim = acc.quota >= 999999;
+                  const isUnlim = acc.quota >= UNLIMITED_QUOTA;
                   const availPct = isUnlim ? 100 : acc.quota > 0 ? Math.max(0, Math.min(100, ((acc.remaining ?? 0) / acc.quota) * 100)) : 0;
                   const ringColor = isLocked ? '#ff4757' : availPct > 50 ? '#00c896' : availPct > 20 ? '#f0b90b' : '#ff4757';
                   const glowColor = isLocked ? 'rgba(255,71,87,0.2)' : availPct > 50 ? 'rgba(0,200,150,0.2)' : 'rgba(240,185,11,0.2)';
@@ -321,12 +307,12 @@ export default function LandingCalculator({ onStartAssessment }) {
                       style={{ padding: '22px 48px', minWidth: '240px' }}
                       onClick={() => {
                         if (onStartAssessment) onStartAssessment(acc.size);
-                        navigate('/register');
+                        navigate(buildTenantPath('/register'));
                       }}
                     >
-                      Start Assessment
+                      Start Challenge
                     </button>
-                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', textAlign: 'center', fontWeight: 500 }}>Immediate institutional access</p>
+                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', textAlign: 'center', fontWeight: 500 }}>{landingCopy.calculatorFooter}</p>
                   </>
                 )}
               </div>

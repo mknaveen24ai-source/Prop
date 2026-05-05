@@ -1,19 +1,49 @@
-import React, { useState } from 'react'
+import React, { useLayoutEffect, useRef, useState } from 'react'
+import { getMemoryItem, setMemoryItem } from '../utils/memoryStore'
 
-export default function RiskWarningBanner() {
+export default function RiskWarningBanner({ floating = false }) {
+  const bannerRef = useRef(null)
   const [dismissed, setDismissed] = useState(() => {
     try {
-      return sessionStorage.getItem('riskWarningDismissed') === 'true'
+      return getMemoryItem('riskWarningDismissed') === 'true'
     } catch {
       return false
     }
   })
 
+  useLayoutEffect(() => {
+    if (!floating) return undefined
+
+    const root = document.documentElement
+    const setHeight = () => {
+      const height = dismissed
+        ? 0
+        : Math.ceil(bannerRef.current?.getBoundingClientRect().height || 0)
+      root.style.setProperty('--risk-warning-height', `${height}px`)
+    }
+
+    setHeight()
+
+    let resizeObserver
+    if (!dismissed && bannerRef.current && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(setHeight)
+      resizeObserver.observe(bannerRef.current)
+    }
+
+    window.addEventListener('resize', setHeight)
+
+    return () => {
+      if (resizeObserver) resizeObserver.disconnect()
+      window.removeEventListener('resize', setHeight)
+      root.style.setProperty('--risk-warning-height', '0px')
+    }
+  }, [dismissed, floating])
+
   if (dismissed) return null
 
   function handleDismiss() {
     try {
-      sessionStorage.setItem('riskWarningDismissed', 'true')
+      setMemoryItem('riskWarningDismissed', 'true')
     } catch {
       // Non-fatal: dismissal will not persist in restricted storage environments.
     }
@@ -21,16 +51,20 @@ export default function RiskWarningBanner() {
   }
 
   return (
-    <div style={{
+    <div
+      ref={bannerRef}
+      className={`risk-warning-banner${floating ? ' risk-warning-banner-floating' : ''}`}
+      style={{
       background: 'rgba(97, 97, 97, 0.08)',
       borderBottom: '1px solid rgba(97, 97, 97, 0.3)',
-      padding: '12px 48px',
+      padding: floating ? 'calc(12px + env(safe-area-inset-top)) 48px 12px' : '12px 48px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: '16px',
       flexWrap: 'wrap'
-    }}>
+    }}
+    >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1 }}>
         <span style={{ fontSize: '12px', fontWeight: 700, flexShrink: 0, marginTop: '2px', color: '#7a7a7a' }}>WARNING</span>
         <p style={{

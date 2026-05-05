@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react'
 import axios from 'axios'
+import { renderIcon } from '../utils/iconMap'
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 const DISPUTE_REASONS = [
-  { value: 'drawdown_error',   label: '📊 Drawdown calculation error' },
-  { value: 'price_feed',       label: '📡 Incorrect price feed / slippage' },
-  { value: 'technical_error',  label: '🔧 Platform technical error' },
-  { value: 'wrong_close',      label: '❌ Trade closed incorrectly' },
-  { value: 'account_expired',  label: '⏰ Unjust account expiry' },
-  { value: 'other',            label: '💬 Other reason' },
+  { value: 'drawdown_error',   label: 'Drawdown calculation error' },
+  { value: 'price_feed',       label: 'Incorrect price feed / slippage' },
+  { value: 'technical_error',  label: 'Platform technical error' },
+  { value: 'wrong_close',      label: 'Trade closed incorrectly' },
+  { value: 'account_expired',  label: 'Unjust account expiry' },
+  { value: 'other',            label: 'Other reason' },
 ]
 
 export default function Dispute({ user, accounts }) {
@@ -79,7 +80,9 @@ export default function Dispute({ user, accounts }) {
         <div>
           {submitted ? (
             <div className="card" style={{ textAlign: 'center', padding: '48px 32px' }}>
-              <div style={{ fontSize: '52px', marginBottom: '16px' }}>📬</div>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+                {renderIcon('message', { size: 52, color: 'var(--accent-green)' })}
+              </div>
               <h3 style={{ color: 'var(--green)', marginBottom: '12px' }}>Dispute Submitted</h3>
               <p style={{ color: 'var(--text-muted)', marginBottom: '24px', lineHeight: '1.7' }}>
                 Your appeal has been received. Our team will review it and respond to{' '}
@@ -103,7 +106,9 @@ export default function Dispute({ user, accounts }) {
 
               {eligibleAccounts.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '32px' }}>
-                  <div style={{ fontSize: '40px', marginBottom: '12px' }}>✅</div>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+                    {renderIcon('approve', { size: 40, color: 'var(--accent-green)' })}
+                  </div>
                   <h3 style={{ color: 'var(--text)', marginBottom: '8px' }}>No Eligible Accounts</h3>
                   <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
                     Disputes can only be submitted for failed or expired challenge accounts.
@@ -194,7 +199,12 @@ export default function Dispute({ user, accounts }) {
                       fontFamily: 'DM Sans, sans-serif'
                     }}
                   >
-                    {loading ? '⏳ Submitting...' : '📨 Submit Dispute'}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      {loading
+                        ? renderIcon('timer', { size: 14, color: 'currentColor' })
+                        : renderIcon('message', { size: 14, color: 'currentColor' })}
+                      <span>{loading ? 'Submitting...' : 'Submit Dispute'}</span>
+                    </span>
                   </button>
                 </div>
               )}

@@ -1,6 +1,7 @@
 const pool = require('../db')
 const { v4: uuidv4 } = require('uuid')
 const logger = require('../utils/logger')
+const { getTenantSettings } = require('./tenantPolicyService')
 
 let accountUidReady = false
 async function ensureAccountUidColumn(db) {
@@ -34,7 +35,21 @@ function normalizeProgressionSettings(input) {
   }
 }
 
-async function fetchProgressionSettings(db) {
+async function fetchProgressionSettings(db, tenantId = null) {
+  const normalizedTenantId = parseInt(tenantId, 10)
+  if (Number.isFinite(normalizedTenantId) && normalizedTenantId > 0) {
+    const settings = await getTenantSettings(normalizedTenantId, [
+      'phase2_profit_target_pct',
+      'phase2_max_drawdown_pct',
+      'phase2_day_limit',
+      'funded_max_drawdown_pct',
+      'phase1_drawdown_type',
+      'phase2_drawdown_type',
+      'funded_drawdown_type'
+    ])
+    return normalizeProgressionSettings(settings)
+  }
+
   const result = await db.query(
     `SELECT key, value FROM platform_settings
      WHERE key IN (
@@ -64,16 +79,17 @@ function buildPhase2InsertArgs(acc, settings) {
 
   return {
     sql: `INSERT INTO accounts
-          (user_id, account_type, account_size, current_balance, starting_balance,
+          (tenant_id, user_id, account_type, account_size, current_balance, starting_balance,
            peak_balance, profit_target, max_drawdown_pct, status,
            phase_start_date, phase_end_date, account_uid)
-          VALUES ($1, 'phase2', $2, $2, $2, $2, $3, $4, 'active', NOW(), $5, $6)
+          VALUES ($1, $2, 'phase2', $3, $3, $3, $3, $4, $5, 'active', NOW(), $6, $7)
           RETURNING id`,
-    values: [acc.user_id, acc.account_size, profitTarget, settings.phase2_max_drawdown_pct, phaseEndDate, uuidv4()],
-    bbookSql: `INSERT INTO bbook_pnl (date, accounts_passed)
-               VALUES (CURRENT_DATE, 1)
-               ON CONFLICT (date) DO UPDATE
+    values: [acc.tenant_id || 1, acc.user_id, acc.account_size, profitTarget, settings.phase2_max_drawdown_pct, phaseEndDate, uuidv4()],
+    bbookSql: `INSERT INTO bbook_pnl (tenant_id, date, accounts_passed)
+               VALUES ($1, CURRENT_DATE, 1)
+               ON CONFLICT (tenant_id, date) DO UPDATE
                SET accounts_passed = bbook_pnl.accounts_passed + 1`,
+    bbookValues: [acc.tenant_id || 1],
     socketEvent: 'phase1_passed',
     socketMessage: `Phase 1 PASSED! Your Phase 2 challenge is now active. Target: ${settings.phase2_profit_target_pct}%`
   }
@@ -87,15 +103,16 @@ function buildFundedInsertArgs(acc, settings) {
 
   return {
     sql: `INSERT INTO accounts
-          (user_id, account_type, account_size, current_balance, starting_balance,
+          (tenant_id, user_id, account_type, account_size, current_balance, starting_balance,
            peak_balance, profit_target, max_drawdown_pct, status, phase_start_date, account_uid)
-          VALUES ($1, 'funded', $2, $2, $2, $2, 0, $3, 'active', NOW(), $4)
+          VALUES ($1, $2, 'funded', $3, $3, $3, $3, 0, $4, 'active', NOW(), $5)
           RETURNING id`,
-    values: [acc.user_id, acc.account_size, settings.funded_max_drawdown_pct, uuidv4()],
-    bbookSql: `INSERT INTO bbook_pnl (date, new_funded)
-               VALUES (CURRENT_DATE, 1)
-               ON CONFLICT (date) DO UPDATE
+    values: [acc.tenant_id || 1, acc.user_id, acc.account_size, settings.funded_max_drawdown_pct, uuidv4()],
+    bbookSql: `INSERT INTO bbook_pnl (tenant_id, date, new_funded)
+               VALUES ($1, CURRENT_DATE, 1)
+               ON CONFLICT (tenant_id, date) DO UPDATE
                SET new_funded = bbook_pnl.new_funded + 1`,
+    bbookValues: [acc.tenant_id || 1],
     socketEvent: 'phase2_passed',
     socketMessage: 'Phase 2 PASSED! You are now a Funded Trader. Welcome to the team!'
   }
@@ -117,7 +134,7 @@ async function promotePassedAccount(db, acc, settings) {
   // concurrent transactions and added unnecessary overhead on every promotion.
 
   const newAccount = await db.query(plan.sql, plan.values)
-  await db.query(plan.bbookSql)
+  await db.query(plan.bbookSql, plan.bbookValues || [])
 
   return {
     new_account_id: newAccount.rows[0].id,

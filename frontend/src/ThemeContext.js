@@ -1,21 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import axios from 'axios'
+import { getTenantHeaders } from './utils/tenant'
 
 const ThemeContext = createContext()
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 export function ThemeProvider({ children, initialTheme }) {
-  // FIX: Wrap localStorage access in try/catch.
-  // localStorage.getItem throws in some strict privacy modes (Firefox with
+  // FIX: Keep theme in React state and DB preference only.
+  // Browser storage access throws in some strict privacy modes (Firefox with
   // enhanced tracking protection, Safari ITP, and certain embedded webviews).
   // Without the guard the entire ThemeProvider — and therefore the whole app —
   // crashes before anything renders.
   const [theme, setTheme] = useState(() => {
-    try {
-      return initialTheme || localStorage.getItem('theme') || 'dark'
-    } catch {
-      return initialTheme || 'dark'
-    }
+    return initialTheme || 'dark'
   })
 
   // Sync initialTheme when it arrives from the /me response in App.js.
@@ -31,19 +28,14 @@ export function ThemeProvider({ children, initialTheme }) {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
-    try {
-      localStorage.setItem('theme', theme)
-    } catch {
-      // Non-fatal — theme still applied to DOM, just won't persist across sessions
-    }
   }, [theme])
 
   function toggleTheme() {
     const newTheme = theme === 'dark' ? 'light' : 'dark'
     setTheme(newTheme)
 
-    // Persist to DB (non-fatal — localStorage already saved it locally)
-    axios.patch(`${API_URL}/api/auth/theme`, { theme: newTheme }).catch(() => {})
+    // Persist to DB; the current page already applied the theme locally.
+    axios.patch(`${API_URL}/api/auth/theme`, { theme: newTheme }, { headers: getTenantHeaders() }).catch(() => {})
   }
 
   return (

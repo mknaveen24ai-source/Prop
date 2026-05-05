@@ -157,7 +157,7 @@ logger.debug = function(message, meta) {
 // HTTP request logger middleware
 // FIX (LOW #30): Exclude health check and price endpoints to reduce log volume.
 // Previously logged every 1-second price poll (86,400+ entries/day).
-const HEALTH_ENDPOINTS = ['/', '/health', '/api/trades/prices', '/api/price-status', '/ping']
+const HEALTH_ENDPOINTS = ['/', '/health', '/api/prices', '/api/trades/prices', '/api/price-status', '/ping']
 const HEALTH_PREFIXES = ['/api/price']
 
 function shouldSkipHttpLog(path) {

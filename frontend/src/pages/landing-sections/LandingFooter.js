@@ -1,16 +1,22 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useBranding } from '../../BrandingContext';
+import { getTenantLandingCopy } from '../../utils/tenantMarketing';
+import { buildTenantPath } from '../../utils/tenant';
 
 export default function LandingFooter({ onFooterCta }) {
+  const { tenant } = useBranding();
+  const landingCopy = getTenantLandingCopy(tenant);
+
   function linkHref(label) {
     if (label === 'Account Sizes') return '#mp-calculator';
     if (label === 'How It Works') return '#mp-scaling';
     if (label === 'Trading Rules') return '#faq';
     if (label === 'FAQ') return '#faq';
-    if (label === 'Help Center') return '/login';
-    if (label === 'Discord Community') return '/register';
-    if (label === 'Contact Us') return '/login';
-    if (label === 'Submit Ticket') return '/login';
+    if (label === 'Help Center') return buildTenantPath('/login');
+    if (label === 'Discord Community') return buildTenantPath('/register');
+    if (label === 'Contact Us') return buildTenantPath('/login');
+    if (label === 'Submit Ticket') return buildTenantPath('/login');
     return '/';
   }
 
@@ -34,10 +40,10 @@ export default function LandingFooter({ onFooterCta }) {
           }} />
           
           <div style={{ position: 'relative', zIndex: 1 }}>
-            <h2 className="mp-h2" style={{ fontSize: 'clamp(32px, 4vw, 52px)' }}>Claim Your Free Account</h2>
-            <p className="mp-p-lead" style={{ margin: '0 auto 40px' }}>Limited monthly spots backed by real liquidity. No fees, no credit card, no catch.</p>
-            <Link to="/register" className="mp-btn-primary" style={{ padding: '22px 56px', fontSize: '17px', textDecoration: 'none' }} onClick={onFooterCta}>
-              Get Started — It's Free
+            <h2 className="mp-h2" style={{ fontSize: 'clamp(32px, 4vw, 52px)' }}>{landingCopy.footerHeadline}</h2>
+            <p className="mp-p-lead" style={{ margin: '0 auto 40px' }}>{landingCopy.footerSubtitle}</p>
+            <Link to={buildTenantPath('/register')} className="mp-btn-primary" style={{ padding: '22px 56px', fontSize: '17px', textDecoration: 'none' }} onClick={onFooterCta}>
+              {landingCopy.footerButton}
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12H19M19 12L12 5M19 12L12 19" />
               </svg>
@@ -47,17 +53,17 @@ export default function LandingFooter({ onFooterCta }) {
         </div>
 
         {/* Footer Grid */}
-        <div className="mp-reveal mp-delay-200" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '60px', marginBottom: '80px' }}>
+        <div className="mp-footer-grid mp-reveal mp-delay-200" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '60px', marginBottom: '80px' }}>
           
           {/* Brand */}
-          <div style={{ gridColumn: 'span 2' }}>
+          <div className="mp-footer-brand" style={{ gridColumn: 'span 2' }}>
             <div style={{ fontFamily: 'Sora, sans-serif', fontSize: '24px', fontWeight: 800, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div className="mp-badge-dot"></div>
               <span style={{ color: '#fff' }}>PROPFIRM </span>
               <span style={{ color: '#2962ff' }}>V2</span>
             </div>
             <p className="mp-p-body" style={{ color: 'rgba(255,255,255,0.4)', maxWidth: '300px', fontSize: '14px' }}>
-              Free funded trading accounts backed by real liquidity. Pass our 2-phase evaluation and trade with real capital — no fees required.
+              {landingCopy.footerBrand}
             </p>
             <div style={{ marginTop: '30px', display: 'flex', gap: '12px' }}>
               {[
@@ -129,8 +135,8 @@ export default function LandingFooter({ onFooterCta }) {
           <div>
             <h4 style={{ fontFamily: 'Sora, sans-serif', fontSize: '14px', color: 'rgba(255,255,255,0.5)', marginBottom: '24px', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Legal</h4>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <li><Link to="/terms" style={{ color: 'rgba(255,255,255,0.35)', textDecoration: 'none', fontSize: '14px', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color='#fff'} onMouseOut={e => e.currentTarget.style.color='rgba(255,255,255,0.35)'}>Terms of Service</Link></li>
-              <li><Link to="/privacy" style={{ color: 'rgba(255,255,255,0.35)', textDecoration: 'none', fontSize: '14px', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color='#fff'} onMouseOut={e => e.currentTarget.style.color='rgba(255,255,255,0.35)'}>Privacy Policy</Link></li>
+              <li><Link to={buildTenantPath('/terms')} style={{ color: 'rgba(255,255,255,0.35)', textDecoration: 'none', fontSize: '14px', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color='#fff'} onMouseOut={e => e.currentTarget.style.color='rgba(255,255,255,0.35)'}>Terms of Service</Link></li>
+              <li><Link to={buildTenantPath('/privacy')} style={{ color: 'rgba(255,255,255,0.35)', textDecoration: 'none', fontSize: '14px', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color='#fff'} onMouseOut={e => e.currentTarget.style.color='rgba(255,255,255,0.35)'}>Privacy Policy</Link></li>
               <li><a href="/#" style={{ color: 'rgba(255,255,255,0.35)', textDecoration: 'none', fontSize: '14px', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color='#fff'} onMouseOut={e => e.currentTarget.style.color='rgba(255,255,255,0.35)'}>Risk Disclosure</a></li>
               <li><a href="/#" style={{ color: 'rgba(255,255,255,0.35)', textDecoration: 'none', fontSize: '14px', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color='#fff'} onMouseOut={e => e.currentTarget.style.color='rgba(255,255,255,0.35)'}>KYC Policy</a></li>
             </ul>
@@ -138,15 +144,15 @@ export default function LandingFooter({ onFooterCta }) {
         </div>
 
         {/* Bottom Bar */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div className="mp-footer-bottom" style={{ borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', lineHeight: 1.8, textAlign: 'justify' }}>
             <strong style={{ color: 'rgba(255,255,255,0.4)' }}>Risk Warning:</strong> Trading Foreign Exchange (Forex) and Commodities carries a high level of risk and is not suitable for all investors. You may sustain a loss of some or all of your capital. Past performance is not indicative of future results.
             <br/><br/>
             <strong style={{ color: 'rgba(255,255,255,0.4)' }}>Simulated Trading Disclaimer:</strong> All accounts provided during the Phase 1 and Phase 2 evaluations are simulated demo accounts using live market quotes. Upon passing the evaluation, funded accounts are backed by the firm's real capital and trades may be executed on live markets. PropFirm V2 is not a broker, does not accept client deposits for trading, and does not provide financial advice. Accounts are provided free of charge and are limited in availability.
           </p>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '24px', flexWrap: 'wrap', gap: '16px' }}>
+          <div className="mp-footer-bottom-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '24px', flexWrap: 'wrap', gap: '16px' }}>
             <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>© {new Date().getFullYear()} PropFirm V2. All rights reserved.</span>
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div className="mp-footer-chip-row" style={{ display: 'flex', gap: '10px' }}>
               {['WEB PLATFORM', 'FOREX', 'GOLD', 'SILVER'].map(p => (
                 <div key={p} style={{
                   fontSize: '10px', color: 'rgba(255,255,255,0.2)',
