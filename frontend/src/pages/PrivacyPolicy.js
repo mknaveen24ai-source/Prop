@@ -132,7 +132,7 @@ We encourage you to review this policy periodically. Your continued use of the p
       background: 'var(--navy)',
       minHeight: '100vh',
       color: 'var(--text)',
-      fontFamily: 'DM Sans, sans-serif'
+      fontFamily: 'var(--font-ui)'
     }}>
 
       {/* Nav */}
@@ -144,7 +144,7 @@ We encourage you to review this policy periodically. Your continued use of the p
       }}>
         <span
           onClick={() => navigate('/')}
-          style={{ fontFamily: 'Inter, serif', fontSize: '22px', fontWeight: '700', color: 'var(--accent)', letterSpacing: '0.12em', cursor: 'pointer' }}
+          style={{ fontFamily: 'var(--font-ui)', fontSize: '22px', fontWeight: '700', color: 'var(--accent)', letterSpacing: '0.12em', cursor: 'pointer' }}
         >
           PROP FIRM
         </span>
@@ -171,7 +171,7 @@ We encourage you to review this policy periodically. Your continued use of the p
           LEGAL DOCUMENT
         </div>
         <h1 style={{
-          fontFamily: 'Inter, serif', fontSize: '40px', fontWeight: '700',
+          fontFamily: 'var(--font-display)', fontSize: '40px', fontWeight: '700',
           marginBottom: '12px', color: 'var(--text)'
         }}>
           Privacy Policy
@@ -212,7 +212,7 @@ We encourage you to review this policy periodically. Your continued use of the p
                 border: 'none', cursor: 'pointer', color: 'var(--text)', textAlign: 'left'
               }}
             >
-              <span style={{ fontFamily: 'Inter, serif', fontSize: '14px', fontWeight: '600', letterSpacing: '0.05em' }}>
+              <span style={{ fontFamily: 'var(--font-ui)', fontSize: '14px', fontWeight: '600', letterSpacing: '0.05em' }}>
                 {section.title}
               </span>
               <span style={{

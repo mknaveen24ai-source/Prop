@@ -3,7 +3,7 @@ import React from 'react';
 export default function TradingPanelHeader({ priceStatus }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-      <h2 style={{ fontFamily: 'Inter, serif', color: 'var(--accent)', marginBottom: 0, fontSize: '22px' }}>
+      <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: 0, fontSize: '22px' }}>
         Trading Terminal
       </h2>
       <div

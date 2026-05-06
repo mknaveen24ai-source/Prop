@@ -199,13 +199,15 @@ export default function TradingPanel({
 
   async function handlePartialClose(tradeId, currentLots, closeLots) {
     try {
-      if (!closeLots || parseFloat(closeLots) <= 0 || parseFloat(closeLots) > parseFloat(currentLots)) return alert('Invalid lot fraction')
-      await api.post('/api/trades/close', {
-        trade_id: tradeId,
-        close_lots: parseFloat(closeLots)
-      })
+      const closeLotsNum = parseFloat(closeLots)
+      const currentLotsNum = parseFloat(currentLots)
+      const remainingLotsNum = Math.round((currentLotsNum - closeLotsNum) * 100) / 100
+      if (!closeLots || closeLotsNum <= 0 || closeLotsNum > currentLotsNum) return alert('Invalid lot fraction')
+      if (remainingLotsNum < 0.01) return alert('Use Close for a full exit. Partial close must leave at least 0.01 lots open.')
+      if (closingTradeSet.has(tradeId)) return
+      const success = await onCloseTrade(tradeId, { closeLots: closeLotsNum })
+      if (!success) return
       setPartialForm(null)
-      if (onTradeModified) onTradeModified()
     } catch (err) {
       alert(err.response?.data?.error || 'Partial close failed')
     }
@@ -519,7 +521,7 @@ export default function TradingPanel({
                 placeholder="Tags (comma separated, e.g. A+ Setup, Revenge)"
                 value={noteTags}
                 onChange={(e) => { setNoteTags(e.target.value); setNoteSaved(false) }}
-                style={{ width: '100%', fontSize: '13px', background: 'var(--navy)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 12px', color: 'var(--accent)', fontFamily: 'DM Sans, sans-serif' }}
+                style={{ width: '100%', fontSize: '13px', background: 'var(--navy)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 12px', color: 'var(--accent)', fontFamily: 'var(--font-ui)' }}
               />
             </div>
             <textarea
@@ -532,7 +534,7 @@ export default function TradingPanel({
                 width: '100%', fontSize: '13px', resize: 'vertical',
                 background: 'var(--navy)', border: '1px solid var(--navy-border)',
                 borderRadius: '6px', padding: '8px 12px',
-                color: 'var(--text)', fontFamily: 'DM Sans, sans-serif',
+                color: 'var(--text)', fontFamily: 'var(--font-ui)',
                 lineHeight: '1.5', marginBottom: '8px'
               }}
             />
@@ -557,7 +559,7 @@ export default function TradingPanel({
                     padding: '6px 16px', fontSize: '12px',
                     fontWeight: '700',
                     cursor: noteSaving ? 'not-allowed' : 'pointer',
-                    fontFamily: 'DM Sans, sans-serif'
+                    fontFamily: 'var(--font-ui)'
                   }}
                 >
                   {noteSaving ? 'Saving...' : 'Save Note'}
@@ -621,7 +623,7 @@ export default function TradingPanel({
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2 style={{ fontFamily: 'Inter, serif', color: 'var(--accent)', marginBottom: 0, fontSize: '22px' }}>
+      <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: 0, fontSize: '22px' }}>
           Trading Terminal
         </h2>
         {/* Price Feed Status Indicator */}
@@ -705,7 +707,7 @@ export default function TradingPanel({
               }}
             >
               <div style={{ fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.08em', marginBottom: '4px' }}>{instrument}</div>
-              <div style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--accent)', fontFamily: 'DM Mono, monospace' }}>
+              <div style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
                 {bidText}
               </div>
               <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '2px' }}>
@@ -789,7 +791,7 @@ export default function TradingPanel({
                   <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text)' }}>
                     Profit Target Progress
                   </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'DM Mono, monospace' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
                     {targetProgressPct.toFixed(1)}%
                   </div>
                 </div>
@@ -855,7 +857,7 @@ export default function TradingPanel({
                         Drawdown {level === 'critical' ? '— CRITICAL' : level === 'high' ? '— HIGH' : level === 'medium' ? '— WARNING' : ''}
                       </span>
                     </div>
-                    <div style={{ display: 'flex', gap: '16px', fontSize: '11px', fontFamily: 'DM Mono, monospace' }}>
+                <div style={{ display: 'flex', gap: '16px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
                       <span style={{ color: c.text }}>Used: {drawdownPct.toFixed(2)}%</span>
                       <span style={{ color: 'var(--text-muted)' }}>Remaining: {remaining}%</span>
                       <span style={{ color: 'var(--text-dim)' }}>Limit: {maxDrawdownPct}%</span>
@@ -932,7 +934,7 @@ export default function TradingPanel({
                   </div>
                   <div style={{
                     fontSize: '16px', fontWeight: '700',
-                    fontFamily: 'DM Mono, monospace',
+                      fontFamily: 'var(--font-mono)',
                     color: timeRemaining.expired ? 'var(--red)'
                       : timeRemaining.urgent ? 'var(--red)'
                       : 'var(--accent)'
@@ -1165,8 +1167,8 @@ export default function TradingPanel({
                                   <div style={{ background: 'var(--navy-card)', border: '1px dashed var(--accent)', borderRadius: '8px', padding: '12px 16px', margin: '4px 0 8px 0', display: 'grid', gap: '10px' }}>
                                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                                       <span style={{ fontSize: '12px', color: 'var(--text)' }}>Close Fraction (Current: {parseFloat(trade.lot_size).toFixed(2)}):</span>
-                                      <input type="number" step="0.01" max={trade.lot_size} value={partialForm.val || ''} onChange={e => setPartialForm({ ...partialForm, val: e.target.value })} style={{ width: '80px', padding: '4px 8px', fontSize: '12px' }} />
-                                      <button onClick={() => handlePartialClose(trade.id, trade.lot_size, partialForm.val)} className="btn btn-accent" style={{ padding: '4px 12px', fontSize: '11px' }}>Confirm Partial Close</button>
+                                      <input type="number" step="0.01" max={Math.max(parseFloat(trade.lot_size) - 0.01, 0.01).toFixed(2)} value={partialForm.val || ''} onChange={e => setPartialForm({ ...partialForm, val: e.target.value })} style={{ width: '80px', padding: '4px 8px', fontSize: '12px' }} />
+                                      <button onClick={() => handlePartialClose(trade.id, trade.lot_size, partialForm.val)} disabled={closingTradeSet.has(trade.id)} className="btn btn-accent" style={{ padding: '4px 12px', fontSize: '11px', opacity: closingTradeSet.has(trade.id) ? 0.6 : 1, cursor: closingTradeSet.has(trade.id) ? 'not-allowed' : 'pointer' }}>{closingTradeSet.has(trade.id) ? 'Closing...' : 'Confirm Partial Close'}</button>
                                       <button onClick={() => setPartialForm(null)} className="btn" style={{ padding: '4px 12px', fontSize: '11px', background: 'transparent', border: '1px solid var(--navy-border)' }}>Cancel</button>
                                     </div>
                                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -1179,15 +1181,15 @@ export default function TradingPanel({
                                           <button
                                             key={ratio}
                                             type="button"
-                                            disabled={invalid}
+                                            disabled={invalid || closingTradeSet.has(trade.id)}
                                             onClick={() => handlePartialClose(trade.id, trade.lot_size, closeLots.toFixed(2))}
                                             style={{
                                               padding: '6px 10px',
                                               borderRadius: '999px',
                                               border: '1px solid var(--navy-border)',
-                                              background: invalid ? 'rgba(255,255,255,0.03)' : 'rgba(37,99,235,0.08)',
-                                              color: invalid ? 'var(--text-dim)' : 'var(--accent)',
-                                              cursor: invalid ? 'not-allowed' : 'pointer',
+                                              background: invalid || closingTradeSet.has(trade.id) ? 'rgba(255,255,255,0.03)' : 'rgba(37,99,235,0.08)',
+                                              color: invalid || closingTradeSet.has(trade.id) ? 'var(--text-dim)' : 'var(--accent)',
+                                              cursor: invalid || closingTradeSet.has(trade.id) ? 'not-allowed' : 'pointer',
                                               fontSize: '11px',
                                               fontWeight: '700'
                                             }}
@@ -1504,7 +1506,7 @@ export default function TradingPanel({
                                     <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '8px', letterSpacing: '0.08em' }}>
                                       TRADE NOTE — {trade.instrument} {trade.direction?.toUpperCase()} {parseFloat(trade.lot_size).toFixed(2)} lots
                                     </div>
-                                    <input type="text" placeholder="Tags (comma separated, e.g. A+ Setup, Revenge)" value={noteTags} onChange={e => { setNoteTags(e.target.value); setNoteSaved(false) }} style={{ width: '100%', fontSize: '13px', background: 'var(--navy)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 12px', color: 'var(--accent)', fontFamily: 'DM Sans, sans-serif', marginBottom: '8px' }} />
+                                    <input type="text" placeholder="Tags (comma separated, e.g. A+ Setup, Revenge)" value={noteTags} onChange={e => { setNoteTags(e.target.value); setNoteSaved(false) }} style={{ width: '100%', fontSize: '13px', background: 'var(--navy)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 12px', color: 'var(--accent)', fontFamily: 'var(--font-ui)', marginBottom: '8px' }} />
                                     <textarea
                                       value={noteText}
                                       onChange={e => { setNoteText(e.target.value); setNoteSaved(false) }}
@@ -1515,7 +1517,7 @@ export default function TradingPanel({
                                         width: '100%', fontSize: '13px', resize: 'vertical',
                                         background: 'var(--navy)', border: '1px solid var(--navy-border)',
                                         borderRadius: '6px', padding: '8px 12px',
-                                        color: 'var(--text)', fontFamily: 'DM Sans, sans-serif',
+                                        color: 'var(--text)', fontFamily: 'var(--font-ui)',
                                         lineHeight: '1.5', marginBottom: '8px'
                                       }}
                                     />
@@ -1538,7 +1540,7 @@ export default function TradingPanel({
                                             padding: '6px 16px', fontSize: '12px',
                                             fontWeight: '700',
                                             cursor: noteSaving ? 'not-allowed' : 'pointer',
-                                            fontFamily: 'DM Sans, sans-serif'
+                                            fontFamily: 'var(--font-ui)'
                                           }}
                                         >
                                           {noteSaving ? 'Saving...' : 'Save Note'}

@@ -40,6 +40,7 @@ const {
 } = require('./utils/tenantSettings')
 const { ensureIdempotencyInfrastructure } = require('./utils/idempotency')
 const { ensureTenantIsolationInfrastructure } = require('./utils/tenantIsolation')
+const { ensureEmailQueueInfrastructure } = require('./utils/emailQueue')
 const { sanitizeString } = require('./utils/validation')
 
 // -- Rate limiters --
@@ -428,6 +429,9 @@ ensureTenantIsolationInfrastructure().catch(err => {
 })
 ensureIdempotencyInfrastructure().catch(err => {
   logger.error('[startup] Failed to ensure idempotency infrastructure:', { error: err.message })
+})
+ensureEmailQueueInfrastructure().catch(err => {
+  logger.error('[startup] Failed to ensure email queue infrastructure:', { error: err.message })
 })
 
 const app = express()

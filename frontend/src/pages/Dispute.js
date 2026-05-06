@@ -66,7 +66,7 @@ export default function Dispute({ user, accounts }) {
 
   return (
     <div>
-      <h2 style={{ fontFamily: 'Inter, serif', color: 'var(--accent)', marginBottom: '8px', fontSize: '22px' }}>
+      <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: '8px', fontSize: '22px' }}>
         Dispute / Appeal
       </h2>
       <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '28px' }}>
@@ -156,7 +156,7 @@ export default function Dispute({ user, accounts }) {
                             background: form.reason === r.value ? 'rgba(148, 148, 148, 0.1)' : 'var(--navy-card)',
                             color: form.reason === r.value ? 'var(--accent)' : 'var(--text-muted)',
                             fontSize: '12px', textAlign: 'left',
-                            fontFamily: 'DM Sans, sans-serif', transition: 'all 0.15s'
+                            fontFamily: 'var(--font-ui)', transition: 'all 0.15s'
                           }}
                         >
                           {r.label}
@@ -180,7 +180,7 @@ export default function Dispute({ user, accounts }) {
                         width: '100%', fontSize: '14px', resize: 'vertical',
                         background: 'var(--navy)', border: '1px solid var(--navy-border)',
                         borderRadius: '8px', padding: '10px 14px',
-                        color: 'var(--text)', fontFamily: 'DM Sans, sans-serif', lineHeight: '1.6'
+                        color: 'var(--text)', fontFamily: 'var(--font-ui)', lineHeight: '1.6'
                       }}
                     />
                     <div style={{ fontSize: '11px', color: 'var(--text-dim)', textAlign: 'right', marginTop: '4px' }}>
@@ -196,7 +196,7 @@ export default function Dispute({ user, accounts }) {
                       color: loading ? 'var(--text-muted)' : 'var(--navy)',
                       border: 'none', borderRadius: '8px', padding: '12px 32px',
                       fontSize: '14px', fontWeight: '700', cursor: loading ? 'not-allowed' : 'pointer',
-                      fontFamily: 'DM Sans, sans-serif'
+                      fontFamily: 'var(--font-ui)'
                     }}
                   >
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
@@ -248,7 +248,7 @@ export default function Dispute({ user, accounts }) {
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                     {DISPUTE_REASONS.find(r => r.value === d.reason)?.label || d.reason}
                   </div>
-                  <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '3px', fontFamily: 'DM Mono, monospace' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '3px', fontFamily: 'var(--font-mono)' }}>
                     Account ID: {d.account_uid || d.account_id || '—'}
                   </div>
                   <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '3px' }}>

@@ -4870,3 +4870,72 @@
 {"error":"column d.payout_id does not exist","level":"error","message":"Admin payouts fetch error:","timestamp":"2026-05-04 10:39:36"}
 {"duration":2,"error":"column d.payout_id does not exist","level":"error","message":"[PERFORMANCE] Failed query: 2ms","sql":"SELECT\n        p.id,\n        p.id::text AS entity_id,\n        'payout'::text AS entity_type,\n       ","timestamp":"2026-05-04 10:39:36"}
 {"error":"column d.payout_id does not exist","level":"error","message":"Admin payouts fetch error:","timestamp":"2026-05-04 10:39:36"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:03"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:04"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:05"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:06"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:08"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:09"}
+{"error":"","level":"error","message":"NewsService: ForexFactory fetch failed, falling back to DB cache","timestamp":"2026-05-05 22:11:09"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:10"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:12"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:13"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:15"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:16"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:18"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:20"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:25"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:26"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:27"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:29"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:30"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:31"}
+{"error":"","level":"error","message":"NewsService: ForexFactory fetch failed, falling back to DB cache","timestamp":"2026-05-05 22:12:31"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:33"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:34"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:36"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:37"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:39"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:40"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:42"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:44"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:45"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:47"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:49"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:50"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:14:54"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:14:55"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:14:56"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Failed to initialize Redis:","timestamp":"2026-05-05 22:14:56"}
+{"error":"","level":"error","message":"NewsService: ForexFactory fetch failed, falling back to DB cache","timestamp":"2026-05-05 22:15:00"}
+{"duration":1,"error":"column \"reset_token\" of relation \"users\" does not exist","level":"error","message":"[PERFORMANCE] Failed query: 1ms","sql":"UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE id = $3","timestamp":"2026-05-05 22:15:02"}
+{"error":"column \"reset_token\" of relation \"users\" does not exist","level":"error","message":"Forgot password error:","timestamp":"2026-05-05 22:15:02"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:16:39"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:16:40"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:16:41"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Failed to initialize Redis:","timestamp":"2026-05-05 22:16:41"}
+{"error":"","level":"error","message":"NewsService: ForexFactory fetch failed, falling back to DB cache","timestamp":"2026-05-05 22:16:45"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:18:32"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:18:33"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:18:35"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Failed to initialize Redis:","timestamp":"2026-05-05 22:18:35"}
+{"error":"","level":"error","message":"NewsService: ForexFactory fetch failed, falling back to DB cache","timestamp":"2026-05-05 22:18:39"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:23:40"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:23:41"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:23:42"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Failed to initialize Redis:","timestamp":"2026-05-05 22:23:42"}
+{"error":"","level":"error","message":"NewsService: ForexFactory fetch failed, falling back to DB cache","timestamp":"2026-05-05 22:23:46"}
+{"error":"self-signed certificate; if the root CA is installed locally, try running Node.js with --use-system-ca","level":"error","message":"NewsService: ForexFactory fetch failed, falling back to DB cache","timestamp":"2026-05-06 11:32:11"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-06 11:32:12"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-06 11:32:13"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-06 11:32:14"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Failed to initialize Redis:","timestamp":"2026-05-06 11:32:14"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-06 12:07:32"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-06 12:07:33"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-06 12:07:34"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Failed to initialize Redis:","timestamp":"2026-05-06 12:07:34"}
+{"duration":20889,"error":"deadlock detected","level":"error","message":"[PERFORMANCE] Failed query: 20889ms","sql":"INSERT INTO price_feed_history_1h\n         (instrument, bucket_time, open, high, low, close, ticks, ","timestamp":"2026-05-06 12:37:52"}
+{"error":"deadlock detected","level":"error","message":"Hourly rollup sync failed:","timestamp":"2026-05-06 12:37:52"}
+{"duration":6554,"error":"deadlock detected","level":"error","message":"[PERFORMANCE] Failed query: 6554ms","sql":"INSERT INTO price_feed_history_1h\n         (instrument, bucket_time, open, high, low, close, ticks, ","timestamp":"2026-05-06 13:07:38"}
+{"error":"deadlock detected","level":"error","message":"Hourly rollup sync failed:","timestamp":"2026-05-06 13:07:38"}
+{"error":"getaddrinfo ENOTFOUND nfs.faireconomy.media","level":"error","message":"NewsService: ForexFactory fetch failed, falling back to DB cache","timestamp":"2026-05-06 14:03:03"}

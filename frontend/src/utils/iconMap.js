@@ -22,6 +22,7 @@ import {
   KeyRound,
   LayoutDashboard,
   LogOut,
+  Mail,
   MessageCircle,
   Minus,
   MoreHorizontal,
@@ -98,6 +99,7 @@ const ICON_MAP = {
   minus: Minus,
   profile: User,
   message: MessageCircle,
+  mail: Mail,
   key: KeyRound,
   lock: Shield,
   flag: AlertTriangle,
@@ -199,4 +201,3 @@ export function renderIcon(icon, options = {}) {
     />
   )
 }
-

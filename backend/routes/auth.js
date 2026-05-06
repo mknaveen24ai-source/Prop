@@ -8,7 +8,7 @@ const qrcode   = require('qrcode')
 const pool     = require('../db')
 const { authenticateToken, authenticatePre2FA } = require('./middleware')
 const rateLimit = require('express-rate-limit')
-const { sendPasswordReset } = require('../mailer')
+const { enqueuePasswordResetEmail, enqueueWelcomeOnboardingEmail } = require('../utils/emailQueue')
 const { passwordResetLimiter } = require('../utils/security')
 const { isValidEmail, isValidPassword, sanitizeString } = require('../utils/validation')
 const logger   = require('../utils/logger')
@@ -198,6 +198,24 @@ router.post('/register', registerLimiter, async function(req, res) {
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     )
+
+    try {
+      await enqueueWelcomeOnboardingEmail(
+        user.email,
+        user.full_name,
+        user.trader_uid,
+        user.affiliate_code,
+        {
+          tenantId,
+          userId: user.id
+        }
+      )
+    } catch (emailErr) {
+      logger.error('[welcome_email] Failed to enqueue onboarding email', {
+        error: emailErr.message,
+        userId: user.id
+      })
+    }
 
     setAuthCookie(res, token)
     res.status(201).json({
@@ -393,7 +411,10 @@ router.post('/forgot-password', passwordResetLimiter, async function(req, res) {
     // leakage via browser history, server logs, referrer headers, etc.
     const resetLink = buildTenantAwareResetLink(req)
 
-    await sendPasswordReset(user.email, resetLink, rawToken, { tenant: req.tenant || null })
+    await enqueuePasswordResetEmail(user.email, resetLink, rawToken, {
+      tenant: req.tenant || null,
+      userId: user.id
+    })
 
     if (process.env.NODE_ENV !== 'production') {
       logger.debug('Password reset link:', { email: user.email, link: resetLink })
@@ -597,6 +618,8 @@ module.exports = router
 // ─────────────────────────────────────────────────────────────────────────────
 ;(async () => {
   try {
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token TEXT DEFAULT NULL`)
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMPTZ DEFAULT NULL`)
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret      TEXT    DEFAULT NULL`)
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled     BOOLEAN DEFAULT FALSE`)
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_temp_secret TEXT    DEFAULT NULL`)

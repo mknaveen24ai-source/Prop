@@ -562,19 +562,21 @@ function Dashboard({ user, onLogout }) {
   }
 
   async function closeTrade(tradeId, options = {}) {
-    if (closingTradesRef.current.has(tradeId)) return
+    if (closingTradesRef.current.has(tradeId)) return false
     closingTradesRef.current.add(tradeId)
     setClosingTradeIds((current) => (current.includes(tradeId) ? current : [...current, tradeId]))
     try {
       const payload = { trade_id: tradeId }
       if (options.closeLots) payload.close_lots = options.closeLots
       const res = await axios.post(`${API_URL}/api/trades/close`, payload)
-      setSuccess(`Trade closed. P&L: $${res.data.pnl}`)
+      setSuccess(`${options.closeLots ? 'Partial close executed' : 'Trade closed'}. P&L: $${res.data.pnl}`)
       fetchOpenTrades(selectedAccount.id)
       fetchStats(selectedAccount.id)
       fetchTradeHistory(selectedAccount.id)
+      return true
     } catch (err) {
       setError(err.response?.data?.error || 'Could not close trade')
+      return false
     } finally {
       closingTradesRef.current.delete(tradeId)
       setClosingTradeIds((current) => current.filter((id) => id !== tradeId))
@@ -890,7 +892,7 @@ function Dashboard({ user, onLogout }) {
         {/* KYC Page */}
         {activePage === 'kyc' && (
           <div>
-            <h2 style={{ fontFamily: 'Inter, serif', color: 'var(--accent)', marginBottom: '24px', fontSize: '22px' }}>Identity Verification</h2>
+            <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: '24px', fontSize: '22px' }}>Identity Verification</h2>
             {kycStatus === 'approved' ? (
               <div className="card" style={{ textAlign: 'center', padding: '48px', maxWidth: '500px' }}>
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
@@ -940,7 +942,7 @@ function Dashboard({ user, onLogout }) {
         {/* Payouts Page */}
         {activePage === 'payouts' && (
           <div>
-            <h2 style={{ fontFamily: 'Inter, serif', color: 'var(--accent)', marginBottom: '24px', fontSize: '22px' }}>Payouts</h2>
+            <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: '24px', fontSize: '22px' }}>Payouts</h2>
             {!fundedAccount ? (
               <div className="card" style={{ textAlign: 'center', padding: '48px', maxWidth: '500px' }}>
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
@@ -1046,8 +1048,8 @@ function Dashboard({ user, onLogout }) {
                       <tbody>
                         {payouts.map(p => (
                           <tr key={p.id}>
-                            <td style={{ fontFamily: 'DM Mono, monospace', fontSize: '11px' }}>{user?.trader_uid || user?.trader_id || '—'}</td>
-                            <td style={{ fontFamily: 'DM Mono, monospace', fontSize: '11px' }}>{p.account_uid || p.account_id || '—'}</td>
+                            <td style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{user?.trader_uid || user?.trader_id || '—'}</td>
+                            <td style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{p.account_uid || p.account_id || '—'}</td>
                             <td>${parseFloat(p.amount_requested).toFixed(2)}</td>
                             <td style={{ color: 'var(--green)' }}>${parseFloat(p.amount_payable).toFixed(2)}</td>
                             <td>{p.payment_method}</td>
@@ -1069,7 +1071,7 @@ function Dashboard({ user, onLogout }) {
         {/* Account History Page */}
         {activePage === 'history' && (
           <div>
-            <h2 style={{ fontFamily: 'Inter, serif', color: 'var(--accent)', marginBottom: '24px', fontSize: '22px' }}>Account History</h2>
+            <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: '24px', fontSize: '22px' }}>Account History</h2>
             {accountHistory.length === 0 ? (
               <div className="card" style={{ textAlign: 'center', padding: '48px', maxWidth: '500px' }}>
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>

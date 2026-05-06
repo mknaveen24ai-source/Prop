@@ -138,6 +138,7 @@ export default function AdminSidebar({
             {isSuperAdmin && <NavItem to="/admin/command-center" icon="command" label="Command Center" />}
             {isSuperAdmin && <NavItem to="/admin/tenants" icon="tenant" label="White Label" />}
             <NavItem to="/admin/access" icon="key" label="Access & Security" />
+            <NavItem to="/admin/email-jobs" icon="mail" label="Email Jobs" />
             <NavItem to="/admin/settings" icon="settings" label="Settings" />
             <NavItem to="/admin/violations" icon="violations" label="Violations" badge={counts.violations > 0 ? { val: counts.violations, color: 'red' } : null} />
             <NavItem to="/admin/disputes" icon="dispute" label="Disputes" badge={counts.disputes > 0 ? { val: counts.disputes, color: 'red' } : null} />

@@ -46,7 +46,7 @@ export default function SimulatedTradingDisclaimer() {
                 style={{
                   background: 'transparent', border: 'none', color: 'var(--accent)',
                   fontSize: '12px', cursor: 'pointer', padding: '0 0 0 6px',
-                  fontFamily: 'DM Sans, sans-serif', textDecoration: 'underline'
+                  fontFamily: 'var(--font-ui)', textDecoration: 'underline'
                 }}
               >
                 Learn more

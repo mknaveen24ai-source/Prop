@@ -67,7 +67,7 @@ export default function LandingWallOfLove() {
                     {t.avatar}
                   </div>
                   <div>
-                    <div style={{ fontFamily: 'Sora, sans-serif', fontWeight: 600, fontSize: '14px', color: '#fff' }}>{t.name}</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '14px', color: '#fff' }}>{t.name}</div>
                     <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>{t.handle}</div>
                   </div>
                   <div style={{ marginLeft: 'auto' }}>

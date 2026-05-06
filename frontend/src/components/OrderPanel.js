@@ -266,11 +266,11 @@ export default function OrderPanel({
       <div className="order-panel-price-card">
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '10px', color: 'var(--red)', marginBottom: '4px', letterSpacing: '0.08em' }}>BID</div>
-          <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text)', fontFamily: 'JetBrains Mono, monospace' }}>{bid}</div>
+          <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{bid}</div>
         </div>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '10px', color: 'var(--green)', marginBottom: '4px', letterSpacing: '0.08em' }}>ASK</div>
-          <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text)', fontFamily: 'JetBrains Mono, monospace' }}>{ask}</div>
+          <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{ask}</div>
         </div>
         <div style={{ gridColumn: '1/-1', textAlign: 'center', fontSize: '10px', color: 'var(--text-muted)' }}>
           Spread: {spread} pts
@@ -461,22 +461,52 @@ export default function OrderPanel({
           <div style={{ fontSize: '10px', color: 'var(--text-dim)', letterSpacing: '0.1em', marginBottom: '8px' }}>
             R:R CALCULATOR ({previewDirection.toUpperCase()} PREVIEW)
           </div>
+          {orderMode === 'market' && (
+            <div style={{ display: 'inline-flex', gap: '6px', marginBottom: '10px' }}>
+              {[
+                { value: 'buy', label: 'Preview BUY', color: 'var(--green)' },
+                { value: 'sell', label: 'Preview SELL', color: 'var(--red)' }
+              ].map((option) => {
+                const active = marketPreviewDirection === option.value
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setMarketPreviewDirection(option.value)}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '999px',
+                      border: `1px solid ${active ? option.color : 'rgba(148, 148, 148, 0.2)'}`,
+                      background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
+                      color: active ? option.color : 'var(--text-muted)',
+                      fontSize: '10px',
+                      fontWeight: '700',
+                      letterSpacing: '0.04em',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {option.label}
+                  </button>
+                )
+              })}
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
             <div>
               <div style={{ color: 'var(--text-dim)', fontSize: '10px', marginBottom: '2px' }}>RISK</div>
-              <div style={{ color: 'var(--red)', fontWeight: '700', fontFamily: 'DM Mono, monospace' }}>
+              <div style={{ color: 'var(--red)', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>
                 {rrSummary.riskUSD != null ? `-${formatCurrency(rrSummary.riskUSD)}` : '-'}
               </div>
             </div>
             <div>
               <div style={{ color: 'var(--text-dim)', fontSize: '10px', marginBottom: '2px' }}>REWARD</div>
-              <div style={{ color: 'var(--green)', fontWeight: '700', fontFamily: 'DM Mono, monospace' }}>
+              <div style={{ color: 'var(--green)', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>
                 {rrSummary.rewardUSD != null ? `+${formatCurrency(rrSummary.rewardUSD)}` : '-'}
               </div>
             </div>
             <div>
               <div style={{ color: 'var(--text-dim)', fontSize: '10px', marginBottom: '2px' }}>R:R RATIO</div>
-              <div style={{ color: rrSummary.rr >= 2 ? 'var(--green)' : rrSummary.rr >= 1 ? '#8b8b8b' : 'var(--red)', fontWeight: '700', fontFamily: 'DM Mono, monospace' }}>
+              <div style={{ color: rrSummary.rr >= 2 ? 'var(--green)' : rrSummary.rr >= 1 ? '#8b8b8b' : 'var(--red)', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>
                 {rrSummary.rr != null ? `1:${rrSummary.rr}` : '-'}
               </div>
             </div>
@@ -604,7 +634,7 @@ export default function OrderPanel({
             }}
           >
             <div style={{ fontSize: '10px', marginBottom: '4px', opacity: 0.7, letterSpacing: '0.1em' }}>SELL</div>
-            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '18px' }}>{isSubmitting ? '...' : bid}</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '18px' }}>{isSubmitting ? '...' : bid}</div>
           </button>
           <button
             className="btn"
@@ -625,7 +655,7 @@ export default function OrderPanel({
             }}
           >
             <div style={{ fontSize: '10px', marginBottom: '4px', opacity: 0.7, letterSpacing: '0.1em' }}>BUY</div>
-            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '18px' }}>{isSubmitting ? '...' : ask}</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '18px' }}>{isSubmitting ? '...' : ask}</div>
           </button>
         </div>
       )}
@@ -656,13 +686,13 @@ export default function OrderPanel({
         <div className="order-panel-summary" style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
           <div className="order-panel-summary-row">
             <span style={{ fontSize: '12px' }}>Balance</span>
-            <span style={{ color: 'var(--accent)', fontFamily: 'DM Mono, monospace', fontSize: '15px', fontWeight: '700' }}>
+            <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: '15px', fontWeight: '700' }}>
               ${accountBalanceNum.toFixed(2)}
             </span>
           </div>
           <div className="order-panel-summary-row">
             <span style={{ fontSize: '12px' }}>Floating Balance</span>
-            <span style={{ color: floatingBalanceNum >= accountBalanceNum ? 'var(--green)' : 'var(--red)', fontFamily: 'DM Mono, monospace', fontSize: '15px', fontWeight: '700' }}>
+            <span style={{ color: floatingBalanceNum >= accountBalanceNum ? 'var(--green)' : 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: '15px', fontWeight: '700' }}>
               ${floatingBalanceNum.toFixed(2)}
             </span>
           </div>

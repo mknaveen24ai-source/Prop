@@ -95,7 +95,7 @@ export default function RiskWarningBanner({ floating = false }) {
           cursor: 'pointer',
           fontSize: '12px',
           flexShrink: 0,
-          fontFamily: 'DM Sans, sans-serif'
+          fontFamily: 'var(--font-ui)'
         }}
       >
         Dismiss

@@ -327,7 +327,7 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
           {/* Trust Stats */}
           <div className="mp-reveal mp-delay-400 mp-active mp-stat-counter">
             <div className="mp-stat-item">
-              <span style={{ color: '#f0b90b', fontFamily: 'DM Mono, monospace', fontSize: '14px', fontWeight: 700 }}>{landingCopy.heroStatsLead}</span>
+                <span style={{ color: '#f0b90b', fontFamily: 'var(--font-mono)', fontSize: '14px', fontWeight: 700 }}>{landingCopy.heroStatsLead}</span>
               <span className="mp-stat-number">&nbsp;{landingCopy.heroStatsLeadSuffix}</span>
             </div>
             <div className="mp-stat-divider" />
@@ -348,7 +348,7 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
 
       {/* Scroll indicator */}
       <div style={{ position: 'absolute', bottom: '40px', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', opacity: 0.4, animation: 'mp-scroll-bounce 2s ease-in-out infinite' }}>
-        <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.2em', fontFamily: 'DM Mono, monospace' }}>Scroll to explore</span>
+              <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.2em', fontFamily: 'var(--font-mono)' }}>Scroll to explore</span>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="6 9 12 15 18 9" />
         </svg>

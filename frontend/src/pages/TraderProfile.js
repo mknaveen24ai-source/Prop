@@ -91,7 +91,7 @@ export default function TraderProfile() {
 
             {/* Name + badges */}
             <div style={{ flex: 1 }}>
-              <h1 style={{ fontFamily: 'Inter, serif', color: 'var(--accent)', fontSize: '22px', marginBottom: '6px' }}>
+      <h1 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', fontSize: '22px', marginBottom: '6px' }}>
                 {trader.full_name}
               </h1>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -138,7 +138,7 @@ export default function TraderProfile() {
             { label: 'Challenges',      value: trader.total_accounts || 0,                                     color: 'var(--text-muted)' },
           ].map(s => (
             <div key={s.label} className="stat-card" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '20px', fontWeight: '700', color: s.color, fontFamily: 'DM Mono, monospace', marginBottom: '4px' }}>
+              <div style={{ fontSize: '20px', fontWeight: '700', color: s.color, fontFamily: 'var(--font-mono)', marginBottom: '4px' }}>
                 {s.value}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-dim)', letterSpacing: '0.06em' }}>{s.label}</div>
@@ -154,7 +154,7 @@ export default function TraderProfile() {
               {stats.favourite_instrument && (
                 <div>
                   <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>FAVOURITE INSTRUMENT</div>
-                  <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--accent)', fontFamily: 'DM Mono, monospace' }}>
+              <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
                     {stats.favourite_instrument}
                   </div>
                 </div>
@@ -162,7 +162,7 @@ export default function TraderProfile() {
               {stats.avg_hold_mins && (
                 <div>
                   <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>AVG HOLD TIME</div>
-                  <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text)', fontFamily: 'DM Mono, monospace' }}>
+              <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>
                     {stats.avg_hold_mins < 60
                       ? `${Math.round(stats.avg_hold_mins)}m`
                       : `${(stats.avg_hold_mins / 60).toFixed(1)}h`}
@@ -172,7 +172,7 @@ export default function TraderProfile() {
               {stats.profit_factor && (
                 <div>
                   <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>PROFIT FACTOR</div>
-                  <div style={{ fontSize: '15px', fontWeight: '700', color: parseFloat(stats.profit_factor) >= 1.5 ? 'var(--green)' : 'var(--text)', fontFamily: 'DM Mono, monospace' }}>
+              <div style={{ fontSize: '15px', fontWeight: '700', color: parseFloat(stats.profit_factor) >= 1.5 ? 'var(--green)' : 'var(--text)', fontFamily: 'var(--font-mono)' }}>
                     {parseFloat(stats.profit_factor).toFixed(2)}
                   </div>
                 </div>

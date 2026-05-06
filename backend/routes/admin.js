@@ -32,13 +32,14 @@ const {
 } = require('../constants')
 const { buildAccountAvailability } = require('../utils/accountAvailability')
 const {
-  sendKycApprovedEmail,
-  sendKycRejectedEmail,
-  sendPayoutApprovedEmail,
-  sendPayoutRejectedEmail
-} = require('../mailer')
+  ensureEmailQueueInfrastructure,
+  enqueueKycApprovedEmail,
+  enqueueKycRejectedEmail,
+  enqueuePayoutApprovedEmail,
+  enqueuePayoutRejectedEmail
+} = require('../utils/emailQueue')
 const { sanitizeString } = require('../utils/validation')
-const { DEFAULT_TENANT_SLUG, getTenantById } = require('../utils/tenants')
+const { DEFAULT_TENANT_SLUG } = require('../utils/tenants')
 const { fetchProgressionSettings, promotePassedAccount } = require('../services/progressionService')
 const { ensureViolationTables } = require('../services/violationEngine')
 const { getTenantSettings } = require('../services/tenantPolicyService')
@@ -112,6 +113,11 @@ function createHttpError(message, statusCode = 400) {
 
 function normalizeAdminEmail(email) {
   return String(email || '').trim().toLowerCase()
+}
+
+function buildKycDocumentPresencePredicate(tableAlias = 'u') {
+  const alias = String(tableAlias || 'u').trim() || 'u'
+  return `(${alias}.id_document_path IS NOT NULL OR ${alias}.selfie_path IS NOT NULL)`
 }
 
 function isBcryptHash(value) {
@@ -3691,6 +3697,192 @@ router.post('/entity-meta', authenticateAdmin, requireTenantAdminOrSuperAdmin, a
   }
 })
 
+function buildAllowedEmailJobActions(job) {
+  const status = String(job?.status || '').toLowerCase()
+  const actions = ['preview_email_job']
+  if (['retry', 'dead', 'failed'].includes(status)) {
+    actions.push('retry_email_job')
+  }
+  if (job?.preview_url) {
+    actions.push('copy_preview_path')
+  }
+  return actions
+}
+
+async function buildEmailJobListResult({ tenantId = null, query = {} } = {}) {
+  await ensureEmailQueueInfrastructure()
+
+  const search = String(query.search || '').trim().toLowerCase()
+  const page = Number.isFinite(query.page) ? query.page : 1
+  const pageSize = Number.isFinite(query.pageSize) ? query.pageSize : 25
+  const filters = query.filters || {}
+  const sortKey = String(query.sort || 'created_at').trim().toLowerCase()
+  const sortDirection = String(query.order || 'desc').trim().toLowerCase() === 'asc' ? 'ASC' : 'DESC'
+  const where = []
+  const params = []
+  let index = 1
+
+  if (tenantId !== null && tenantId !== undefined) {
+    params.push(tenantId)
+    where.push(`ej.tenant_id = $${index}`)
+    index += 1
+  }
+
+  if (search) {
+    params.push(`%${search}%`)
+    where.push(`(
+      LOWER(COALESCE(ej.to_email, '')) LIKE $${index}
+      OR LOWER(COALESCE(ej.template_key, '')) LIKE $${index}
+      OR LOWER(COALESCE(ej.provider_message_id, '')) LIKE $${index}
+      OR LOWER(COALESCE(ej.unique_key, '')) LIKE $${index}
+      OR LOWER(COALESCE(ej.id::text, '')) LIKE $${index}
+    )`)
+    index += 1
+  }
+
+  if (filters.status) {
+    params.push(String(filters.status).trim().toLowerCase())
+    where.push(`LOWER(COALESCE(ej.status, 'pending')) = $${index}`)
+    index += 1
+  }
+
+  if (filters.template_key) {
+    params.push(String(filters.template_key).trim().toLowerCase())
+    where.push(`LOWER(COALESCE(ej.template_key, '')) = $${index}`)
+    index += 1
+  }
+
+  if (filters.delivery_type === 'automation') {
+    where.push(`ej.unique_key IS NOT NULL`)
+  } else if (filters.delivery_type === 'transactional') {
+    where.push(`ej.unique_key IS NULL`)
+  }
+
+  const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''
+  const orderByMap = {
+    id: 'ej.id',
+    created_at: 'ej.created_at',
+    scheduled_for: 'ej.scheduled_for',
+    sent_at: 'ej.sent_at',
+    status: 'ej.status',
+    template_key: 'ej.template_key',
+    to_email: 'ej.to_email',
+    attempt_count: 'ej.attempt_count'
+  }
+  const orderBy = orderByMap[sortKey] || orderByMap.created_at
+  const offset = Math.max(0, (page - 1) * pageSize)
+
+  const listValues = [...params, pageSize, offset]
+  const rowsResult = await pool.query(
+    `SELECT
+        ej.id,
+        ej.tenant_id,
+        ej.user_id,
+        ej.to_email,
+        ej.template_key,
+        ej.payload_json,
+        ej.status,
+        ej.attempt_count,
+        ej.last_error,
+        ej.provider_message_id,
+        ej.preview_url,
+        ej.unique_key,
+        ej.scheduled_for,
+        ej.last_attempt_at,
+        ej.sent_at,
+        ej.created_at,
+        ej.updated_at,
+        COALESCE(ej.payload_json->>'fullName', '') AS full_name_hint,
+        CASE WHEN ej.unique_key IS NULL THEN 'transactional' ELSE 'automation' END AS delivery_type
+      FROM email_jobs ej
+      ${whereClause}
+      ORDER BY ${orderBy} ${sortDirection}, ej.id DESC
+      LIMIT $${listValues.length - 1}
+      OFFSET $${listValues.length}`,
+    listValues
+  )
+
+  const totalResult = await pool.query(
+    `SELECT COUNT(*)::int AS count
+       FROM email_jobs ej
+      ${whereClause}`,
+    params
+  )
+
+  const summaryResult = await pool.query(
+    `SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE ej.status = 'pending')::int AS pending,
+        COUNT(*) FILTER (WHERE ej.status = 'sending')::int AS sending,
+        COUNT(*) FILTER (WHERE ej.status = 'retry')::int AS retry,
+        COUNT(*) FILTER (WHERE ej.status = 'sent')::int AS sent,
+        COUNT(*) FILTER (WHERE ej.status = 'dead')::int AS dead
+      FROM email_jobs ej
+      ${whereClause}`,
+    params
+  )
+
+  const statusFacetResult = await pool.query(
+    `SELECT COALESCE(ej.status, 'pending') AS key, COUNT(*)::int AS count
+       FROM email_jobs ej
+      ${whereClause}
+      GROUP BY COALESCE(ej.status, 'pending')
+      ORDER BY count DESC, key ASC`,
+    params
+  )
+
+  const templateFacetResult = await pool.query(
+    `SELECT COALESCE(ej.template_key, 'unknown') AS key, COUNT(*)::int AS count
+       FROM email_jobs ej
+      ${whereClause}
+      GROUP BY COALESCE(ej.template_key, 'unknown')
+      ORDER BY count DESC, key ASC`,
+    params
+  )
+
+  const rows = rowsResult.rows.map((row) => ({
+    ...row,
+    attempt_count: parseInt(row.attempt_count || 0, 10) || 0,
+    delivery_type: row.delivery_type || 'transactional',
+    allowed_actions: buildAllowedEmailJobActions(row)
+  }))
+
+  const statusFacets = {}
+  for (const row of statusFacetResult.rows) {
+    statusFacets[row.key] = parseInt(row.count || 0, 10) || 0
+  }
+  const templateFacets = {}
+  for (const row of templateFacetResult.rows) {
+    templateFacets[row.key] = parseInt(row.count || 0, 10) || 0
+  }
+
+  return {
+    summary: {
+      ...(summaryResult.rows[0] || {}),
+      total: parseInt(summaryResult.rows[0]?.total || 0, 10) || 0,
+      pending: parseInt(summaryResult.rows[0]?.pending || 0, 10) || 0,
+      sending: parseInt(summaryResult.rows[0]?.sending || 0, 10) || 0,
+      retry: parseInt(summaryResult.rows[0]?.retry || 0, 10) || 0,
+      sent: parseInt(summaryResult.rows[0]?.sent || 0, 10) || 0,
+      dead: parseInt(summaryResult.rows[0]?.dead || 0, 10) || 0
+    },
+    rows,
+    pagination: buildPagination({
+      page,
+      pageSize,
+      total: parseInt(totalResult.rows[0]?.count || 0, 10) || 0
+    }),
+    facets: {
+      status: statusFacets,
+      template_key: templateFacets,
+      delivery_type: facetCounts(rows, (row) => row.delivery_type || 'transactional')
+    },
+    default_sort: { key: 'created_at', direction: 'desc' },
+    saved_view_capabilities: buildSavedViewCapabilities('email_jobs'),
+    allRows: rows
+  }
+}
+
 router.post('/export', authenticateAdmin, requireTenantAdminOrSuperAdmin, async function(req, res) {
   try {
     await ensureFeatureTables()
@@ -3748,6 +3940,24 @@ router.post('/export', authenticateAdmin, requireTenantAdminOrSuperAdmin, async 
         { header: 'Risk Tier', key: 'risk_tier' },
         { header: 'Tags', value: (row) => (row.tags || []).join('|') },
         { header: 'Requested At', key: 'requested_at' }
+      ]
+    } else if (resource === 'email_jobs') {
+      result = await buildEmailJobListResult({ tenantId, query })
+      columns = [
+        { header: 'Job ID', key: 'id' },
+        { header: 'Tenant ID', key: 'tenant_id' },
+        { header: 'Recipient', key: 'to_email' },
+        { header: 'Template', key: 'template_key' },
+        { header: 'Delivery Type', key: 'delivery_type' },
+        { header: 'Status', key: 'status' },
+        { header: 'Attempts', key: 'attempt_count' },
+        { header: 'Scheduled For', key: 'scheduled_for' },
+        { header: 'Last Attempt', key: 'last_attempt_at' },
+        { header: 'Sent At', key: 'sent_at' },
+        { header: 'Provider Message ID', key: 'provider_message_id' },
+        { header: 'Preview Path', key: 'preview_url' },
+        { header: 'Unique Key', key: 'unique_key' },
+        { header: 'Last Error', key: 'last_error' }
       ]
     } else if (resource === 'trades') {
       const filters = query.filters || {}
@@ -4236,7 +4446,7 @@ router.post('/export', authenticateAdmin, requireTenantAdminOrSuperAdmin, async 
         { header: 'Updated At', key: 'updated_at' }
       ]
     } else {
-      return res.status(400).json({ error: 'resource must be traders, accounts, payouts, trades, leaderboard, bbook, chat_conversations, violations, or disputes' })
+      return res.status(400).json({ error: 'resource must be traders, accounts, payouts, email_jobs, trades, leaderboard, bbook, chat_conversations, violations, or disputes' })
     }
 
     const csv = serializeCsv(result.allRows || [], columns)
@@ -4246,6 +4456,80 @@ router.post('/export', authenticateAdmin, requireTenantAdminOrSuperAdmin, async 
   } catch (error) {
     logger.error('Admin export error:', { error: error.message })
     res.status(500).json({ error: 'Could not export data' })
+  }
+})
+
+router.get('/email-jobs', authenticateAdmin, requireTenantAdminOrSuperAdmin, async function(req, res) {
+  try {
+    await ensureFeatureTables()
+    await ensureEmailQueueInfrastructure()
+    const tenantId = getScopedTenantId(req)
+    const paging = parseListPaging(req)
+    const listResult = await buildEmailJobListResult({
+      tenantId,
+      query: {
+        page: paging.page,
+        pageSize: paging.pageSize,
+        search: req.query.search || '',
+        sort: req.query.sort || 'created_at',
+        order: req.query.order || 'desc',
+        filters: {
+          status: req.query.status || null,
+          template_key: req.query.template_key || null,
+          delivery_type: req.query.delivery_type || null
+        }
+      }
+    })
+    res.json(wantsAdminListContract(req) ? listResult : {
+      summary: listResult.summary,
+      rows: listResult.rows
+    })
+  } catch (error) {
+    logger.error('Admin email jobs fetch error:', { error: error.message })
+    res.status(500).json({ error: 'Could not fetch email jobs' })
+  }
+})
+
+router.post('/email-jobs/:jobId/retry', authenticateAdmin, requireTenantAdminOrSuperAdmin, async function(req, res) {
+  try {
+    await ensureEmailQueueInfrastructure()
+    const tenantId = getScopedTenantId(req)
+    const jobId = parseInt(req.params.jobId, 10)
+    if (!Number.isFinite(jobId) || jobId <= 0) {
+      return res.status(400).json({ error: 'Valid email job id is required' })
+    }
+
+    const lookup = await pool.query(
+      `SELECT id, status
+         FROM email_jobs
+        WHERE id = $1
+          AND ($2::bigint IS NULL OR tenant_id = $2)
+        LIMIT 1`,
+      [jobId, tenantId]
+    )
+    if (lookup.rows.length === 0) {
+      return res.status(404).json({ error: 'Email job not found' })
+    }
+
+    const status = String(lookup.rows[0].status || '').toLowerCase()
+    if (!['retry', 'dead', 'failed'].includes(status)) {
+      return res.status(409).json({ error: 'Only retryable email jobs can be re-queued' })
+    }
+
+    await pool.query(
+      `UPDATE email_jobs
+          SET status = 'pending',
+              scheduled_for = NOW(),
+              last_error = NULL,
+              updated_at = NOW()
+        WHERE id = $1`,
+      [jobId]
+    )
+
+    res.json({ message: 'Email job re-queued', job_id: jobId })
+  } catch (error) {
+    logger.error('Admin email job retry error:', { error: error.message })
+    res.status(500).json({ error: 'Could not re-queue email job' })
   }
 })
 
@@ -4314,8 +4598,10 @@ router.post('/kyc/approve', authenticateAdmin, requireAdminCapability('kyc:revie
     } catch (_) {}
 
     // Send automated email to the user
-    const tenant = await getTenantById(result.rows[0].tenant_id)
-    await sendKycApprovedEmail(result.rows[0].email, result.rows[0].full_name, { tenant })
+    await enqueueKycApprovedEmail(result.rows[0].email, result.rows[0].full_name, {
+      tenantId: result.rows[0].tenant_id,
+      userId: result.rows[0].id
+    })
 
     res.json({ message: 'KYC approved successfully' })
   } catch (error) {
@@ -4354,8 +4640,10 @@ router.post('/kyc/reject', authenticateAdmin, requireAdminCapability('kyc:review
     } catch (_) {}
 
     // Send automated email to the user
-    const tenant = await getTenantById(result.rows[0].tenant_id)
-    await sendKycRejectedEmail(result.rows[0].email, result.rows[0].full_name, reason, { tenant })
+    await enqueueKycRejectedEmail(result.rows[0].email, result.rows[0].full_name, reason, {
+      tenantId: result.rows[0].tenant_id,
+      userId: result.rows[0].id
+    })
 
     res.json({ message: 'KYC rejected' })
   } catch (error) {
@@ -5173,7 +5461,7 @@ router.post('/payouts/approve', authenticateAdmin, requireAdminCapability('payou
     // Fetch payout details and user email/name first
     const payoutData = await client.query(
       `SELECT p.amount_requested, p.amount_payable, p.payment_method, p.account_id, p.status,
-              u.email, u.full_name, u.tenant_id
+              u.id::text AS user_id, u.email, u.full_name, u.tenant_id
        FROM payouts p
        JOIN users u ON p.user_id = u.id
        WHERE p.id = $1
@@ -5187,7 +5475,7 @@ router.post('/payouts/approve', authenticateAdmin, requireAdminCapability('payou
       return res.status(404).json({ error: 'Payout not found' })
     }
 
-    const { amount_requested, amount_payable, payment_method, account_id, status, email, full_name, tenant_id } = payoutData.rows[0]
+    const { amount_requested, amount_payable, payment_method, account_id, status, user_id, email, full_name, tenant_id } = payoutData.rows[0]
     if (status !== 'pending') {
       await client.query('ROLLBACK')
       return res.status(400).json({ error: 'Payout is not pending' })
@@ -5225,8 +5513,10 @@ router.post('/payouts/approve', authenticateAdmin, requireAdminCapability('payou
     await client.query('COMMIT')
 
     // Send automated email to the user
-    const tenant = await getTenantById(tenant_id)
-    await sendPayoutApprovedEmail(email, full_name, amount_payable, payment_method, { tenant })
+    await enqueuePayoutApprovedEmail(email, full_name, amount_payable, payment_method, {
+      tenantId: tenant_id,
+      userId: user_id || null
+    })
 
     res.json({ message: 'Payout marked as paid and user notified' })
   } catch (error) {
@@ -5247,7 +5537,7 @@ router.post('/payouts/reject', authenticateAdmin, requireAdminCapability('payout
 
     // Fetch payout details and user email/name
     const payoutData = await pool.query(
-      `SELECT p.amount_requested, u.email, u.full_name, u.tenant_id
+      `SELECT p.amount_requested, u.id::text AS user_id, u.email, u.full_name, u.tenant_id
        FROM payouts p
        JOIN users u ON p.user_id = u.id
        WHERE p.id = $1
@@ -5259,7 +5549,7 @@ router.post('/payouts/reject', authenticateAdmin, requireAdminCapability('payout
       return res.status(404).json({ error: 'Payout not found' })
     }
 
-    const { amount_requested, email, full_name, tenant_id } = payoutData.rows[0]
+    const { amount_requested, user_id, email, full_name, tenant_id } = payoutData.rows[0]
 
     await pool.query(
       `UPDATE payouts SET
@@ -5271,8 +5561,10 @@ router.post('/payouts/reject', authenticateAdmin, requireAdminCapability('payout
     )
 
     // Send automated email to the user
-    const tenant = await getTenantById(tenant_id)
-    await sendPayoutRejectedEmail(email, full_name, amount_requested, reason, { tenant })
+    await enqueuePayoutRejectedEmail(email, full_name, amount_requested, reason, {
+      tenantId: tenant_id,
+      userId: user_id || null
+    })
 
     res.json({ message: 'Payout rejected and user notified' })
   } catch (error) {
@@ -7861,7 +8153,7 @@ router.get('/kyc-quality-flags', authenticateAdmin, requireAdminCapability('kyc:
          u.id_document_path,
          u.selfie_path
        FROM users u
-       WHERE u.id_document_path IS NOT NULL OR u.selfie_path IS NOT NULL
+       WHERE ${buildKycDocumentPresencePredicate('u')}
          AND ($1::bigint IS NULL OR COALESCE(u.tenant_id, $1) = $1)
        ORDER BY COALESCE(u.kyc_submitted_at, u.created_at) DESC
        LIMIT 500`,
@@ -9133,4 +9425,7 @@ router.get('/kyc/document/:userId/:type', authenticateAdmin, requireAdminCapabil
     res.status(500).json({ error: 'Failed to retrieve KYC document' });
   }
 });
+router.__test__ = {
+  buildKycDocumentPresencePredicate
+}
 module.exports = router;

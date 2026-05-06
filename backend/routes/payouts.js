@@ -8,6 +8,7 @@ const logger = require('../utils/logger')
 const Decimal = require('decimal.js')
 const { CONTRACT_SIZES } = require('../constants')
 const { getTenantSettings } = require('../services/tenantPolicyService')
+const { enqueuePayoutRequestedEmail } = require('../utils/emailQueue')
 const {
   abandonIdempotentRequest,
   beginIdempotentRequest,
@@ -126,6 +127,17 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
         await client.query('ROLLBACK')
         return res.status(403).json({ error: 'Account is not active' })
       }
+
+      const userProfile = await client.query(
+        `SELECT email, full_name
+           FROM users
+          WHERE id = $1
+            AND COALESCE(tenant_id, $2) = $2
+          LIMIT 1`,
+        [req.user.userId, tenantId]
+      )
+      const payoutEmail = userProfile.rows[0]?.email || null
+      const payoutName = userProfile.rows[0]?.full_name || 'Trader'
 
       // FIX (BUG-H4): The old code calculated floatingPnl in a loop but then
       // immediately did ROLLBACK + early-return if ANY open trades existed.
@@ -289,6 +301,29 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
         await completeIdempotentRequest(pool, idempotencyClaim, 201, responseBody)
         idempotencyClaim = null
       }
+
+      if (payoutEmail) {
+        try {
+          await enqueuePayoutRequestedEmail(
+            payoutEmail,
+            payoutName,
+            amountNum,
+            amount_payable,
+            payment_method,
+            {
+              tenantId,
+              userId: req.user.userId
+            }
+          )
+        } catch (emailErr) {
+          logger.error('[payouts] Failed to enqueue payout requested email', {
+            error: emailErr.message,
+            userId: req.user.userId,
+            payoutId: payout.rows[0]?.id || null
+          })
+        }
+      }
+
       res.status(201).json(responseBody)
     } catch (txErr) {
       await client.query('ROLLBACK').catch(() => {})

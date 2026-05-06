@@ -27,6 +27,7 @@ const AdminPayouts = lazy(() => import('./pages/admin/AdminPayouts'))
 const AdminPlatformPnL = lazy(() => import('./pages/admin/AdminPlatformPnL'))
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'))
 const AdminAccess = lazy(() => import('./pages/admin/AdminAccess'))
+const AdminEmailJobs = lazy(() => import('./pages/admin/AdminEmailJobs'))
 const AdminDisputes = lazy(() => import('./pages/admin/AdminDisputes'))
 const AdminChat = lazy(() => import('./pages/admin/AdminChat'))
 const AdminLeaderboard = lazy(() => import('./pages/admin/AdminLeaderboard'))
@@ -125,6 +126,7 @@ function AnimatedRoutes({ user, login, logout }) {
             <Route path="pnl" element={<AdminPlatformPnL />} />
             <Route path="settings" element={<AdminSettings />} />
             <Route path="access" element={<AdminAccess />} />
+            <Route path="email-jobs" element={<AdminEmailJobs />} />
             <Route path="tenants" element={<AdminTenants />} />
             <Route path="command-center" element={<AdminCommandCenter />} />
             <Route path="disputes" element={<AdminDisputes />} />

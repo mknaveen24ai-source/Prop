@@ -32,7 +32,7 @@ export default function Leaderboard() {
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
             {renderIcon('leaderboard', { size: 48, color: 'var(--accent-gold)' })}
           </div>
-          <h1 style={{ fontFamily: 'Inter, serif', color: 'var(--accent)', fontSize: '28px', marginBottom: '8px' }}>
+      <h1 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', fontSize: '28px', marginBottom: '8px' }}>
             Leaderboard
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
@@ -90,14 +90,14 @@ export default function Leaderboard() {
                   <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
                     {row.country || 'Unknown'} · ${parseFloat(row.account_size).toLocaleString('en-US')} account
                   </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px', fontFamily: 'DM Mono, monospace' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
                     Trader ID: {row.trader_uid || '—'} · Account ID: {row.account_uid || '—'}
                   </div>
                 </div>
 
                 {/* Profit % */}
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--green)', fontFamily: 'DM Mono, monospace' }}>
+                <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--green)', fontFamily: 'var(--font-mono)' }}>
                     +{parseFloat(row.profit_pct).toFixed(2)}%
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>

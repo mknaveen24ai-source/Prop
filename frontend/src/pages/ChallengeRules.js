@@ -18,7 +18,7 @@ function RuleRow({ label, value, accent = false }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '12px 0', borderBottom: '1px solid var(--navy-border)' }}>
       <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{label}</span>
-      <span style={{ color: accent ? 'var(--accent)' : 'var(--text)', fontSize: '13px', fontFamily: 'DM Mono, monospace', textAlign: 'right' }}>{value}</span>
+      <span style={{ color: accent ? 'var(--accent)' : 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-mono)', textAlign: 'right' }}>{value}</span>
     </div>
   )
 }
@@ -28,7 +28,7 @@ function ProgressCard({ title, used, remaining, limit, fill, tone = 'var(--accen
     <div className="card" style={{ padding: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', marginBottom: '10px' }}>
         <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)' }}>{title}</div>
-        <div style={{ fontSize: '12px', color: fill >= 80 ? 'var(--red)' : tone, fontFamily: 'DM Mono, monospace' }}>{fill.toFixed(1)}%</div>
+      <div style={{ fontSize: '12px', color: fill >= 80 ? 'var(--red)' : tone, fontFamily: 'var(--font-mono)' }}>{fill.toFixed(1)}%</div>
       </div>
       <div style={{ height: '10px', borderRadius: '999px', background: 'var(--navy-border)', overflow: 'hidden', marginBottom: '12px' }}>
         <div style={{ height: '100%', width: `${Math.min(fill, 100)}%`, background: fill >= 80 ? 'var(--red)' : tone, transition: 'width 0.4s ease' }} />

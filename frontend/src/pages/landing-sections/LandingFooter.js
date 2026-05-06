@@ -48,7 +48,7 @@ export default function LandingFooter({ onFooterCta }) {
                 <path d="M5 12H19M19 12L12 5M19 12L12 19" />
               </svg>
             </Link>
-            <p style={{ marginTop: '24px', fontSize: '12px', color: 'rgba(255,255,255,0.3)', fontFamily: 'DM Mono, monospace' }}>Accounts released monthly · Limited availability</p>
+        <p style={{ marginTop: '24px', fontSize: '12px', color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-mono)' }}>Accounts released monthly · Limited availability</p>
           </div>
         </div>
 
@@ -57,7 +57,7 @@ export default function LandingFooter({ onFooterCta }) {
           
           {/* Brand */}
           <div className="mp-footer-brand" style={{ gridColumn: 'span 2' }}>
-            <div style={{ fontFamily: 'Sora, sans-serif', fontSize: '24px', fontWeight: 800, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 800, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div className="mp-badge-dot"></div>
               <span style={{ color: '#fff' }}>PROPFIRM </span>
               <span style={{ color: '#2962ff' }}>V2</span>
@@ -113,7 +113,7 @@ export default function LandingFooter({ onFooterCta }) {
             },
           ].map(col => (
             <div key={col.title}>
-              <h4 style={{ fontFamily: 'Sora, sans-serif', fontSize: '14px', color: 'rgba(255,255,255,0.5)', marginBottom: '24px', textTransform: 'uppercase', letterSpacing: '0.15em' }}>{col.title}</h4>
+                <h4 style={{ fontFamily: 'var(--font-display)', fontSize: '14px', color: 'rgba(255,255,255,0.5)', marginBottom: '24px', textTransform: 'uppercase', letterSpacing: '0.15em' }}>{col.title}</h4>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {col.links.map(link => (
                   <li key={link}>
@@ -133,7 +133,7 @@ export default function LandingFooter({ onFooterCta }) {
 
           {/* Legal */}
           <div>
-            <h4 style={{ fontFamily: 'Sora, sans-serif', fontSize: '14px', color: 'rgba(255,255,255,0.5)', marginBottom: '24px', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Legal</h4>
+            <h4 style={{ fontFamily: 'var(--font-display)', fontSize: '14px', color: 'rgba(255,255,255,0.5)', marginBottom: '24px', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Legal</h4>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <li><Link to={buildTenantPath('/terms')} style={{ color: 'rgba(255,255,255,0.35)', textDecoration: 'none', fontSize: '14px', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color='#fff'} onMouseOut={e => e.currentTarget.style.color='rgba(255,255,255,0.35)'}>Terms of Service</Link></li>
               <li><Link to={buildTenantPath('/privacy')} style={{ color: 'rgba(255,255,255,0.35)', textDecoration: 'none', fontSize: '14px', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color='#fff'} onMouseOut={e => e.currentTarget.style.color='rgba(255,255,255,0.35)'}>Privacy Policy</Link></li>
@@ -157,7 +157,7 @@ export default function LandingFooter({ onFooterCta }) {
                 <div key={p} style={{
                   fontSize: '10px', color: 'rgba(255,255,255,0.2)',
                   border: '1px solid rgba(255,255,255,0.06)', padding: '5px 10px',
-                  borderRadius: '6px', fontFamily: 'DM Mono, monospace',
+                borderRadius: '6px', fontFamily: 'var(--font-mono)',
                   letterSpacing: '0.05em',
                 }}>{p}</div>
               ))}

@@ -491,8 +491,9 @@ function ChartPane({
   }, [instrument, livePrice, syncOverlayLevels, timeframe])
 
   useEffect(() => {
-    function handleMouseMove(event) {
+    function handlePointerMove(event) {
       if (!chartContainerRef.current || !candleSeriesRef.current || !dragRef.current) return
+      if (dragRef.current.pointerId != null && event.pointerId !== dragRef.current.pointerId) return
       const bounds = chartContainerRef.current.getBoundingClientRect()
       const relativeY = Math.min(Math.max(event.clientY - bounds.top, 8), bounds.height - 8)
       const nextPrice = candleSeriesRef.current.coordinateToPrice(relativeY)
@@ -509,10 +510,14 @@ function ChartPane({
       )))
     }
 
-    function handleMouseUp() {
+    function finishDrag(event) {
       if (!dragRef.current) return
+      if (dragRef.current.pointerId != null && event?.pointerId != null && event.pointerId !== dragRef.current.pointerId) return
       const finishedDrag = dragRef.current
       dragRef.current = null
+      if (finishedDrag.target && typeof finishedDrag.target.releasePointerCapture === 'function' && finishedDrag.pointerId != null) {
+        try { finishedDrag.target.releasePointerCapture(finishedDrag.pointerId) } catch {}
+      }
       if (Number.isFinite(finishedDrag.price)) {
         onTradeLineAdjust?.(finishedDrag.tradeId, {
           [finishedDrag.field]: roundPrice(finishedDrag.price, instrument)
@@ -520,11 +525,13 @@ function ChartPane({
       }
     }
 
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', finishDrag)
+    window.addEventListener('pointercancel', finishDrag)
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', finishDrag)
+      window.removeEventListener('pointercancel', finishDrag)
     }
   }, [instrument, onTradeLineAdjust])
 
@@ -578,14 +585,19 @@ function ChartPane({
       {overlayLevels.map((level) => (
         <div
           key={`${level.id}-${level.field}`}
-          onMouseDown={(event) => {
+          onPointerDown={(event) => {
             if (!level.draggable) return
             event.preventDefault()
+            if (typeof event.currentTarget.setPointerCapture === 'function') {
+              try { event.currentTarget.setPointerCapture(event.pointerId) } catch {}
+            }
             dragRef.current = {
               tradeId: level.id,
               field: level.field,
               price: level.price,
-              y: level.y
+              y: level.y,
+              pointerId: event.pointerId,
+              target: event.currentTarget
             }
           }}
           style={{
@@ -597,7 +609,8 @@ function ChartPane({
             borderTop: `1px ${level.draggable ? 'dashed' : 'solid'} ${level.color}`,
             cursor: level.draggable ? 'ns-resize' : 'default',
             zIndex: 6,
-            pointerEvents: level.draggable ? 'auto' : 'none'
+            pointerEvents: level.draggable ? 'auto' : 'none',
+            touchAction: level.draggable ? 'none' : 'auto'
           }}
         >
           <span style={{

@@ -137,7 +137,7 @@ export default function LandingFAQ() {
                     ? `1px solid ${color}44`
                     : '1px solid rgba(255,255,255,0.06)',
                   cursor: 'pointer',
-                  fontFamily: 'Sora, sans-serif', fontWeight: 600, fontSize: '14px',
+              fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '14px',
                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                   boxShadow: isActive ? `0 4px 16px ${color}15` : 'none',
                 }}

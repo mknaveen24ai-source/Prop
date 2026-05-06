@@ -14,6 +14,7 @@ const redis = require('redis')
 const logger = require('./logger')
 
 let redisClient = null
+let redisInitPromise = null
 const CACHE_TTL = 5 * 60 // 5 minutes in seconds
 
 /**
@@ -22,32 +23,48 @@ const CACHE_TTL = 5 * 60 // 5 minutes in seconds
  */
 async function initializeRedis() {
   if (redisClient) return redisClient
+  if (redisInitPromise) return redisInitPromise
 
-  try {
-    redisClient = redis.createClient({
-      url: process.env.REDIS_URL || 'redis://localhost:6379',
-      socket: {
-        reconnectStrategy: (retries) => Math.min(retries * 50, 500)
+  redisInitPromise = (async () => {
+    let candidate = null
+    try {
+      candidate = redis.createClient({
+        url: process.env.REDIS_URL || 'redis://localhost:6379',
+        socket: {
+          connectTimeout: parseInt(process.env.REDIS_CONNECT_TIMEOUT_MS || '3000', 10) || 3000,
+          reconnectStrategy: (retries) => (retries >= 2 ? false : Math.min(retries * 50, 500))
+        }
+      })
+
+      candidate.on('error', (err) => {
+        logger.error('Redis error:', { error: err.message })
+        // Don't crash server if Redis fails - fall back to DB
+      })
+
+      candidate.on('reconnecting', () => {
+        logger.warn('Redis reconnecting...')
+      })
+
+      await candidate.connect()
+      redisClient = candidate
+      logger.info('Redis connected for token caching')
+      return redisClient
+    } catch (err) {
+      logger.error('Failed to initialize Redis:', { error: err.message })
+      if (candidate) {
+        try {
+          candidate.destroy()
+        } catch {}
       }
-    })
+      redisClient = null
+      // If Redis fails, we'll just use DB - performance degrades but auth still works
+      return null
+    } finally {
+      redisInitPromise = null
+    }
+  })()
 
-    redisClient.on('error', (err) => {
-      logger.error('Redis error:', { error: err.message })
-      // Don't crash server if Redis fails - fall back to DB
-    })
-
-    redisClient.on('reconnecting', () => {
-      logger.warn('Redis reconnecting...')
-    })
-
-    await redisClient.connect()
-    logger.info('Redis connected for token caching')
-    return redisClient
-  } catch (err) {
-    logger.error('Failed to initialize Redis:', { error: err.message })
-    // If Redis fails, we'll just use DB - performance degrades but auth still works
-    return null
-  }
+  return redisInitPromise
 }
 
 /**

@@ -125,7 +125,7 @@ export const MASTERPIECE_CSS = `
 
   /* ══ TYPOGRAPHY ══ */
   .mp-h1 {
-    font-family: 'Sora', sans-serif;
+    font-family: var(--font-display);
     font-size: clamp(48px, 8vw, 96px);
     font-weight: 800;
     line-height: 1.05;
@@ -138,7 +138,7 @@ export const MASTERPIECE_CSS = `
   }
   
   .mp-h2 {
-    font-family: 'Sora', sans-serif;
+    font-family: var(--font-display);
     font-size: clamp(36px, 5vw, 64px);
     font-weight: 700;
     line-height: 1.1;
@@ -148,7 +148,7 @@ export const MASTERPIECE_CSS = `
   }
 
   .mp-h3 {
-    font-family: 'Sora', sans-serif;
+    font-family: var(--font-display);
     font-size: clamp(22px, 3vw, 32px);
     font-weight: 600;
     line-height: 1.2;
@@ -193,7 +193,7 @@ export const MASTERPIECE_CSS = `
     padding: 18px 40px;
     background: var(--mp-gradient-blue);
     color: #fff;
-    font-family: 'Sora', sans-serif;
+    font-family: var(--font-display);
     font-size: 16px;
     font-weight: 600;
     text-transform: uppercase;
@@ -233,7 +233,7 @@ export const MASTERPIECE_CSS = `
     padding: 16px 36px;
     background: rgba(255,255,255,0.04);
     color: var(--mp-text);
-    font-family: 'Sora', sans-serif;
+    font-family: var(--font-display);
     font-size: 16px;
     font-weight: 500;
     border-radius: 14px;
@@ -334,7 +334,7 @@ export const MASTERPIECE_CSS = `
     border: 1px solid rgba(41, 98, 255, 0.2);
     border-radius: 100px;
     color: var(--mp-accent-bright);
-    font-family: 'DM Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 13px;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -532,7 +532,7 @@ export const MASTERPIECE_CSS = `
     border: none;
     color: var(--mp-text);
     font-size: 22px;
-    font-family: 'Sora', sans-serif;
+    font-family: var(--font-display);
     font-weight: 500;
     cursor: pointer;
     text-align: left;
@@ -597,7 +597,7 @@ export const MASTERPIECE_CSS = `
     justify-content: center;
     font-size: 22px;
     font-weight: 700;
-    font-family: 'Sora', sans-serif;
+    font-family: var(--font-display);
     color: var(--mp-accent-bright);
     box-shadow: 0 0 30px var(--mp-accent-glow), inset 0 0 20px rgba(41, 98, 255, 0.05);
     z-index: 2;
@@ -706,7 +706,7 @@ export const MASTERPIECE_CSS = `
   }
 
   .mp-stat-number {
-    font-family: 'DM Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 14px;
     font-weight: 600;
     color: var(--mp-text-secondary);

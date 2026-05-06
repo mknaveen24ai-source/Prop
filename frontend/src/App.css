@@ -4,7 +4,6 @@
    ============================================================ */
 
 /* ── 1. Fonts ── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 @import './styles/tokens.css';
 @import './styles/primitives.css';
 @import './styles/responsive.css';
@@ -212,7 +211,7 @@ h1, h2, h3, h4, h5, h6 {
   margin-bottom: 8px;
 }
 .card-stat-value {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 28px;
   font-weight: 700;
   color: var(--text-primary);
@@ -228,7 +227,7 @@ h1, h2, h3, h4, h5, h6 {
   gap: 8px;
   padding: 12px 24px;
   border-radius: var(--radius-md);
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-ui);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -318,7 +317,7 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: var(--radius-md); 
   padding: 14px 16px;
   color: var(--text-primary); 
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-ui);
   font-size: 15px; 
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   outline: none;
@@ -375,7 +374,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 .data-table tbody tr { transition: background 0.15s; }
 .data-table tbody tr:hover { background: var(--bg-hover); }
-.data-table td.mono { font-family: 'JetBrains Mono', monospace; }
+.data-table td.mono { font-family: var(--font-mono); }
 
 /* Layout Structure */
 .dashboard-layout { display: flex; min-height: 100vh; background: var(--bg-base); }
@@ -454,7 +453,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .stat-value {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   font-size: clamp(20px, 2vw, 26px);
   font-weight: 800;
   color: var(--text-primary);
@@ -566,7 +565,7 @@ h1, h2, h3, h4, h5, h6 {
   flex-direction: column;
 }
 .nav-logo {
-  font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 800;
+  font-family: var(--font-ui); font-size: 18px; font-weight: 800;
   letter-spacing: 0.05em; color: var(--text-primary);
 }
 

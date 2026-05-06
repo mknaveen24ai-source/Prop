@@ -67,7 +67,7 @@ export default function LandingScaling() {
                   textTransform: 'uppercase', letterSpacing: '0.15em',
                   color: step.color, marginBottom: '16px',
                   border: `1px solid ${step.glow.replace('0.25', '0.15')}`,
-                  fontFamily: 'DM Mono, monospace',
+              fontFamily: 'var(--font-mono)',
                 }}>
                   {step.diff}
                 </div>

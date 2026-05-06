@@ -18,6 +18,7 @@ const pool     = require('../db')
 const bcrypt   = require('bcryptjs')
 const logger   = require('../utils/logger')
 const rateLimit = require('express-rate-limit')
+const { resolveMailTransportConfig } = require('../mailer')
 
 // Only allow 5 setup attempts per hour (prevents brute-force seeding)
 const setupLimiter = rateLimit({
@@ -260,12 +261,15 @@ router.get('/checklist', async function(req, res) {
     })
 
     // 4. Email configured?
-    const emailConfigured = !!(process.env.SMTP_HOST || process.env.SENDGRID_API_KEY)
+    const mailTransport = resolveMailTransportConfig()
+    const emailConfigured = mailTransport.mode !== 'preview'
     checks.push({
       id: 'email_configured',
       title: 'Email (SMTP) configured',
       complete: emailConfigured,
-      detail: emailConfigured ? 'SMTP/SendGrid env var found' : 'No SMTP_HOST or SENDGRID_API_KEY in .env',
+      detail: emailConfigured
+        ? `${mailTransport.provider}${mailTransport.host ? ` via ${mailTransport.host}:${mailTransport.port}` : ''}`
+        : 'No SMTP configured - local preview transport only',
       action: 'Edit .env file — add SMTP_HOST + SMTP_USER + SMTP_PASS'
     })
 

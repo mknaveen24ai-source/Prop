@@ -2,6 +2,7 @@ import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
 import RiskWarningBanner from '../components/RiskWarningBanner';
+import { useTheme } from '../ThemeContext';
 import { trackEvent } from '../utils/analytics';
 import { useBranding } from '../BrandingContext';
 import { buildTenantPath } from '../utils/tenant';
@@ -46,6 +47,7 @@ function upsertMetaTag({ name, property, content, id }) {
 
 export default function Landing() {
   const { tenant } = useBranding();
+  const { theme } = useTheme();
   const requiresPayment = isPaidTenant(tenant);
   const challengeFeeDisplay = getChallengeFeeDisplay(tenant);
   const defaultTitle = requiresPayment
@@ -218,7 +220,7 @@ export default function Landing() {
 
   return (
     <>
-      <div className={`mode-public ui-shell masterpiece-landing${showStickyCta ? ' has-sticky-cta' : ''}`} data-theme="dark">
+      <div className={`mode-public ui-shell masterpiece-landing${showStickyCta ? ' has-sticky-cta' : ''}`} data-theme={theme}>
         {/* Liquid / Noise Filter Definitions */}
         <svg style={{ position: 'absolute', width: 0, height: 0, pointerEvents: 'none' }}>
           <defs>
@@ -252,7 +254,7 @@ export default function Landing() {
       {/* Glass Navbar */}
       <nav className={`nav-transparent ${scrolled ? 'scrolled' : ''}`}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-          <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '20px', fontWeight: 800, letterSpacing: '0.08em', color: '#fff' }}>
+          <span style={{ fontFamily: 'var(--font-ui)', fontSize: '20px', fontWeight: 800, letterSpacing: '0.08em', color: '#fff' }}>
             {String(tenant?.logo_text || tenant?.brand?.short_name || tenant?.name || 'PROPFIRM').toUpperCase()}
           </span>
         </div>
@@ -267,7 +269,7 @@ export default function Landing() {
               ].map(link => (
                 <a key={link.label} href={link.href} style={{
                   color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '14px',
-                  fontFamily: 'Inter, sans-serif', fontWeight: '500',
+                  fontFamily: 'var(--font-ui)', fontWeight: '500',
                   transition: 'color 0.2s',
                   position: 'relative',
                 }}
@@ -337,7 +339,7 @@ export default function Landing() {
         <div className="mp-sticky-cta">
           <div className="mp-sticky-cta-inner">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: '14px', color: '#fff' }}>
+              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '14px', color: '#fff' }}>
                 {requiresPayment ? 'Start Your Trading Challenge Today' : 'Start Your Free Evaluation Today'}
               </span>
               <span style={{ color: 'rgba(255,255,255,0.58)', fontSize: '12px' }}>

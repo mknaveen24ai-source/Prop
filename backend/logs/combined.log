@@ -10710,3 +10710,358 @@
 {"level":"info","message":"NewsService stopped","timestamp":"2026-05-05 09:40:23"}
 {"error":"Server is not running.","level":"warn","message":"HTTP server close error during shutdown","timestamp":"2026-05-05 09:40:23"}
 {"level":"info","message":"Redis connection closed","timestamp":"2026-05-05 09:40:23"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u1: size=$10000 target=8% ($800) maxDD=9% days=20","timestamp":"2026-05-05 21:42:28"}
+{"level":"info","message":"[progression] Creating Funded account for user u2: size=$5000 maxDD=4%","timestamp":"2026-05-05 21:42:28"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u3: size=$2000 target=10% ($200) maxDD=10% days=30","timestamp":"2026-05-05 21:42:28"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u1: size=$10000 target=8% ($800) maxDD=9% days=20","timestamp":"2026-05-05 21:46:25"}
+{"level":"info","message":"[progression] Creating Funded account for user u2: size=$5000 maxDD=4%","timestamp":"2026-05-05 21:46:25"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u3: size=$2000 target=10% ($200) maxDD=10% days=30","timestamp":"2026-05-05 21:46:25"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u1: size=$10000 target=8% ($800) maxDD=9% days=20","timestamp":"2026-05-05 21:50:42"}
+{"level":"info","message":"[progression] Creating Funded account for user u2: size=$5000 maxDD=4%","timestamp":"2026-05-05 21:50:42"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u3: size=$2000 target=10% ($200) maxDD=10% days=30","timestamp":"2026-05-05 21:50:42"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u1: size=$10000 target=8% ($800) maxDD=9% days=20","timestamp":"2026-05-05 21:56:27"}
+{"level":"info","message":"[progression] Creating Funded account for user u2: size=$5000 maxDD=4%","timestamp":"2026-05-05 21:56:27"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u3: size=$2000 target=10% ($200) maxDD=10% days=30","timestamp":"2026-05-05 21:56:27"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u1: size=$10000 target=8% ($800) maxDD=9% days=20","timestamp":"2026-05-05 22:06:54"}
+{"level":"info","message":"[progression] Creating Funded account for user u2: size=$5000 maxDD=4%","timestamp":"2026-05-05 22:06:54"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u3: size=$2000 target=10% ($200) maxDD=10% days=30","timestamp":"2026-05-05 22:06:54"}
+{"level":"info","message":"[startup] Express trust proxy configured","timestamp":"2026-05-05 22:11:01","trustProxy":false}
+{"level":"info","message":"NewsService started — 30-min refresh cycle, 15-min pre-event protection window","timestamp":"2026-05-05 22:11:01"}
+{"level":"info","message":"NewsService: news_cache table ready","timestamp":"2026-05-05 22:11:02"}
+{"commandsFile":"E:\\MT5_Data\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Files\\DWX\\DWX_Commands_0.txt","error":"EPERM: operation not permitted, open 'E:\\MT5_Data\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Files\\DWX\\DWX_Commands_0.txt'","level":"warn","message":"DWX command channel is not writable; shared feed will remain in read-only mode.","sourceKey":"shared","timestamp":"2026-05-05 22:11:02"}
+{"level":"info","message":"Watching MT5 price feed for real-time updates...","timestamp":"2026-05-05 22:11:02"}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-05 22:11:02","total":31}
+{"duration":850,"level":"warn","message":"[PERFORMANCE] Slow database query: 850ms","sql":"SELECT instrument, COUNT(*)::int AS count, MIN(recorded_at) AS min_recorded_at\n       FROM price_fee","timestamp":"2026-05-05 22:11:02"}
+{"eligibleInstrumentCount":4,"level":"info","message":"MT5 history bootstrap skipped configured instruments that are not present in the MT5 export.","sample":["USDJPY","USDCHF","AUDUSD","USDCAD","NZDUSD","EURGBP","EURJPY","GBPJPY","AUDJPY","CADJPY","CHFJPY","NZDJPY"],"skippedConfiguredCount":28,"source":"DWX_History_Export.json","timestamp":"2026-05-05 22:11:02","truncated":true}
+{"hourlyDays":365,"hourlyDeleted":0,"level":"info","message":"Price history pruned:","rawDays":90,"rawDeleted":400,"timestamp":"2026-05-05 22:11:02"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:03"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:11:03"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:04"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:11:04"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:05"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:11:05"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:06"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:11:06"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:08"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:11:08"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:09"}
+{"error":"","level":"error","message":"NewsService: ForexFactory fetch failed, falling back to DB cache","timestamp":"2026-05-05 22:11:09"}
+{"level":"info","message":"NewsService: loaded 13 events from DB cache","timestamp":"2026-05-05 22:11:09"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:11:09"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:10"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:11:11"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:12"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:11:12"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:13"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:11:14"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:15"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:11:15"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:16"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:11:17"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:18"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:11:19"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:11:20"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:11:20"}
+{"batch_size":10,"level":"info","message":"[email-worker] Started","poll_ms":5000,"timestamp":"2026-05-05 22:11:46"}
+{"level":"info","message":"[startup] Express trust proxy configured","timestamp":"2026-05-05 22:12:24","trustProxy":false}
+{"level":"info","message":"NewsService started — 30-min refresh cycle, 15-min pre-event protection window","timestamp":"2026-05-05 22:12:24"}
+{"level":"info","message":"NewsService: news_cache table ready","timestamp":"2026-05-05 22:12:24"}
+{"commandsFile":"E:\\MT5_Data\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Files\\DWX\\DWX_Commands_0.txt","error":"EPERM: operation not permitted, open 'E:\\MT5_Data\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Files\\DWX\\DWX_Commands_0.txt'","level":"warn","message":"DWX command channel is not writable; shared feed will remain in read-only mode.","sourceKey":"shared","timestamp":"2026-05-05 22:12:24"}
+{"level":"info","message":"Watching MT5 price feed for real-time updates...","timestamp":"2026-05-05 22:12:24"}
+{"eligibleInstrumentCount":4,"level":"info","message":"MT5 history bootstrap skipped configured instruments that are not present in the MT5 export.","sample":["USDJPY","USDCHF","AUDUSD","USDCAD","NZDUSD","EURGBP","EURJPY","GBPJPY","AUDJPY","CADJPY","CHFJPY","NZDJPY"],"skippedConfiguredCount":28,"source":"DWX_History_Export.json","timestamp":"2026-05-05 22:12:24","truncated":true}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-05 22:12:24","total":31}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:25"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:12:25"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:26"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:12:26"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:27"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:12:27"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:29"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:12:29"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:30"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:12:30"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:31"}
+{"error":"","level":"error","message":"NewsService: ForexFactory fetch failed, falling back to DB cache","timestamp":"2026-05-05 22:12:31"}
+{"level":"info","message":"NewsService: loaded 13 events from DB cache","timestamp":"2026-05-05 22:12:31"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:12:32"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:33"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:12:33"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:34"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:12:34"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:36"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:12:36"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:37"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:12:38"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:39"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:12:39"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:40"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:12:41"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:42"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:12:43"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:44"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:12:44"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:45"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:12:46"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:47"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:12:47"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:49"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:12:49"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:12:50"}
+{"level":"info","message":"[startup] Express trust proxy configured","timestamp":"2026-05-05 22:14:53","trustProxy":false}
+{"level":"info","message":"NewsService started — 30-min refresh cycle, 15-min pre-event protection window","timestamp":"2026-05-05 22:14:53"}
+{"level":"info","message":"NewsService: news_cache table ready","timestamp":"2026-05-05 22:14:53"}
+{"commandsFile":"E:\\MT5_Data\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Files\\DWX\\DWX_Commands_0.txt","error":"EPERM: operation not permitted, open 'E:\\MT5_Data\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Files\\DWX\\DWX_Commands_0.txt'","level":"warn","message":"DWX command channel is not writable; shared feed will remain in read-only mode.","sourceKey":"shared","timestamp":"2026-05-05 22:14:53"}
+{"level":"info","message":"Watching MT5 price feed for real-time updates...","timestamp":"2026-05-05 22:14:53"}
+{"eligibleInstrumentCount":4,"level":"info","message":"MT5 history bootstrap skipped configured instruments that are not present in the MT5 export.","sample":["USDJPY","USDCHF","AUDUSD","USDCAD","NZDUSD","EURGBP","EURJPY","GBPJPY","AUDJPY","CADJPY","CHFJPY","NZDJPY"],"skippedConfiguredCount":28,"source":"DWX_History_Export.json","timestamp":"2026-05-05 22:14:53","truncated":true}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-05 22:14:53","total":31}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:14:54"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:14:54"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:14:55"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:14:55"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:14:56"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Failed to initialize Redis:","timestamp":"2026-05-05 22:14:56"}
+{"level":"info","message":"[kafka] Kafka disabled; continuing without event streaming","timestamp":"2026-05-05 22:14:56"}
+{"env":"development","level":"info","message":"Server started:","port":"5000","timestamp":"2026-05-05 22:14:56"}
+{"batch_size":10,"level":"info","message":"[email-worker] Started","poll_ms":5000,"timestamp":"2026-05-05 22:14:57"}
+{"error":"","level":"error","message":"NewsService: ForexFactory fetch failed, falling back to DB cache","timestamp":"2026-05-05 22:15:00"}
+{"level":"info","message":"NewsService: loaded 13 events from DB cache","timestamp":"2026-05-05 22:15:00"}
+{"duration":1,"error":"column \"reset_token\" of relation \"users\" does not exist","level":"error","message":"[PERFORMANCE] Failed query: 1ms","sql":"UPDATE users SET reset_token = $1, reset_token_expires = $2 WHERE id = $3","timestamp":"2026-05-05 22:15:02"}
+{"error":"column \"reset_token\" of relation \"users\" does not exist","level":"error","message":"Forgot password error:","timestamp":"2026-05-05 22:15:02"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u1: size=$10000 target=8% ($800) maxDD=9% days=20","timestamp":"2026-05-05 22:16:09"}
+{"level":"info","message":"[progression] Creating Funded account for user u2: size=$5000 maxDD=4%","timestamp":"2026-05-05 22:16:09"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u3: size=$2000 target=10% ($200) maxDD=10% days=30","timestamp":"2026-05-05 22:16:09"}
+{"level":"info","message":"[startup] Express trust proxy configured","timestamp":"2026-05-05 22:16:38","trustProxy":false}
+{"level":"info","message":"NewsService started — 30-min refresh cycle, 15-min pre-event protection window","timestamp":"2026-05-05 22:16:38"}
+{"level":"info","message":"NewsService: news_cache table ready","timestamp":"2026-05-05 22:16:38"}
+{"commandsFile":"E:\\MT5_Data\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Files\\DWX\\DWX_Commands_0.txt","error":"EPERM: operation not permitted, open 'E:\\MT5_Data\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Files\\DWX\\DWX_Commands_0.txt'","level":"warn","message":"DWX command channel is not writable; shared feed will remain in read-only mode.","sourceKey":"shared","timestamp":"2026-05-05 22:16:38"}
+{"level":"info","message":"Watching MT5 price feed for real-time updates...","timestamp":"2026-05-05 22:16:38"}
+{"eligibleInstrumentCount":4,"level":"info","message":"MT5 history bootstrap skipped configured instruments that are not present in the MT5 export.","sample":["USDJPY","USDCHF","AUDUSD","USDCAD","NZDUSD","EURGBP","EURJPY","GBPJPY","AUDJPY","CADJPY","CHFJPY","NZDJPY"],"skippedConfiguredCount":28,"source":"DWX_History_Export.json","timestamp":"2026-05-05 22:16:38","truncated":true}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-05 22:16:38","total":31}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:16:39"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:16:39"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:16:40"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:16:40"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:16:41"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Failed to initialize Redis:","timestamp":"2026-05-05 22:16:41"}
+{"level":"info","message":"[kafka] Kafka disabled; continuing without event streaming","timestamp":"2026-05-05 22:16:41"}
+{"env":"development","level":"info","message":"Server started:","port":"5000","timestamp":"2026-05-05 22:16:41"}
+{"batch_size":10,"level":"info","message":"[email-worker] Started","poll_ms":5000,"timestamp":"2026-05-05 22:16:42"}
+{"error":"","level":"error","message":"NewsService: ForexFactory fetch failed, falling back to DB cache","timestamp":"2026-05-05 22:16:45"}
+{"level":"info","message":"NewsService: loaded 13 events from DB cache","timestamp":"2026-05-05 22:16:45"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u1: size=$10000 target=8% ($800) maxDD=9% days=20","timestamp":"2026-05-05 22:17:59"}
+{"level":"info","message":"[progression] Creating Funded account for user u2: size=$5000 maxDD=4%","timestamp":"2026-05-05 22:17:59"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u3: size=$2000 target=10% ($200) maxDD=10% days=30","timestamp":"2026-05-05 22:17:59"}
+{"level":"info","message":"[startup] Express trust proxy configured","timestamp":"2026-05-05 22:18:31","trustProxy":false}
+{"level":"info","message":"NewsService started — 30-min refresh cycle, 15-min pre-event protection window","timestamp":"2026-05-05 22:18:31"}
+{"level":"info","message":"NewsService: news_cache table ready","timestamp":"2026-05-05 22:18:31"}
+{"commandsFile":"E:\\MT5_Data\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Files\\DWX\\DWX_Commands_0.txt","error":"EPERM: operation not permitted, open 'E:\\MT5_Data\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Files\\DWX\\DWX_Commands_0.txt'","level":"warn","message":"DWX command channel is not writable; shared feed will remain in read-only mode.","sourceKey":"shared","timestamp":"2026-05-05 22:18:31"}
+{"level":"info","message":"Watching MT5 price feed for real-time updates...","timestamp":"2026-05-05 22:18:31"}
+{"eligibleInstrumentCount":4,"level":"info","message":"MT5 history bootstrap skipped configured instruments that are not present in the MT5 export.","sample":["USDJPY","USDCHF","AUDUSD","USDCAD","NZDUSD","EURGBP","EURJPY","GBPJPY","AUDJPY","CADJPY","CHFJPY","NZDJPY"],"skippedConfiguredCount":28,"source":"DWX_History_Export.json","timestamp":"2026-05-05 22:18:31","truncated":true}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-05 22:18:31","total":31}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:18:32"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:18:32"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:18:33"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:18:33"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:18:35"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Failed to initialize Redis:","timestamp":"2026-05-05 22:18:35"}
+{"level":"info","message":"[kafka] Kafka disabled; continuing without event streaming","timestamp":"2026-05-05 22:18:35"}
+{"env":"development","level":"info","message":"Server started:","port":"5000","timestamp":"2026-05-05 22:18:35"}
+{"batch_size":10,"level":"info","message":"[email-worker] Started","poll_ms":5000,"timestamp":"2026-05-05 22:18:35"}
+{"error":"","level":"error","message":"NewsService: ForexFactory fetch failed, falling back to DB cache","timestamp":"2026-05-05 22:18:39"}
+{"level":"info","message":"NewsService: loaded 13 events from DB cache","timestamp":"2026-05-05 22:18:39"}
+{"claimed":1,"dead":0,"level":"info","message":"[email-worker] Processed email batch","retry":1,"sent":0,"timestamp":"2026-05-05 22:18:50"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u1: size=$10000 target=8% ($800) maxDD=9% days=20","timestamp":"2026-05-05 22:23:02"}
+{"level":"info","message":"[progression] Creating Funded account for user u2: size=$5000 maxDD=4%","timestamp":"2026-05-05 22:23:02"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u3: size=$2000 target=10% ($200) maxDD=10% days=30","timestamp":"2026-05-05 22:23:02"}
+{"level":"info","message":"[startup] Express trust proxy configured","timestamp":"2026-05-05 22:23:39","trustProxy":false}
+{"level":"info","message":"NewsService started — 30-min refresh cycle, 15-min pre-event protection window","timestamp":"2026-05-05 22:23:39"}
+{"level":"info","message":"NewsService: news_cache table ready","timestamp":"2026-05-05 22:23:39"}
+{"commandsFile":"E:\\MT5_Data\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Files\\DWX\\DWX_Commands_0.txt","error":"EPERM: operation not permitted, open 'E:\\MT5_Data\\MetaQuotes\\Terminal\\D0E8209F77C8CF37AD8BF550E51FF075\\MQL5\\Files\\DWX\\DWX_Commands_0.txt'","level":"warn","message":"DWX command channel is not writable; shared feed will remain in read-only mode.","sourceKey":"shared","timestamp":"2026-05-05 22:23:39"}
+{"level":"info","message":"Watching MT5 price feed for real-time updates...","timestamp":"2026-05-05 22:23:39"}
+{"eligibleInstrumentCount":4,"level":"info","message":"MT5 history bootstrap skipped configured instruments that are not present in the MT5 export.","sample":["USDJPY","USDCHF","AUDUSD","USDCAD","NZDUSD","EURGBP","EURJPY","GBPJPY","AUDJPY","CADJPY","CHFJPY","NZDJPY"],"skippedConfiguredCount":28,"source":"DWX_History_Export.json","timestamp":"2026-05-05 22:23:39","truncated":true}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-05 22:23:39","total":31}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:23:40"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:23:40"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:23:41"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-05 22:23:41"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-05 22:23:42"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Failed to initialize Redis:","timestamp":"2026-05-05 22:23:42"}
+{"level":"info","message":"[kafka] Kafka disabled; continuing without event streaming","timestamp":"2026-05-05 22:23:42"}
+{"env":"development","level":"info","message":"Server started:","port":"5000","timestamp":"2026-05-05 22:23:42"}
+{"batch_size":10,"level":"info","message":"[email-worker] Started","poll_ms":5000,"timestamp":"2026-05-05 22:23:43"}
+{"claimed":1,"dead":0,"level":"info","message":"[email-worker] Processed email batch","retry":0,"sent":1,"timestamp":"2026-05-05 22:23:43"}
+{"error":"","level":"error","message":"NewsService: ForexFactory fetch failed, falling back to DB cache","timestamp":"2026-05-05 22:23:46"}
+{"level":"info","message":"NewsService: loaded 13 events from DB cache","timestamp":"2026-05-05 22:23:46"}
+{"claimed":1,"dead":0,"level":"info","message":"[email-worker] Processed email batch","retry":0,"sent":1,"timestamp":"2026-05-05 22:23:48"}
+{"level":"info","message":"[startup] Express trust proxy configured","timestamp":"2026-05-06 11:32:10","trustProxy":false}
+{"level":"info","message":"NewsService started — 30-min refresh cycle, 15-min pre-event protection window","timestamp":"2026-05-06 11:32:10"}
+{"level":"info","message":"NewsService: news_cache table ready","timestamp":"2026-05-06 11:32:11"}
+{"instruments":"EURUSD,GBPUSD,USDJPY,USDCHF,AUDUSD,USDCAD,NZDUSD,EURGBP,EURJPY,GBPJPY,AUDJPY,CADJPY,CHFJPY,NZDJPY,EURAUD,EURCAD,EURCHF,EURNZD,GBPAUD,GBPCAD,GBPCHF,GBPNZD,AUDCAD,AUDCHF,AUDNZD,CADCHF,NZDCAD,NZDCHF,XAUUSD,XAGUSD,US30,NAS100","level":"info","message":"Subscribed to MT5 symbols:","sourceKey":"shared","timestamp":"2026-05-06 11:32:11"}
+{"level":"info","message":"Watching MT5 price feed for real-time updates...","timestamp":"2026-05-06 11:32:11"}
+{"error":"self-signed certificate; if the root CA is installed locally, try running Node.js with --use-system-ca","level":"error","message":"NewsService: ForexFactory fetch failed, falling back to DB cache","timestamp":"2026-05-06 11:32:11"}
+{"level":"info","message":"NewsService: loaded 9 events from DB cache","timestamp":"2026-05-06 11:32:11"}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 11:32:11","total":31}
+{"duration":288,"level":"warn","message":"[PERFORMANCE] Slow database query: 288ms","sql":"SELECT instrument, COUNT(*)::int AS count, MIN(recorded_at) AS min_recorded_at\n       FROM price_fee","timestamp":"2026-05-06 11:32:11"}
+{"eligibleInstrumentCount":4,"level":"info","message":"MT5 history bootstrap skipped configured instruments that are not present in the MT5 export.","sample":["USDJPY","USDCHF","AUDUSD","USDCAD","NZDUSD","EURGBP","EURJPY","GBPJPY","AUDJPY","CADJPY","CHFJPY","NZDJPY"],"skippedConfiguredCount":28,"source":"DWX_History_Export.json","timestamp":"2026-05-06 11:32:11","truncated":true}
+{"hourlyDays":365,"hourlyDeleted":0,"level":"info","message":"Price history pruned:","rawDays":90,"rawDeleted":432,"timestamp":"2026-05-06 11:32:11"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-06 11:32:12"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-06 11:32:12"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:02:12.276Z"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-06 11:32:13"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-06 11:32:13"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-06 11:32:14"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Failed to initialize Redis:","timestamp":"2026-05-06 11:32:14"}
+{"level":"info","message":"[kafka] Kafka disabled; continuing without event streaming","timestamp":"2026-05-06 11:32:14"}
+{"env":"development","level":"info","message":"Server started:","port":"5000","timestamp":"2026-05-06 11:32:14"}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 11:33:11","total":31}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 11:34:12","total":31}
+{"level":"info","message":"SIGINT received, shutting down gracefully...","timestamp":"2026-05-06 11:34:28"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u1: size=$10000 target=8% ($800) maxDD=9% days=20","timestamp":"2026-05-06 11:37:30"}
+{"level":"info","message":"[progression] Creating Funded account for user u2: size=$5000 maxDD=4%","timestamp":"2026-05-06 11:37:30"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u3: size=$2000 target=10% ($200) maxDD=10% days=30","timestamp":"2026-05-06 11:37:30"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u1: size=$10000 target=8% ($800) maxDD=9% days=20","timestamp":"2026-05-06 11:38:07"}
+{"level":"info","message":"[progression] Creating Funded account for user u2: size=$5000 maxDD=4%","timestamp":"2026-05-06 11:38:07"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u3: size=$2000 target=10% ($200) maxDD=10% days=30","timestamp":"2026-05-06 11:38:07"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u1: size=$10000 target=8% ($800) maxDD=9% days=20","timestamp":"2026-05-06 11:42:17"}
+{"level":"info","message":"[progression] Creating Funded account for user u2: size=$5000 maxDD=4%","timestamp":"2026-05-06 11:42:17"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u3: size=$2000 target=10% ($200) maxDD=10% days=30","timestamp":"2026-05-06 11:42:17"}
+{"level":"info","message":"[startup] Express trust proxy configured","timestamp":"2026-05-06 12:07:31","trustProxy":false}
+{"level":"info","message":"NewsService started — 30-min refresh cycle, 15-min pre-event protection window","timestamp":"2026-05-06 12:07:31"}
+{"level":"info","message":"NewsService: news_cache table ready","timestamp":"2026-05-06 12:07:31"}
+{"instruments":"EURUSD,GBPUSD,USDJPY,USDCHF,AUDUSD,USDCAD,NZDUSD,EURGBP,EURJPY,GBPJPY,AUDJPY,CADJPY,CHFJPY,NZDJPY,EURAUD,EURCAD,EURCHF,EURNZD,GBPAUD,GBPCAD,GBPCHF,GBPNZD,AUDCAD,AUDCHF,AUDNZD,CADCHF,NZDCAD,NZDCHF,XAUUSD,XAGUSD,US30,NAS100","level":"info","message":"Subscribed to MT5 symbols:","sourceKey":"shared","timestamp":"2026-05-06 12:07:31"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:37:31.516Z"}
+{"level":"info","message":"Watching MT5 price feed for real-time updates...","timestamp":"2026-05-06 12:07:31"}
+{"duration":333,"level":"warn","message":"[PERFORMANCE] Slow database query: 333ms","sql":"SELECT instrument, COUNT(*)::int AS count, MIN(recorded_at) AS min_recorded_at\n       FROM price_fee","timestamp":"2026-05-06 12:07:31"}
+{"eligibleInstrumentCount":4,"level":"info","message":"MT5 history bootstrap skipped configured instruments that are not present in the MT5 export.","sample":["USDJPY","USDCHF","AUDUSD","USDCAD","NZDUSD","EURGBP","EURJPY","GBPJPY","AUDJPY","CADJPY","CHFJPY","NZDJPY"],"skippedConfiguredCount":28,"source":"DWX_History_Export.json","timestamp":"2026-05-06 12:07:31","truncated":true}
+{"hourlyDays":365,"hourlyDeleted":0,"level":"info","message":"Price history pruned:","rawDays":90,"rawDeleted":16,"timestamp":"2026-05-06 12:07:31"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-06 12:07:32"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-06 12:07:32"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-06 12:07:33"}
+{"level":"warn","message":"Redis reconnecting...","timestamp":"2026-05-06 12:07:33"}
+{"level":"info","message":"NewsService: fetched 10 High-impact events (USD,EUR,GBP,JPY,AUD,CAD,CHF,NZD combined)","timestamp":"2026-05-06 12:07:33"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Redis error:","timestamp":"2026-05-06 12:07:34"}
+{"error":"getaddrinfo ENOTFOUND red-d7sot6reo5us73em1pp0","level":"error","message":"Failed to initialize Redis:","timestamp":"2026-05-06 12:07:34"}
+{"level":"info","message":"[kafka] Kafka disabled; continuing without event streaming","timestamp":"2026-05-06 12:07:34"}
+{"env":"development","level":"info","message":"Server started:","port":"5000","timestamp":"2026-05-06 12:07:34"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:38:31.528Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:39:31.556Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:40:31.702Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:41:31.820Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:42:31.896Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:43:31.910Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:44:32.030Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:45:32.135Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:46:32.158Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:47:32.270Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:48:32.281Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:49:32.469Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:50:32.506Z"}
+{"duration":203,"level":"warn","message":"[PERFORMANCE] Slow database query: 203ms","sql":"INSERT INTO price_feed_history (instrument, bid, ask, recorded_at)\n     VALUES ($1, $2, $3, NOW()), ","timestamp":"2026-05-06 12:20:44"}
+{"duration":667,"endpoint":"/api/auth/login","level":"warn","message":"[PERFORMANCE] Slow request: POST /api/auth/login took 667ms","method":"POST","statusCode":200,"timestamp":"2026-05-06 12:20:44"}
+{"duration":1035,"level":"warn","message":"[PERFORMANCE] Slow database query: 1035ms","sql":"WITH bucketed AS (\n             SELECT FLOOR(EXTRACT(EPOCH FROM recorded_at) / $3)::bigint * $3 AS t","timestamp":"2026-05-06 12:21:12"}
+{"duration":1040,"endpoint":"/api/trades/candles","level":"warn","message":"[PERFORMANCE] Slow request: GET /api/trades/candles took 1040ms","method":"GET","statusCode":200,"timestamp":"2026-05-06 12:21:12"}
+{"duration":390,"level":"warn","message":"[PERFORMANCE] Slow database query: 390ms","sql":"WITH bucketed AS (\n             SELECT FLOOR(EXTRACT(EPOCH FROM recorded_at) / $3)::bigint * $3 AS t","timestamp":"2026-05-06 12:21:25"}
+{"duration":479,"level":"warn","message":"[PERFORMANCE] Slow database query: 479ms","sql":"WITH bucketed AS (\n             SELECT FLOOR(EXTRACT(EPOCH FROM recorded_at) / $3)::bigint * $3 AS t","timestamp":"2026-05-06 12:21:31"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:51:32.545Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:52:32.548Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:53:32.554Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:54:32.648Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:55:32.748Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:56:32.859Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:57:32.892Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:58:32.951Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T06:59:32.989Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:00:33.042Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:01:33.178Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:02:33.368Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:03:33.381Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:04:33.413Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:05:33.485Z"}
+{"duration":201,"level":"warn","message":"[PERFORMANCE] Slow database query: 201ms","sql":"INSERT INTO price_feed_history (instrument, bid, ask, recorded_at)\n     VALUES ($1, $2, $3, NOW()), ","timestamp":"2026-05-06 12:36:26"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:06:33.541Z"}
+{"level":"info","message":"NewsService: fetched 10 High-impact events (USD,EUR,GBP,JPY,AUD,CAD,CHF,NZD combined)","timestamp":"2026-05-06 12:37:31"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:07:33.792Z"}
+{"duration":20889,"error":"deadlock detected","level":"error","message":"[PERFORMANCE] Failed query: 20889ms","sql":"INSERT INTO price_feed_history_1h\n         (instrument, bucket_time, open, high, low, close, ticks, ","timestamp":"2026-05-06 12:37:52"}
+{"error":"deadlock detected","level":"error","message":"Hourly rollup sync failed:","timestamp":"2026-05-06 12:37:52"}
+{"duration":11906,"level":"warn","message":"[PERFORMANCE] Slow database query: 11906ms","sql":"INSERT INTO price_feed_history_1h\n       (instrument, bucket_time, open, high, low, close, ticks, up","timestamp":"2026-05-06 12:37:52"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:08:33.828Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:09:33.932Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:10:33.952Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:11:33.962Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:12:33.964Z"}
+{"duration":428,"level":"warn","message":"[PERFORMANCE] Slow database query: 428ms","sql":"WITH bucketed AS (\n             SELECT FLOOR(EXTRACT(EPOCH FROM recorded_at) / $3)::bigint * $3 AS t","timestamp":"2026-05-06 12:42:50"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:13:34.020Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:14:34.086Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:15:34.202Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:16:34.270Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:17:34.279Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:18:34.279Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:19:34.318Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:20:34.332Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:21:34.347Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:22:34.445Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:23:34.535Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:24:34.637Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:25:34.652Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:26:34.667Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:27:34.710Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:28:34.797Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:29:34.863Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:30:34.980Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:31:35.153Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:32:35.157Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:33:35.255Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:34:35.279Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:35:35.476Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:36:35.587Z"}
+{"level":"info","message":"NewsService: fetched 10 High-impact events (USD,EUR,GBP,JPY,AUD,CAD,CHF,NZD combined)","timestamp":"2026-05-06 13:07:31"}
+{"duration":6554,"error":"deadlock detected","level":"error","message":"[PERFORMANCE] Failed query: 6554ms","sql":"INSERT INTO price_feed_history_1h\n         (instrument, bucket_time, open, high, low, close, ticks, ","timestamp":"2026-05-06 13:07:38"}
+{"error":"deadlock detected","level":"error","message":"Hourly rollup sync failed:","timestamp":"2026-05-06 13:07:38"}
+{"duration":2854,"level":"warn","message":"[PERFORMANCE] Slow database query: 2854ms","sql":"INSERT INTO price_feed_history_1h\n       (instrument, bucket_time, open, high, low, close, ticks, up","timestamp":"2026-05-06 13:07:38"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:37:38.103Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:38:38.106Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:39:38.201Z"}
+{"duration":204,"level":"warn","message":"[PERFORMANCE] Slow database query: 204ms","sql":"SELECT key, value FROM tenant_settings WHERE tenant_id = $1 AND key = ANY($2::text[])","timestamp":"2026-05-06 13:10:02"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:40:38.315Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:41:38.315Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:42:38.446Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:43:38.483Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:44:38.651Z"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:45:38.737Z"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u1: size=$10000 target=8% ($800) maxDD=9% days=20","timestamp":"2026-05-06 13:15:40"}
+{"level":"info","message":"[progression] Creating Funded account for user u2: size=$5000 maxDD=4%","timestamp":"2026-05-06 13:15:40"}
+{"level":"info","message":"[progression] Creating Phase 2 for user u3: size=$2000 target=10% ($200) maxDD=10% days=30","timestamp":"2026-05-06 13:15:40"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T07:46:38.856Z"}
+{"error":"getaddrinfo ENOTFOUND nfs.faireconomy.media","level":"error","message":"NewsService: ForexFactory fetch failed, falling back to DB cache","timestamp":"2026-05-06 14:03:03"}
+{"duration":617,"level":"warn","message":"[PERFORMANCE] Slow database query: 617ms","sql":"SELECT *\n       FROM price_feed_sources\n      WHERE source_type IN ('shared_env', 'dwx_path')\n      ","timestamp":"2026-05-06 14:03:03"}
+{"level":"info","message":"MT5 prices updating normally:","timestamp":"2026-05-06T08:33:03.655Z"}
+{"duration":547,"level":"warn","message":"[PERFORMANCE] Slow database query: 547ms","sql":"SELECT t.id, t.account_id, t.instrument, t.direction, t.lot_size, t.open_price,\n              t.stop","timestamp":"2026-05-06 14:03:03"}
+{"level":"info","message":"NewsService: loaded 9 events from DB cache","timestamp":"2026-05-06 14:03:03"}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:03:18","total":31}
+{"duration":40787,"level":"warn","message":"[PERFORMANCE] Slow database query: 40787ms","sql":"INSERT INTO price_feed_history_1h\n         (instrument, bucket_time, open, high, low, close, ticks, ","timestamp":"2026-05-06 14:03:43"}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:04:19","total":31}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:14:50","total":31}
+{"duration":335,"level":"warn","message":"[PERFORMANCE] Slow database query: 335ms","sql":"SELECT t.id, t.account_id, t.instrument, t.direction, t.lot_size, t.open_price,\n              t.stop","timestamp":"2026-05-06 14:14:50"}
+{"duration":328,"level":"warn","message":"[PERFORMANCE] Slow database query: 328ms","sql":"SELECT t.id, t.account_id, t.instrument, t.direction, t.lot_size, t.open_price,\n              t.stop","timestamp":"2026-05-06 14:14:50"}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:15:50","total":31}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:16:50","total":31}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:17:50","total":31}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:18:51","total":31}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:19:51","total":31}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:20:51","total":31}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:21:51","total":31}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:22:51","total":31}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:23:51","total":31}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:24:51","total":31}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:25:52","total":31}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:26:52","total":31}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:27:52","total":31}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:28:52","total":31}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:29:53","total":31}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:30:53","total":31}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:31:53","total":31}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:32:53","total":31}
+{"level":"info","message":"NewsService: fetched 10 High-impact events (USD,EUR,GBP,JPY,AUD,CAD,CHF,NZD combined)","timestamp":"2026-05-06 14:33:03"}
+{"duration":39834,"level":"warn","message":"[PERFORMANCE] Slow database query: 39834ms","sql":"INSERT INTO price_feed_history_1h\n         (instrument, bucket_time, open, high, low, close, ticks, ","timestamp":"2026-05-06 14:33:42"}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:33:53","total":31}
+{"level":"warn","message":"Price feed has stale data:","staleCount":31,"timestamp":"2026-05-06 14:34:53","total":31}

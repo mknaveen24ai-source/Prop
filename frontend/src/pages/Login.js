@@ -131,7 +131,7 @@ function TotpInput({ onSubmit, onBack, loading, error }) {
           width: '100%', background: 'transparent',
           border: '1px solid var(--navy-border)', color: 'var(--text-muted)',
           padding: '10px', borderRadius: '6px', cursor: 'pointer',
-          fontSize: '13px', fontFamily: 'DM Sans, sans-serif'
+          fontSize: '13px', fontFamily: 'var(--font-ui)'
         }}
       >
         ← Back to login
@@ -389,7 +389,7 @@ function Login({ onLogin, initialMode = 'login' }) {
                 width: '100%', marginTop: '10px', background: 'transparent',
                 border: '1px solid var(--navy-border)', color: 'var(--text-muted)',
                 padding: '10px', borderRadius: '6px', cursor: 'pointer',
-                fontSize: '13px', fontFamily: 'DM Sans, sans-serif'
+                fontSize: '13px', fontFamily: 'var(--font-ui)'
               }}
             >
               ← Back to Login

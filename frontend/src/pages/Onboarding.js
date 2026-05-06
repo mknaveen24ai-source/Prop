@@ -45,7 +45,7 @@ const STEPS = [
               borderRadius: '6px', padding: '8px 10px'
             }}>
               <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '2px' }}>{label}</div>
-              <div style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'DM Mono, monospace' }}>{val}</div>
+            <div style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--font-mono)' }}>{val}</div>
             </div>
           ))}
         </div>
@@ -206,7 +206,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
 
         {/* Title */}
         <h2 style={{
-          fontFamily: 'Inter, serif',
+            fontFamily: 'var(--font-ui)',
           color: 'var(--accent)',
           fontSize: '20px',
           marginBottom: '14px',
@@ -275,7 +275,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
               fontSize: '14px',
               fontWeight: '700',
               cursor: 'pointer',
-              fontFamily: 'DM Sans, sans-serif'
+                fontFamily: 'var(--font-ui)'
             }}
           >
             {isLast ? "Let's Go! 🚀" : 'Next →'}

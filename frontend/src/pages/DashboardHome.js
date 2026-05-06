@@ -47,7 +47,7 @@ function CountdownBoxes({ countdown, accent = 'var(--accent)' }) {
         { label: 'Sec', value: countdown.seconds },
       ].map(item => (
         <div key={item.label} style={{ minWidth: '72px', padding: '12px 14px', borderRadius: '12px', border: '1px solid var(--navy-border)', background: 'var(--bg-hover)', textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', fontWeight: 800, color: accent, fontFamily: 'DM Mono, monospace' }}>
+          <div style={{ fontSize: '24px', fontWeight: 800, color: accent, fontFamily: 'var(--font-mono)' }}>
             {String(item.value).padStart(2, '0')}
           </div>
           <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
@@ -63,7 +63,7 @@ function RuleRow({ label, value, accent = false }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '11px 0', borderBottom: '1px solid var(--navy-border)' }}>
       <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{label}</span>
-      <span style={{ color: accent ? 'var(--accent)' : 'var(--text)', fontSize: '13px', fontFamily: 'DM Mono, monospace', textAlign: 'right' }}>{value}</span>
+      <span style={{ color: accent ? 'var(--accent)' : 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-mono)', textAlign: 'right' }}>{value}</span>
     </div>
   )
 }
@@ -75,7 +75,7 @@ function DrawdownCard({ title, usedPct, remainingPct, limitPct, tone = 'var(--ac
     <div className="card">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', marginBottom: '10px' }}>
         <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)' }}>{title}</div>
-        <div style={{ fontSize: '12px', color, fontFamily: 'DM Mono, monospace' }}>
+        <div style={{ fontSize: '12px', color, fontFamily: 'var(--font-mono)' }}>
           <CountUp
             end={fill}
             decimals={1}
@@ -344,7 +344,7 @@ export default function DashboardHome({
                 <div style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '0.02em' }}>
                   {account.account_type.toUpperCase()} ${parseFloat(account.account_size).toLocaleString('en-US')}
                 </div>
-                <div style={{ fontSize: '12px', fontFamily: 'DM Mono, monospace', color: isSelected ? 'rgba(255,255,255,0.72)' : 'var(--text-muted)' }}>
+                <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: isSelected ? 'rgba(255,255,255,0.72)' : 'var(--text-muted)' }}>
                   #{account.account_uid ? account.account_uid.slice(0, 8) : account.id}
                 </div>
                 <span style={{
@@ -538,7 +538,7 @@ export default function DashboardHome({
             <div className="card" style={{ marginBottom: '24px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
                 <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 600 }}>Profit Target Progress</span>
-                <span style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: 700, fontFamily: 'DM Mono, monospace' }}>
+                <span style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
                   <CountUp
                     end={profitProgressPct}
                     decimals={1}

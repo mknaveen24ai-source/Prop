@@ -7,8 +7,11 @@ const { CONTRACT_SIZES } = require('./constants')
 require('./loadEnv')
 const { getCurrentPricesForTenant } = require('./priceFeed')
 const { fetchProgressionSettings, promotePassedAccount } = require('./services/progressionService')
-const { sendPhasePassedEmail, sendAccountFailedEmail, sendAccountExpiredEmail } = require('./mailer')
-const { getTenantById } = require('./utils/tenants')
+const {
+  enqueuePhasePassedEmail,
+  enqueueAccountFailedEmail,
+  enqueueAccountExpiredEmail
+} = require('./utils/emailQueue')
 const { getTenantSettings } = require('./services/tenantPolicyService')
 const {
   applyAccountEnforcement,
@@ -186,8 +189,10 @@ async function expireAccount(acc, io) {
       const userResult = await pool.query('SELECT email, full_name, tenant_id FROM users WHERE id = $1', [acc.user_id])
       if (userResult.rows.length > 0) {
         const { email, full_name, tenant_id } = userResult.rows[0]
-        const tenant = await getTenantById(tenant_id)
-        sendAccountExpiredEmail(email, full_name, acc.account_type, acc.account_size, { tenant }).catch(() => {})
+        enqueueAccountExpiredEmail(email, full_name, acc.account_type, acc.account_size, {
+          tenantId: tenant_id,
+          userId: acc.user_id
+        }).catch(() => {})
       }
     } catch (emailErr) {
       logger.error('[mail] expireAccount email lookup failed:', { error: emailErr.message })
@@ -377,8 +382,10 @@ async function failAccount(acc, reason, io, platformSettings = null, options = {
       const userResult = await pool.query('SELECT email, full_name, tenant_id FROM users WHERE id = $1', [acc.user_id])
       if (userResult.rows.length > 0) {
         const { email, full_name, tenant_id } = userResult.rows[0]
-        const tenant = await getTenantById(tenant_id)
-        sendAccountFailedEmail(email, full_name, acc.account_type, reason, acc.account_size, { tenant }).catch(() => {})
+        enqueueAccountFailedEmail(email, full_name, acc.account_type, reason, acc.account_size, {
+          tenantId: tenant_id,
+          userId: acc.user_id
+        }).catch(() => {})
       }
     } catch (emailErr) {
       logger.error('[mail] failAccount email lookup failed:', { error: emailErr.message })
@@ -464,8 +471,10 @@ async function passAccount(acc, platformSettings, io) {
       const userResult = await pool.query('SELECT email, full_name, tenant_id FROM users WHERE id = $1', [acc.user_id])
       if (userResult.rows.length > 0) {
         const { email, full_name, tenant_id } = userResult.rows[0]
-        const tenant = await getTenantById(tenant_id)
-        sendPhasePassedEmail(email, full_name, acc.account_type, acc.account_size, { tenant }).catch(() => {})
+        enqueuePhasePassedEmail(email, full_name, acc.account_type, acc.account_size, {
+          tenantId: tenant_id,
+          userId: acc.user_id
+        }).catch(() => {})
       }
     } catch (emailErr) {
       logger.error('[mail] passAccount email lookup failed:', { error: emailErr.message })

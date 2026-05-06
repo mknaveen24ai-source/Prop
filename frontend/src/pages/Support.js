@@ -72,7 +72,7 @@ export default function Support({ user }) {
   if (selectedTicket) {
     return (
       <div>
-        <h2 style={{ fontFamily: 'Inter, serif', color: 'var(--accent)', marginBottom: '8px', fontSize: '22px' }}>Support Chat</h2>
+        <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: '8px', fontSize: '22px' }}>Support Chat</h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '28px' }}>Chatting with our support team.</p>
         <TicketChat ticket={selectedTicket} user={user} onBack={() => { setSelectedTicket(null); loadTickets() }} />
       </div>
@@ -81,7 +81,7 @@ export default function Support({ user }) {
 
   return (
     <div>
-      <h2 style={{ fontFamily: 'Inter, serif', color: 'var(--accent)', marginBottom: '8px', fontSize: '22px' }}>Support</h2>
+      <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: '8px', fontSize: '22px' }}>Support</h2>
       
       <div style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
         <button onClick={() => setActiveTab('new')} style={{ padding:'8px 16px', background: activeTab === 'new' ? 'var(--accent)' : 'var(--navy-card)', color: activeTab === 'new' ? '#fff' : 'var(--text-muted)', border:'none', borderRadius:'6px', cursor:'pointer', fontSize: '13px', fontWeight: 600 }}>Submit Ticket</button>
@@ -98,7 +98,7 @@ export default function Support({ user }) {
               <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px', letterSpacing: '0.08em' }}>CATEGORY</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 {CATEGORIES.map(cat => (
-                  <button key={cat.value} onClick={() => setForm(f => ({...f, category: cat.value}))} style={{ padding:'10px 12px', borderRadius: '8px', border: form.category === cat.value ? '1px solid var(--accent)' : '1px solid var(--navy-border)', background: form.category === cat.value ? 'rgba(148, 148, 148, 0.1)' : 'var(--navy-card)', color: form.category === cat.value ? 'var(--accent)' : 'var(--text-muted)', cursor: 'pointer', fontSize: '13px', textAlign: 'left', fontFamily: 'DM Sans, sans-serif' }}>{cat.label}</button>
+                  <button key={cat.value} onClick={() => setForm(f => ({...f, category: cat.value}))} style={{ padding:'10px 12px', borderRadius: '8px', border: form.category === cat.value ? '1px solid var(--accent)' : '1px solid var(--navy-border)', background: form.category === cat.value ? 'rgba(148, 148, 148, 0.1)' : 'var(--navy-card)', color: form.category === cat.value ? 'var(--accent)' : 'var(--text-muted)', cursor: 'pointer', fontSize: '13px', textAlign: 'left', fontFamily: 'var(--font-ui)' }}>{cat.label}</button>
                 ))}
               </div>
             </div>
@@ -117,7 +117,7 @@ export default function Support({ user }) {
 
             <div style={{ marginBottom: '20px' }}>
               <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px', letterSpacing: '0.08em' }}>MESSAGE</label>
-              <textarea value={form.message} onChange={e => setForm({...form, message: e.target.value})} placeholder="Describe your issue..." rows={6} maxLength={2000} style={{ width: '100%', fontSize: '14px', resize: 'vertical', background: 'var(--navy)', border: '1px solid var(--navy-border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text)', fontFamily: 'DM Sans, sans-serif', lineHeight: '1.6' }} />
+              <textarea value={form.message} onChange={e => setForm({...form, message: e.target.value})} placeholder="Describe your issue..." rows={6} maxLength={2000} style={{ width: '100%', fontSize: '14px', resize: 'vertical', background: 'var(--navy)', border: '1px solid var(--navy-border)', borderRadius: '8px', padding: '10px 14px', color: 'var(--text)', fontFamily: 'var(--font-ui)', lineHeight: '1.6' }} />
             </div>
 
             <button onClick={handleCreate} disabled={submitting} className="btn" style={{ padding: '12px 32px', fontSize: '14px', fontWeight: '700', cursor: submitting ? 'not-allowed' : 'pointer', background: submitting ? 'var(--navy-border)' : 'var(--accent)' }}>
@@ -176,7 +176,7 @@ export default function Support({ user }) {
             {[ { label: 'KYC / Payout', time: '24 hours' }, { label: 'Account Issues', time: '24–48 hours' }, { label: 'Technical Bugs', time: '48–72 hours' } ].map(row => (
               <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid var(--navy-border)' }}>
                 <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{row.label}</span>
-                <span style={{ fontSize: '12px', color: 'var(--accent)', fontFamily: 'DM Mono, monospace' }}>{row.time}</span>
+                <span style={{ fontSize: '12px', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{row.time}</span>
               </div>
             ))}
           </div>

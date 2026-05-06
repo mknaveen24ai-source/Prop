@@ -113,11 +113,11 @@ export default function LandingCalculator({ onStartAssessment }) {
           {/* Summary pill */}
           <div className="mp-reveal mp-delay-300" style={{ marginTop: '24px', display: 'inline-flex', gap: '24px', padding: '12px 28px', background: 'rgba(255,255,255,0.03)', borderRadius: '100px', border: '1px solid rgba(255,255,255,0.06)' }}>
             <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)' }}>
-              Sizes Available: <span style={{ color: '#fff', fontWeight: 600, fontFamily: 'DM Mono, monospace' }}>{totalEnabled}</span>
+              Sizes Available: <span style={{ color: '#fff', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{totalEnabled}</span>
             </span>
             <span style={{ width: '1px', background: 'rgba(255,255,255,0.08)' }} />
             <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)' }}>
-              Remaining Slots: <span style={{ color: hasUnlimitedAvailability || totalRemaining > 0 ? '#00c896' : '#f0b90b', fontWeight: 600, fontFamily: 'DM Mono, monospace' }}>{loadingAPI ? '...' : hasUnlimitedAvailability ? 'Unlimited' : totalRemaining}</span>
+              Remaining Slots: <span style={{ color: hasUnlimitedAvailability || totalRemaining > 0 ? '#00c896' : '#f0b90b', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{loadingAPI ? '...' : hasUnlimitedAvailability ? 'Unlimited' : totalRemaining}</span>
             </span>
           </div>
         </div>
@@ -187,14 +187,14 @@ export default function LandingCalculator({ onStartAssessment }) {
                     background: 'rgba(255,71,87,0.15)', border: '1px solid rgba(255,71,87,0.3)',
                     color: '#ff4757', fontSize: '9px', fontWeight: 800,
                     textTransform: 'uppercase', letterSpacing: '0.1em',
-                    fontFamily: 'DM Mono, monospace',
+              fontFamily: 'var(--font-mono)',
                   }}>Full</div>
                 )}
 
-                <div style={{ fontSize: '10px', color: isSelected && !isSoldOut ? '#2962ff' : 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '10px', fontFamily: 'DM Mono, monospace', fontWeight: 700 }}>
+          <div style={{ fontSize: '10px', color: isSelected && !isSoldOut ? '#2962ff' : 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '10px', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
                   {sizeLabel(a.size)}
                 </div>
-                <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 'clamp(20px,2vw,28px)', fontWeight: 800, color: isSoldOut ? 'rgba(255,255,255,0.25)' : '#fff', marginBottom: '14px' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(20px,2vw,28px)', fontWeight: 800, color: isSoldOut ? 'rgba(255,255,255,0.25)' : '#fff', marginBottom: '14px' }}>
                   ${a.size.toLocaleString('en-US')}
                 </div>
 
@@ -213,7 +213,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>AVAILABLE</span>
-                    <span style={{ fontSize: '10px', color: isSoldOut ? '#ff4757' : pct > 50 ? '#00c896' : '#f0b90b', fontFamily: 'DM Mono, monospace', fontWeight: 700 }}>
+                <span style={{ fontSize: '10px', color: isSoldOut ? '#ff4757' : pct > 50 ? '#00c896' : '#f0b90b', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
                       {isSoldOut ? '0/0' : isUnlimited ? 'OPEN' : `${a.remaining ?? 0}/${a.quota}`}
                     </span>
                   </div>
@@ -238,8 +238,8 @@ export default function LandingCalculator({ onStartAssessment }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '48px' }}>
 
               <div style={{ flex: 1, minWidth: '300px' }}>
-                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '12px', fontFamily: 'DM Mono, monospace', fontWeight: 700 }}>Active Tier Assessment</div>
-                <div style={{ fontFamily: 'Sora, sans-serif', fontSize: '56px', fontWeight: 800, color: isLocked ? 'rgba(255,255,255,0.25)' : '#fff', marginBottom: '32px', letterSpacing: '-0.02em' }}>
+          <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '12px', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>Active Tier Assessment</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '56px', fontWeight: 800, color: isLocked ? 'rgba(255,255,255,0.25)' : '#fff', marginBottom: '32px', letterSpacing: '-0.02em' }}>
                   $<CountUp value={acc.size} />
                 </div>
 
@@ -285,7 +285,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                           style={{ transition: 'stroke-dasharray 1s cubic-bezier(0.16, 1, 0.3, 1)' }}
                         />
                       </svg>
-                      <div style={{ fontFamily: 'Sora, sans-serif', fontSize: '38px', fontWeight: 800, color: '#fff', zIndex: 1, letterSpacing: '-0.02em' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '38px', fontWeight: 800, color: '#fff', zIndex: 1, letterSpacing: '-0.02em' }}>
                         {isLocked ? '0' : isUnlim ? '∞' : (acc.remaining ?? 0)}
                       </div>
                       <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', zIndex: 1, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>

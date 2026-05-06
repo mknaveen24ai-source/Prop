@@ -108,6 +108,27 @@ services:
       - internal
 
   # ── Frontend ─────────────────────────────────────────────────────────────────
+  email-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: propfirm_email_worker
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${DB_USER:-propfirm}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-propfirm}
+      EMAIL_WORKER_POLL_MS: ${EMAIL_WORKER_POLL_MS:-5000}
+      EMAIL_WORKER_BATCH_SIZE: ${EMAIL_WORKER_BATCH_SIZE:-10}
+    command: ["node", "workers/emailWorker.js"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - logs:/app/logs
+    networks:
+      - internal
+
   frontend:
     build:
       context: ./frontend

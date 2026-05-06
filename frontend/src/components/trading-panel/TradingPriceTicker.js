@@ -28,7 +28,7 @@ export default function TradingPriceTicker({ prices, orderForm, setOrderForm }) 
             }}
           >
             <div style={{ fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.08em', marginBottom: '4px' }}>{instrument}</div>
-            <div style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--accent)', fontFamily: 'DM Mono, monospace' }}>
+            <div style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
               {parseFloat(data.bid).toFixed(decimals)}
             </div>
             <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '2px' }}>
