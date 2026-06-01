@@ -14,7 +14,7 @@ const helmet = require('helmet')
 const rateLimit = require('express-rate-limit')
 const Decimal = require('decimal.js')
 const { CONTRACT_SIZES } = require('./constants')
-const { securityHeaders, apiLimiter, abuseDetector, requestSizeLimiter } = require('./utils/security')
+const { securityHeaders, apiLimiter, abuseDetector } = require('./utils/security')
 const { securityMonitor } = require('./config/security-config')
 const logger = require('./utils/logger')
 const { withAdvisoryLock } = require('./utils/advisoryLock')
@@ -433,6 +433,10 @@ ensureIdempotencyInfrastructure().catch(err => {
 ensureEmailQueueInfrastructure().catch(err => {
   logger.error('[startup] Failed to ensure email queue infrastructure:', { error: err.message })
 })
+// FIX (AUDIT-1): Run disputes DDL once at startup instead of on every request.
+runWithSystemDbContext(() => ensureDisputesTable()).catch(err => {
+  logger.error('[startup] Failed to ensure disputes table:', { error: err.message })
+})
 
 const app = express()
 const httpServer = createServer(app)
@@ -443,7 +447,10 @@ logger.info('[startup] Express trust proxy configured', { trustProxy: trustProxy
 // Apply security middleware first
 app.use(securityHeaders)
 app.use(abuseDetector)
-app.use(requestSizeLimiter)
+// BUG-07 FIX: requestSizeLimiter removed — actual body size is enforced by
+// express.json({ limit }) / express.urlencoded({ limit }) configured below.
+// Content-Length header (which requestSizeLimiter relied on) is client-supplied
+// and can be spoofed to bypass the check.
 // Add performance monitoring middleware
 app.use(performanceMonitor)
 app.use(apiLimiter)
@@ -644,7 +651,7 @@ app.use(cors({
   credentials: true
 }))
 app.post('/api/billing/stripe/webhook', express.raw({ type: 'application/json' }), billingWebhookHandler)
-app.use(express.json())
+app.use(express.json({ limit: '1mb' }))
 app.use(cookieParser())
 app.disable('x-powered-by')
 app.use(logger.httpMiddleware)
@@ -755,7 +762,10 @@ app.post('/api/support/ticket', supportLimiter, function optionalAuth(req, res, 
   next()
 }, async function(req, res) {
   try {
-    const { category, subject, message, email, name } = req.body
+    const { category, email, name } = req.body
+    // FIX (AUDIT-3): Sanitize user-supplied text to prevent stored XSS
+    const subject = sanitizeString(String(req.body?.subject || ''), 200)
+    const message = sanitizeString(String(req.body?.message || ''), 5000)
     const user_id = req.user?.userId
     const tenantId = req.user?.tenantId || req.tenant?.id || 1
     if (!subject || !message) {
@@ -765,7 +775,7 @@ app.post('/api/support/ticket', supportLimiter, function optionalAuth(req, res, 
     await pool.query(
       `INSERT INTO support_tickets (tenant_id, user_id, email, name, category, subject, message)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [tenantId, user_id || null, email || null, name || null, category || 'other', subject, message]
+      [tenantId, user_id || null, sanitizeString(String(email || ''), 200), sanitizeString(String(name || ''), 100), category || 'other', subject, message]
     )
     res.status(201).json({ message: 'Support ticket submitted successfully' })
   } catch (error) {
@@ -936,9 +946,12 @@ async function ensureDisputesTable() {
 
 app.post('/api/disputes/submit', authTok, async function(req, res) {
   try {
-    await ensureDisputesTable()
+    // FIX (AUDIT-1): DDL moved to startup — no more inline ensureDisputesTable()
     const tenantId = req.user?.tenantId || req.tenant?.id || 1
-    const { account_id, reason, description } = req.body
+    const { account_id } = req.body
+    // FIX (AUDIT-4): Sanitize user-supplied text to prevent stored XSS
+    const reason = sanitizeString(String(req.body?.reason || ''), 200)
+    const description = sanitizeString(String(req.body?.description || ''), 5000)
     const accountId = account_id === undefined || account_id === null || account_id === ''
       ? null
       : String(account_id).trim()
@@ -994,7 +1007,7 @@ app.post('/api/disputes/submit', authTok, async function(req, res) {
 
 app.get('/api/disputes/my-disputes', authTok, async function(req, res) {
   try {
-    await ensureDisputesTable()
+    // FIX (AUDIT-1): DDL moved to startup
     const tenantId = req.user?.tenantId || req.tenant?.id || 1
     const result = await pool.query(
       `SELECT d.*, a.account_uid, a.account_type, a.account_size
@@ -1013,7 +1026,7 @@ app.get('/api/disputes/my-disputes', authTok, async function(req, res) {
 
 app.get('/api/disputes/all', authAdm, async function(req, res) {
   try {
-    await ensureDisputesTable()
+    // FIX (AUDIT-1): DDL moved to startup
     const tenantId = req.admin?.tenantId || null
     const result = await pool.query(
       `SELECT d.*, u.email, u.full_name, u.trader_uid,
@@ -1033,7 +1046,7 @@ app.get('/api/disputes/all', authAdm, async function(req, res) {
 
 app.patch('/api/disputes/:id', authAdm, async function(req, res) {
   try {
-    await ensureDisputesTable()
+    // FIX (AUDIT-1): DDL moved to startup
     const tenantId = req.admin?.tenantId || null
     const { id } = req.params
     const { status, admin_response } = req.body
@@ -1078,7 +1091,8 @@ app.get('/api/prices', async function(req, res) {
 app.get('/api/prices/chart/:instrument', async function(req, res) {
   try {
     const { instrument } = req.params
-    const timeframeMins = parseInt(req.query.tf) || 1
+    // FIX (AUDIT-6): Clamp timeframe to prevent heavy aggregation queries
+    const timeframeMins = Math.max(1, Math.min(parseInt(req.query.tf) || 1, 1440))
     
     // Group ticks into OHLC candles. 
     // Uses 1-minute buckets by default, filtering the last 2000 records.
@@ -1550,130 +1564,10 @@ registerTrackedInterval(() => {
   runLockedSchedulerJob('jobs:news_force_close', 'news_force_close', checkNewsForceClose)
 }, 10000)
 
-// FIX (BUG-M2): Added deduplication flag to prevent the force-close from
-// firing multiple times in the same 2-minute Friday window. The interval runs
-// every 60s; without this flag it could fire twice (at 21:58 and 21:59).
+// FIX (AUDIT-2): Removed duplicate weekendForceClose() — weekendForceCloseByTenant()
+// is the correct implementation that handles per-tenant trading rules and uses
+// tenant-specific prices. The old function used global prices and ignored tenant rules.
 let weekendCloseExecutedDate = ''
-
-async function weekendForceClose() {
-  try {
-    const now       = new Date()
-    const dayUTC    = now.getUTCDay()
-    const hourUTC   = now.getUTCHours()
-    const minuteUTC = now.getUTCMinutes()
-
-    // Weekend holding disabled: flatten open exposure shortly after Friday 21:00 UTC.
-    if (dayUTC !== 5) return
-    const inWindow = hourUTC === 21 && minuteUTC < 10
-    if (!inWindow) return
-
-    // FIX (BUG-M2): Dedup — only run once per Friday using date string key
-    const todayKey = now.toISOString().slice(0, 10) // e.g. '2026-03-27'
-    if (weekendCloseExecutedDate === todayKey) return
-
-    const openTrades = await pool.query(
-      `SELECT t.*, a.user_id, a.tenant_id FROM trades t
-       JOIN accounts a ON t.account_id = a.id
-       WHERE t.status = 'open'`
-    )
-    const pendingOrders = await pool.query(
-      `SELECT t.id, t.account_id, t.instrument, t.order_type, a.user_id, a.tenant_id
-       FROM trades t
-       JOIN accounts a ON t.account_id = a.id
-       WHERE t.status = 'pending'`
-    )
-    if (openTrades.rows.length === 0 && pendingOrders.rows.length === 0) return
-
-    logger.info(`[weekend_close] Friday 21:00–21:09 UTC — flattening ${openTrades.rows.length} open trade(s) and cancelling ${pendingOrders.rows.length} pending order(s)`)
-
-    const prices = await getCurrentPrices()
-    let closeErrors = 0
-
-    for (const trade of openTrades.rows) {
-      try {
-        const priceData = prices[trade.instrument]
-        if (!priceData) continue
-
-        const close_price = trade.direction === 'buy'
-          ? parseFloat(priceData.bid)
-          : parseFloat(priceData.ask)
-
-        const demo_pnl = calculateServerPnL(
-          trade.direction,
-          parseFloat(trade.open_price),
-          close_price,
-          parseFloat(trade.lot_size),
-          trade.instrument,
-          parseFloat(trade.commission || 0)
-        )
-
-        const client = await pool.connect()
-        try {
-          await client.query('BEGIN')
-          const locked = await client.query(
-            `SELECT id FROM trades WHERE id = $1 AND status = 'open' FOR UPDATE SKIP LOCKED`,
-            [trade.id]
-          )
-          if (locked.rows.length === 0) { await client.query('ROLLBACK'); continue }
-
-          await client.query(
-            `UPDATE trades SET status = 'closed', close_price = $1, close_time = NOW(),
-             demo_pnl = $2, close_reason = 'Weekend Close' WHERE id = $3`,
-            [close_price, demo_pnl, trade.id]
-          )
-          await client.query(
-            `UPDATE accounts SET
-               current_balance = current_balance + $1,
-               peak_balance    = GREATEST(peak_balance, current_balance + $1)
-             WHERE id = $2`,
-            [demo_pnl, trade.account_id]
-          )
-          await client.query('COMMIT')
-        } catch (txErr) {
-          await client.query('ROLLBACK')
-          logger.error(`[weekend_close] Trade ${trade.id} error:`, { error: txErr.message })
-        } finally {
-          client.release()
-        }
-      } catch (tradeErr) {
-        closeErrors += 1
-        logger.error(`[weekend_close] Error on trade ${trade.id}:`, { error: tradeErr.message })
-      }
-    }
-
-    for (const order of pendingOrders.rows) {
-      try {
-        await pool.query(
-          `UPDATE trades
-           SET status = 'cancelled',
-               close_time = NOW(),
-               close_reason = 'Weekend holding disabled'
-           WHERE id = $1 AND status = 'pending'`,
-          [order.id]
-        )
-      } catch (orderErr) {
-        closeErrors += 1
-        logger.error(`[weekend_close] Error on pending order ${order.id}:`, { error: orderErr.message })
-      }
-    }
-
-    const uniqueUsers = [...new Set([
-      ...openTrades.rows.map(t => t.user_id),
-      ...pendingOrders.rows.map(t => t.user_id)
-    ])]
-    for (const userId of uniqueUsers) {
-      io.to(String(userId)).emit('account_update', {
-        event:   'weekend_close',
-        message: '🔦 Weekend holding is disabled. Open positions were closed and pending orders were cancelled before the weekend.'
-      })
-    }
-
-    logger.info('[weekend_close] Completed:', { tradesClosed: openTrades.rows.length, pendingCancelled: pendingOrders.rows.length })
-    if (closeErrors === 0) weekendCloseExecutedDate = todayKey
-  } catch (error) {
-    logger.error('[weekend_close] Error:', { error: error.message })
-  }
-}
 
 async function weekendForceCloseByTenant() {
   try {
