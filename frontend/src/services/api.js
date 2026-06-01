@@ -44,6 +44,18 @@ export function normalizeApiError(error, fallbackMessage = 'Request failed') {
       status: error?.response?.status || null
     }
   }
+  // BUG-10 FIX: Check payload.message before falling back to the axios error
+  // message. Some backend endpoints return { message: '...' } instead of
+  // { error: '...' }. Without this check, callers saw a generic axios error
+  // (e.g. "Request failed with status code 200") instead of the real message.
+  if (typeof payload?.message === 'string') {
+    return {
+      code: null,
+      message: payload.message,
+      details: null,
+      status: error?.response?.status || null
+    }
+  }
   return {
     code: null,
     message: error?.message || fallbackMessage,
@@ -105,12 +117,15 @@ api.interceptors.request.use(
 api.interceptors.response.use(
     response => response,
     error => {
-      if (error.response?.status === 401 || error.response?.status === 403) {
+      if (error.response?.status === 401) {
         // FIX (HIGH #11): Only redirect for foreground requests, not background
         // polling or analytics calls, so the UI does not lose state unexpectedly.
         const isBackgroundRequest = error.config?.url?.includes('/prices') ||
                                     error.config?.url?.includes('/ping') ||
                                     error.config?.url?.includes('/analytics')
+        // BUG-22 FIX: Read skipAuthRedirect from config directly (it IS passed
+        // through by axios as a custom config property). Added inline comment
+        // so future developers know this is intentional axios behavior.
         const skipAuthRedirect = error.config?.skipAuthRedirect === true
       
       if (!isBackgroundRequest && !skipAuthRedirect && !window.location.pathname.includes('/login')) {
@@ -149,6 +164,10 @@ export const authAPI = {
   resetPassword: (email, token, new_password) => 
     api.post('/api/auth/reset-password', { email, token, new_password }),
   
+  // BUG-22 NOTE: skipAuthRedirect is a custom axios config property.
+  // Axios passes all config keys through to error.config in interceptors,
+  // which is how the response interceptor reads it to skip the /login redirect.
+  // This is documented axios behavior (not undocumented) since axios v0.19+.
   getProfile: () => 
     api.get('/api/auth/me', { skipAuthRedirect: true }),
   

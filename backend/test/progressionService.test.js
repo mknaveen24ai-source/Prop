@@ -1,10 +1,16 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const {
+  ensureBbookPnlConflictTarget,
   normalizeProgressionSettings,
   buildPromotionPlan,
-  promotePassedAccount
+  promotePassedAccount,
+  __test__
 } = require('../services/progressionService')
+
+test.beforeEach(() => {
+  __test__.resetBbookPnlConflictTargetReady()
+})
 
 test('normalizeProgressionSettings applies defaults', () => {
   const settings = normalizeProgressionSettings({})
@@ -59,5 +65,23 @@ test('promotePassedAccount runs insert and bbook update', async () => {
 
   assert.equal(result.new_account_id, 'new-account-1')
   assert.equal(result.event, 'phase1_passed')
-  assert.equal(calls.length, 2)
+  assert.ok(calls.some((call) => /CREATE UNIQUE INDEX IF NOT EXISTS bbook_pnl_tenant_date_uq/i.test(call.sql)))
+  assert.ok(calls.some((call) => /INSERT INTO accounts/i.test(call.sql)))
+  assert.ok(calls.some((call) => /ON CONFLICT \(tenant_id, date\)/i.test(call.sql)))
+})
+
+test('ensureBbookPnlConflictTarget creates the conflict target used by promotion upserts', async () => {
+  const calls = []
+  const mockDb = {
+    async query(sql, values) {
+      calls.push({ sql, values })
+      return { rows: [] }
+    }
+  }
+
+  await ensureBbookPnlConflictTarget(mockDb)
+
+  assert.ok(calls.some((call) => /CREATE TABLE IF NOT EXISTS bbook_pnl/i.test(call.sql)))
+  assert.ok(calls.some((call) => /DELETE FROM bbook_pnl/i.test(call.sql)))
+  assert.ok(calls.some((call) => /CREATE UNIQUE INDEX IF NOT EXISTS bbook_pnl_tenant_date_uq ON bbook_pnl\(tenant_id, date\)/i.test(call.sql)))
 })

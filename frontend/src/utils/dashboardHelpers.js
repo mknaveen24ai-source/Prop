@@ -1,4 +1,4 @@
-import { calculatePnL } from './instruments'
+import { calculatePnL } from './instruments.js'
 
 export { calculatePnL }
 

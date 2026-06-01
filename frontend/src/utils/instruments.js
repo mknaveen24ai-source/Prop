@@ -1,4 +1,4 @@
-import { decimalToNumber, toDecimal } from './finance'
+import { decimalToNumber, toDecimal } from './finance.js'
 
 const FOREX_INSTRUMENTS = [
   'EURUSD',

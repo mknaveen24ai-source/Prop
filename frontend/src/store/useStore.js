@@ -7,10 +7,21 @@ const useStore = create((set, get) => ({
   allAccounts: [],
 
   setActiveAccount: (account) => set({ activeAccount: account }),
-  setAllAccounts: (accounts) => set({
-    allAccounts: accounts,
-    activeAccount: accounts[0] || null
+
+  setAllAccounts: (accounts) => set(state => {
+    // BUG-12 FIX: Preserve the user's manually-selected account when accounts
+    // are refreshed (e.g. after a trade closes or on socket reconnect).
+    // Previously this always reset to accounts[0], losing user's selection.
+    const currentId = state.activeAccount?.id
+    const stillExists = accounts.find(a => a.id === currentId)
+    return {
+      allAccounts: accounts,
+      // BUG-21 FIX: Guard against empty accounts array — null is a safe default
+      // and prevents null-access crashes in components that read activeAccount.
+      activeAccount: stillExists || accounts[0] || null
+    }
   }),
+
   switchAccount: (accountId) => {
     const account = get().allAccounts.find(a => a.id === accountId);
     if (account) set({ activeAccount: account });
@@ -43,9 +54,15 @@ const useStore = create((set, get) => ({
     return { openPositions: updated, totalFloatingPnL: total };
   }),
 
-  addPosition: (position) => set(state => ({
-    openPositions: [...state.openPositions, position]
-  })),
+  // BUG-08 FIX: addPosition now recalculates totalFloatingPnL so the dashboard
+  // shows the correct total immediately when a new trade is opened.
+  // Previously totalFloatingPnL was only updated by updatePositionPnL (price
+  // ticks) and removePosition, so the total was wrong until the next price tick.
+  addPosition: (position) => set(state => {
+    const updated = [...state.openPositions, position];
+    const total = updated.reduce((sum, p) => sum + (p.floating_pnl || 0), 0);
+    return { openPositions: updated, totalFloatingPnL: total };
+  }),
 
   removePosition: (tradeId) => set(state => {
     const updated = state.openPositions.filter(p => p.id !== tradeId);

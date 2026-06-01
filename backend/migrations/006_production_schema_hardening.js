@@ -1,0 +1,57 @@
+exports.up = async function(knex) {
+  await knex.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 1`)
+  await knex.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_rejection_reason TEXT`)
+  await knex.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_document_country TEXT`)
+  await knex.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_document_type TEXT`)
+  await knex.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_document_number TEXT`)
+  await knex.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS id_document_back_path TEXT`)
+  await knex.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token TEXT DEFAULT NULL`)
+  await knex.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMPTZ DEFAULT NULL`)
+  await knex.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret TEXT DEFAULT NULL`)
+  await knex.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN DEFAULT FALSE`)
+  await knex.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_temp_secret TEXT DEFAULT NULL`)
+  await knex.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_backup_codes TEXT DEFAULT NULL`)
+
+  await knex.raw(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS review_flagged BOOLEAN NOT NULL DEFAULT FALSE`)
+  await knex.raw(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS review_flag_reason TEXT`)
+  await knex.raw(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ`)
+
+  await knex.raw(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS trader_note TEXT`)
+  await knex.raw(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]'::jsonb`)
+  await knex.raw(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS strategy_tag TEXT`)
+  await knex.raw(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS open_screenshot_path TEXT`)
+  await knex.raw(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS close_screenshot_path TEXT`)
+  await knex.raw(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS trailing_activation_price NUMERIC(15,5)`)
+  await knex.raw(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS trailing_step_pips INTEGER`)
+  await knex.raw(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS breakeven_trigger_pips NUMERIC(10,2)`)
+  await knex.raw(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS oco_group_id TEXT`)
+  await knex.raw(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS original_commission NUMERIC(10,2)`)
+  await knex.raw(`CREATE INDEX IF NOT EXISTS trades_oco_group_idx ON trades(oco_group_id) WHERE oco_group_id IS NOT NULL`)
+
+  await knex.raw(`ALTER TABLE payouts ADD COLUMN IF NOT EXISTS tenant_id BIGINT`)
+  await knex.raw(`ALTER TABLE payouts ADD COLUMN IF NOT EXISTS is_flagged BOOLEAN NOT NULL DEFAULT FALSE`)
+  await knex.raw(`ALTER TABLE payouts ADD COLUMN IF NOT EXISTS flag_reason TEXT`)
+  await knex.raw(`ALTER TABLE payouts ADD COLUMN IF NOT EXISTS admin_notes TEXT`)
+
+  await knex.raw(`ALTER TABLE tenant_admins ADD COLUMN IF NOT EXISTS totp_temp_secret TEXT`)
+  await knex.raw(`ALTER TABLE tenant_admins ADD COLUMN IF NOT EXISTS totp_backup_codes TEXT`)
+  await knex.raw(`ALTER TABLE tenant_admins ADD COLUMN IF NOT EXISTS full_name TEXT`)
+  await knex.raw(`ALTER TABLE tenant_admins ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ`)
+
+  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_price_feed_history_instrument_recorded_at ON price_feed_history(instrument, recorded_at DESC)`)
+  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_price_feed_history_1h_instrument_bucket ON price_feed_history_1h(instrument, bucket_time DESC)`)
+  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_price_feed_source_history_1h_source_instrument_bucket ON price_feed_source_history_1h(source_key, instrument, bucket_time DESC)`)
+  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_accounts_tenant_status_created ON accounts(tenant_id, status, created_at DESC)`)
+  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_users_tenant_created ON users(tenant_id, created_at DESC)`)
+  await knex.raw(`CREATE INDEX IF NOT EXISTS idx_payouts_tenant_status_requested ON payouts(tenant_id, status, requested_at DESC)`)
+}
+
+exports.down = async function(knex) {
+  await knex.raw(`DROP INDEX IF EXISTS idx_payouts_tenant_status_requested`)
+  await knex.raw(`DROP INDEX IF EXISTS idx_users_tenant_created`)
+  await knex.raw(`DROP INDEX IF EXISTS idx_accounts_tenant_status_created`)
+  await knex.raw(`DROP INDEX IF EXISTS idx_price_feed_source_history_1h_source_instrument_bucket`)
+  await knex.raw(`DROP INDEX IF EXISTS idx_price_feed_history_1h_instrument_bucket`)
+  await knex.raw(`DROP INDEX IF EXISTS idx_price_feed_history_instrument_recorded_at`)
+  await knex.raw(`DROP INDEX IF EXISTS trades_oco_group_idx`)
+}

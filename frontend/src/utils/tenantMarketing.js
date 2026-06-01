@@ -30,7 +30,7 @@ export function getTenantLandingCopy(tenant) {
       heroPrimaryCta: 'Start Challenge',
       heroStatsLead: feeLabel,
       heroStatsLeadSuffix: 'Challenge Access',
-      calculatorLead: `Challenge access starts from ${feeLabel}. Available account tiers refresh automatically from live issued-slot quotas.`,
+      calculatorLead: `Challenge access starts from ${feeLabel}. Each account size has its own monthly allocation that resets automatically.`,
       calculatorBadgeOpen: feeLabel,
       calculatorLocked: 'FULL',
       calculatorFeeLabel: feeLabel,
@@ -47,13 +47,13 @@ export function getTenantLandingCopy(tenant) {
         {
           category: 'General',
           q: 'Are account tiers always available?',
-          a: 'Each account size follows live issued-slot quotas. Once a tier is filled for the current period, it stays full until the configured quota window resets.'
+          a: 'Each account size has its own monthly allocation. Once that size is filled, it reopens automatically at the start of the next month.'
         }
       ],
       footerHeadline: 'Start Your Challenge',
-      footerSubtitle: `Live account availability updates in real time. Challenge access currently starts from ${feeLabel}.`,
+      footerSubtitle: `Per-size monthly availability updates in real time. Challenge access currently starts from ${feeLabel}.`,
       footerButton: 'Get Started',
-      footerBrand: 'Prop trading challenges with transparent rules, live quota enforcement, and funded progression once you pass.'
+      footerBrand: 'Prop trading challenges with transparent rules, per-size monthly quota enforcement, and funded progression once you pass.'
     }
   }
 
@@ -65,7 +65,7 @@ export function getTenantLandingCopy(tenant) {
     heroPrimaryCta: 'Start Challenge',
     heroStatsLead: '100%',
     heroStatsLeadSuffix: 'Free',
-    calculatorLead: 'All accounts are completely free. Limited spots available each month, backed by real liquidity.',
+    calculatorLead: 'All accounts are completely free. Each account size has limited monthly spots backed by real liquidity.',
     calculatorBadgeOpen: 'FREE',
     calculatorLocked: 'FULL',
     calculatorFeeLabel: '0.00 USD',
@@ -81,7 +81,7 @@ export function getTenantLandingCopy(tenant) {
       }
     ],
     footerHeadline: 'Claim Your Free Account',
-    footerSubtitle: 'Limited monthly spots backed by real liquidity. No fees, no credit card, no catch.',
+    footerSubtitle: 'Limited per-size monthly spots backed by real liquidity. No fees, no credit card, no catch.',
     footerButton: "Get Started - It's Free",
     footerBrand: 'Free funded trading accounts backed by real liquidity. Pass our 2-phase evaluation and trade with firm capital - no fees required.'
   }

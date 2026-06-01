@@ -6,7 +6,7 @@ import {
   calculateRealizedProfit,
   calculateTargetRemaining,
   formatCurrency,
-} from './finance'
+} from './finance.js'
 
 describe('finance helpers', () => {
   it('keeps payout math precise to the cent', () => {

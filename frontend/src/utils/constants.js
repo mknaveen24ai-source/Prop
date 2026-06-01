@@ -9,7 +9,7 @@ import {
   INSTRUMENT_GROUPS,
   calculatePnL,
   calculateMargin,
-} from './instruments'
+} from './instruments.js'
 
 export { CONTRACT_SIZES, LEVERAGE, INSTRUMENT_GROUPS }
 
@@ -75,7 +75,7 @@ export const RISK_LEVELS = {
   CRITICAL: { threshold: 90, color: '#F44336', label: 'Critical' }
 }
 
-export const VALID_ACCOUNT_SIZES = [1000, 2000, 2500, 5000, 10000, 25000, 50000, 100000, 200000]
+export const VALID_ACCOUNT_SIZES = [1000, 2000, 5000, 10000, 25000, 50000, 100000, 200000]
 
 export const DEFAULT_PLATFORM_SETTINGS = {
   phase1_profit_target_pct: 10,

@@ -1,7 +1,7 @@
 import {
   calculatePnL as calculateInstrumentPnL,
   calculateMargin as calculateInstrumentMargin,
-} from './instruments'
+} from './instruments.js'
 
 /**
  * @typedef {Object} User
@@ -176,7 +176,7 @@ export function calculateDrawdown(currentBalance, peakBalance, startingBalance) 
   const base = Math.max(peakBalance, startingBalance)
   if (base <= 0) return 0
   const drawdown = (base - currentBalance) / base * 100
-  return Math.max(0, parseFloat(drawdown.toFixed(2)))
+  return Math.min(100, Math.max(0, parseFloat(drawdown.toFixed(2))))
 }
 
 /**
