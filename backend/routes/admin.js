@@ -1,4 +1,4 @@
-const express = require('express')
+﻿const express = require('express')
 const router = express.Router()
 const pool = require('../db')
 const {
@@ -10,7 +10,7 @@ const {
   requireTenantAdminOrSuperAdmin
 } = require('./middleware')
 const jwt = require('jsonwebtoken')
-const bcrypt = require('bcrypt')
+const bcrypt = require('bcryptjs')
 const { v4: uuidv4 } = require('uuid')
 const rateLimit = require('express-rate-limit')
 const fs = require('fs')
@@ -1724,10 +1724,55 @@ function calcTradePnl(direction, openPrice, currentPrice, lots, instrument) {
   return priceDiff.times(lots).times(contractSize).toDecimalPlaces(2).toNumber()
 }
 
-async function forceCloseOpenTradesForAccount(client, accountId) {
+// -- Copier event helpers (shared by force-close functions) -------------------
+function buildCopierTradePayload(trade, overrides) {
+  if (!overrides) overrides = {}
+  return {
+    instrument: trade.instrument || null,
+    direction: trade.direction || null,
+    status: trade.status || null,
+    order_type: trade.order_type || null,
+    open_price: trade.open_price != null ? trade.open_price : null,
+    close_price: trade.close_price != null ? trade.close_price : null,
+    stop_loss: trade.stop_loss != null ? trade.stop_loss : null,
+    take_profit: trade.take_profit != null ? trade.take_profit : null,
+    lot_size: trade.lot_size != null ? trade.lot_size : null,
+    close_reason: trade.close_reason || null,
+    source: overrides.source || 'admin',
+  }
+}
+
+function queueAdminCopierEvent(target, event) {
+  if (Array.isArray(target)) target.push(event)
+}
+
+async function emitCopierEventSafe(payload) {
+  try {
+    const { writeCopierEvent } = require('../utils/copierV2')
+    await writeCopierEvent(pool, payload)
+  } catch (error) {
+    logger.warn('[copier] Failed to write admin copier event:', {
+      error: error.message,
+      eventType: payload && payload.eventType,
+      masterTradeId: payload && payload.masterTradeId
+    })
+  }
+}
+
+async function emitCopierEventsAfterCommit(events) {
+  if (!Array.isArray(events)) return
+  for (const event of events) {
+    await emitCopierEventSafe(event)
+  }
+}
+
+// -- Force-close helpers ------------------------------------------------------
+async function forceCloseOpenTradesForAccount(client, accountId, options) {
+  if (!options) options = {}
+  const localCopierEvents = []
+  const copierEventsTarget = Array.isArray(options.copierEvents) ? options.copierEvents : localCopierEvents
   const openTrades = await client.query(
-    `SELECT t.id, t.instrument, t.direction, t.open_price, t.lot_size, t.commission,
-            a.tenant_id
+    `SELECT t.*, a.tenant_id, a.user_id
        FROM trades t
        JOIN accounts a ON a.id = t.account_id
       WHERE t.account_id = $1 AND t.status = 'open'
@@ -1736,7 +1781,7 @@ async function forceCloseOpenTradesForAccount(client, accountId) {
   )
 
   if (openTrades.rows.length === 0) {
-    return { closedCount: 0, totalPnl: 0 }
+    return { closedCount: 0, totalPnl: 0, copierEvents: [] }
   }
 
   let totalPnl = 0
@@ -1744,17 +1789,17 @@ async function forceCloseOpenTradesForAccount(client, accountId) {
     const openPrice = parseFloat(t.open_price || 0)
     const lots = parseFloat(t.lot_size || 0)
     const fallbackPrice = openPrice
-    const livePrice = await getPriceForTenant(t.tenant_id || 1, t.instrument).catch(() => null)
+    const livePrice = await getPriceForTenant(t.tenant_id || 1, t.instrument).catch(function() { return null })
     const currentPrice = t.direction === 'buy'
-      ? parseFloat(livePrice?.bid || fallbackPrice)
-      : parseFloat(livePrice?.ask || fallbackPrice)
+      ? parseFloat((livePrice && livePrice.bid) || fallbackPrice)
+      : parseFloat((livePrice && livePrice.ask) || fallbackPrice)
     const pnl = parseFloat((
       calcTradePnl(t.direction, openPrice, currentPrice, lots, t.instrument) -
       parseFloat(t.commission || 0)
     ).toFixed(2))
     totalPnl += pnl
 
-    await client.query(
+    const closeResult = await client.query(
       `UPDATE trades
           SET status = 'closed',
               close_price = $1,
@@ -1764,6 +1809,22 @@ async function forceCloseOpenTradesForAccount(client, accountId) {
         WHERE id = $3`,
       [currentPrice, pnl, t.id]
     )
+    if (closeResult.rowCount !== 1) {
+      throw new Error('Failed to force-close trade ' + t.id)
+    }
+    queueAdminCopierEvent(copierEventsTarget, {
+      tenantId: t.tenant_id,
+      masterAccountId: accountId,
+      masterTradeId: t.id,
+      eventType: 'CLOSE_POSITION',
+      payload: buildCopierTradePayload(t, {
+        status: 'closed',
+        close_price: currentPrice,
+        close_reason: options.closeReason || 'Admin Auto Enforcement',
+        demo_pnl: pnl,
+        source: options.source || 'admin_force_close_open_trades'
+      })
+    })
   }
 
   await client.query(
@@ -1775,10 +1836,25 @@ async function forceCloseOpenTradesForAccount(client, accountId) {
     [totalPnl, accountId]
   )
 
-  return { closedCount: openTrades.rows.length, totalPnl: parseFloat(totalPnl.toFixed(2)) }
+  return {
+    closedCount: openTrades.rows.length,
+    totalPnl: parseFloat(totalPnl.toFixed(2)),
+    copierEvents: localCopierEvents
+  }
 }
 
-async function cancelPendingTradesForAccount(client, accountId, closeReason) {
+async function cancelPendingTradesForAccount(client, accountId, closeReason, options) {
+  if (!options) options = {}
+  const pendingTrades = await client.query(
+    `SELECT t.*, a.tenant_id
+       FROM trades t
+       JOIN accounts a ON a.id = t.account_id
+      WHERE t.account_id = $1 AND t.status = 'pending'
+      FOR UPDATE`,
+    [accountId]
+  )
+  if (pendingTrades.rows.length === 0) return 0
+
   const cancelled = await client.query(
     `UPDATE trades
         SET status = 'cancelled',
@@ -1788,10 +1864,29 @@ async function cancelPendingTradesForAccount(client, accountId, closeReason) {
       RETURNING id`,
     [accountId, String(closeReason || 'Cancelled by admin')]
   )
+  if (cancelled.rows.length !== pendingTrades.rows.length) {
+    throw new Error('Failed to cancel all pending trades for account ' + accountId)
+  }
+  for (var ti = 0; ti < pendingTrades.rows.length; ti++) {
+    var trade = pendingTrades.rows[ti]
+    queueAdminCopierEvent(options.copierEvents, {
+      tenantId: trade.tenant_id,
+      masterAccountId: accountId,
+      masterTradeId: trade.id,
+      eventType: 'CANCEL_PENDING',
+      payload: buildCopierTradePayload(trade, {
+        status: 'cancelled',
+        close_reason: String(closeReason || 'Cancelled by admin'),
+        source: options.source || 'admin_cancel_pending'
+      })
+    })
+  }
   return cancelled.rows.length
 }
 
-async function forceCloseTradeById(client, tradeId, closeReason = 'Admin Force Close') {
+async function forceCloseTradeById(client, tradeId, closeReason, options) {
+  if (!closeReason) closeReason = 'Admin Force Close'
+  if (!options) options = {}
   const result = await client.query(
     `SELECT t.id, t.account_id, t.instrument, t.direction, t.open_price, t.lot_size, t.commission,
             a.user_id, a.tenant_id
@@ -1807,10 +1902,10 @@ async function forceCloseTradeById(client, tradeId, closeReason = 'Admin Force C
   const trade = result.rows[0]
   const openPrice = parseFloat(trade.open_price || 0)
   const fallbackPrice = openPrice
-  const livePrice = await getPriceForTenant(trade.tenant_id || 1, trade.instrument).catch(() => null)
+  const livePrice = await getPriceForTenant(trade.tenant_id || 1, trade.instrument).catch(function() { return null })
   const closePrice = trade.direction === 'buy'
-    ? parseFloat(livePrice?.bid || fallbackPrice)
-    : parseFloat(livePrice?.ask || fallbackPrice)
+    ? parseFloat((livePrice && livePrice.bid) || fallbackPrice)
+    : parseFloat((livePrice && livePrice.ask) || fallbackPrice)
   const pnl = parseFloat((
     calcTradePnl(
       trade.direction,
@@ -1821,7 +1916,7 @@ async function forceCloseTradeById(client, tradeId, closeReason = 'Admin Force C
     ) - parseFloat(trade.commission || 0)
   ).toFixed(2))
 
-  await client.query(
+  const closeResult = await client.query(
     `UPDATE trades
         SET status = 'closed',
             close_price = $1,
@@ -1831,6 +1926,9 @@ async function forceCloseTradeById(client, tradeId, closeReason = 'Admin Force C
       WHERE id = $4`,
     [closePrice, pnl, String(closeReason || 'Admin Force Close'), trade.id]
   )
+  if (closeResult.rowCount !== 1) {
+    throw new Error('Failed to force-close trade ' + trade.id)
+  }
 
   await client.query(
     `UPDATE accounts
@@ -1841,6 +1939,20 @@ async function forceCloseTradeById(client, tradeId, closeReason = 'Admin Force C
     [pnl, trade.account_id]
   )
 
+  queueAdminCopierEvent(options.copierEvents, {
+    tenantId: trade.tenant_id,
+    masterAccountId: trade.account_id,
+    masterTradeId: trade.id,
+    eventType: 'CLOSE_POSITION',
+    payload: buildCopierTradePayload(trade, {
+      status: 'closed',
+      close_price: closePrice,
+      close_reason: String(closeReason || 'Admin Force Close'),
+      demo_pnl: pnl,
+      source: options.source || 'admin_force_close_trade'
+    })
+  })
+
   return {
     trade_id: trade.id,
     account_id: trade.account_id,
@@ -1850,7 +1962,6 @@ async function forceCloseTradeById(client, tradeId, closeReason = 'Admin Force C
     close_price: closePrice
   }
 }
-
 async function getExposureData(pool, tenantId = null) {
   const pricesResult = await pool.query('SELECT instrument, bid, ask FROM price_feed');
   const priceMap = {};
@@ -4856,6 +4967,9 @@ router.post('/users/:userId/manual-account', authenticateAdmin, requireAdminCapa
 
     await client.query('COMMIT')
 
+    // Emit copier events after commit
+    await emitCopierEventsAfterCommit(copierEvents)
+
     if (req.app.get('io')) {
       req.app.get('io').to(String(userId)).emit('account_update', {
         message: `Support issued a new ${accountType.toUpperCase()} account for you.`,
@@ -4985,6 +5099,9 @@ router.post('/accounts/:accountId/adjust-balance', authenticateAdmin, requireAdm
 
     await client.query('COMMIT')
 
+    // Emit copier events after commit
+    await emitCopierEventsAfterCommit(copierEvents)
+
     if (req.app.get('io')) {
       req.app.get('io').to(String(account.user_id)).emit('account_update', {
         message: `Admin balance adjustment applied: ${amount >= 0 ? '+' : ''}$${amount.toFixed(2)}`,
@@ -5054,6 +5171,7 @@ router.post('/accounts/:accountId/override', authenticateAdmin, requireAdminCapa
     let updatedAccount = null
     let closeResult = { closedCount: 0, totalPnl: 0 }
     let cancelledCount = 0
+    const copierEvents = []
 
     if (action === 'pass' || action === 'promote') {
       if (!['phase1', 'phase2'].includes(account.account_type)) {
@@ -5135,7 +5253,7 @@ router.post('/accounts/:accountId/override', authenticateAdmin, requireAdminCapa
       )
       message = `Funded account revoked. Closed ${closeResult.closedCount} open trades and cancelled ${cancelledCount} pending orders.`
     } else if (action === 'force_close_open_trades') {
-      closeResult = await forceCloseOpenTradesForAccount(client, account.id)
+      closeResult = await forceCloseOpenTradesForAccount(client, account.id, { copierEvents, source: 'admin_enforcement_force_close_open_trades' })
       message = `Force-closed ${closeResult.closedCount} open trades; total P&L ${closeResult.totalPnl >= 0 ? '+' : ''}$${closeResult.totalPnl.toFixed(2)}`
     } else if (action === 'restore_active') {
       if (!['failed', 'locked'].includes(String(account.status || '').toLowerCase())) {
@@ -5252,6 +5370,9 @@ router.post('/accounts/:accountId/override', authenticateAdmin, requireAdminCapa
     } catch (_) {}
 
     await client.query('COMMIT')
+
+    // Emit copier events after commit
+    await emitCopierEventsAfterCommit(copierEvents)
 
     if (req.app.get('io')) {
       req.app.get('io').to(String(account.user_id)).emit('account_update', {
@@ -5391,6 +5512,9 @@ router.post('/trades/:tradeId/close', authenticateAdmin, requireAdminCapability(
     } catch (_) {}
 
     await client.query('COMMIT')
+
+    // Emit copier events after commit
+    await emitCopierEventsAfterCommit(copierEvents)
 
     if (req.app.get('io')) {
       req.app.get('io').to(String(closed.user_id)).emit('account_update', {
@@ -6269,6 +6393,7 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
           ])
           let closeResult = { closedCount: 0, totalPnl: 0 }
           let cancelledCount = 0
+    const copierEvents = []
           let linkedAccountId = null
           let message = ''
 
@@ -9235,6 +9360,7 @@ router.post('/scheduled-reports/:id/toggle', authenticateAdmin, async (req, res)
   }
 })
 
+// admin_emergency_kill handler
 router.get('/emergency-kill/status', authenticateAdmin, async (req, res) => {
   try {
     const settings = await getSettingsMap([
@@ -9427,5 +9553,61 @@ router.get('/kyc/document/:userId/:type', authenticateAdmin, requireAdminCapabil
 });
 router.__test__ = {
   buildKycDocumentPresencePredicate
+}
+
+router._internals = {
+  signAdminToken,
+  setAdminCookie,
+  isBcryptHash,
+  looksLikeDefaultSecret,
+  normalizeAdminEmail,
+  getActivePlatformAdminCount,
+  getPlatformAdminByEmail,
+  getPlatformAdminById,
+  buildAdminJwtPayload,
+  buildAdminSessionPayload,
+  ensureFeatureTables,
+  parsePositiveInteger,
+  parseBooleanFilter,
+  parseCsvListParam,
+  parseListPaging,
+  buildPagination,
+  paginateRows,
+  facetCounts,
+  toIsoOrNull,
+  normalizeEntityId,
+  normalizeAdminTag,
+  normalizeEntityType,
+  getAdminOwnerId,
+  getAdminActorLabel,
+  buildAdminActorPayload,
+  wantsAdminListContract,
+  computeUserLifecycleStage,
+  computeAccountLifecycleStage,
+  computePayoutComplianceStatus,
+  buildSavedViewCapabilities,
+  normalizeAccountSnapshot,
+  normalizeUserSnapshot,
+  normalizePayoutSnapshot,
+  normalizeViolationSnapshot,
+  buildAllowedAccountActions,
+  buildAllowedUserActions,
+  buildAllowedPayoutActions,
+  buildAllowedViolationActions,
+  forceCloseOpenTradesForAccount,
+  cancelPendingTradesForAccount,
+  forceCloseTradeById,
+  calcTradePnl,
+  emitCopierEventSafe,
+  emitCopierEventsAfterCommit,
+  buildCopierTradePayload,
+  queueAdminCopierEvent,
+  upsertAdminEntityMeta,
+  computePhaseEndDateForAccountType,
+  appendImmutableAudit,
+  buildKycDocumentPresencePredicate,
+  getExposureData,
+  buildAccountListResult,
+  getScopedTenantId,
 }
 module.exports = router;

@@ -201,7 +201,10 @@ async function recordViolation(input) {
            last_detected_at = NOW(),
            resolved_at = NULL,
            resolution_note = NULL,
-           resolution_type = 'resolved'
+           -- BUG-03 FIX: Keep the original resolution_type on re-detection.
+           -- Previously this was set to 'resolved' even when re-opening a violation,
+           -- corrupting the audit trail (resolution_type describes HOW it was resolved).
+           resolution_type = admin_rule_violations.resolution_type
      RETURNING *`,
     [
       violationKey,
