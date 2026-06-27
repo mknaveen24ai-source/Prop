@@ -1,4 +1,4 @@
-// NOTE: All date operations should use UTC methods (getUTC*, setUTC*)
+﻿// NOTE: All date operations should use UTC methods (getUTC*, setUTC*)
 // to ensure consistent behavior across timezones
 const express = require('express')
 const router = express.Router()
@@ -819,9 +819,17 @@ async function checkPendingOrders(io) {
     const tenantPriceMap = await buildTenantPriceMap(pendingOrders.rows.map((order) => order.tenant_id))
     const tenantRulesCache = new Map()
 
+    const copierEvents = []
     for (const order of pendingOrders.rows) {
       if (order.account_status !== 'active') {
         await cancelPendingOrder(order.id, 'Account inactive')
+        await emitCopierEventSafe({
+          tenantId: order.tenant_id || 1,
+          masterAccountId: order.account_id,
+          masterTradeId: order.id,
+          eventType: 'CANCEL_PENDING',
+          payload: buildCopierTradePayload({ ...order, status: 'cancelled', close_reason: 'Account inactive' }, { source: 'pending_account_inactive_cancel' })
+        })
         continue
       }
 
@@ -876,6 +884,13 @@ async function checkPendingOrders(io) {
               [limitError, order.id]
             )
             await client.query('COMMIT')
+            await emitCopierEventSafe({
+              tenantId: order.tenant_id || 1,
+              masterAccountId: order.account_id,
+              masterTradeId: order.id,
+              eventType: 'CANCEL_PENDING',
+              payload: buildCopierTradePayload({ ...order, status: 'cancelled', close_reason: limitError }, { source: 'pending_trigger_rejected' })
+            })
             continue
           }
 
@@ -1063,7 +1078,7 @@ async function autoCloseAndFail(acc, reason, io) {
           })
         })
       } catch (err) {
-        logger.error(`Error closing trade ${trade.id} on drawdown breach:`, { error: err.message })
+        logger.error(`Failed to close trade ${trade.id} during drawdown breach`, { error: err.message })
       }
     }
 
@@ -1196,6 +1211,7 @@ async function autoCloseAndPass(acc, io) {
       [acc.id]
     )
     const priceMap = await getCurrentPricesForTenant(acc.tenant_id || 1)
+    const copierEvents = []
 
     const closeReason = acc.account_type === 'phase1' ? 'Phase 1 Passed' : 'Phase 2 Passed'
     // FIX (AUDIT): Use Decimal accumulator — native float += on many trades
@@ -1248,7 +1264,8 @@ async function autoCloseAndPass(acc, io) {
           })
         })
       } catch (err) {
-        logger.error(`Error closing trade ${trade.id} on profit target hit:`, { error: err.message })
+        logger.error(`Failed to close trade ${trade.id} on profit target:`, { error: err.message })
+        throw err
       }
     }
 
@@ -1317,7 +1334,7 @@ async function autoCloseAndPass(acc, io) {
 
   } catch (err) {
     await client.query('ROLLBACK')
-    logger.error(`autoCloseAndPass error for account ${acc.id}:`, { error: err.message })
+    logger.error(`autoCloseAndPass error for account ${acc.id}:`, { error: err.message, auto_pass_aborted: true })
   } finally {
     client.release()
   }
@@ -2526,11 +2543,17 @@ router.post('/cancel', authenticateToken, tradeCloseLimiter, async function(req,
       return res.status(403).json({ error: 'Unauthorized' })
     }
 
-    await pool.query(
+    // Race-safe cancel: only cancel if still pending (prevents double-cancel)
+    const cancelResult = await pool.query(
       `UPDATE trades SET status = 'cancelled', close_time = NOW(), close_reason = 'Cancelled by trader'
-       WHERE id = $1`,
+       WHERE id = $1 AND status = 'pending'
+       RETURNING id`,
       [trade_id]
     )
+
+    if (cancelResult.rowCount === 0) {
+      return res.status(409).json({ error: 'Pending order was already processed' })
+    }
 
     await emitCopierEventSafe({
       tenantId,
@@ -2555,6 +2578,7 @@ router.post('/cancel', authenticateToken, tradeCloseLimiter, async function(req,
 })
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
 // PATCH /api/trades/modify  (update SL/TP on open trade)
 // FIX: Added rate limiter â€” 60 modifications per minute per user is generous
 // for legitimate use but prevents bot-level abuse that would hammer the DB.
@@ -2566,6 +2590,76 @@ const tradeModifyLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => req.user ? String(req.user.userId) : 'anon'
+})
+
+// PATCH /api/trades/modify-pending  (adjust price/SL/TP on a pending order)
+router.patch('/modify-pending', authenticateToken, tradeModifyLimiter, async function(req, res) {
+  try {
+    await ensureTradeExperienceInfrastructure()
+    const tenantId = req.user?.tenantId || req.tenant?.id || 1
+    const { trade_id, pending_price, stop_loss, take_profit } = req.body
+
+    if (!trade_id) return res.status(400).json({ error: 'Trade ID required' })
+
+    const tradeResult = await pool.query(
+      `SELECT t.*, a.user_id, a.tenant_id FROM trades t
+         JOIN accounts a ON t.account_id = a.id
+        WHERE t.id = $1 AND t.status = 'pending'
+          AND COALESCE(a.tenant_id, $2) = $2`,
+      [trade_id, tenantId]
+    )
+
+    if (tradeResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Pending order not found or already processed' })
+    }
+
+    const trade = tradeResult.rows[0]
+
+    if (trade.user_id !== req.user.userId) {
+      return res.status(403).json({ error: 'Unauthorized' })
+    }
+
+    const prices = await buildTenantPriceMap([trade.tenant_id])
+    const tenantKey = String(normalizeTenantId(trade.tenant_id) || 1)
+    const price = prices.get(tenantKey)?.[trade.instrument]
+    const bid = price ? parseFloat(price.bid) : 0
+    const ask = price ? parseFloat(price.ask) : 0
+
+    const nextPendingPrice = pending_price != null ? parseFloat(pending_price) : parseFloat(trade.pending_price)
+    const priceError = validatePendingOrderPrice(trade.order_type, nextPendingPrice, bid, ask)
+    if (priceError) return res.status(400).json({ error: priceError })
+
+    const updates = []
+    const vals = []
+    let idx = 1
+    if (pending_price != null) { updates.push('pending_price = $' + idx++); vals.push(nextPendingPrice) }
+    if (stop_loss != null)     { updates.push('stop_loss = $' + idx++);     vals.push(parseFloat(stop_loss)) }
+    if (take_profit != null)   { updates.push('take_profit = $' + idx++);   vals.push(parseFloat(take_profit)) }
+    if (updates.length === 0) return res.status(400).json({ error: 'No fields to update' })
+    updates.push('updated_at = NOW()')
+    vals.push(trade_id)
+
+    const updated = await pool.query(
+      `UPDATE trades SET ${updates.join(', ')} WHERE id = $${idx} AND status = 'pending' RETURNING *`,
+      vals
+    )
+    if (updated.rowCount === 0) return res.status(409).json({ error: 'Trade was already processed' })
+    const row = updated.rows[0]
+
+    await emitCopierEventSafe({
+      tenantId: trade.tenant_id || tenantId,
+      masterAccountId: trade.account_id,
+      masterTradeId: trade_id,
+      eventType: 'MODIFY_PENDING',
+      payload: buildCopierTradePayload({ ...row }, { source: 'trade_modify_pending_manual' })
+    })
+
+    res.json({ message: 'Pending order updated', trade: row })
+
+  } catch (error) {
+    logger.error('Modify pending order error:', { error: error.message })
+    res.status(500).json({ error: 'Could not modify pending order' })
+  }
 })
 
 router.patch('/modify', authenticateToken, tradeModifyLimiter, async function(req, res) {
@@ -2697,10 +2791,13 @@ router.patch('/modify', authenticateToken, tradeModifyLimiter, async function(re
     }
 
     values.push(trade_id)
-    await pool.query(
-      `UPDATE trades SET ${updates.join(', ')} WHERE id = $${idx}`,
+    const modResult = await pool.query(
+      `UPDATE trades SET ${updates.join(', ')} WHERE id = $${idx} AND status = 'open'`,
       values
     )
+    if (modResult.rowCount === 0) {
+      return res.status(409).json({ error: 'Trade was already processed' })
+    }
 
     const nextTradeState = {
       ...trade,
@@ -2732,6 +2829,8 @@ router.patch('/modify', authenticateToken, tradeModifyLimiter, async function(re
 })
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+
 // PATCH /api/trades/note  â€” Save a personal note on a trade
 // Notes are private â€” only the trade owner can read/write them.
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -3893,6 +3992,7 @@ router.post('/batch-action', authenticateToken, tradingLimiter, async function(r
     const tenantId = openTradesResult.rows[0]?.tenant_id || req.user?.tenantId || req.tenant?.id || null
     const rules = await getTradingRules(tenantId)
     let affectedCount = 0
+    const copierEvents = []
     const skipped = {
       min_hold: 0,
       price_unavailable: 0,
@@ -3958,7 +4058,15 @@ router.post('/batch-action', authenticateToken, tradingLimiter, async function(r
             `UPDATE trades SET stop_loss = $1 WHERE id = $2`,
             [trade.open_price, trade.id]
           )
+          await client.query('COMMIT')
           affectedCount++
+          copierEvents.push({
+            tenantId: trade.tenant_id || tenantId,
+            masterAccountId: trade.account_id,
+            masterTradeId: trade.id,
+            eventType: 'MODIFY_POSITION',
+            payload: buildCopierTradePayload(trade, { stop_loss: trade.open_price, source: 'batch_breakeven' })
+          })
         } else {
           // Close trade logic
           await client.query(
@@ -3969,15 +4077,33 @@ router.post('/batch-action', authenticateToken, tradingLimiter, async function(r
             `UPDATE accounts SET current_balance = current_balance + $1, peak_balance = GREATEST(peak_balance, current_balance + $1) WHERE id = $2`,
             [demo_pnl, trade.account_id]
           )
+          await client.query('COMMIT')
           affectedCount++
+          copierEvents.push({
+            tenantId: trade.tenant_id || tenantId,
+            masterAccountId: trade.account_id,
+            masterTradeId: trade.id,
+            eventType: 'CLOSE_POSITION',
+            payload: buildCopierTradePayload(trade, {
+              status: 'closed',
+              close_price: currentPrice,
+              demo_pnl,
+              close_reason: 'Batch Close',
+              source: 'batch_close'
+            })
+          })
         }
-        await client.query('COMMIT')
       }
     } catch (txErr) {
        await client.query('ROLLBACK').catch(() => {})
        throw txErr
     } finally {
        client.release()
+    }
+
+    // Emit copier events collected during the batch (after all transactions committed)
+    for (const event of copierEvents) {
+      await emitCopierEventSafe(event)
     }
 
     const attempted = openTradesResult.rows.length
@@ -4017,6 +4143,8 @@ router.post('/batch-action', authenticateToken, tradingLimiter, async function(r
     res.status(500).json({ error: 'Could not process batch action' })
   }
 })
+
+
 
 router.get('/:tradeId/screenshot/:kind', authenticateToken, async function(req, res) {
   try {
