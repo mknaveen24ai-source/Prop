@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState, useEffect, useMemo, useRef } from 'react'
+﻿import React, { Suspense, lazy, useState, useEffect, useMemo, useRef } from 'react'
 import axios from 'axios'
 import { io } from 'socket.io-client'
 import toast from 'react-hot-toast'
@@ -17,6 +17,7 @@ import useStore from '../store/useStore'
 import { renderIcon } from '../utils/iconMap'
 import { calculatePayoutPreview, calculateRealizedProfit, formatCurrency, toMoneyNumber } from '../utils/finance'
 import { filterVisibleTraderAccounts, isTraderAccountVisible } from '../utils/accountVisibility'
+import Pagination from '../components/Pagination'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 const TradingPanel = lazy(() => import('../components/TradingPanel'))
@@ -86,6 +87,14 @@ function Dashboard({ user, onLogout }) {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [activePage, setActivePage] = useState('dashboard')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem('sidebarCollapsed') === 'true'
+  )
+  const handleToggleSidebar = () => setSidebarCollapsed(prev => {
+    const next = !prev
+    localStorage.setItem('sidebarCollapsed', String(next))
+    return next
+  })
   const [orderForm, setOrderForm] = useState({
     instrument: 'EURUSD',
     lots: '0.01',
@@ -116,6 +125,8 @@ function Dashboard({ user, onLogout }) {
   const [tradeSubmitting, setTradeSubmitting] = useState(false)
   const [closingTradeIds, setClosingTradeIds] = useState([])
   const [payoutSubmitting, setPayoutSubmitting] = useState(false)
+  const [historyPage, setHistoryPage] = useState(1)
+  const HISTORY_PAGE_SIZE = 8
 
   // ── Quota state: set when the backend returns quota_full on account creation ──
   const [quotaFull, setQuotaFull] = useState(false)
@@ -731,6 +742,8 @@ function Dashboard({ user, onLogout }) {
         kycStatus={kycStatus}
         pendingPayouts={payouts.filter(p => p.status === 'pending').length}
         unreadNotifications={notifications.filter(n => !n.read).length}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={handleToggleSidebar}
       />
 
       {/* Main Content */}
@@ -1100,6 +1113,13 @@ function Dashboard({ user, onLogout }) {
                             <td>{new Date(p.requested_at).toLocaleDateString()}</td>
                             {/* FIX (BUG-L2): was p.processed_at but backend column is paid_at */}
                             <td>{p.paid_at ? new Date(p.paid_at).toLocaleDateString() : '—'}</td>
+                            <td>${parseFloat(p.amount_requested).toFixed(2)}</td>
+                            <td style={{ color: 'var(--green)' }}>${parseFloat(p.amount_payable).toFixed(2)}</td>
+                            <td>{p.payment_method}</td>
+                            <td style={{ color: getStatusColor(p.status) }}>{p.status.toUpperCase()}</td>
+                            <td>{new Date(p.requested_at).toLocaleDateString()}</td>
+                            {/* FIX (BUG-L2): was p.processed_at but backend column is paid_at */}
+                            <td>{p.paid_at ? new Date(p.paid_at).toLocaleDateString() : '—'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1123,61 +1143,77 @@ function Dashboard({ user, onLogout }) {
                 <h3 style={{ color: 'var(--accent)', marginBottom: '12px' }}>No History Yet</h3>
                 <p style={{ color: 'var(--text-muted)' }}>Your challenge history will appear here once you complete or start a challenge.</p>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {accountHistory.map(acc => {
-                  const pnl = parseFloat(acc.total_pnl || 0)
-                  const trades = parseInt(acc.total_trades || 0)
-                  const wins = parseInt(acc.winning_trades || 0)
-                  const winRate = trades > 0 ? ((wins / trades) * 100).toFixed(0) : 0
-                  const statusColors = {
-                    active: 'var(--accent)', passed: 'var(--green)', failed: 'var(--red)',
-                    funded: 'var(--cyan)', expired: '#878787', locked: '#8a8a8a'
-                  }
-                  const statusColor = statusColors[acc.status] || 'var(--text-muted)'
-                  return (
-                    <div key={acc.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderLeft: `3px solid ${statusColor}` }}>
-                      <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <div>
-                          <div style={{ fontWeight: '700', fontSize: '15px', color: 'var(--accent)', marginBottom: '4px' }}>
-                            {acc.account_type.toUpperCase()} — ${parseFloat(acc.account_size).toLocaleString('en-US')}
+            ) : (() => {
+              const totalHistPages = Math.ceil(accountHistory.length / HISTORY_PAGE_SIZE)
+              const pagedHistory = accountHistory.slice(
+                (historyPage - 1) * HISTORY_PAGE_SIZE,
+                historyPage * HISTORY_PAGE_SIZE
+              )
+              return (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {pagedHistory.map(acc => {
+                      const pnl = parseFloat(acc.total_pnl || 0)
+                      const trades = parseInt(acc.total_trades || 0)
+                      const wins = parseInt(acc.winning_trades || 0)
+                      const winRate = trades > 0 ? ((wins / trades) * 100).toFixed(0) : 0
+                      const statusColors = {
+                        active: 'var(--accent)', passed: 'var(--green)', failed: 'var(--red)',
+                        funded: 'var(--cyan)', expired: '#878787', locked: '#8a8a8a'
+                      }
+                      const statusColor = statusColors[acc.status] || 'var(--text-muted)'
+                      return (
+                        <div key={acc.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderLeft: `3px solid ${statusColor}` }}>
+                          <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <div>
+                              <div style={{ fontWeight: '700', fontSize: '15px', color: 'var(--accent)', marginBottom: '4px' }}>
+                                {acc.account_type.toUpperCase()} — ${parseFloat(acc.account_size).toLocaleString('en-US')}
+                              </div>
+                              <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
+                                Started {acc.phase_start_date ? new Date(acc.phase_start_date).toLocaleDateString() : '—'}
+                                {acc.phase_end_date && acc.status !== 'active' && ` · Ended ${new Date(acc.phase_end_date).toLocaleDateString()}`}
+                              </div>
+                            </div>
+                            <span style={{ padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: '700', color: statusColor, border: `1px solid ${statusColor}`, background: 'rgba(0,0,0,0.05)' }}>
+                              {acc.status.toUpperCase()}
+                            </span>
                           </div>
-                          <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
-                            Started {acc.phase_start_date ? new Date(acc.phase_start_date).toLocaleDateString() : '—'}
-                            {acc.phase_end_date && acc.status !== 'active' && ` · Ended ${new Date(acc.phase_end_date).toLocaleDateString()}`}
+                          <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+                            <div style={{ textAlign: 'center' }}>
+                              <div style={{ fontSize: '15px', fontWeight: '700', color: pnl >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                                {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
+                              </div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Total P&L</div>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                              <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text)' }}>{trades}</div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Trades</div>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                              <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text)' }}>{winRate}%</div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Win Rate</div>
+                            </div>
+                            <div style={{ textAlign: 'center' }}>
+                              <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text)' }}>
+                                ${parseFloat(acc.current_balance).toFixed(0)}
+                              </div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Final Balance</div>
+                            </div>
                           </div>
                         </div>
-                        <span style={{ padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: '700', color: statusColor, border: `1px solid ${statusColor}`, background: 'rgba(0,0,0,0.05)' }}>
-                          {acc.status.toUpperCase()}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ fontSize: '15px', fontWeight: '700', color: pnl >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                            {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
-                          </div>
-                          <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Total P&L</div>
-                        </div>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text)' }}>{trades}</div>
-                          <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Trades</div>
-                        </div>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text)' }}>{winRate}%</div>
-                          <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Win Rate</div>
-                        </div>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text)' }}>
-                            ${parseFloat(acc.current_balance).toFixed(0)}
-                          </div>
-                          <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Final Balance</div>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+                      )
+                    })}
+                  </div>
+                  <Pagination
+                    page={historyPage}
+                    totalPages={totalHistPages}
+                    onPageChange={p => { setHistoryPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                    pageSize={HISTORY_PAGE_SIZE}
+                    total={accountHistory.length}
+                  />
+                </>
+              )
+            })()}
           </div>
         )}
 
