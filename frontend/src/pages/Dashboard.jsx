@@ -1,4 +1,4 @@
-﻿import React, { Suspense, lazy, useState, useEffect, useMemo, useRef } from 'react'
+import React, { Suspense, lazy, useState, useEffect, useMemo, useRef } from 'react'
 import axios from 'axios'
 import { io } from 'socket.io-client'
 import toast from 'react-hot-toast'
@@ -18,6 +18,8 @@ import { renderIcon } from '../utils/iconMap'
 import { calculatePayoutPreview, calculateRealizedProfit, formatCurrency, toMoneyNumber } from '../utils/finance'
 import { filterVisibleTraderAccounts, isTraderAccountVisible } from '../utils/accountVisibility'
 import Pagination from '../components/Pagination'
+import DashboardKYCPage from './DashboardKYCPage'
+import DashboardPayoutsPage from './DashboardPayoutsPage'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 const TradingPanel = lazy(() => import('../components/TradingPanel'))
@@ -935,201 +937,41 @@ function Dashboard({ user, onLogout }) {
 
         {/* KYC Page */}
         {activePage === 'kyc' && (
-          <div>
-            <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: '24px', fontSize: '22px' }}>Identity Verification</h2>
-            {kycStatus === 'approved' ? (
-              <div className="card" style={{ textAlign: 'center', padding: '48px', maxWidth: '500px' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-                  {renderIcon('approve', { size: 48, color: 'var(--accent-green)' })}
-                </div>
-                <h3 style={{ color: 'var(--green)', marginBottom: '12px' }}>KYC Verified</h3>
-                <p style={{ color: 'var(--text-muted)' }}>Your identity has been verified. You can start trading.</p>
-              </div>
-            ) : kycStatus === 'pending' ? (
-              <div className="card" style={{ textAlign: 'left', padding: '28px', marginBottom: '20px', border: '1px solid rgba(245, 158, 11, 0.35)', maxWidth: '720px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '10px' }}>
-                  {renderIcon('timer', { size: 40, color: 'var(--accent-gold)' })}
-                  <div>
-                    <h3 style={{ color: 'var(--accent)', margin: 0 }}>KYC Under Review</h3>
-                    <p style={{ color: 'var(--text-muted)', margin: '6px 0 0', lineHeight: 1.6 }}>
-                      Your documents were submitted successfully. The upload form is locked while admin reviews your KYC. If it is declined, you can resubmit corrected documents here.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div>
-                {kycStatus === 'rejected' && (
-                  <div className="card" style={{ textAlign: 'center', padding: '24px', marginBottom: '20px', border: '1px solid var(--red)', maxWidth: '720px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
-                      {renderIcon('reject', { size: 32, color: 'var(--accent-red)' })}
-                    </div>
-                    <h3 style={{ color: 'var(--red)', marginBottom: '8px' }}>KYC Rejected</h3>
-                    <p style={{ color: 'var(--text-muted)' }}>Your documents were rejected. Please re-submit.</p>
-                    {user?.kyc_rejection_reason && (
-                      <div style={{ marginTop: '12px', padding: '12px 16px', background: 'rgba(97, 97, 97, 0.08)', border: '1px solid rgba(97, 97, 97, 0.3)', borderRadius: '8px', textAlign: 'left' }}>
-                        <div style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>Reason from Admin</div>
-                        <div style={{ fontSize: '14px', color: 'var(--text)' }}>{user.kyc_rejection_reason}</div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                <KYCUploadForm
-                  onSubmit={uploadKYC}
-                  country={kycCountry}
-                  setCountry={setKycCountry}
-                  documentType={kycDocumentType}
-                  setDocumentType={setKycDocumentType}
-                  documentNumber={kycDocumentNumber}
-                  setDocumentNumber={setKycDocumentNumber}
-                  idDocument={idDocument}
-                  setIdDocument={setIdDocument}
-                  idDocumentBack={idDocumentBack}
-                  setIdDocumentBack={setIdDocumentBack}
-                  selfie={selfie}
-                  setSelfie={setSelfie}
-                  uploading={kycUploading}
-                />
-              </div>
-            )}
-          </div>
+          <DashboardKYCPage
+            user={user}
+            kycStatus={kycStatus}
+            uploadKYC={uploadKYC}
+            kycCountry={kycCountry}
+            setKycCountry={setKycCountry}
+            kycDocumentType={kycDocumentType}
+            setKycDocumentType={setKycDocumentType}
+            kycDocumentNumber={kycDocumentNumber}
+            setKycDocumentNumber={setKycDocumentNumber}
+            idDocument={idDocument}
+            setIdDocument={setIdDocument}
+            idDocumentBack={idDocumentBack}
+            setIdDocumentBack={setIdDocumentBack}
+            selfie={selfie}
+            setSelfie={setSelfie}
+            kycUploading={kycUploading}
+          />
         )}
 
         {/* Payouts Page */}
         {activePage === 'payouts' && (
-          <div>
-            <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: '24px', fontSize: '22px' }}>Payouts</h2>
-            {!fundedAccount ? (
-              <div className="card" style={{ textAlign: 'center', padding: '48px', maxWidth: '500px' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-                  {renderIcon('payouts', { size: 48, color: 'var(--accent-gold)' })}
-                </div>
-                <h3 style={{ color: 'var(--accent)', marginBottom: '12px' }}>No Funded Account Yet</h3>
-                <p style={{ color: 'var(--text-muted)' }}>Complete Phase 1 and Phase 2 to unlock payouts.</p>
-              </div>
-            ) : (
-              <div>
-                <div className="grid-2" style={{ marginBottom: '20px', maxWidth: '600px' }}>
-                  <div className="stat-card">
-                    <div className="stat-value" style={{ color: 'var(--green)' }}>{formatCurrency(availableProfit)}</div>
-                    <div className="stat-label">Available Profit</div>
-                  </div>
-                  <div className="stat-card">
-                    <div className="stat-value" style={{ color: 'var(--accent)' }}>{profitSharePct}%</div>
-                    <div className="stat-label">Your Profit Share</div>
-                  </div>
-                </div>
-
-                <div className="card" style={{ marginBottom: '20px', maxWidth: '700px' }}>
-                  <h3 style={{ marginBottom: '20px', color: 'var(--accent)' }}>Request Payout</h3>
-                  <form onSubmit={requestPayout}>
-                    <div className="grid-2 payout-form-grid">
-                      <div>
-                        <label>Amount to Withdraw ($)</label>
-                        <input type="number" value={payoutForm.amount_requested}
-                          onChange={e => setPayoutForm({ ...payoutForm, amount_requested: e.target.value })}
-                          placeholder={`Max ${formatCurrency(availableProfit)}`} min="50" max={availableProfit} step="0.01" required />
-                        {payoutForm.amount_requested && (
-                          <p style={{ fontSize: '13px', color: 'var(--green-light)', marginTop: '6px' }}>
-                            You will receive: {formatCurrency(calculatePayoutPreview(payoutForm.amount_requested || 0, profitSharePct))} ({profitSharePct}% share)
-                          </p>
-                        )}
-                        <label>Payment Method</label>
-                        <select value={payoutForm.payment_method} onChange={e => setPayoutForm({ ...payoutForm, payment_method: e.target.value })}>
-                          <option value="crypto">Cryptocurrency (USDT/BTC)</option>
-                          <option value="bank">Bank Transfer</option>
-                          <option value="wise">Wise</option>
-                          <option value="paypal">PayPal</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label>Payment Details</label>
-                        <textarea value={payoutForm.payment_details}
-                          onChange={e => setPayoutForm({ ...payoutForm, payment_details: e.target.value })}
-                          placeholder="Enter your payment details" rows="5" required style={{ resize: 'vertical' }} />
-                      </div>
-                    </div>
-                    <button className="btn btn-accent" type="submit" style={{ marginTop: '16px', padding: '12px 32px' }} disabled={availableProfit < 50}>
-                      {availableProfit < 50 ? 'Minimum $50 required' : 'Submit Payout Request'}
-                    </button>
-                  </form>
-                </div>
-
-                {payouts.length > 0 && (
-                  <div className="card" style={{ maxWidth: '900px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                      <h3 style={{ color: 'var(--accent)', margin: 0 }}>Payout History</h3>
-                      {payouts.some(p => p.status === 'paid') && (
-                        <button
-                          onClick={() => {
-                            const link = document.createElement('a')
-                            link.href = `${API_URL}/api/payouts/statement`
-                            link.target = '_blank'
-                            link.click()
-                          }}
-                          style={{
-                            background: 'transparent',
-                            border: '1px solid rgba(148, 148, 148, 0.3)',
-                            borderRadius: '6px',
-                            padding: '6px 14px',
-                            fontSize: '12px',
-                            color: 'var(--accent)',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s'
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(148, 148, 148, 0.08)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                          title="Download your payout statement as HTML (printable / save as PDF)"
-                        >
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                            {renderIcon('download', { size: 14, color: 'currentColor' })}
-                            <span>Download Statement</span>
-                          </span>
-                        </button>
-                      )}
-                    </div>
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Trader ID</th>
-                          <th>Account ID</th>
-                          <th>Amount</th>
-                          <th>You Receive</th>
-                          <th>Method</th>
-                          <th>Status</th>
-                          <th>Requested</th>
-                          <th>Paid</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {payouts.map(p => (
-                          <tr key={p.id}>
-                            <td style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{user?.trader_uid || user?.trader_id || '—'}</td>
-                            <td style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{p.account_uid || p.account_id || '—'}</td>
-                            <td>${parseFloat(p.amount_requested).toFixed(2)}</td>
-                            <td style={{ color: 'var(--green)' }}>${parseFloat(p.amount_payable).toFixed(2)}</td>
-                            <td>{p.payment_method}</td>
-                            <td style={{ color: getStatusColor(p.status) }}>{p.status.toUpperCase()}</td>
-                            <td>{new Date(p.requested_at).toLocaleDateString()}</td>
-                            {/* FIX (BUG-L2): was p.processed_at but backend column is paid_at */}
-                            <td>{p.paid_at ? new Date(p.paid_at).toLocaleDateString() : '—'}</td>
-                            <td>${parseFloat(p.amount_requested).toFixed(2)}</td>
-                            <td style={{ color: 'var(--green)' }}>${parseFloat(p.amount_payable).toFixed(2)}</td>
-                            <td>{p.payment_method}</td>
-                            <td style={{ color: getStatusColor(p.status) }}>{p.status.toUpperCase()}</td>
-                            <td>{new Date(p.requested_at).toLocaleDateString()}</td>
-                            {/* FIX (BUG-L2): was p.processed_at but backend column is paid_at */}
-                            <td>{p.paid_at ? new Date(p.paid_at).toLocaleDateString() : '—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <DashboardPayoutsPage
+            user={user}
+            fundedAccount={fundedAccount}
+            payouts={payouts}
+            payoutForm={payoutForm}
+            setPayoutForm={setPayoutForm}
+            requestPayout={requestPayout}
+            availableProfit={availableProfit}
+            profitSharePct={profitSharePct}
+            API_URL={API_URL}
+          />
         )}
+
       </div>
         {/* Account History Page */}
         {activePage === 'history' && (

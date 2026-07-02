@@ -19,6 +19,7 @@ import {
   sumMoney,
 } from '../utils/finance'
 import { filterVisibleTraderAccounts, isTraderAccountVisible } from '../utils/accountVisibility'
+import Pagination from './Pagination'
 
 const MultiChartGrid = lazy(() => import('./MultiChartGrid'))
 
@@ -616,6 +617,8 @@ export default function TradingPanel({
   const closedTrades = tradeHistory.filter(trade => trade.status === 'closed')
   const cancelledTrades = tradeHistory.filter(trade => trade.status === 'cancelled')
   const realizedHistoryPnl = closedTrades.reduce((sum, trade) => sum + parseFloat(trade.demo_pnl || 0), 0)
+  const [tradeHistoryPage, setTradeHistoryPage] = useState(1)
+  const TRADE_HIST_PAGE_SIZE = 20
   const visibleOpenTrades = positionView === 'open'
     ? openPositions
     : positionView === 'pending'
@@ -1523,7 +1526,10 @@ export default function TradingPanel({
                       </tr>
                     </thead>
                     <tbody>
-                      {tradeHistory.map(trade => {
+                      {tradeHistory.slice(
+                        (tradeHistoryPage - 1) * TRADE_HIST_PAGE_SIZE,
+                        tradeHistoryPage * TRADE_HIST_PAGE_SIZE
+                      ).map(trade => {
                         const dec = getPriceDecimals(trade.instrument)
                         const isCancelled = trade.status === 'cancelled'
                         const isEditingNote = editingNoteId === trade.id
@@ -1661,6 +1667,13 @@ export default function TradingPanel({
                     </tbody>
                   </table>
                 </div>
+                <Pagination
+                  page={tradeHistoryPage}
+                  totalPages={Math.ceil(tradeHistory.length / TRADE_HIST_PAGE_SIZE)}
+                  onPageChange={p => setTradeHistoryPage(p)}
+                  pageSize={TRADE_HIST_PAGE_SIZE}
+                  total={tradeHistory.length}
+                />
               </div>
             )}
             </div>
