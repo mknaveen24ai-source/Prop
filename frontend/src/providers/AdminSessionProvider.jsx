@@ -13,7 +13,6 @@ const defaultSession = {
   authenticated: false,
   adminId: null,
   role: null,
-  tenantId: null,
   permissions: [],
   email: null,
   full_name: null,

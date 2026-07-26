@@ -1,49 +1,70 @@
-@import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700;800&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+/* ── The Ledger Desk ──────────────────────────────────────────────────────────
+   Editorial financial-print design system. Reads like a printed ledger
+   statement, not a typical fintech app: flat corners, hairline rules,
+   double-border mastheads, serif display type, no shadows, no gradients.
+   Light = "Rag Cotton White", Dark = "Charcoal Noir".
+   Every existing component var(--...) is preserved by name; only the VALUES
+   change here, so the whole app re-themes without a component-by-component
+   rewrite.
+──────────────────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Bitter:wght@400;600;700&family=PT+Sans:wght@400;700&family=PT+Mono&display=swap');
 
 :root,
 [data-theme="dark"] {
-  --brand-primary: #2563eb;
-  --brand-primary-strong: #3b82f6;
-  --brand-primary-rgb: 37, 99, 235;
-  --brand-primary-glow: rgba(37, 99, 235, 0.32);
-  --brand-primary-soft: rgba(37, 99, 235, 0.12);
+  color-scheme: dark;
 
-  --brand-accent: #0ea5e9;
-  --brand-accent-strong: #38bdf8;
-  --brand-accent-rgb: 14, 165, 233;
-  --brand-accent-glow: rgba(14, 165, 233, 0.24);
-  --brand-accent-soft: rgba(14, 165, 233, 0.12);
+  /* ── Ledger Desk primitives (Charcoal Noir) ── */
+  --paper: #161616;
+  --paper-2: #1f1f1f;
+  --ink: #e8e4d8;
+  --rule: #3a3a3a;
+  --gain: #4ade80;
+  --loss: #f87171;
+  --muted: #8a8a82;
+  --warn: #d4a256;
 
-  --color-bg-deep: #050811;
-  --color-bg-base: #070b16;
-  --color-bg-subtle: #0b1220;
-  --color-surface-glass: rgba(13, 17, 33, 0.68);
-  --color-surface-elevated: rgba(17, 24, 39, 0.84);
-  --color-surface-solid: #101827;
-  --color-surface-operator: rgba(12, 16, 29, 0.96);
-  --color-surface-operator-alt: rgba(16, 21, 37, 0.98);
-  --color-border-subtle: rgba(255, 255, 255, 0.08);
-  --color-border-strong: rgba(255, 255, 255, 0.15);
-  --color-border-operator: rgba(148, 163, 184, 0.14);
+  --brand-primary: var(--ink);
+  --brand-primary-strong: #cfcbb8;
+  --brand-primary-rgb: 232, 228, 216;
+  --brand-primary-glow: rgba(232, 228, 216, 0.14);
+  --brand-primary-soft: rgba(232, 228, 216, 0.08);
 
-  --color-text-primary: #f1f5f9;
-  --color-text-secondary: #94a3b8;
-  --color-text-muted: #475569;
-  --color-text-faint: #334155;
-  --color-text-disabled: #273244;
+  --brand-accent: var(--ink);
+  --brand-accent-strong: #cfcbb8;
+  --brand-accent-rgb: 232, 228, 216;
+  --brand-accent-glow: rgba(232, 228, 216, 0.14);
+  --brand-accent-soft: rgba(232, 228, 216, 0.08);
 
-  --color-success: #10b981;
-  --color-success-soft: rgba(16, 185, 129, 0.12);
-  --color-warning: #f59e0b;
-  --color-warning-soft: rgba(245, 158, 11, 0.12);
-  --color-danger: #ef4444;
-  --color-danger-soft: rgba(239, 68, 68, 0.12);
-  --color-info: #0ea5e9;
-  --color-info-soft: rgba(14, 165, 233, 0.12);
+  --color-bg-deep: var(--paper);
+  --color-bg-base: var(--paper);
+  --color-bg-subtle: var(--paper-2);
+  --color-surface-glass: var(--paper-2);
+  --color-surface-elevated: var(--paper-2);
+  --color-surface-solid: var(--paper-2);
+  --color-surface-operator: var(--paper-2);
+  --color-surface-operator-alt: var(--paper);
+  --color-border-subtle: var(--rule);
+  --color-border-strong: var(--ink);
+  --color-border-operator: var(--rule);
 
-  --font-ui: 'Public Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-display: 'Manrope', 'Public Sans', 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --color-text-primary: var(--ink);
+  --color-text-secondary: var(--muted);
+  --color-text-muted: var(--muted);
+  --color-text-faint: #5c5c56;
+  --color-text-disabled: #454540;
+
+  --color-success: var(--gain);
+  --color-success-soft: rgba(74, 222, 128, 0.12);
+  --color-warning: var(--warn);
+  --color-warning-soft: rgba(212, 162, 86, 0.14);
+  --color-danger: var(--loss);
+  --color-danger-soft: rgba(248, 113, 113, 0.12);
+  --color-info: var(--muted);
+  --color-info-soft: rgba(138, 138, 130, 0.12);
+
+  --font-ui: 'PT Sans', -apple-system, 'Segoe UI', Helvetica, sans-serif;
+  --font-display: 'Bitter', Georgia, 'Times New Roman', serif;
+  --font-mono: 'PT Mono', 'Courier New', ui-monospace, monospace;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -56,18 +77,20 @@
   --space-9: 48px;
   --space-10: 64px;
 
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-  --radius-2xl: 24px;
-  --radius-pill: 999px;
+  /* Ledger Desk is flat everywhere â€” no rounded corners on any element */
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-pill: 0;
 
-  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.18);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.22);
-  --shadow-lg: 0 14px 40px rgba(0, 0, 0, 0.3);
-  --shadow-surface: 0 16px 40px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  --shadow-operator: 0 12px 28px rgba(0, 0, 0, 0.22);
+  /* Hierarchy comes from hairline/double rules, never elevation */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-surface: none;
+  --shadow-operator: none;
 
   --motion-fast: 160ms cubic-bezier(0.4, 0, 0.2, 1);
   --motion-base: 260ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -81,7 +104,7 @@
   --bg-base: var(--color-bg-base);
   --bg-surface: var(--color-surface-glass);
   --bg-elevated: var(--color-surface-elevated);
-  --bg-hover: rgba(24, 35, 56, 0.84);
+  --bg-hover: var(--paper-2);
   --border: var(--color-border-subtle);
   --border-strong: var(--color-border-strong);
 
@@ -111,25 +134,25 @@
   --navy-border: var(--border);
   --navy-hover: var(--bg-hover);
   --green: var(--success);
-  --green-light: #34e0b0;
+  --green-light: var(--gain);
   --red: var(--danger);
-  --red-light: #ff6b7a;
+  --red-light: var(--loss);
   --cyan: var(--brand-accent);
   --text: var(--text-primary);
   --text-dim: var(--text-secondary);
-  --shadow: var(--shadow-md);
-  --radius: var(--radius-sm);
+  --shadow: none;
+  --radius: 0;
   --transition: all var(--motion-base);
-  --nav-bg: rgba(8, 12, 24, 0.86);
+  --nav-bg: var(--paper);
   --nav-border: var(--border);
-  --input-bg: var(--bg-elevated);
-  --input-focus-bg: rgba(19, 27, 44, 0.96);
-  --table-border: var(--border);
-  --table-row-hover: var(--bg-hover);
-  --scrollbar-track: var(--color-bg-deep);
-  --scrollbar-thumb: var(--color-text-muted);
-  --toggle-bg: var(--bg-elevated);
-  --toggle-border: var(--border);
+  --input-bg: var(--paper-2);
+  --input-focus-bg: var(--paper-2);
+  --table-border: var(--rule);
+  --table-row-hover: var(--paper-2);
+  --scrollbar-track: var(--paper);
+  --scrollbar-thumb: var(--rule);
+  --toggle-bg: var(--paper-2);
+  --toggle-border: var(--rule);
   --risk-warning-height: 0px;
 
   --accent-green: var(--success);
@@ -143,26 +166,61 @@
 }
 
 [data-theme="light"] {
-  --color-bg-deep: #e8eefc;
-  --color-bg-base: #f0f4ff;
-  --color-bg-subtle: #e5ebfb;
-  --color-surface-glass: rgba(255, 255, 255, 0.76);
-  --color-surface-elevated: rgba(255, 255, 255, 0.92);
+  color-scheme: light;
+
+  /* ── Ledger Desk primitives (Rag Cotton White) ── */
+  --paper: #efe9db;
+  --paper-2: #e5ddc9;
+  --ink: #1b2b3a;
+  --rule: #c7bda5;
+  --gain: #2f5233;
+  --loss: #6e1f22;
+  --muted: #7a7261;
+  --warn: #8a6d3b;
+
+  --brand-primary: var(--ink);
+  --brand-primary-strong: #3d3d3d;
+  --brand-primary-rgb: 35, 35, 35;
+  --brand-primary-glow: rgba(35, 35, 35, 0.1);
+  --brand-primary-soft: rgba(35, 35, 35, 0.06);
+
+  --brand-accent: var(--ink);
+  --brand-accent-strong: #3d3d3d;
+  --brand-accent-rgb: 35, 35, 35;
+  --brand-accent-glow: rgba(35, 35, 35, 0.1);
+  --brand-accent-soft: rgba(35, 35, 35, 0.06);
+
+  --color-bg-deep: var(--paper);
+  --color-bg-base: var(--paper);
+  --color-bg-subtle: var(--paper-2);
+  --color-surface-glass: var(--paper-2);
+  --color-surface-elevated: #ffffff;
   --color-surface-solid: #ffffff;
-  --color-surface-operator: rgba(255, 255, 255, 0.98);
-  --color-surface-operator-alt: rgba(245, 247, 255, 0.98);
-  --color-border-subtle: rgba(15, 23, 42, 0.08);
-  --color-border-strong: rgba(15, 23, 42, 0.14);
-  --color-border-operator: rgba(15, 23, 42, 0.12);
+  --color-surface-operator: #ffffff;
+  --color-surface-operator-alt: var(--paper-2);
+  --color-border-subtle: var(--rule);
+  --color-border-strong: var(--ink);
+  --color-border-operator: var(--rule);
 
-  --color-text-primary: #0f172a;
-  --color-text-secondary: #475569;
-  --color-text-muted: #64748b;
-  --color-text-faint: #94a3b8;
-  --color-text-disabled: #cbd5e1;
+  --color-text-primary: var(--ink);
+  --color-text-secondary: var(--muted);
+  --color-text-muted: var(--muted);
+  --color-text-faint: #9c988c;
+  --color-text-disabled: #c5c1b5;
 
-  --bg-hover: rgba(233, 239, 255, 0.92);
-  --nav-bg: rgba(255, 255, 255, 0.92);
-  --scrollbar-track: #f1f5f9;
-  --scrollbar-thumb: #cbd5e1;
+  --color-success: var(--gain);
+  --color-success-soft: rgba(47, 82, 51, 0.1);
+  --color-warning: var(--warn);
+  --color-warning-soft: rgba(138, 109, 59, 0.12);
+  --color-danger: var(--loss);
+  --color-danger-soft: rgba(110, 31, 34, 0.1);
+  --color-info: var(--muted);
+  --color-info-soft: rgba(106, 103, 94, 0.1);
+
+  --bg-hover: var(--paper-2);
+  --nav-bg: var(--paper);
+  --input-bg: #ffffff;
+  --input-focus-bg: #ffffff;
+  --scrollbar-track: var(--paper);
+  --scrollbar-thumb: var(--rule);
 }

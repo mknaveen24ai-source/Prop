@@ -26,6 +26,7 @@ const AdminTrades = lazy(() => import('./pages/admin/AdminTrades'))
 const AdminPayouts = lazy(() => import('./pages/admin/AdminPayouts'))
 const AdminPlatformPnL = lazy(() => import('./pages/admin/AdminPlatformPnL'))
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'))
+const AdminStepModels = lazy(() => import('./pages/admin/AdminStepModels'))
 const AdminAccess = lazy(() => import('./pages/admin/AdminAccess'))
 const AdminEmailJobs = lazy(() => import('./pages/admin/AdminEmailJobs'))
 const AdminDisputes = lazy(() => import('./pages/admin/AdminDisputes'))
@@ -34,7 +35,6 @@ const AdminLeaderboard = lazy(() => import('./pages/admin/AdminLeaderboard'))
 const AdminTradeCopier = lazy(() => import('./pages/admin/AdminTradeCopier'))
 const AdminAccountDetail = lazy(() => import('./pages/admin/AdminAccountDetail'))
 const AdminViolations = lazy(() => import('./pages/admin/AdminViolations'))
-const AdminTenants = lazy(() => import('./pages/admin/AdminTenants'))
 const AdminCommandCenter = lazy(() => import('./pages/admin/AdminCommandCenter'))
 const AdminPromotionReviews = lazy(() => import('./pages/admin/AdminPromotionReviews'))
 
@@ -126,9 +126,9 @@ function AnimatedRoutes({ user, login, logout }) {
             <Route path="payouts" element={<AdminPayouts />} />
             <Route path="pnl" element={<AdminPlatformPnL />} />
             <Route path="settings" element={<AdminSettings />} />
+            <Route path="step-models" element={<AdminStepModels />} />
             <Route path="access" element={<AdminAccess />} />
             <Route path="email-jobs" element={<AdminEmailJobs />} />
-            <Route path="tenants" element={<AdminTenants />} />
             <Route path="command-center" element={<AdminCommandCenter />} />
             <Route path="promotion-reviews" element={<AdminPromotionReviews />} />
             <Route path="disputes" element={<AdminDisputes />} />
@@ -168,21 +168,19 @@ function AppRoutes() {
         toastOptions={{
           duration: 4000,
           style: {
-            background: '#111E35',
-            color: '#F0F4FF',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: '10px',
+            background: 'var(--paper-2)',
+            color: 'var(--ink)',
+            border: '1px solid var(--rule)',
             fontSize: '13px',
-            fontFamily: 'system-ui, sans-serif',
+            fontFamily: 'var(--font-ui, system-ui, sans-serif)',
             padding: '12px 16px',
-            boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
             maxWidth: '360px',
           },
           success: {
-            iconTheme: { primary: '#00FF88', secondary: '#111E35' },
+            iconTheme: { primary: 'var(--gain)', secondary: 'var(--paper-2)' },
           },
           error: {
-            iconTheme: { primary: '#FF3B5C', secondary: '#111E35' },
+            iconTheme: { primary: 'var(--loss)', secondary: 'var(--paper-2)' },
           },
         }}
       />

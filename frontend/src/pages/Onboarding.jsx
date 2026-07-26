@@ -8,7 +8,7 @@ const STEPS = [
   {
     icon: '👋',
     title: 'Welcome to Prop Firm!',
-    body: `This is a free trader evaluation platform. Prove your trading skill across two phases and earn a funded account — with real capital on the line.`,
+    body: `This platform runs paid trader evaluations. Choose a 1-step, 2-step, or 3-step challenge, prove your trading skill, and earn a funded account — with real capital on the line.`,
     highlight: null
   },
   {
@@ -19,8 +19,8 @@ const STEPS = [
   },
   {
     icon: '📈',
-    title: 'Step 2 — Start a Challenge',
-    body: `Choose an account size from the Dashboard. Your Phase 1 challenge begins immediately — free, no entry fee. Hit the 10% profit target within 30 days without breaching the 10% drawdown limit.`,
+    title: 'Step 2 — Choose a Challenge',
+    body: `Pick a 1-step, 2-step, or 3-step model and an account size from the New Challenge tab, then complete checkout. Your challenge begins as soon as payment clears. Hit each phase's profit target within its time limit without breaching the drawdown limit.`,
     highlight: 'dashboard'
   },
   {
@@ -30,9 +30,9 @@ const STEPS = [
       <div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '8px' }}>
           {[
-            ['Profit Target',    '10% per phase'],
-            ['Max Drawdown',     '10% limit'],
-            ['Time Limit',       '30 days / phase'],
+            ['Profit Target',    'Set by your model'],
+            ['Max Drawdown',     'Set by your model'],
+            ['Time Limit',       'Set by your model'],
             ['Min Trade Time',   '60 seconds'],
             ['Forex Leverage',   '1:30'],
             ['Gold/Silver Lev.', '1:10'],
@@ -55,8 +55,8 @@ const STEPS = [
   },
   {
     icon: '🏆',
-    title: 'Step 3 — Pass Both Phases',
-    body: `Pass Phase 1 → Phase 2 activates automatically. Same rules apply. Pass Phase 2 → you become a Funded Trader with a real broker account. No profit target in funded — just the 5% drawdown limit.`,
+    title: 'Step 3 — Pass Your Challenge',
+    body: `Pass each phase of your chosen model and the next one activates automatically, with the same rules applying throughout. Complete the final phase and you become a Funded Trader with a real broker account. No profit target once funded — just the drawdown limit.`,
     highlight: null
   },
   {
@@ -94,24 +94,12 @@ export function markOnboardingComplete() {
 export default function Onboarding({ onComplete, onNavigate }) {
   const { tenant } = useBranding()
   const [step, setStep] = useState(0)
-  const requiresPayment = tenant?.settings?.requires_payment === 'true'
   const tenantName = tenant?.name || 'Prop Firm'
   const effectiveSteps = STEPS.map((stepItem) => {
     if (stepItem.title === 'Welcome to Prop Firm!') {
       return {
         ...stepItem,
-        title: `Welcome to ${tenantName}!`,
-        body: requiresPayment
-          ? `This platform runs paid trader evaluations. Complete the challenge rules, pass the phases, and unlock a funded account.`
-          : `This platform runs a free trader evaluation model. Prove your trading skill across two phases and earn a funded account.`
-      }
-    }
-    if (stepItem.title === 'Step 2 — Start a Challenge') {
-      return {
-        ...stepItem,
-        body: requiresPayment
-          ? `Choose an account size from the Dashboard. Your challenge begins after checkout is completed for the selected plan.`
-          : `Choose an account size from the Dashboard. Your Phase 1 challenge begins immediately after you claim an available slot.`
+        title: `Welcome to ${tenantName}!`
       }
     }
     return stepItem

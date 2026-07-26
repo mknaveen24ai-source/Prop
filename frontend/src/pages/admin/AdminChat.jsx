@@ -433,7 +433,7 @@ export default function AdminChat() {
                         {conversation.unread_admin_count > 0 && visibleColumnKeys.includes('unread') && (
                           <span style={{
                             background: 'var(--admin-danger)',
-                            color: '#fff',
+                            color: 'var(--paper)',
                             fontSize: '10px',
                             fontWeight: 700,
                             borderRadius: '10px',
@@ -572,7 +572,7 @@ export default function AdminChat() {
                           padding: '12px 16px',
                           borderRadius: isAdmin ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
                           background: isAdmin ? 'var(--admin-accent)' : 'var(--admin-surface)',
-                          color: isAdmin ? '#fff' : 'var(--admin-text)',
+                          color: isAdmin ? 'var(--paper)' : 'var(--admin-text)',
                           fontSize: '13px',
                           lineHeight: '1.5',
                           border: isAdmin ? 'none' : '1px solid var(--admin-border)',

@@ -9,6 +9,8 @@ const Decimal = require('decimal.js')
 const { CONTRACT_SIZES } = require('../constants')
 const { getTenantSettings } = require('../services/tenantPolicyService')
 const { enqueuePayoutRequestedEmail } = require('../utils/emailQueue')
+const tradingDaysService = require('../services/tradingDaysService')
+const { fetchStepModelBySlug } = require('../utils/stepModels')
 const {
   abandonIdempotentRequest,
   beginIdempotentRequest,
@@ -52,7 +54,6 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
   let idempotencyClaim = null
   try {
     const { account_id, amount_requested, payment_method, payment_details } = req.body
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
 
     if (!account_id || !amount_requested || !payment_method || !payment_details) {
       return res.status(400).json({ error: 'All fields are required' })
@@ -92,13 +93,12 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
       // Lock the account row for this transaction
       const account = await client.query(
         `SELECT id, user_id, account_type, account_size, current_balance, starting_balance,
-                peak_balance, status, created_at
+                peak_balance, status, created_at, challenge_model_slug
          FROM accounts
          WHERE id = $1
            AND user_id = $2
-           AND COALESCE(tenant_id, $3) = $3
          FOR UPDATE`,
-        [accountIdStr, req.user.userId, tenantId]
+        [accountIdStr, req.user.userId]
       )
 
       if (account.rows.length === 0) {
@@ -115,8 +115,8 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
 
       // FIX: KYC must be approved before payout
       const userKyc = await client.query(
-        `SELECT kyc_status FROM users WHERE id = $1 AND COALESCE(tenant_id, $2) = $2`,
-        [req.user.userId, tenantId]
+        `SELECT kyc_status FROM users WHERE id = $1`,
+        [req.user.userId]
       )
       if (userKyc.rows.length === 0 || userKyc.rows[0].kyc_status !== 'approved') {
         await client.query('ROLLBACK')
@@ -132,9 +132,8 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
         `SELECT email, full_name
            FROM users
           WHERE id = $1
-            AND COALESCE(tenant_id, $2) = $2
           LIMIT 1`,
-        [req.user.userId, tenantId]
+        [req.user.userId]
       )
       const payoutEmail = userProfile.rows[0]?.email || null
       const payoutName = userProfile.rows[0]?.full_name || 'Trader'
@@ -169,6 +168,45 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
         })
       }
 
+      // ── Funded-stage eligibility gates (min trading days, min net profit, consistency) ──
+      if (acc.challenge_model_slug) {
+        const fundedModel = await fetchStepModelBySlug(acc.challenge_model_slug)
+        if (fundedModel) {
+          const minTradingDaysForPayout = parseInt(fundedModel.funded_min_trading_days_for_payout || 0, 10)
+          if (minTradingDaysForPayout > 0) {
+            const tradingDays = await tradingDaysService.countTradingDays(client, accountIdStr)
+            if (tradingDays < minTradingDaysForPayout) {
+              await client.query('ROLLBACK')
+              return res.status(400).json({
+                error: `You need to trade on at least ${minTradingDaysForPayout} distinct days before requesting a payout. You've traded on ${tradingDays} so far.`
+              })
+            }
+          }
+
+          const payoutMinNetProfitPct = parseFloat(fundedModel.funded_payout_min_net_profit_pct || 0)
+          if (payoutMinNetProfitPct > 0) {
+            const minProfitRequired = parseFloat(acc.starting_balance) * (payoutMinNetProfitPct / 100)
+            if (realizedProfit < minProfitRequired) {
+              await client.query('ROLLBACK')
+              return res.status(400).json({
+                error: `Your account needs at least ${payoutMinNetProfitPct}% net profit ($${minProfitRequired.toFixed(2)}) before requesting a payout. Current profit: $${realizedProfit.toFixed(2)}.`
+              })
+            }
+          }
+
+          const consistencyPct = parseFloat(fundedModel.funded_consistency_max_day_pct || 0)
+          if (consistencyPct > 0) {
+            const consistency = await tradingDaysService.checkConsistencyRule(client, accountIdStr, realizedProfit, consistencyPct)
+            if (!consistency.ok) {
+              await client.query('ROLLBACK')
+              return res.status(400).json({
+                error: `Your best single trading day represents ${consistency.bestDayPct.toFixed(1)}% of your total profit, exceeding this model's ${consistencyPct}% consistency limit. Keep trading to bring that ratio down, then request your payout.`
+              })
+            }
+          }
+        }
+      }
+
       // Check no pending payout already exists (inside transaction Ã¢â‚¬â€ serialised)
       const existing = await client.query(
         `SELECT id FROM payouts WHERE account_id = $1 AND status = 'pending'`,
@@ -190,7 +228,7 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
         ? parseFloat(settingsResult.rows[0].value) / 100
         : 0.80
 
-      const payoutSettings = await getTenantSettings(tenantId, ['profit_share_pct'])
+      const payoutSettings = await getTenantSettings(['profit_share_pct'])
       const effectiveProfitSharePct = parseFloat(payoutSettings.profit_share_pct || (profitSharePct * 100) || 80) / 100
       const amount_payable = parseFloat((amountNum * effectiveProfitSharePct).toFixed(2))
 
@@ -269,7 +307,6 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
 
       const idempotencyResult = await beginIdempotentRequest(pool, {
         scope: 'payouts:request',
-        tenantId,
         actorId: req.user.userId,
         idempotencyKey: getIdempotencyKey(req)
       })
@@ -285,10 +322,10 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
 
       const payout = await client.query(
         `INSERT INTO payouts
-         (tenant_id, user_id, account_id, amount_requested, amount_payable, payment_method, payment_details, status, is_flagged, flag_reason)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9)
+         (user_id, account_id, amount_requested, amount_payable, payment_method, payment_details, status, is_flagged, flag_reason)
+         VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8)
          RETURNING *`,
-        [tenantId, req.user.userId, accountIdStr, amountNum, amount_payable, payment_method, paymentDetailsStr, is_flagged, flagReasons.join(' | ') || null]
+        [req.user.userId, accountIdStr, amountNum, amount_payable, payment_method, paymentDetailsStr, is_flagged, flagReasons.join(' | ') || null]
       )
 
       await client.query('COMMIT')
@@ -311,7 +348,6 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
             amount_payable,
             payment_method,
             {
-              tenantId,
               userId: req.user.userId
             }
           )
@@ -344,15 +380,13 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
 // GET /api/payouts/my-payouts
 router.get('/my-payouts', authenticateToken, async function(req, res) {
   try {
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
     const result = await pool.query(
       `SELECT p.*, a.account_type, a.account_size, a.account_uid
        FROM payouts p
        JOIN accounts a ON p.account_id = a.id
        WHERE p.user_id = $1
-         AND COALESCE(a.tenant_id, $2) = $2
        ORDER BY p.requested_at DESC`,
-      [req.user.userId, tenantId]
+      [req.user.userId]
     )
     res.json(result.rows)
   } catch (error) {
@@ -363,7 +397,6 @@ router.get('/my-payouts', authenticateToken, async function(req, res) {
 
 router.get('/statement', authenticateToken, async function(req, res) {
   try {
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
     const result = await pool.query(
       `SELECT p.id, p.account_id, p.amount_requested, p.amount_payable,
               p.payment_method, p.status, p.requested_at, p.paid_at,
@@ -371,9 +404,8 @@ router.get('/statement', authenticateToken, async function(req, res) {
        FROM payouts p
        JOIN accounts a ON p.account_id = a.id
        WHERE p.user_id = $1
-         AND COALESCE(a.tenant_id, $2) = $2
        ORDER BY p.requested_at DESC`,
-      [req.user.userId, tenantId]
+      [req.user.userId]
     )
 
     const rows = result.rows
@@ -474,8 +506,7 @@ router.get('/statement', authenticateToken, async function(req, res) {
 // GET /api/payouts/settings
 router.get('/settings', authenticateToken, async function(req, res) {
   try {
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
-    const settings = await getTenantSettings(tenantId, ['profit_share_pct'])
+    const settings = await getTenantSettings(['profit_share_pct'])
     const profit_share_pct = parseFloat(settings.profit_share_pct || 80)
     res.json({ profit_share_pct })
   } catch (error) {

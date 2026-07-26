@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import './admin.css'
 import { AdminToastProvider, useToast } from '../../components/admin/AdminToast'
 import AdminSidebar from '../../components/admin/AdminSidebar'
 import AdminTopBar from '../../components/admin/AdminTopBar'
 import { useAdminSession } from '../../providers/AdminSessionProvider'
+import ErrorBoundary from '../../ErrorBoundary'
 
 function formatViolationLabel(value) {
   return String(value || 'critical violation')
@@ -147,7 +148,7 @@ function AdminLoginScreen({ onLoginSuccess }) {
           </div>
           <h1 className="admin-h1">Admin Portal</h1>
           <p style={{ color: 'var(--admin-text-muted)' }}>
-            {step === 'totp' ? 'Enter your authenticator code' : 'DB-backed platform and tenant admin access'}
+            {step === 'totp' ? 'Enter your authenticator code' : 'DB-backed platform admin access'}
           </p>
         </div>
 
@@ -169,7 +170,7 @@ function AdminLoginScreen({ onLoginSuccess }) {
                 placeholder="admin@yourfirm.com"
               />
               <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--admin-text-muted)' }}>
-                Required for DB-backed platform admins and tenant admins. Leave blank only for one-time legacy bootstrap access before the first platform admin exists.
+                Required for DB-backed platform admins. Leave blank only for one-time legacy bootstrap access before the first platform admin exists.
               </div>
             </div>
             <div className="admin-form-group">
@@ -264,6 +265,7 @@ export default function AdminLayout() {
   const { adminAxios, checking, isAuthenticated, session, socket, refreshSession, logout } = useAdminSession()
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const location = useLocation()
 
   if (checking) {
     return <div className="mode-operator admin-layout" style={{ justifyContent: 'center', alignItems: 'center' }}>Connecting secure tunnel...</div>
@@ -294,7 +296,9 @@ export default function AdminLayout() {
             onMobileMenuClick={() => setMobileMenuOpen(true)}
           />
           <main className="admin-content" id="admin-scroll-container">
-            <Outlet context={{ adminAxios, socket, session }} />
+            <ErrorBoundary variant="section" label="This admin page" key={location.pathname}>
+              <Outlet context={{ adminAxios, socket, session }} />
+            </ErrorBoundary>
           </main>
         </div>
       </div>

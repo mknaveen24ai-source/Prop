@@ -1,7 +1,6 @@
 const pool = require('../db')
 const logger = require('../utils/logger')
 const { emitAdminEvent } = require('../utils/realtime')
-const { runWithSystemDbContext } = require('../utils/dbContext')
 
 let _violationTablesReady = false
 
@@ -20,7 +19,7 @@ function buildViolationKey(parts) {
 async function ensureViolationTables() {
   if (_violationTablesReady) return
 
-  await runWithSystemDbContext(async () => {
+  await (async () => {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS admin_rules (
       id BIGSERIAL PRIMARY KEY,
@@ -45,7 +44,6 @@ async function ensureViolationTables() {
     CREATE TABLE IF NOT EXISTS admin_rule_violations (
       id BIGSERIAL PRIMARY KEY,
       violation_key TEXT NOT NULL UNIQUE,
-      tenant_id BIGINT,
       violation_type TEXT NOT NULL,
       severity TEXT NOT NULL DEFAULT 'medium',
       status TEXT NOT NULL DEFAULT 'open',
@@ -65,7 +63,6 @@ async function ensureViolationTables() {
     )
   `)
   await pool.query(`ALTER TABLE admin_rule_violations ADD COLUMN IF NOT EXISTS violation_key TEXT`)
-  await pool.query(`ALTER TABLE admin_rule_violations ADD COLUMN IF NOT EXISTS tenant_id BIGINT`)
   await pool.query(`ALTER TABLE admin_rule_violations ADD COLUMN IF NOT EXISTS violation_type TEXT`)
   await pool.query(`ALTER TABLE admin_rule_violations ADD COLUMN IF NOT EXISTS severity TEXT NOT NULL DEFAULT 'medium'`)
   await pool.query(`ALTER TABLE admin_rule_violations ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'open'`)
@@ -91,10 +88,6 @@ async function ensureViolationTables() {
       ON admin_rule_violations(status, last_detected_at DESC)
   `)
   await pool.query(`
-    CREATE INDEX IF NOT EXISTS idx_admin_rule_violations_tenant_status_detected
-      ON admin_rule_violations(tenant_id, status, last_detected_at DESC)
-  `)
-  await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_admin_rule_violations_account_type
       ON admin_rule_violations(account_id, violation_type, last_detected_at DESC)
   `)
@@ -103,7 +96,6 @@ async function ensureViolationTables() {
     CREATE TABLE IF NOT EXISTS admin_enforcement_events (
       id BIGSERIAL PRIMARY KEY,
       rule_id BIGINT REFERENCES admin_rules(id) ON DELETE SET NULL,
-      tenant_id BIGINT,
       account_id TEXT,
       user_id TEXT,
       action TEXT NOT NULL,
@@ -113,7 +105,6 @@ async function ensureViolationTables() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `)
-  await pool.query(`ALTER TABLE admin_enforcement_events ADD COLUMN IF NOT EXISTS tenant_id BIGINT`)
   await pool.query(`ALTER TABLE admin_enforcement_events ADD COLUMN IF NOT EXISTS account_id TEXT`)
   await pool.query(`ALTER TABLE admin_enforcement_events ADD COLUMN IF NOT EXISTS user_id TEXT`)
   await pool.query(`ALTER TABLE admin_enforcement_events ADD COLUMN IF NOT EXISTS action TEXT`)
@@ -125,16 +116,12 @@ async function ensureViolationTables() {
     CREATE INDEX IF NOT EXISTS idx_admin_enforcement_events_created
       ON admin_enforcement_events(created_at DESC)
   `)
-  await pool.query(`
-    CREATE INDEX IF NOT EXISTS idx_admin_enforcement_events_tenant_created
-      ON admin_enforcement_events(tenant_id, created_at DESC)
-  `)
 
   await pool.query(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS review_flagged BOOLEAN NOT NULL DEFAULT FALSE`)
   await pool.query(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS review_flag_reason TEXT`)
 
   _violationTablesReady = true
-  })
+  })()
 }
 
 async function recordEnforcementEvent(clientOrPayload, maybePayload) {
@@ -144,12 +131,11 @@ async function recordEnforcementEvent(clientOrPayload, maybePayload) {
   await ensureViolationTables()
 
   const result = await client.query(
-    `INSERT INTO admin_enforcement_events (rule_id, tenant_id, account_id, user_id, action, payload_json, status, message)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
+    `INSERT INTO admin_enforcement_events (rule_id, account_id, user_id, action, payload_json, status, message)
+     VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)
      RETURNING *`,
     [
       Number.isFinite(parseInt(payload.ruleId, 10)) ? parseInt(payload.ruleId, 10) : null,
-      Number.isFinite(parseInt(payload.tenantId, 10)) ? parseInt(payload.tenantId, 10) : null,
       payload.accountId ? String(payload.accountId) : null,
       payload.userId ? String(payload.userId) : null,
       String(payload.action || 'unknown_action'),
@@ -159,15 +145,14 @@ async function recordEnforcementEvent(clientOrPayload, maybePayload) {
     ]
   )
   const event = result.rows[0]
-  emitAdminEvent('admin_enforcement_event', event, event.tenant_id)
+  emitAdminEvent('admin_enforcement_event', event)
   emitAdminEvent('admin_alert', {
     type: 'violation',
     event: 'enforcement_applied',
-    tenant_id: event.tenant_id,
     account_id: event.account_id,
     user_id: event.user_id,
     action: event.action
-  }, event.tenant_id)
+  })
   return event
 }
 
@@ -176,7 +161,6 @@ async function recordViolation(input) {
 
   const payload = input && typeof input === 'object' ? input : {}
   const violationKey = buildViolationKey([
-    payload.tenantId,
     payload.dedupeKey || payload.violationType,
     payload.accountId,
     payload.userId,
@@ -186,13 +170,12 @@ async function recordViolation(input) {
 
   const result = await pool.query(
     `INSERT INTO admin_rule_violations (
-       violation_key, tenant_id, violation_type, severity, status, account_id, user_id,
+       violation_key, violation_type, severity, status, account_id, user_id,
        trade_id, instrument, source, message, payload_json
      )
-     VALUES ($1, $2, $3, $4, 'open', $5, $6, $7, $8, $9, $10, $11::jsonb)
+     VALUES ($1, $2, $3, 'open', $4, $5, $6, $7, $8, $9, $10::jsonb)
      ON CONFLICT (violation_key) DO UPDATE
-       SET tenant_id = COALESCE(EXCLUDED.tenant_id, admin_rule_violations.tenant_id),
-           severity = EXCLUDED.severity,
+       SET severity = EXCLUDED.severity,
            status = 'open',
            source = EXCLUDED.source,
            message = EXCLUDED.message,
@@ -208,7 +191,6 @@ async function recordViolation(input) {
      RETURNING *`,
     [
       violationKey,
-      Number.isFinite(parseInt(payload.tenantId, 10)) ? parseInt(payload.tenantId, 10) : null,
       String(payload.violationType || 'unknown_violation'),
       String(payload.severity || 'medium'),
       payload.accountId ? String(payload.accountId) : null,
@@ -222,17 +204,16 @@ async function recordViolation(input) {
   )
 
   const violation = result.rows[0]
-  emitAdminEvent('admin_violation_updated', violation, violation.tenant_id)
+  emitAdminEvent('admin_violation_updated', violation)
   emitAdminEvent('admin_alert', {
     type: 'violation',
     event: 'violation_recorded',
-    tenant_id: violation.tenant_id,
     account_id: violation.account_id,
     user_id: violation.user_id,
     violation_type: violation.violation_type,
     severity: violation.severity,
     status: violation.status
-  }, violation.tenant_id)
+  })
 
   return violation
 }
@@ -245,7 +226,7 @@ async function applyAccountEnforcement(payload) {
     await client.query('BEGIN')
 
     const accountResult = await client.query(
-      `SELECT id, user_id, tenant_id, status, review_flagged, review_flag_reason
+      `SELECT id, user_id, status, review_flagged, review_flag_reason
          FROM accounts
         WHERE id = $1
         FOR UPDATE`,
@@ -292,7 +273,6 @@ async function applyAccountEnforcement(payload) {
 
     const event = await recordEnforcementEvent(client, {
       ruleId: payload.ruleId,
-      tenantId: payload.tenantId || account.tenant_id,
       accountId: account.id,
       userId: account.user_id,
       action,

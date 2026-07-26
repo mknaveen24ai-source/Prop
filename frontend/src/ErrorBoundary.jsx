@@ -1,5 +1,12 @@
 import React from 'react'
 
+// FIX (AUDIT): There was only ever one app-wide ErrorBoundary — a rendering
+// crash in any single page or widget (e.g. the 1700-line TradingPanel, or any
+// one Admin page) unmounted the ENTIRE app to this fallback, logging the user
+// out of context everywhere. `variant="section"` renders a compact inline
+// fallback with a "Try Again" reset instead of taking over the whole screen,
+// so a section boundary can wrap individual pages/widgets without the
+// blast radius of the top-level boundary.
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props)
@@ -11,43 +18,78 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error('Frontend Edge Case Error Caught:', error, errorInfo)
+    console.error(`Frontend error caught${this.props.label ? ` (${this.props.label})` : ''}:`, error, errorInfo)
     this.setState({ error, errorInfo })
   }
 
+  handleRetry = () => {
+    this.setState({ hasError: false, error: null, errorInfo: null })
+  }
+
   render() {
+    if (this.state.hasError && this.props.variant === 'section') {
+      return (
+        <div style={{
+          padding: '32px 24px',
+          textAlign: 'center',
+          border: '1px solid var(--loss, #f87171)',
+          background: 'var(--paper-2, #1f1f1f)',
+        }}>
+          <p style={{ color: 'var(--text-primary)', fontWeight: 700, marginBottom: '6px' }}>
+            {this.props.label ? `${this.props.label} failed to load` : 'This section failed to load'}
+          </p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '18px' }}>
+            An unexpected error occurred here — the rest of the app is unaffected.
+          </p>
+          <button
+            onClick={this.handleRetry}
+            style={{ padding: '9px 22px', background: 'var(--accent)', color: 'var(--paper, #fff)', border: '1px solid var(--accent)', cursor: 'pointer', fontWeight: 600 }}
+          >
+            Try Again
+          </button>
+          {process.env.NODE_ENV === 'development' && this.state.error && (
+            <pre style={{ marginTop: '18px', textAlign: 'left', fontSize: '11px', color: 'var(--danger)', overflowX: 'auto', maxWidth: '100%' }}>
+              {this.state.error.toString()}
+              {'\n'}
+              {this.state.errorInfo?.componentStack}
+            </pre>
+          )}
+        </div>
+      )
+    }
+
     if (this.state.hasError) {
       return (
         <div style={{
           height: '100vh', width: '100%', 
           display: 'flex', flexDirection: 'column', 
           justifyContent: 'center', alignItems: 'center', 
-          background: 'var(--navy-bg, #0b0f19)', 
-          color: 'var(--text, #e2e8f0)',
-          fontFamily: 'system-ui, sans-serif'
+          background: 'var(--paper, #161616)',
+          color: 'var(--ink, #e8e4d8)',
+          fontFamily: 'var(--font-ui, system-ui, sans-serif)'
         }}>
-          <h1 style={{ color: 'var(--accent, #3b82f6)', marginBottom: '10px' }}>Something went wrong.</h1>
-          <p style={{ color: 'var(--text-muted, #94a3b8)', maxWidth: '500px', textAlign: 'center', lineHeight: '1.5' }}>
-            We encountered an unexpected error while rendering this page. 
-            This might be due to a network interruption or missing data. 
+          <h1 style={{ color: 'var(--ink, #e8e4d8)', marginBottom: '10px' }}>Something went wrong.</h1>
+          <p style={{ color: 'var(--muted, #8a8a82)', maxWidth: '500px', textAlign: 'center', lineHeight: '1.5' }}>
+            We encountered an unexpected error while rendering this page.
+            This might be due to a network interruption or missing data.
           </p>
           <div style={{ marginTop: '30px', display: 'flex', gap: '15px' }}>
-            <button 
+            <button
               onClick={() => window.location.reload()}
-              style={{ padding: '10px 20px', background: 'var(--accent, #3b82f6)', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}
+              style={{ padding: '10px 20px', background: 'var(--ink, #e8e4d8)', color: 'var(--paper, #161616)', border: '1px solid var(--ink, #e8e4d8)', cursor: 'pointer', fontWeight: 'bold' }}
             >
               Refresh Page
             </button>
-            <button 
+            <button
               onClick={() => window.location.href = '/'}
-              style={{ padding: '10px 20px', background: 'transparent', color: 'var(--text, #e2e8f0)', border: '1px solid var(--navy-border, #1e293b)', borderRadius: '5px', cursor: 'pointer' }}
+              style={{ padding: '10px 20px', background: 'transparent', color: 'var(--ink, #e8e4d8)', border: '1px solid var(--rule, #3a3a3a)', cursor: 'pointer' }}
             >
               Go Home
             </button>
           </div>
           {process.env.NODE_ENV === 'development' && this.state.error && (
-            <div style={{ marginTop: '40px', padding: '20px', background: 'var(--navy-card, #111827)', border: '1px solid var(--red, #ef4444)', borderRadius: '5px', width: '80%', maxWidth: '800px', overflowX: 'auto' }}>
-              <pre style={{ color: 'var(--red, #ef4444)', fontSize: '12px', margin: 0 }}>
+            <div style={{ marginTop: '40px', padding: '20px', background: 'var(--paper-2, #1f1f1f)', border: '1px solid var(--loss, #f87171)', width: '80%', maxWidth: '800px', overflowX: 'auto' }}>
+              <pre style={{ color: 'var(--loss, #f87171)', fontSize: '12px', margin: 0 }}>
                 {this.state.error.toString()}
                 <br/>
                 {this.state.errorInfo?.componentStack}

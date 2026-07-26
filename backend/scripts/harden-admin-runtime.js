@@ -3,7 +3,7 @@
 const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
-const bcrypt = require('bcrypt')
+const bcrypt = require('bcryptjs')
 const { Pool } = require('pg')
 
 require('../loadEnv')
@@ -78,26 +78,16 @@ async function getExistingPlatformAdmin(pool, email) {
 }
 
 async function getActiveOrEnrolledAdminCounts(pool) {
-  const [platform, tenant] = await Promise.all([
-    pool.query(
-      `SELECT
-         COUNT(*) FILTER (WHERE status = 'active')::int AS active,
-         COUNT(*) FILTER (WHERE totp_enabled = TRUE)::int AS totp_enabled
-       FROM platform_admins`
-    ),
-    pool.query(
-      `SELECT
-         COUNT(*) FILTER (WHERE status = 'active')::int AS active,
-         COUNT(*) FILTER (WHERE totp_enabled = TRUE)::int AS totp_enabled
-       FROM tenant_admins`
-    ).catch(() => ({ rows: [{ active: 0, totp_enabled: 0 }] }))
-  ])
+  const platform = await pool.query(
+    `SELECT
+       COUNT(*) FILTER (WHERE status = 'active')::int AS active,
+       COUNT(*) FILTER (WHERE totp_enabled = TRUE)::int AS totp_enabled
+     FROM platform_admins`
+  )
 
   return {
     activePlatformAdmins: parseInt(platform.rows[0]?.active || 0, 10) || 0,
-    activePlatformAdminsWithTotp: parseInt(platform.rows[0]?.totp_enabled || 0, 10) || 0,
-    activeTenantAdmins: parseInt(tenant.rows[0]?.active || 0, 10) || 0,
-    activeTenantAdminsWithTotp: parseInt(tenant.rows[0]?.totp_enabled || 0, 10) || 0
+    activePlatformAdminsWithTotp: parseInt(platform.rows[0]?.totp_enabled || 0, 10) || 0
   }
 }
 
@@ -159,7 +149,7 @@ async function main() {
       ADMIN_PASSWORD: await bcrypt.hash(randomBase64Url(24), 12)
     }
 
-    const enrolledTotpAdmins = counts.activePlatformAdminsWithTotp + counts.activeTenantAdminsWithTotp
+    const enrolledTotpAdmins = counts.activePlatformAdminsWithTotp
     const shouldRotateTotpKey = enrolledTotpAdmins === 0 || args['force-rotate-totp-key'] === true
     if (shouldRotateTotpKey) {
       rotated.TOTP_ENCRYPTION_KEY = randomHex(32)

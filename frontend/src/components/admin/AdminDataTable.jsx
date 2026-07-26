@@ -28,7 +28,7 @@ export default function AdminDataTable({
 
   return (
     <div className={`admin-table-wrapper density-${density}`}>
-      <table className="admin-table admin-table-sticky">
+      <table className="admin-table">
         <thead>
           <tr>
             {selection && (

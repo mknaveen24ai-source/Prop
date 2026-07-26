@@ -20,6 +20,7 @@ import {
 } from '../utils/finance'
 import { filterVisibleTraderAccounts, isTraderAccountVisible } from '../utils/accountVisibility'
 import Pagination from './Pagination'
+import Button from './ui/Button'
 
 const MultiChartGrid = lazy(() => import('./MultiChartGrid'))
 
@@ -450,8 +451,8 @@ export default function TradingPanel({
         key: 'strategy',
         label: trade.strategy_tag,
         color: 'var(--accent)',
-        background: 'rgba(37, 99, 235, 0.14)',
-        border: 'rgba(37, 99, 235, 0.28)'
+        background: 'rgba(var(--brand-primary-rgb), 0.14)',
+        border: 'rgba(var(--brand-primary-rgb), 0.28)'
       })
     }
 
@@ -619,6 +620,14 @@ export default function TradingPanel({
   const realizedHistoryPnl = closedTrades.reduce((sum, trade) => sum + parseFloat(trade.demo_pnl || 0), 0)
   const [tradeHistoryPage, setTradeHistoryPage] = useState(1)
   const TRADE_HIST_PAGE_SIZE = 20
+
+  // FIX (AUDIT): tradeHistoryPage was never reset on account switch — a
+  // trader on page 3 of Account A's history would land on Account B with
+  // fewer trades and slice past the array end, showing a silently blank
+  // table with no visible pagination controls to explain why.
+  useEffect(() => {
+    setTradeHistoryPage(1)
+  }, [selectedAccount?.id])
   const visibleOpenTrades = positionView === 'open'
     ? openPositions
     : positionView === 'pending'
@@ -747,11 +756,11 @@ export default function TradingPanel({
 
       {/* Locked account */}
       {selectedAccount?.status === 'locked' && (
-        <div className="card" style={{ textAlign: 'center', padding: '32px', border: '1px solid #8a8a8a', marginBottom: '20px' }}>
+        <div className="card" style={{ textAlign: 'center', padding: '32px', border: '1px solid var(--muted)', marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
             {renderIcon('lock', { size: 40, color: 'var(--text-secondary)' })}
           </div>
-          <h3 style={{ color: '#8a8a8a', marginBottom: '8px' }}>Account Locked</h3>
+          <h3 style={{ color: 'var(--muted)', marginBottom: '8px' }}>Account Locked</h3>
           <p style={{ color: 'var(--text-muted)' }}>This account has been locked by admin. Contact support.</p>
         </div>
       )}
@@ -819,9 +828,9 @@ export default function TradingPanel({
                     background: targetProgressPct >= 100
                       ? 'var(--green)'
                       : targetProgressPct >= 75
-                        ? '#7a7a7a'
+                        ? 'var(--muted)'
                         : targetProgressPct >= 50
-                          ? '#8b8b8b'
+                          ? 'var(--muted)'
                           : 'var(--accent)'
                   }} />
                 </div>
@@ -850,9 +859,9 @@ export default function TradingPanel({
 
               const level = usedPct >= 90 ? 'critical' : usedPct >= 75 ? 'high' : usedPct >= 50 ? 'medium' : 'low'
               const levelColors = {
-                critical: { bg: 'rgba(97, 97, 97, 0.15)', border: 'var(--red)',   bar: '#7a7a7a', text: 'var(--red)',   icon: 'risk-alerts' },
-                high:     { bg: 'rgba(122, 122, 122, 0.10)', border: '#7a7a7a',      bar: '#7a7a7a', text: '#7a7a7a',     icon: 'warning' },
-                medium:   { bg: 'rgba(139, 139, 139, 0.10)', border: '#8b8b8b',     bar: '#8b8b8b', text: '#8b8b8b',     icon: 'analytics' },
+                critical: { bg: 'rgba(97, 97, 97, 0.15)', border: 'var(--red)',   bar: 'var(--muted)', text: 'var(--red)',   icon: 'risk-alerts' },
+                high:     { bg: 'rgba(122, 122, 122, 0.10)', border: 'var(--muted)',      bar: 'var(--muted)', text: 'var(--muted)',     icon: 'warning' },
+                medium:   { bg: 'rgba(139, 139, 139, 0.10)', border: 'var(--muted)',     bar: 'var(--muted)', text: 'var(--muted)',     icon: 'analytics' },
                 low:      { bg: 'rgba(148, 148, 148, 0.06)', border: 'rgba(148, 148, 148, 0.3)', bar: 'var(--accent)', text: 'var(--text-muted)', icon: 'floating_down' },
               }
               const c = levelColors[level]
@@ -973,7 +982,7 @@ export default function TradingPanel({
                           <div style={{
                             height: '100%', borderRadius: '2px',
                             width: `${pct}%`,
-                            background: pct > 80 ? 'var(--red)' : pct > 60 ? '#8b8b8b' : 'var(--accent)',
+                            background: pct > 80 ? 'var(--red)' : pct > 60 ? 'var(--muted)' : 'var(--accent)',
                             transition: 'width 1s linear'
                           }} />
                         </div>
@@ -1049,7 +1058,7 @@ export default function TradingPanel({
                         style={{
                           background: positionView === view.id ? 'var(--accent)' : 'var(--navy-card)',
                           color: positionView === view.id ? 'var(--navy)' : 'var(--text-muted)',
-                          boxShadow: positionView === view.id ? '0 10px 24px rgba(37, 99, 235, 0.22)' : 'none'
+                          boxShadow: positionView === view.id ? '0 10px 24px rgba(var(--brand-primary-rgb), 0.22)' : 'none'
                         }}
                       >
                         {view.label}
@@ -1124,65 +1133,56 @@ export default function TradingPanel({
                                 }
                               </td>
                               <td>
-                                <div className="trade-actions">
+                                <div className="trade-actions" style={{ display: 'flex', gap: '6px' }}>
                                   {isPending ? (
                                     <>
-                                      <button
-                                        className="btn"
+                                      <Button
+                                        variant="secondary"
+                                        size="sm"
                                         onClick={() => isModifying ? cancelModify() : openModifyForm(trade)}
-                                        style={{
-                                          padding: '5px 10px', fontSize: '11px',
-                                          background: isModifying ? 'var(--navy-border)' : 'var(--navy-card)',
-                                          border: '1px solid var(--accent)',
-                                          color: 'var(--accent)'
-                                        }}>
+                                      >
                                         {isModifying ? 'Cancel' : 'Modify'}
-                                      </button>
-                                      <button
-                                        className="btn btn-red"
+                                      </Button>
+                                      <Button
+                                        variant="danger"
+                                        size="sm"
                                         onClick={() => onCancelOrder(trade.id)}
-                                        style={{ padding: '5px 10px', fontSize: '11px' }}>
+                                      >
                                         Cancel Order
-                                      </button>
+                                      </Button>
                                     </>
                                   ) : (
                                     <>
-                                      <button
-                                        className="btn"
+                                      <Button
+                                        variant="secondary"
+                                        size="sm"
                                         onClick={() => isModifying ? cancelModify() : openModifyForm(trade)}
-                                        style={{
-                                          padding: '5px 10px', fontSize: '11px',
-                                          background: isModifying ? 'var(--navy-border)' : 'var(--navy-card)',
-                                          border: '1px solid var(--accent)',
-                                          color: 'var(--accent)'
-                                        }}>
+                                      >
                                         {isModifying ? 'Cancel' : 'Modify'}
-                                      </button>
-                                      <button
-                                        className="btn"
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
                                         onClick={() => editingNoteId === trade.id ? closeNoteEditor() : openNoteEditor(trade)}
-                                        style={{
-                                          padding: '5px 10px',
-                                          fontSize: '11px',
-                                          background: editingNoteId === trade.id ? 'var(--navy-border)' : 'transparent',
-                                          border: '1px solid var(--navy-border)',
-                                          color: trade.trader_note ? 'var(--accent)' : 'var(--text-muted)'
-                                        }}>
+                                        style={trade.trader_note ? { color: 'var(--ink)' } : undefined}
+                                      >
                                         Journal
-                                      </button>
-                                      <button
-                                        className="btn"
+                                      </Button>
+                                      <Button
+                                        variant="secondary"
+                                        size="sm"
                                         onClick={() => setPartialForm({ id: trade.id, lots: parseFloat(trade.lot_size).toFixed(2) })}
-                                        style={{ padding: '5px 10px', fontSize: '11px', background: 'var(--navy-border)', color: 'var(--text-muted)' }}>
+                                      >
                                         Partial
-                                      </button>
-                                      <button
-                                        className="btn btn-red"
+                                      </Button>
+                                      <Button
+                                        variant="danger"
+                                        size="sm"
                                         onClick={() => handleCloseTrade(trade)}
                                         disabled={closingTradeSet.has(trade.id)}
-                                        style={{ padding: '5px 10px', fontSize: '11px', opacity: closingTradeSet.has(trade.id) ? 0.6 : 1, cursor: closingTradeSet.has(trade.id) ? 'not-allowed' : 'pointer' }}>
+                                      >
                                         {closingTradeSet.has(trade.id) ? 'Closing...' : 'Close'}
-                                      </button>
+                                      </Button>
                                     </>
                                   )}
                                 </div>
@@ -1216,7 +1216,7 @@ export default function TradingPanel({
                                               padding: '6px 10px',
                                               borderRadius: '999px',
                                               border: '1px solid var(--navy-border)',
-                                              background: invalid || closingTradeSet.has(trade.id) ? 'rgba(255,255,255,0.03)' : 'rgba(37,99,235,0.08)',
+                                              background: invalid || closingTradeSet.has(trade.id) ? 'rgba(255,255,255,0.03)' : 'rgba(var(--brand-primary-rgb),0.08)',
                                               color: invalid || closingTradeSet.has(trade.id) ? 'var(--text-dim)' : 'var(--accent)',
                                               cursor: invalid || closingTradeSet.has(trade.id) ? 'not-allowed' : 'pointer',
                                               fontSize: '11px',

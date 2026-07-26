@@ -47,7 +47,6 @@ function formatDate(value) {
 function formatAuthSource(value) {
   const normalized = String(value || '').trim().toLowerCase()
   if (normalized === 'platform_admin') return 'DB Platform Admin'
-  if (normalized === 'tenant_admin') return 'Tenant Admin'
   if (normalized === 'env_fallback') return 'Legacy Env Bootstrap'
   return normalized || '-'
 }
@@ -68,7 +67,7 @@ export default function AdminAccess() {
   const [loading, setLoading] = useState(true)
   const [twoFaStatus, setTwoFaStatus] = useState(null)
   const [securityStatus, setSecurityStatus] = useState(null)
-  const [accessData, setAccessData] = useState({ platform_admins: [], tenant_admins: [], summary: null })
+  const [accessData, setAccessData] = useState({ platform_admins: [], summary: null })
   const [setupPayload, setSetupPayload] = useState(null)
   const [setupCode, setSetupCode] = useState('')
   const [backupCodes, setBackupCodes] = useState([])
@@ -93,11 +92,10 @@ export default function AdminAccess() {
       if (accessRes?.data) {
         setAccessData({
           platform_admins: Array.isArray(accessRes.data.platform_admins) ? accessRes.data.platform_admins : [],
-          tenant_admins: Array.isArray(accessRes.data.tenant_admins) ? accessRes.data.tenant_admins : [],
           summary: accessRes.data.summary || null
         })
       } else {
-        setAccessData({ platform_admins: [], tenant_admins: [], summary: null })
+        setAccessData({ platform_admins: [], summary: null })
       }
     } catch (err) {
       toast.error(err?.response?.data?.error || 'Could not load admin access state')
@@ -231,7 +229,7 @@ export default function AdminAccess() {
   }
 
   const currentAdminCards = useMemo(() => {
-    const role = session?.role === 'super_admin' ? 'Super Admin' : session?.role === 'tenant_admin' ? 'Tenant Admin' : 'Unknown'
+    const role = session?.role === 'super_admin' ? 'Super Admin' : 'Unknown'
     return [
       {
         title: 'Current Role',
@@ -246,12 +244,6 @@ export default function AdminAccess() {
           ? 'Bootstrap-only access path'
           : 'DB-backed admin authentication',
         status: session?.auth_source === 'env_fallback' ? 'warning' : 'success'
-      },
-      {
-        title: 'Tenant Scope',
-        value: session?.tenantId ? `Tenant #${session.tenantId}` : 'Global',
-        helper: session?.tenantId ? 'This admin session is tenant-scoped' : 'This admin session can see platform-wide data',
-        status: session?.tenantId ? 'warning' : 'success'
       },
       {
         title: '2FA',
@@ -273,7 +265,7 @@ export default function AdminAccess() {
       <div>
         <h1 className="admin-h1">Access & Security</h1>
         <p style={{ color: 'var(--admin-text-muted)', maxWidth: '920px', margin: 0 }}>
-          Manage DB-backed platform admins, review current tenant-admin access, and enroll account-based admin 2FA.
+          Manage DB-backed platform admins and enroll account-based admin 2FA.
           Legacy `.env` admin login is treated as bootstrap-only and should be retired once a real platform admin exists.
         </p>
       </div>
@@ -314,7 +306,7 @@ export default function AdminAccess() {
           <div style={{ display: 'grid', gap: '20px', gridTemplateColumns: 'minmax(240px, 320px) minmax(280px, 1fr)' }}>
             <div className="admin-card" style={{ marginBottom: 0, background: 'var(--admin-bg)' }}>
               <div style={{ fontWeight: 600, marginBottom: '10px' }}>Scan QR Code</div>
-              <img src={setupPayload.qr} alt="Admin 2FA QR" style={{ width: '100%', maxWidth: '240px', borderRadius: '10px', background: '#fff', padding: '10px' }} />
+              <img src={setupPayload.qr} alt="Admin 2FA QR" style={{ width: '100%', maxWidth: '240px', borderRadius: '10px', background: 'var(--paper)', padding: '10px' }} />
             </div>
             <div className="admin-card" style={{ marginBottom: 0, background: 'var(--admin-bg)' }}>
               <div style={{ fontWeight: 600, marginBottom: '10px' }}>Verify Setup</div>
@@ -525,51 +517,6 @@ export default function AdminAccess() {
             </div>
           </div>
 
-          <div className="admin-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center', marginBottom: '16px' }}>
-              <div>
-                <h2 className="admin-h2" style={{ marginBottom: '6px' }}>Tenant Admin Access</h2>
-                <div style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
-                  Tenant admin credentials are managed through the White Label tenant screen. Passwords are reset-only and never shown here.
-                </div>
-              </div>
-            </div>
-            <div className="admin-table-wrapper">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th className="admin-th">Tenant</th>
-                    <th className="admin-th">Admin</th>
-                    <th className="admin-th">Status</th>
-                    <th className="admin-th">2FA</th>
-                    <th className="admin-th">Last Login</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {accessData.tenant_admins.map((tenantAdmin) => (
-                    <tr key={tenantAdmin.id}>
-                      <td className="admin-td">
-                        <div style={{ fontWeight: 600 }}>{tenantAdmin.tenant_name || `Tenant #${tenantAdmin.tenant_id}`}</div>
-                        <div style={{ color: 'var(--admin-text-muted)', fontSize: '12px' }}>{tenantAdmin.tenant_slug || '-'}</div>
-                      </td>
-                      <td className="admin-td">
-                        <div style={{ fontWeight: 600 }}>{tenantAdmin.full_name || tenantAdmin.email}</div>
-                        <div style={{ color: 'var(--admin-text-muted)', fontSize: '12px' }}>{tenantAdmin.email}</div>
-                      </td>
-                      <td className="admin-td"><AdminBadge status={tenantAdmin.status === 'active' ? 'success' : 'danger'} label={tenantAdmin.status} /></td>
-                      <td className="admin-td"><AdminBadge status={tenantAdmin.totp_enabled ? 'success' : 'warning'} label={tenantAdmin.totp_enabled ? 'Enabled' : 'Disabled'} /></td>
-                      <td className="admin-td">{formatDate(tenantAdmin.last_login_at)}</td>
-                    </tr>
-                  ))}
-                  {accessData.tenant_admins.length === 0 && (
-                    <tr>
-                      <td className="admin-td" colSpan={5}>No tenant-admin accounts exist yet.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </>
       )}
     </div>

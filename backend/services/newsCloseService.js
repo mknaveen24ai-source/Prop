@@ -55,7 +55,7 @@ async function checkNewsForceClose() {
     if (lastClosedNewsId === newsId) return
 
     const openTrades = await pool.query(
-      `SELECT t.*, a.user_id, a.tenant_id FROM trades t
+      `SELECT t.*, a.user_id FROM trades t
        JOIN accounts a ON t.account_id = a.id
        WHERE t.status = 'open'`
     )
@@ -65,15 +65,14 @@ async function checkNewsForceClose() {
 
     client = await pool.connect()
     let closeErrors = 0
-    const tenantPriceCache = new Map()
+    let priceMap = null
 
     for (const trade of openTrades.rows) {
       try {
-        const tenantKey = String(trade.tenant_id || 1)
-        if (!tenantPriceCache.has(tenantKey)) {
-          tenantPriceCache.set(tenantKey, await getCurrentPricesForTenant(trade.tenant_id || 1))
+        if (!priceMap) {
+          priceMap = await getCurrentPricesForTenant()
         }
-        const priceData = tenantPriceCache.get(tenantKey)?.[trade.instrument]
+        const priceData = priceMap[trade.instrument]
         if (!priceData) {
           closeErrors += 1
           logger.warn(`[news_close] Missing live price for ${trade.instrument}; trade ${trade.id} left open for retry`)

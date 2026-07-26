@@ -4,7 +4,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * Extracted from server.js (lines ~1578–1720).
  * Every Friday 21:00–21:09 UTC, flattens open positions and cancels pending
- * orders for tenants where `weekendHoldingEnabled === false`.
+ * orders when `weekendHoldingEnabled === false`.
  *
  * Usage:
  *   const { weekendForceCloseByTenant, setIo } = require('./services/weekendCloseService')
@@ -54,48 +54,38 @@ async function weekendForceCloseByTenant() {
     if (weekendCloseExecutedDate === todayKey) return
 
     const openTrades = await pool.query(
-      `SELECT t.*, a.user_id, a.tenant_id
+      `SELECT t.*, a.user_id
          FROM trades t
          JOIN accounts a ON t.account_id = a.id
         WHERE t.status = 'open'`
     )
     const pendingOrders = await pool.query(
-      `SELECT t.id, t.account_id, t.instrument, t.order_type, a.user_id, a.tenant_id
+      `SELECT t.id, t.account_id, t.instrument, t.order_type, a.user_id
          FROM trades t
          JOIN accounts a ON t.account_id = a.id
         WHERE t.status = 'pending'`
     )
     if (openTrades.rows.length === 0 && pendingOrders.rows.length === 0) return
 
-    const tenantIds = [...new Set([
-      ...openTrades.rows.map((trade) => parseInt(trade.tenant_id, 10) || 1),
-      ...pendingOrders.rows.map((order) => parseInt(order.tenant_id, 10) || 1)
-    ])]
-    const tenantRules = new Map()
-    for (const tenantId of tenantIds) {
-      tenantRules.set(String(tenantId), await getTradingRules(tenantId))
-    }
+    const rules = await getTradingRules()
 
-    const filteredOpenTrades = openTrades.rows.filter(
-      (trade) => tenantRules.get(String(trade.tenant_id || 1))?.weekendHoldingEnabled === false
-    )
-    const filteredPendingOrders = pendingOrders.rows.filter(
-      (order) => tenantRules.get(String(order.tenant_id || 1))?.weekendHoldingEnabled === false
-    )
+    if (rules?.weekendHoldingEnabled !== false) return
+
+    const filteredOpenTrades = openTrades.rows
+    const filteredPendingOrders = pendingOrders.rows
     if (filteredOpenTrades.length === 0 && filteredPendingOrders.length === 0) return
 
     logger.info(`[weekend_close] Friday 21:00-21:09 UTC - flattening ${filteredOpenTrades.length} open trade(s) and cancelling ${filteredPendingOrders.length} pending order(s)`)
 
-    const tenantPriceCache = new Map()
+    let priceMap = null
     let closeErrors = 0
 
     for (const trade of filteredOpenTrades) {
       try {
-        const tenantKey = String(trade.tenant_id || 1)
-        if (!tenantPriceCache.has(tenantKey)) {
-          tenantPriceCache.set(tenantKey, await getCurrentPricesForTenant(trade.tenant_id || 1))
+        if (!priceMap) {
+          priceMap = await getCurrentPricesForTenant()
         }
-        const priceData = tenantPriceCache.get(tenantKey)?.[trade.instrument]
+        const priceData = priceMap[trade.instrument]
         if (!priceData) continue
 
         const close_price = trade.direction === 'buy'

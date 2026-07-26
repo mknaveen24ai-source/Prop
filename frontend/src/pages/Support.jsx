@@ -234,7 +234,7 @@ function TicketChat({ ticket, user, onBack }) {
             {/* Original message */}
             <div style={{ alignSelf: 'flex-end', maxWidth: '75%' }}>
               <div style={{ fontSize:'11px', color:'var(--text-muted)', marginBottom:'4px', textAlign:'right', marginRight:'4px' }}>You • {formatTime(ticket.created_at)}</div>
-              <div style={{ background: 'var(--accent)', color: '#fff', padding: '12px 16px', borderRadius: '16px', borderBottomRightRadius: '4px', lineHeight:'1.5', whiteSpace:'pre-wrap' }}>
+              <div style={{ background: 'var(--accent)', color: 'var(--paper)', padding: '12px 16px', borderRadius: '16px', borderBottomRightRadius: '4px', lineHeight:'1.5', whiteSpace:'pre-wrap' }}>
                 {ticket.message}
               </div>
             </div>
@@ -244,7 +244,7 @@ function TicketChat({ ticket, user, onBack }) {
                 <div style={{ fontSize:'11px', color:'var(--text-muted)', marginBottom:'4px', marginLeft: m.sender_type === 'user' ? 0 : '4px', marginRight: m.sender_type === 'user' ? '4px' : 0, textAlign: m.sender_type === 'user' ? 'right' : 'left' }}>
                   {m.sender_name || (m.sender_type==='admin'?'Support Team':'You')} • {formatTime(m.created_at)}
                 </div>
-                <div style={{ background: m.sender_type === 'user' ? 'var(--accent)' : 'var(--navy)', color: m.sender_type === 'user' ? '#fff' : 'var(--text)', padding: '12px 16px', borderRadius: '16px', borderBottomRightRadius: m.sender_type === 'user' ? '4px' : '16px', borderBottomLeftRadius: m.sender_type === 'admin' ? '4px' : '16px', lineHeight:'1.5', whiteSpace:'pre-wrap' }}>
+                <div style={{ background: m.sender_type === 'user' ? 'var(--accent)' : 'var(--navy)', color: m.sender_type === 'user' ? 'var(--paper)' : 'var(--text)', padding: '12px 16px', borderRadius: '16px', borderBottomRightRadius: m.sender_type === 'user' ? '4px' : '16px', borderBottomLeftRadius: m.sender_type === 'admin' ? '4px' : '16px', lineHeight:'1.5', whiteSpace:'pre-wrap' }}>
                   {m.message}
                 </div>
               </div>
@@ -267,7 +267,7 @@ function TicketChat({ ticket, user, onBack }) {
           <button 
              onClick={handleSend} 
              disabled={sending || ticket.status === 'closed'} 
-             style={{ padding: '0 24px', borderRadius: '24px', background: ticket.status === 'closed' ? 'var(--navy-border)' : 'var(--accent)', color: '#fff', border: 'none', fontWeight: 600, cursor: ticket.status === 'closed' ? 'not-allowed' : 'pointer' }}>
+             style={{ padding: '0 24px', borderRadius: '24px', background: ticket.status === 'closed' ? 'var(--navy-border)' : 'var(--accent)', color: 'var(--paper)', border: 'none', fontWeight: 600, cursor: ticket.status === 'closed' ? 'not-allowed' : 'pointer' }}>
              Send
           </button>
         </div>

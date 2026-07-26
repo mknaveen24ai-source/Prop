@@ -6,7 +6,6 @@ const { authenticateToken, authenticateAdmin } = require('./middleware')
 const rateLimit = require('express-rate-limit')
 const logger = require('../utils/logger')
 const { publishDomainEvent } = require('../utils/kafka')
-const { runWithSystemDbContext } = require('../utils/dbContext')
 
 let ensureChatTablesPromise = null
 
@@ -25,11 +24,10 @@ const chatMessageLimiter = rateLimit({
 // Ownership is validated at the route level instead of the DB constraint level.
 // This also supports both integer-string and UUID-string user IDs transparently.
 async function runEnsureChatTables() {
-  await runWithSystemDbContext(async () => {
+  await (async () => {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS chat_conversations (
       id                 BIGSERIAL PRIMARY KEY,
-      tenant_id          BIGINT NOT NULL DEFAULT 1,
       user_id            TEXT NOT NULL,
       subject            TEXT NOT NULL,
       status             TEXT NOT NULL DEFAULT 'open',
@@ -45,7 +43,6 @@ async function runEnsureChatTables() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS chat_messages (
       id              BIGSERIAL PRIMARY KEY,
-      tenant_id       BIGINT NOT NULL DEFAULT 1,
       conversation_id INTEGER NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
       user_id         TEXT,
       message         TEXT NOT NULL,
@@ -134,26 +131,12 @@ async function runEnsureChatTables() {
     CREATE INDEX IF NOT EXISTS chat_conversations_status_idx ON chat_conversations(status)
   `)
   await pool.query(`
-    CREATE INDEX IF NOT EXISTS chat_conversations_tenant_status_idx ON chat_conversations(tenant_id, status, created_at DESC)
+    CREATE INDEX IF NOT EXISTS chat_conversations_status_created_idx ON chat_conversations(status, created_at DESC)
   `)
   await pool.query(`
-    CREATE INDEX IF NOT EXISTS chat_messages_tenant_conversation_idx ON chat_messages(tenant_id, conversation_id, created_at ASC)
+    CREATE INDEX IF NOT EXISTS chat_messages_conversation_created_idx ON chat_messages(conversation_id, created_at ASC)
   `)
-  await pool.query(`
-    UPDATE chat_conversations c
-       SET tenant_id = COALESCE(u.tenant_id, c.tenant_id, 1)
-      FROM users u
-     WHERE u.id::text = c.user_id
-       AND (c.tenant_id IS NULL OR c.tenant_id = 1)
-  `)
-  await pool.query(`
-    UPDATE chat_messages m
-       SET tenant_id = c.tenant_id
-      FROM chat_conversations c
-     WHERE m.conversation_id = c.id
-       AND (m.tenant_id IS NULL OR m.tenant_id <> c.tenant_id)
-  `)
-  })
+  })()
 }
 
 function ensureChatTables() {
@@ -177,17 +160,15 @@ router.post('/conversations', authenticateToken, chatMessageLimiter, async funct
     }
 
     const userId = req.user.userId
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
 
     // Check for existing open conversations
     const existingOpen = await pool.query(
       `SELECT id
          FROM chat_conversations
         WHERE user_id = $1
-          AND tenant_id = $2
           AND status = 'open'
         LIMIT 1`,
-      [userId, tenantId]
+      [userId]
     )
 
     if (existingOpen.rows.length > 0) {
@@ -198,14 +179,13 @@ router.post('/conversations', authenticateToken, chatMessageLimiter, async funct
     }
 
     const result = await pool.query(
-      `INSERT INTO chat_conversations (tenant_id, user_id, subject, last_message_at)
-       VALUES ($1, $2, $3, NOW()) RETURNING *`,
-      [tenantId, userId, subject.trim()]
+      `INSERT INTO chat_conversations (user_id, subject, last_message_at)
+       VALUES ($1, $2, NOW()) RETURNING *`,
+      [userId, subject.trim()]
     )
 
     await publishDomainEvent('chat.conversation.created', {
       conversation_id: result.rows[0].id,
-      tenant_id: tenantId,
       user_id: String(userId),
       subject: result.rows[0].subject,
       status: result.rows[0].status,
@@ -227,16 +207,14 @@ router.get('/conversations', authenticateToken, async function(req, res) {
   try {
     await ensureChatTables()
     const userId = req.user.userId
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
     const result = await pool.query(
       `SELECT c.*,
               (SELECT COUNT(*) FROM chat_messages WHERE conversation_id = c.id) as message_count,
               (SELECT message FROM chat_messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message
        FROM chat_conversations c
        WHERE c.user_id = $1
-         AND c.tenant_id = $2
        ORDER BY c.created_at DESC`,
-      [userId, tenantId]
+      [userId]
     )
     res.json(result.rows)
   } catch (error) {
@@ -249,15 +227,14 @@ router.get('/conversations/:id', authenticateToken, async function(req, res) {
   try {
     await ensureChatTables()
     const userId = req.user.userId
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
     const { id } = req.params
 
     // Verify ownership
     const convResult = await pool.query(
       `SELECT id, user_id, subject, status, assigned_to, created_at, updated_at,
-              last_message_at, unread_user_count, unread_admin_count, tenant_id
-       FROM chat_conversations WHERE id = $1 AND user_id = $2 AND tenant_id = $3`,
-      [id, userId, tenantId]
+              last_message_at, unread_user_count, unread_admin_count
+       FROM chat_conversations WHERE id = $1 AND user_id = $2`,
+      [id, userId]
     )
 
     if (convResult.rows.length === 0) {
@@ -268,9 +245,9 @@ router.get('/conversations/:id', authenticateToken, async function(req, res) {
       `SELECT id, conversation_id, user_id, message, is_admin, sender_name,
               created_at, read_at, attachments
        FROM chat_messages
-       WHERE conversation_id = $1 AND tenant_id = $2
+       WHERE conversation_id = $1
        ORDER BY created_at ASC`,
-      [id, tenantId]
+      [id]
     )
 
     // Mark admin messages as read
@@ -300,7 +277,6 @@ router.post('/conversations/:id/messages', authenticateToken, chatMessageLimiter
   try {
     await ensureChatTables()
     const userId = req.user.userId
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
     const { id } = req.params
     const { message } = req.body
 
@@ -311,9 +287,9 @@ router.post('/conversations/:id/messages', authenticateToken, chatMessageLimiter
     // Verify ownership or active conversation
     const convResult = await pool.query(
       `SELECT id, user_id, subject, status, assigned_to, created_at, updated_at,
-              last_message_at, tenant_id
-       FROM chat_conversations WHERE id = $1 AND user_id = $2 AND tenant_id = $3`,
-      [id, userId, tenantId]
+              last_message_at
+       FROM chat_conversations WHERE id = $1 AND user_id = $2`,
+      [id, userId]
     )
 
     if (convResult.rows.length === 0) {
@@ -331,9 +307,9 @@ router.post('/conversations/:id/messages', authenticateToken, chatMessageLimiter
     const senderName = user.rows[0]?.full_name || 'User'
 
     const messageResult = await pool.query(
-      `INSERT INTO chat_messages (tenant_id, conversation_id, user_id, message, is_admin, sender_name)
-       VALUES ($1, $2, $3, $4, false, $5) RETURNING *`,
-      [tenantId, id, userId, message.trim(), senderName]
+      `INSERT INTO chat_messages (conversation_id, user_id, message, is_admin, sender_name)
+       VALUES ($1, $2, $3, false, $4) RETURNING *`,
+      [id, userId, message.trim(), senderName]
     )
 
     // FIX (BUG-3): When the USER sends a message, increment unread_admin_count
@@ -350,19 +326,11 @@ router.post('/conversations/:id/messages', authenticateToken, chatMessageLimiter
     // Emit WebSocket event
     const io = req.app.get('io')
     if (io) {
-      const adminRoom = conversation.tenant_id ? `admin:tenant:${conversation.tenant_id}` : 'admin'
-      io.to(adminRoom).emit('chat_new_message', {
+      io.to('admin').emit('chat_new_message', {
         conversation_id: parseInt(id),
         message: messageResult.rows[0],
         conversation_subject: conversation.subject
       })
-      if (conversation.tenant_id) {
-        io.to('admin:super').emit('chat_new_message', {
-          conversation_id: parseInt(id),
-          message: messageResult.rows[0],
-          conversation_subject: conversation.subject
-        })
-      }
       io.to(`chat:${id}`).emit('chat_message_received', {
         conversation_id: parseInt(id),
         message: messageResult.rows[0]
@@ -371,7 +339,6 @@ router.post('/conversations/:id/messages', authenticateToken, chatMessageLimiter
 
     await publishDomainEvent('chat.message.created', {
       conversation_id: parseInt(id, 10),
-      tenant_id: tenantId,
       user_id: String(userId),
       is_admin: false,
       subject: conversation.subject,
@@ -390,15 +357,14 @@ router.patch('/conversations/:id/close', authenticateToken, async function(req, 
   try {
     await ensureChatTables()
     const userId = req.user.userId
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
     const { id } = req.params
 
     const result = await pool.query(
       `UPDATE chat_conversations
        SET status = 'closed', updated_at = NOW()
-       WHERE id = $1 AND user_id = $2 AND tenant_id = $3
+       WHERE id = $1 AND user_id = $2
        RETURNING *`,
-      [id, userId, tenantId]
+      [id, userId]
     )
 
     if (result.rows.length === 0) {
@@ -407,7 +373,6 @@ router.patch('/conversations/:id/close', authenticateToken, async function(req, 
 
     await publishDomainEvent('chat.conversation.closed', {
       conversation_id: parseInt(id, 10),
-      tenant_id: tenantId,
       user_id: String(userId),
       actor: 'user'
     })
@@ -423,10 +388,9 @@ router.get('/admin/conversations', authenticateAdmin, async function(req, res) {
   try {
     await ensureChatTables()
     const { status, page = 1, limit = 20 } = req.query
-    const tenantId = req.admin?.tenantId || null
-    
+
     let query = `
-      SELECT c.*, 
+      SELECT c.*,
              u.email as user_email,
              u.full_name as user_name,
              (SELECT COUNT(*) FROM chat_messages WHERE conversation_id = c.id) as message_count,
@@ -434,16 +398,10 @@ router.get('/admin/conversations', authenticateAdmin, async function(req, res) {
       FROM chat_conversations c
       LEFT JOIN users u ON u.id::text = c.user_id
     `
-    
+
     const conditions = []
     const values = []
     let paramIndex = 1
-
-    if (tenantId) {
-      conditions.push(`c.tenant_id = $${paramIndex}`)
-      values.push(tenantId)
-      paramIndex++
-    }
 
     if (status) {
       conditions.push(`c.status = $${paramIndex}`)
@@ -482,18 +440,16 @@ router.get('/admin/conversations', authenticateAdmin, async function(req, res) {
 router.get('/admin/conversations/:id', authenticateAdmin, async function(req, res) {
   try {
     await ensureChatTables()
-    const tenantId = req.admin?.tenantId || null
     const { id } = req.params
 
     const convResult = await pool.query(
       `SELECT c.id, c.user_id, c.subject, c.status, c.assigned_to, c.created_at,
-              c.updated_at, c.last_message_at, c.unread_user_count, c.unread_admin_count, c.tenant_id,
+              c.updated_at, c.last_message_at, c.unread_user_count, c.unread_admin_count,
               u.email as user_email, u.full_name as user_name
        FROM chat_conversations c
        LEFT JOIN users u ON u.id::text = c.user_id
-       WHERE c.id = $1
-         AND ($2::bigint IS NULL OR c.tenant_id = $2)`,
-      [id, tenantId]
+       WHERE c.id = $1`,
+      [id]
     )
 
     if (convResult.rows.length === 0) {
@@ -505,9 +461,8 @@ router.get('/admin/conversations/:id', authenticateAdmin, async function(req, re
               created_at, read_at, attachments
        FROM chat_messages
        WHERE conversation_id = $1
-         AND ($2::bigint IS NULL OR tenant_id = $2)
        ORDER BY created_at ASC`,
-      [id, tenantId]
+      [id]
     )
 
     // Mark user messages as read
@@ -536,7 +491,6 @@ router.get('/admin/conversations/:id', authenticateAdmin, async function(req, re
 router.post('/admin/conversations/:id/messages', authenticateAdmin, chatMessageLimiter, async function(req, res) {
   try {
     await ensureChatTables()
-    const tenantId = req.admin?.tenantId || null
     const { id } = req.params
     const { message } = req.body
 
@@ -546,11 +500,10 @@ router.post('/admin/conversations/:id/messages', authenticateAdmin, chatMessageL
 
     const convResult = await pool.query(
       `SELECT id, user_id, subject, status, assigned_to, created_at, updated_at,
-              last_message_at, tenant_id
+              last_message_at
        FROM chat_conversations
-       WHERE id = $1
-         AND ($2::bigint IS NULL OR tenant_id = $2)`,
-      [id, tenantId]
+       WHERE id = $1`,
+      [id]
     )
 
     if (convResult.rows.length === 0) {
@@ -566,9 +519,9 @@ router.post('/admin/conversations/:id/messages', authenticateAdmin, chatMessageL
     const senderName = 'Support'
 
     const messageResult = await pool.query(
-      `INSERT INTO chat_messages (tenant_id, conversation_id, user_id, message, is_admin, sender_name)
-       VALUES ($1, $2, $3, $4, true, $5) RETURNING *`,
-      [conversation.tenant_id || tenantId || 1, id, null, message.trim(), senderName]
+      `INSERT INTO chat_messages (conversation_id, user_id, message, is_admin, sender_name)
+       VALUES ($1, $2, $3, true, $4) RETURNING *`,
+      [id, null, message.trim(), senderName]
     )
 
     // FIX (BUG-3): When ADMIN sends a message, increment unread_user_count
@@ -598,7 +551,6 @@ router.post('/admin/conversations/:id/messages', authenticateAdmin, chatMessageL
 
     await publishDomainEvent('chat.message.created', {
       conversation_id: parseInt(id, 10),
-      tenant_id: conversation.tenant_id || tenantId || null,
       user_id: String(conversation.user_id),
       is_admin: true,
       subject: conversation.subject,
@@ -616,7 +568,6 @@ router.post('/admin/conversations/:id/messages', authenticateAdmin, chatMessageL
 router.patch('/admin/conversations/:id', authenticateAdmin, async function(req, res) {
   try {
     await ensureChatTables()
-    const tenantId = req.admin?.tenantId || null
     const { id } = req.params
     const { status, assigned_to } = req.body
 
@@ -644,12 +595,11 @@ router.patch('/admin/conversations/:id', authenticateAdmin, async function(req, 
     updates.push(`updated_at = NOW()`)
 
     const result = await pool.query(
-      `UPDATE chat_conversations 
+      `UPDATE chat_conversations
        SET ${updates.join(', ')}
        WHERE id = $${paramIndex}
-         AND ($${paramIndex + 1}::bigint IS NULL OR tenant_id = $${paramIndex + 1})
        RETURNING *`,
-      [...values, id, tenantId]
+      [...values, id]
     )
 
     if (result.rows.length === 0) {
@@ -658,7 +608,6 @@ router.patch('/admin/conversations/:id', authenticateAdmin, async function(req, 
 
     await publishDomainEvent('chat.conversation.updated', {
       conversation_id: parseInt(id, 10),
-      tenant_id: result.rows[0].tenant_id || tenantId || null,
       user_id: String(result.rows[0].user_id),
       status: result.rows[0].status,
       assigned_to: result.rows[0].assigned_to || null,
@@ -675,16 +624,15 @@ router.patch('/admin/conversations/:id', authenticateAdmin, async function(req, 
 router.get('/admin/chat-stats', authenticateAdmin, async function(req, res) {
   try {
     await ensureChatTables()
-    const tenantId = req.admin?.tenantId || null
     const stats = await pool.query(`
-      SELECT 
-        (SELECT COUNT(*) FROM chat_conversations WHERE ($1::bigint IS NULL OR tenant_id = $1) AND status = 'open') as open_count,
-        (SELECT COUNT(*) FROM chat_conversations WHERE ($1::bigint IS NULL OR tenant_id = $1) AND status = 'pending') as pending_count,
-        (SELECT COUNT(*) FROM chat_conversations WHERE ($1::bigint IS NULL OR tenant_id = $1) AND status = 'resolved') as resolved_count,
-        (SELECT COUNT(*) FROM chat_conversations WHERE ($1::bigint IS NULL OR tenant_id = $1) AND status = 'closed') as closed_count,
-        (SELECT COUNT(*) FROM chat_conversations WHERE ($1::bigint IS NULL OR tenant_id = $1) AND unread_admin_count > 0) as unread_count,
-        (SELECT COUNT(*) FROM chat_messages WHERE ($1::bigint IS NULL OR tenant_id = $1) AND is_admin = false AND created_at > NOW() - INTERVAL '24 hours') as messages_24h
-    `, [tenantId])
+      SELECT
+        (SELECT COUNT(*) FROM chat_conversations WHERE status = 'open') as open_count,
+        (SELECT COUNT(*) FROM chat_conversations WHERE status = 'pending') as pending_count,
+        (SELECT COUNT(*) FROM chat_conversations WHERE status = 'resolved') as resolved_count,
+        (SELECT COUNT(*) FROM chat_conversations WHERE status = 'closed') as closed_count,
+        (SELECT COUNT(*) FROM chat_conversations WHERE unread_admin_count > 0) as unread_count,
+        (SELECT COUNT(*) FROM chat_messages WHERE is_admin = false AND created_at > NOW() - INTERVAL '24 hours') as messages_24h
+    `)
 
     res.json(stats.rows[0])
   } catch (error) {

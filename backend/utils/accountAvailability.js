@@ -1,4 +1,4 @@
-const VALID_ACCOUNT_SIZES = [1000, 2000, 2500, 5000, 10000, 25000, 50000, 100000, 200000]
+const VALID_ACCOUNT_SIZES = [5000, 10000, 25000, 50000, 100000]
 const UNLIMITED_QUOTA = 999999
 
 function quotaKey(size) {
@@ -20,7 +20,7 @@ function parseQuotaSetting(settings, size) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0
 }
 
-async function countUsedQuotaSlots(db, tenantId, size, settings = {}) {
+async function countUsedQuotaSlots(db, size, settings = {}) {
   const periodStart = settings.max_accounts_period_start
   const periodEnd = settings.max_accounts_period_end
 
@@ -29,10 +29,9 @@ async function countUsedQuotaSlots(db, tenantId, size, settings = {}) {
       `SELECT COUNT(*) AS count
          FROM accounts
         WHERE account_size = $1
-          AND COALESCE(tenant_id, $4) = $4
           AND created_at >= $2::date
           AND created_at < ($3::date + INTERVAL '1 day')`,
-      [size, periodStart, periodEnd, tenantId]
+      [size, periodStart, periodEnd]
     )
     return parseInt(result.rows[0]?.count || 0, 10)
   }
@@ -40,14 +39,13 @@ async function countUsedQuotaSlots(db, tenantId, size, settings = {}) {
   const result = await db.query(
     `SELECT COUNT(*) AS count
        FROM accounts
-      WHERE account_size = $1
-        AND COALESCE(tenant_id, $2) = $2`,
-    [size, tenantId]
+      WHERE account_size = $1`,
+    [size]
   )
   return parseInt(result.rows[0]?.count || 0, 10)
 }
 
-async function buildAccountAvailability(db, tenantId, settings = {}) {
+async function buildAccountAvailability(db, settings = {}) {
   const periodMeta = buildAvailabilityPeriodMeta(settings)
   return Promise.all(VALID_ACCOUNT_SIZES.map(async (size) => {
     const configuredQuota = parseQuotaSetting(settings, size)
@@ -66,7 +64,7 @@ async function buildAccountAvailability(db, tenantId, settings = {}) {
       }
     }
 
-    const used = await countUsedQuotaSlots(db, tenantId, size, settings)
+    const used = await countUsedQuotaSlots(db, size, settings)
     const isUnlimited = configuredQuota >= UNLIMITED_QUOTA
     const remaining = isUnlimited ? null : Math.max(0, configuredQuota - used)
     const locked = !isUnlimited && remaining === 0

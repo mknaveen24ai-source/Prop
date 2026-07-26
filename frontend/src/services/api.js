@@ -5,7 +5,6 @@
 
 import axios from 'axios'
 import { setMemoryItem } from '../utils/memoryStore'
-import { getTenantHeaders } from '../utils/tenant'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
@@ -97,21 +96,10 @@ const api = axios.create({
   withCredentials: true
 })
 
-// Request interceptor
-// FIX: Removed browser-storage token lookup. The backend sets the JWT as an
+// NOTE: There is no request interceptor. The backend sets the JWT as an
 // httpOnly cookie which axios sends automatically via withCredentials: true.
 // Storing the token in browser storage creates an XSS theft vector — any injected
 // script can read it. The httpOnly cookie is inaccessible to JavaScript.
-api.interceptors.request.use(
-  config => {
-    config.headers = {
-      ...(config.headers || {}),
-      ...getTenantHeaders()
-    }
-    return config
-  },
-  error => Promise.reject(error)
-)
 
 // Response interceptor - handle global errors
 api.interceptors.response.use(
@@ -328,26 +316,11 @@ export const adminAPI = {
   banUser: (userId, reason) => 
     api.post('/api/admin/ban', { user_id: userId, reason }),
   
-  getAnnouncement: () => 
+  getAnnouncement: () =>
     api.get('/api/admin/announcement'),
-  
-  setAnnouncement: (message) => 
-    api.post('/api/admin/announcement', { message }),
 
-  getTenantSubscription: () =>
-    api.get('/api/billing/tenant/subscription'),
-
-  createTenantBillingPortal: () =>
-    api.post('/api/billing/tenant/portal'),
-
-  getTenants: () =>
-    api.get('/api/admin/tenants'),
-
-  createTenant: (data) =>
-    api.post('/api/admin/tenants', data),
-
-  updateTenant: (tenantId, data) =>
-    api.patch(`/api/admin/tenants/${tenantId}`, data)
+  setAnnouncement: (message) =>
+    api.post('/api/admin/announcement', { message })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

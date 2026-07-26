@@ -174,7 +174,6 @@ router.post('/init', setupLimiter, async function(req, res) {
       ['inactivity_fail_days',         String(inactivity_fail_days)],
       ['drawdown_type',                String(drawdown_type)],
       ['price_history_retain_days',    '7'],
-      ['requires_payment',             'false'],
       ['announcement_enabled',         'false'],
       ['announcement_message',         ''],
       ['leaderboard_enabled',          'true'],

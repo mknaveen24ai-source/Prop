@@ -84,11 +84,7 @@ export default function AdminSidebar({
   }, [socket])
 
   const profileName = session?.full_name || session?.email || 'Administrator'
-  const profileRole = isSuperAdmin
-    ? 'Platform Owner'
-    : session?.tenantId
-      ? `Tenant Admin • Tenant #${session.tenantId}`
-      : 'Tenant Admin'
+  const profileRole = isSuperAdmin ? 'Platform Owner' : 'Administrator'
   const initials = profileName
     .split(/\s+/)
     .filter(Boolean)
@@ -103,7 +99,7 @@ export default function AdminSidebar({
         <div className="admin-sidebar-header">
           <div className="admin-sidebar-logo">
             <Shield size={18} color="var(--admin-accent)" />
-            {!isCollapsed && <span>{isSuperAdmin ? 'Platform Admin' : 'Tenant Admin'}</span>}
+            {!isCollapsed && <span>Platform Admin</span>}
           </div>
         </div>
 
@@ -137,10 +133,10 @@ export default function AdminSidebar({
           <div className="admin-nav-group">
             <div className="admin-nav-label">Platform</div>
             {isSuperAdmin && <NavItem to="/admin/command-center" icon="command" label="Command Center" />}
-            {isSuperAdmin && <NavItem to="/admin/tenants" icon="tenant" label="White Label" />}
             <NavItem to="/admin/access" icon="key" label="Access & Security" />
             <NavItem to="/admin/email-jobs" icon="mail" label="Email Jobs" />
             <NavItem to="/admin/settings" icon="settings" label="Settings" />
+            {isSuperAdmin && <NavItem to="/admin/step-models" icon="challenges" label="Challenge Models" />}
             <NavItem to="/admin/violations" icon="violations" label="Violations" badge={counts.violations > 0 ? { val: counts.violations, color: 'red' } : null} />
             <NavItem to="/admin/disputes" icon="dispute" label="Disputes" badge={counts.disputes > 0 ? { val: counts.disputes, color: 'red' } : null} />
             <NavItem to="/admin/chat" icon="chat" label="Support Chat" badge={counts.chatUnread > 0 ? { val: counts.chatUnread, color: 'red' } : null} />
@@ -153,7 +149,7 @@ export default function AdminSidebar({
             <div className="admin-avatar">{initials}</div>
             {!isCollapsed && (
               <div style={{ flex: 1, overflow: 'hidden' }}>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: '#fff' }}>{profileName}</div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--ink)' }}>{profileName}</div>
                 <div style={{ fontSize: '11px', color: 'var(--admin-text-faint)' }}>{profileRole}</div>
               </div>
             )}

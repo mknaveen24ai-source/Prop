@@ -75,13 +75,19 @@ export default function AdminUsers() {
     }
   };
 
-  const fetchUsers = async ({ silent = false } = {}) => {
+  // FIX (AUDIT): stale-closure race — the debounced search effect below calls
+  // setPage(1) then fetchUsers({silent:true}), but fetchUsers closes over the
+  // *pre-update* `page` from this render, so it requested the old page with
+  // the new search/filter params. pageOverride lets the caller force page 1
+  // explicitly instead of relying on the closure.
+  const fetchUsers = async ({ silent = false, pageOverride } = {}) => {
+    const effectivePage = pageOverride ?? page;
     if (!silent) setLoading(true);
     try {
       const res = await adminAxios.get('/api/admin/traders', {
         params: {
           format: 'list',
-          page,
+          page: effectivePage,
           page_size: 25,
           search,
           sort: sort.key,
@@ -113,7 +119,7 @@ export default function AdminUsers() {
   useEffect(() => {
     const timeout = setTimeout(() => {
       setPage(1);
-      fetchUsers({ silent: true });
+      fetchUsers({ silent: true, pageOverride: 1 });
     }, 150);
     return () => clearTimeout(timeout);
   // eslint-disable-next-line react-hooks/exhaustive-deps

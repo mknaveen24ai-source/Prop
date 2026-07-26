@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import AdminBadge from '../../components/admin/AdminBadge'
 import AdminDataTable from '../../components/admin/AdminDataTable'
@@ -80,7 +80,6 @@ export default function AdminTradeCopier() {
   const [activeTab, setActiveTab] = useState('overview')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [tenantScope, setTenantScope] = useState('')
   const [data, setData] = useState({
     health: null,
     activeAccounts: [],
@@ -127,14 +126,6 @@ export default function AdminTradeCopier() {
     instrument: ''
   })
 
-  const scopeParams = useMemo(() => {
-    const params = {}
-    if (tenantScope.trim()) {
-      params.tenant_id = tenantScope.trim()
-    }
-    return params
-  }, [tenantScope])
-
   async function fetchAll() {
     setLoading(true)
     try {
@@ -149,15 +140,15 @@ export default function AdminTradeCopier() {
         deadLettersRes,
         reconciliationRes
       ] = await Promise.all([
-        adminAxios.get('/api/admin/copier/health', { params: scopeParams }),
-        adminAxios.get('/api/admin/copier/active-accounts', { params: scopeParams }),
-        adminAxios.get('/api/admin/copier/masters', { params: scopeParams }),
-        adminAxios.get('/api/admin/copier/followers', { params: scopeParams }),
-        adminAxios.get('/api/admin/copier/mappings', { params: scopeParams }),
-        adminAxios.get('/api/admin/copier/symbol-mappings', { params: scopeParams }),
-        adminAxios.get('/api/admin/copier/jobs', { params: { ...scopeParams, limit: 100 } }),
-        adminAxios.get('/api/admin/copier/dead-letters', { params: { ...scopeParams, limit: 100 } }),
-        adminAxios.get('/api/admin/copier/reconciliation', { params: scopeParams })
+        adminAxios.get('/api/admin/copier/health'),
+        adminAxios.get('/api/admin/copier/active-accounts'),
+        adminAxios.get('/api/admin/copier/masters'),
+        adminAxios.get('/api/admin/copier/followers'),
+        adminAxios.get('/api/admin/copier/mappings'),
+        adminAxios.get('/api/admin/copier/symbol-mappings'),
+        adminAxios.get('/api/admin/copier/jobs', { params: { limit: 100 } }),
+        adminAxios.get('/api/admin/copier/dead-letters', { params: { limit: 100 } }),
+        adminAxios.get('/api/admin/copier/reconciliation')
       ])
 
       setData({
@@ -181,7 +172,7 @@ export default function AdminTradeCopier() {
   useEffect(() => {
     fetchAll()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantScope])
+  }, [])
 
   async function runAction(action, successMessage) {
     setSaving(true)
@@ -195,10 +186,6 @@ export default function AdminTradeCopier() {
       setSaving(false)
     }
   }
-
-  const withTenantBody = (body) => (
-    tenantScope.trim() ? { ...body, tenant_id: tenantScope.trim() } : body
-  )
 
   const health = data.health || {}
   const runtime = health.runtime || {}
@@ -286,18 +273,10 @@ export default function AdminTradeCopier() {
         <div>
           <h1 className="admin-h1">Trade Copier v2</h1>
           <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px', maxWidth: '860px' }}>
-            Tenant-scoped multi-master and multi-follower copier with outbox events, per-follower routing, health metrics, dead letters, and reconciliation tools.
+            Multi-master and multi-follower copier with outbox events, per-follower routing, health metrics, dead letters, and reconciliation tools.
           </p>
         </div>
         <div style={{ minWidth: '220px' }}>
-          <Field label="Tenant Scope">
-            <input
-              className="admin-input"
-              placeholder="Blank = current tenant"
-              value={tenantScope}
-              onChange={(event) => setTenantScope(event.target.value)}
-            />
-          </Field>
           <button className="admin-btn admin-btn-ghost" onClick={fetchAll}>Refresh</button>
         </div>
       </div>
@@ -353,18 +332,21 @@ export default function AdminTradeCopier() {
             />
           </SectionCard>
 
-          <SectionCard title="Per-Tenant Copier Status">
-            <AdminDataTable
-              loading={loading}
-              data={Array.isArray(health.per_tenant) ? health.per_tenant : []}
-              columns={[
-                { header: 'Tenant', key: 'tenant_id', isMono: true },
-                { header: 'Followers', key: 'follower_count', isMono: true },
-                { header: 'Active', key: 'active_followers', isMono: true },
-                { header: 'Latest Heartbeat', key: 'latest_follower_heartbeat', render: (row) => formatDateTime(row.latest_follower_heartbeat) }
-              ]}
-              emptyMessage="No tenant copier status available"
-            />
+          <SectionCard title="Copier Status">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '20px' }}>
+              <div>
+                <div style={{ color: 'var(--admin-text-faint)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Followers</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, marginTop: 4 }}>{totals.follower_count || 0}</div>
+              </div>
+              <div>
+                <div style={{ color: 'var(--admin-text-faint)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Active</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, marginTop: 4 }}>{totals.active_followers || 0}</div>
+              </div>
+              <div>
+                <div style={{ color: 'var(--admin-text-faint)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Latest Heartbeat</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, marginTop: 4 }}>{formatDateTime(health.latest_follower_heartbeat)}</div>
+              </div>
+            </div>
           </SectionCard>
         </>
       )}
@@ -385,7 +367,7 @@ export default function AdminTradeCopier() {
               style={{ marginTop: '12px' }}
               disabled={saving}
               onClick={() => runAction(
-                () => adminAxios.post('/api/admin/copier/masters', withTenantBody(masterForm)),
+                () => adminAxios.post('/api/admin/copier/masters', masterForm),
                 'Copier master saved'
               )}
             >
@@ -402,7 +384,7 @@ export default function AdminTradeCopier() {
                 {
                   label: row.is_enabled ? 'Disable' : 'Enable',
                   onClick: () => runAction(
-                    () => adminAxios.patch(`/api/admin/copier/masters/${row.id}`, withTenantBody({ is_enabled: !row.is_enabled })),
+                    () => adminAxios.patch(`/api/admin/copier/masters/${row.id}`, { is_enabled: !row.is_enabled }),
                     `Master ${row.is_enabled ? 'disabled' : 'enabled'}`
                   )
                 }
@@ -416,7 +398,7 @@ export default function AdminTradeCopier() {
       {activeTab === 'activeAccounts' && (
         <SectionCard title={`Active Platform Accounts (${data.activeAccounts.length})`}>
           <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px', marginTop: 0 }}>
-            Tenant-scoped active Phase 1, Phase 2, and Funded accounts available for copier planning and master selection.
+            Active Phase 1, Phase 2, and Funded accounts available for copier planning and master selection.
           </p>
           <AdminDataTable
             loading={loading}
@@ -463,10 +445,10 @@ export default function AdminTradeCopier() {
               style={{ marginTop: '12px' }}
               disabled={saving}
               onClick={() => runAction(
-                () => adminAxios.post('/api/admin/copier/followers', withTenantBody({
+                () => adminAxios.post('/api/admin/copier/followers', {
                   ...followerForm,
                   symbol_allowlist: parseCsv(followerForm.symbol_allowlist)
-                })),
+                }),
                 'Follower saved'
               )}
             >
@@ -483,7 +465,7 @@ export default function AdminTradeCopier() {
                 {
                   label: row.status === 'paused' ? 'Resume' : 'Pause',
                   onClick: () => runAction(
-                    () => adminAxios.post(`/api/admin/copier/followers/${row.id}/${row.status === 'paused' ? 'resume' : 'pause'}`, withTenantBody({})),
+                    () => adminAxios.post(`/api/admin/copier/followers/${row.id}/${row.status === 'paused' ? 'resume' : 'pause'}`),
                     `Follower ${row.status === 'paused' ? 'resumed' : 'paused'}`
                   )
                 }
@@ -514,11 +496,11 @@ export default function AdminTradeCopier() {
               style={{ marginTop: '12px' }}
               disabled={saving}
               onClick={() => runAction(
-                () => adminAxios.post('/api/admin/copier/mappings', withTenantBody({
+                () => adminAxios.post('/api/admin/copier/mappings', {
                   ...mappingForm,
                   allowed_master_account_types: parseCsv(mappingForm.allowed_master_account_types).filter((item) => MASTER_TYPE_OPTIONS.includes(item)),
                   symbol_allowlist: parseCsv(mappingForm.symbol_allowlist)
-                })),
+                }),
                 'Mapping saved'
               )}
             >
@@ -535,7 +517,7 @@ export default function AdminTradeCopier() {
                 {
                   label: row.is_enabled ? 'Disable' : 'Enable',
                   onClick: () => runAction(
-                    () => adminAxios.patch(`/api/admin/copier/mappings/${row.id}`, withTenantBody({ is_enabled: !row.is_enabled })),
+                    () => adminAxios.patch(`/api/admin/copier/mappings/${row.id}`, { is_enabled: !row.is_enabled }),
                     `Mapping ${row.is_enabled ? 'disabled' : 'enabled'}`
                   )
                 }
@@ -559,7 +541,7 @@ export default function AdminTradeCopier() {
               style={{ marginTop: '12px' }}
               disabled={saving}
               onClick={() => runAction(
-                () => adminAxios.post('/api/admin/copier/symbol-mappings', withTenantBody(symbolForm)),
+                () => adminAxios.post('/api/admin/copier/symbol-mappings', symbolForm),
                 'Symbol mapping saved'
               )}
             >
@@ -576,7 +558,7 @@ export default function AdminTradeCopier() {
                 {
                   label: row.is_enabled ? 'Disable' : 'Enable',
                   onClick: () => runAction(
-                    () => adminAxios.patch(`/api/admin/copier/symbol-mappings/${row.id}`, withTenantBody({ is_enabled: !row.is_enabled })),
+                    () => adminAxios.patch(`/api/admin/copier/symbol-mappings/${row.id}`, { is_enabled: !row.is_enabled }),
                     `Symbol mapping ${row.is_enabled ? 'disabled' : 'enabled'}`
                   )
                 }
@@ -597,7 +579,7 @@ export default function AdminTradeCopier() {
               rowActions={(row) => row.state === 'dead' ? [{
                 label: 'Retry',
                 onClick: () => runAction(
-                  () => adminAxios.post(`/api/admin/copier/jobs/${row.id}/retry`, withTenantBody({})),
+                  () => adminAxios.post(`/api/admin/copier/jobs/${row.id}/retry`),
                   'Job requeued'
                 )
               }] : []}
@@ -613,7 +595,7 @@ export default function AdminTradeCopier() {
               rowActions={(row) => [{
                 label: 'Retry',
                 onClick: () => runAction(
-                  () => adminAxios.post(`/api/admin/copier/jobs/${row.id}/retry`, withTenantBody({})),
+                  () => adminAxios.post(`/api/admin/copier/jobs/${row.id}/retry`),
                   'Dead-letter job requeued'
                 )
               }]}
@@ -642,7 +624,7 @@ export default function AdminTradeCopier() {
               style={{ marginTop: '12px' }}
               disabled={saving}
               onClick={() => runAction(
-                () => adminAxios.post('/api/admin/copier/reconciliation/resync', withTenantBody(resyncForm)),
+                () => adminAxios.post('/api/admin/copier/reconciliation/resync', resyncForm),
                 'Resync action queued'
               )}
             >

@@ -104,7 +104,6 @@ const ICON_MAP = {
   lock: Shield,
   flag: AlertTriangle,
   command: Shield,
-  tenant: Copy,
   pnl: Activity,
   menu: MoreHorizontal,
   file: FileText,

@@ -9,7 +9,6 @@ const {
 const { getTenantFeedConfig } = require('../services/tenantPolicyService')
 const {
   getCurrentPrices,
-  getCurrentPricesForTenant,
   getPriceFeedRuntimeStatus,
   INSTRUMENTS
 } = require('../priceFeed')
@@ -123,22 +122,9 @@ function sanitizeRuntimeState(runtime = null) {
   }
 }
 
-async function getFeedHealthForTenant(tenantId = null) {
-  const normalizedTenantId = parseInt(tenantId, 10)
-  const scopedTenantId = Number.isFinite(normalizedTenantId) && normalizedTenantId > 0 ? normalizedTenantId : null
-  const feedConfig = scopedTenantId
-    ? await getTenantFeedConfig(scopedTenantId, { forceRefresh: true })
-    : {
-        tenant_id: null,
-        feed_mode: 'shared',
-        source_key: SHARED_FEED_SOURCE_KEY,
-        effective_source_key: SHARED_FEED_SOURCE_KEY,
-        effective_feed_mode: 'shared',
-        fallback_to_shared: true
-      }
-  const prices = scopedTenantId
-    ? await getCurrentPricesForTenant(scopedTenantId)
-    : await getCurrentPrices()
+async function getFeedHealthForTenant() {
+  const feedConfig = await getTenantFeedConfig({ forceRefresh: true })
+  const prices = await getCurrentPrices()
   const requiredLaunchInstruments = getRequiredLaunchInstruments()
   const summary = summarizeFeedSnapshot(prices, {
     staleMs: LAUNCH_FEED_STALE_MS,
@@ -169,7 +155,6 @@ async function getFeedHealthForTenant(tenantId = null) {
     launch_ready: status === 'healthy',
     status,
     message,
-    tenant_id: scopedTenantId,
     feed_mode: feedConfig.feed_mode || 'shared',
     effective_feed_mode: feedConfig.effective_feed_mode || 'shared',
     source_key: effectiveSourceKey,
@@ -221,11 +206,11 @@ function getRecent5xxCount() {
   return rows.filter((entry) => (now - entry.timestampMs) <= HEALTH_5XX_WINDOW_MS).length
 }
 
-async function getLaunchHealthStatus(tenantId = null) {
+async function getLaunchHealthStatus() {
   const [database, redis, feed] = await Promise.all([
     getDatabaseHealth(),
     getRedisHealth(),
-    getFeedHealthForTenant(tenantId)
+    getFeedHealthForTenant()
   ])
 
   const memory = process.memoryUsage()

@@ -793,18 +793,13 @@ function applyTenantMarkupToPriceRow(instrument, row, settings = null) {
   }
 }
 
-async function getCurrentPricesForTenant(tenantId, basePrices = null) {
-  const normalizedTenantId = parseInt(tenantId, 10)
-  if (!Number.isFinite(normalizedTenantId) || normalizedTenantId <= 0) {
-    return basePrices || await getCurrentPrices()
-  }
-
-  const feedConfig = await getTenantFeedConfig(normalizedTenantId)
+async function getCurrentPricesForTenant(basePrices = null) {
+  const feedConfig = await getTenantFeedConfig()
   const prices = feedConfig.effective_source_key === SHARED_FEED_SOURCE_KEY && basePrices
     ? basePrices
     : await getCurrentPricesForSource(feedConfig.effective_source_key || SHARED_FEED_SOURCE_KEY)
   const settings = buildEffectiveSpreadSettings(
-    await getTenantSettings(normalizedTenantId, ['spread_markup_points_json']),
+    await getTenantSettings(['spread_markup_points_json']),
     feedConfig
   )
   return Object.fromEntries(
@@ -815,30 +810,13 @@ async function getCurrentPricesForTenant(tenantId, basePrices = null) {
   )
 }
 
-async function getPriceForTenant(tenantId, instrument, basePrices = null) {
+async function getPriceForTenant(instrument, basePrices = null) {
   const normalizedInstrument = String(instrument || '').trim().toUpperCase()
   if (!normalizedInstrument) {
     throw new Error('Instrument is required')
   }
 
-  const normalizedTenantId = parseInt(tenantId, 10)
-  if (!Number.isFinite(normalizedTenantId) || normalizedTenantId <= 0) {
-    if (basePrices && basePrices[normalizedInstrument]) {
-      return applyTenantMarkupToPriceRow(normalizedInstrument, basePrices[normalizedInstrument], null)
-    }
-    const result = await pool.query(
-      'SELECT bid, ask, updated_at FROM price_feed WHERE instrument = $1',
-      [normalizedInstrument]
-    )
-    if (result.rows.length === 0) {
-      const error = new Error('Price not available')
-      error.code = 'PRICE_NOT_AVAILABLE'
-      throw error
-    }
-    return applyTenantMarkupToPriceRow(normalizedInstrument, result.rows[0], null)
-  }
-
-  const feedConfig = await getTenantFeedConfig(normalizedTenantId)
+  const feedConfig = await getTenantFeedConfig()
   let basePrice = null
   if (feedConfig.effective_source_key === SHARED_FEED_SOURCE_KEY && basePrices?.[normalizedInstrument]) {
     basePrice = basePrices[normalizedInstrument]
@@ -852,7 +830,7 @@ async function getPriceForTenant(tenantId, instrument, basePrices = null) {
   }
 
   const settings = buildEffectiveSpreadSettings(
-    await getTenantSettings(normalizedTenantId, ['spread_markup_points_json']),
+    await getTenantSettings(['spread_markup_points_json']),
     feedConfig
   )
   return applyTenantMarkupToPriceRow(normalizedInstrument, basePrice, settings)

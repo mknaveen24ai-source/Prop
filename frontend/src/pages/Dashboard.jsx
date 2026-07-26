@@ -20,6 +20,8 @@ import { filterVisibleTraderAccounts, isTraderAccountVisible } from '../utils/ac
 import Pagination from '../components/Pagination'
 import DashboardKYCPage from './DashboardKYCPage'
 import DashboardPayoutsPage from './DashboardPayoutsPage'
+import GetChallenge from './GetChallenge'
+import ErrorBoundary from '../ErrorBoundary'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 const TradingPanel = lazy(() => import('../components/TradingPanel'))
@@ -29,7 +31,7 @@ function getStatusColor(status) {
   const c = {
     active: 'var(--accent)', passed: 'var(--green)', failed: 'var(--red)',
     funded: 'var(--cyan)', pending: 'var(--accent)', approved: 'var(--green)',
-    paid: 'var(--green)', rejected: 'var(--red)', locked: '#8a8a8a'
+    paid: 'var(--green)', rejected: 'var(--red)', locked: 'var(--muted)'
   }
   return c[status] || 'var(--text-muted)'
 }
@@ -224,13 +226,6 @@ function Dashboard({ user, onLogout }) {
 
       if (payload?.instrument) {
         updatePrice(payload.instrument, payload)
-      } else if (data?.monthly_claim_limit) {
-        const resetText = data.monthly_claim_limit.resets_at
-          ? new Date(data.monthly_claim_limit.resets_at).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })
-          : 'next month'
-        const message = `Free account already claimed. Try again ${resetText}.`
-        setError(message)
-        toast.error(message)
       } else {
         updatePrices(mergedPrices)
       }
@@ -256,7 +251,7 @@ function Dashboard({ user, onLogout }) {
         {
           icon: renderIcon(profit ? 'approve' : 'reject', { size: 16, color: profit ? 'var(--accent-green)' : 'var(--accent-red)' }),
           style: {
-            borderLeft: `3px solid ${profit ? '#00FF88' : '#FF3B5C'}`
+            borderLeft: `3px solid ${profit ? 'var(--gain)' : 'var(--loss)'}`
           }
         }
       )
@@ -268,21 +263,21 @@ function Dashboard({ user, onLogout }) {
       addPosition(openedPosition)
       toast(`Trade opened: ${openedPosition.instrument} ${openedPosition.direction}`, {
         icon: renderIcon('trade', { size: 16, color: 'var(--accent)' }),
-        style: { borderLeft: '3px solid #00D4FF' }
+        style: { borderLeft: '3px solid var(--accent)' }
       })
     })
     socket.on('account_passed', (data) => {
       toast.success(`Congratulations! You passed ${data?.phase || 'your challenge'}!`, {
         duration: 8000,
         icon: renderIcon('leaderboard', { size: 16, color: 'var(--accent-gold)' }),
-        style: { borderLeft: '3px solid #FFD700' }
+        style: { borderLeft: '3px solid var(--warn)' }
       })
     })
     socket.on('payout_approved', (data) => {
       toast.success(`Payout of $${formatMoney(data?.amount)} approved!`, {
         duration: 8000,
         icon: renderIcon('payouts', { size: 16, color: 'var(--accent-gold)' }),
-        style: { borderLeft: '3px solid #FFD700' }
+        style: { borderLeft: '3px solid var(--warn)' }
       })
     })
     socket.on('sl_triggered', (data) => {
@@ -291,27 +286,28 @@ function Dashboard({ user, onLogout }) {
         : ''
       toast(`SL triggered on ${data?.instrument || 'trade'}${slipMsg}`, {
         icon: renderIcon('warning', { size: 16, color: 'var(--accent-red)' }),
-        style: { borderLeft: '3px solid #FF3B5C' }
+        style: { borderLeft: '3px solid var(--loss)' }
       })
     })
     socket.on('tp_triggered', (data) => {
       toast.success(`TP hit on ${data?.instrument || 'trade'}! +$${formatMoney(data?.pnl)}`, {
         icon: renderIcon('target', { size: 16, color: 'var(--accent-green)' }),
-        style: { borderLeft: '3px solid #00FF88' }
+        style: { borderLeft: '3px solid var(--gain)' }
       })
     })
     socket.on('account_update', (data) => {
+      const isPhasePassedEvent = /^phase\d+_passed$/.test(data?.event || '')
       if (data?.message) {
         setSuccess(data.message + (data.pnl != null ? ` P&L: $${data.pnl}` : ''))
         pushNotification(data.message + (data.pnl != null ? ` P&L: $${data.pnl}` : ''),
-          data.event === 'account_failed' ? 'error' : (data.event === 'phase1_passed' || data.event === 'phase2_passed') ? 'success' : 'info')
+          data.event === 'account_failed' ? 'error' : isPhasePassedEvent ? 'success' : 'info')
       }
-      if (data?.event === 'phase1_passed' || data?.event === 'phase2_passed') {
-        const phaseLabel = data?.event === 'phase1_passed' ? 'Phase 1' : 'Phase 2'
+      if (isPhasePassedEvent) {
+        const phaseLabel = `Phase ${data.event.match(/^phase(\d+)_passed$/)[1]}`
         toast.success(`Congratulations! You passed ${phaseLabel}!`, {
           duration: 8000,
           icon: renderIcon('leaderboard', { size: 16, color: 'var(--accent-gold)' }),
-          style: { borderLeft: '3px solid #FFD700' }
+          style: { borderLeft: '3px solid var(--warn)' }
         })
       }
       if (selectedAccountRef.current) {
@@ -354,6 +350,49 @@ function Dashboard({ user, onLogout }) {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchAccounts(); fetchPrices(); fetchPayouts(); fetchPayoutSettings(); fetchAccountHistory() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Stripe checkout return handler ──────────────────────────────────────
+  // After a challenge order is paid, Stripe redirects back to
+  // /dashboard?checkout=success&order_id=N. Webhook delivery can lag a few
+  // seconds behind the redirect, so poll the order until it's marked paid,
+  // then create the challenge account.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const checkout = params.get('checkout')
+    const orderId = params.get('order_id')
+    if (!checkout) return
+
+    window.history.replaceState({}, '', window.location.pathname)
+
+    if (checkout === 'cancelled') {
+      toast.error('Checkout was cancelled — no charge was made.')
+      return
+    }
+    if (checkout !== 'success' || !orderId) return
+
+    let cancelled = false
+    async function confirmPayment() {
+      setSuccess('Confirming your payment...')
+      for (let attempt = 0; attempt < 10 && !cancelled; attempt++) {
+        try {
+          const res = await axios.get(`${API_URL}/api/accounts/orders/${orderId}`)
+          const order = res.data?.order
+          if (order?.status === 'paid') {
+            await createAccount(parseFloat(order.account_size), { challengeOrderId: order.id })
+            return
+          }
+        } catch (_) {
+          // keep retrying — webhook may not have landed yet
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+      }
+      if (!cancelled) {
+        setError('Payment is taking longer than expected to confirm. If you were charged, your account will appear shortly — refresh in a minute or contact support.')
+      }
+    }
+    confirmPayment()
+    return () => { cancelled = true }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (selectedAccount) {
@@ -709,10 +748,10 @@ function Dashboard({ user, onLogout }) {
       {announcement && !announcementDismissed && (() => {
         // FIX (BUG-L3): All four types rendered identical grey shades; now uses proper semantic colors
         const colors = {
-          info:    { bg: 'rgba(100, 180, 255, 0.10)', border: 'rgba(100, 180, 255, 0.4)', text: '#60b4ff', icon: 'info' },
-          warning: { bg: 'rgba(255, 180, 50, 0.10)',  border: 'rgba(255, 180, 50, 0.4)',  text: '#ffb432', icon: 'warning' },
-          success: { bg: 'rgba(80, 200, 120, 0.10)',  border: 'rgba(80, 200, 120, 0.4)',  text: '#50c878', icon: 'approve' },
-          error:   { bg: 'rgba(240, 80, 80, 0.10)',   border: 'rgba(240, 80, 80, 0.4)',   text: '#f05050', icon: 'reject' },
+          info:    { bg: 'transparent', border: 'var(--rule)', text: 'var(--ink)', icon: 'info' },
+          warning: { bg: 'transparent', border: 'var(--warn)', text: 'var(--warn)', icon: 'warning' },
+          success: { bg: 'transparent', border: 'var(--gain)', text: 'var(--gain)', icon: 'approve' },
+          error:   { bg: 'transparent', border: 'var(--loss)', text: 'var(--loss)', icon: 'reject' },
         }
         const c = colors[announcement.type] || colors.info
         return (
@@ -870,12 +909,20 @@ function Dashboard({ user, onLogout }) {
             accounts={visibleAccounts}
             selectedAccount={selectedAccount}
             setSelectedAccount={setSelectedAccount}
-            onCreateAccount={createAccount}
             getStatusColor={getStatusColor}
             profitSharePct={profitSharePct}
             quotaFull={quotaFull}
             quotaNextOpen={quotaNextOpen}
             onOpenRulesPage={() => setActivePage('rules')}
+            onStartChallenge={() => setActivePage('get-challenge')}
+          />
+        )}
+
+        {activePage === 'get-challenge' && (
+          <GetChallenge
+            onCreateAccount={createAccount}
+            kycStatus={kycStatus}
+            setActivePage={setActivePage}
           />
         )}
 
@@ -901,38 +948,46 @@ function Dashboard({ user, onLogout }) {
               <button className="btn btn-primary" onClick={() => setActivePage('kyc')} style={{ padding: '12px 32px' }}>Complete KYC</button>
             </div>
           ) : (
-            <Suspense fallback={<DashboardSectionFallback label="Loading trading terminal..." />}>
-              <TradingPanel
-                prices={prices}
-                selectedAccount={selectedAccount}
-                accounts={visibleAccounts}
-                setSelectedAccount={setSelectedAccount}
-                openTrades={openTrades}
-                tradeHistory={tradeHistory}
-                orderForm={orderForm}
-                setOrderForm={setOrderForm}
-                onOpenTrade={openTrade}
-                onCloseTrade={closeTrade}
-                closingTradeIds={closingTradeIds}
-                onCancelOrder={cancelOrder}
-                getStatusColor={getStatusColor}
-                stats={stats}
-                
-                onTradeModified={handleTradeModified}
-                accountLoading={accountLoading}
-              />
-            </Suspense>
+            // FIX (AUDIT): TradingPanel is a ~1700-line component with its own
+            // chart/order-form/batch-action state — a rendering crash in it
+            // used to take down the entire app via the single app-wide
+            // boundary. Scoped here so a crash falls back in place instead.
+            <ErrorBoundary variant="section" label="Trading Panel" key={selectedAccount?.id}>
+              <Suspense fallback={<DashboardSectionFallback label="Loading trading terminal..." />}>
+                <TradingPanel
+                  prices={prices}
+                  selectedAccount={selectedAccount}
+                  accounts={visibleAccounts}
+                  setSelectedAccount={setSelectedAccount}
+                  openTrades={openTrades}
+                  tradeHistory={tradeHistory}
+                  orderForm={orderForm}
+                  setOrderForm={setOrderForm}
+                  onOpenTrade={openTrade}
+                  onCloseTrade={closeTrade}
+                  closingTradeIds={closingTradeIds}
+                  onCancelOrder={cancelOrder}
+                  getStatusColor={getStatusColor}
+                  stats={stats}
+
+                  onTradeModified={handleTradeModified}
+                  accountLoading={accountLoading}
+                />
+              </Suspense>
+            </ErrorBoundary>
           )
         )}
 
         {/* Analytics Page */}
         {activePage === 'analytics' && (
-          <Suspense fallback={<DashboardSectionFallback label="Loading analytics..." />}>
-            <Analytics
-              selectedAccount={selectedAccount}
-              
-            />
-          </Suspense>
+          <ErrorBoundary variant="section" label="Analytics">
+            <Suspense fallback={<DashboardSectionFallback label="Loading analytics..." />}>
+              <Analytics
+                selectedAccount={selectedAccount}
+
+              />
+            </Suspense>
+          </ErrorBoundary>
         )}
 
         {/* KYC Page */}
@@ -1001,7 +1056,7 @@ function Dashboard({ user, onLogout }) {
                       const winRate = trades > 0 ? ((wins / trades) * 100).toFixed(0) : 0
                       const statusColors = {
                         active: 'var(--accent)', passed: 'var(--green)', failed: 'var(--red)',
-                        funded: 'var(--cyan)', expired: '#878787', locked: '#8a8a8a'
+                        funded: 'var(--cyan)', expired: 'var(--muted)', locked: 'var(--muted)'
                       }
                       const statusColor = statusColors[acc.status] || 'var(--text-muted)'
                       return (
@@ -1075,170 +1130,6 @@ function Dashboard({ user, onLogout }) {
         )}
 
       </div>
-    </div>
-  )
-}
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-const ALLOWED_ID_TYPES     = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf']
-const ALLOWED_SELFIE_TYPES = ['image/jpeg', 'image/jpg', 'image/png']
-const MAX_FILE_SIZE        = 5 * 1024 * 1024 // 5 MB
-
-function LegacyKYCUploadForm({ onSubmit, idDocument, setIdDocument, selfie, setSelfie, uploading }) {
-  const [idError, setIdError]         = React.useState('')
-  const [selfieError, setSelfieError] = React.useState('')
-
-  function handleIdChange(e) {
-    const file = e.target.files[0]
-    if (!file) return
-    if (!ALLOWED_ID_TYPES.includes(file.type)) {
-      setIdError('ID must be JPG, PNG or PDF')
-      setIdDocument(null)
-      e.target.value = ''
-      return
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      setIdError('ID file must be under 5MB')
-      setIdDocument(null)
-      e.target.value = ''
-      return
-    }
-    setIdError('')
-    setIdDocument(file)
-  }
-
-  function handleSelfieChange(e) {
-    const file = e.target.files[0]
-    if (!file) return
-    if (!ALLOWED_SELFIE_TYPES.includes(file.type)) {
-      setSelfieError('Selfie must be JPG or PNG (no PDFs)')
-      setSelfie(null)
-      e.target.value = ''
-      return
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      setSelfieError('Selfie file must be under 5MB')
-      setSelfie(null)
-      e.target.value = ''
-      return
-    }
-    setSelfieError('')
-    setSelfie(file)
-  }
-
-  return (
-    <div className="card" style={{ maxWidth: '600px' }}>
-      <h3 style={{ color: 'var(--accent)', marginBottom: '8px' }}>Upload Documents</h3>
-      <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '24px' }}>
-        Upload your ID document and a selfie. ID files must be JPG, PNG or PDF under 5MB. Selfie must be JPG or PNG.
-      </p>
-      <form onSubmit={onSubmit}>
-        <div className="grid-2 kyc-upload-grid">
-
-          {/* ID Document */}
-          <div>
-            <label>ID Document</label>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>Passport, National ID or Driver's License</p>
-            <div
-              style={{
-                border: `2px dashed ${idError ? 'var(--red)' : 'var(--navy-border)'}`,
-                borderRadius: '8px', padding: '20px', textAlign: 'center',
-                cursor: 'pointer',
-                background: idDocument ? 'rgba(74, 74, 74, 0.12)' : 'transparent',
-                transition: 'all 0.2s'
-              }}
-              onClick={() => document.getElementById('id_doc_input').click()}
-            >
-              {idDocument ? (
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
-                    {renderIcon('file', { size: 24, color: 'var(--accent-green)' })}
-                  </div>
-                  <div style={{ fontSize: '13px', color: 'var(--green-light)' }}>{idDocument.name}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>{(idDocument.size / 1024).toFixed(0)} KB</div>
-                </div>
-              ) : (
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
-                    {renderIcon('folder', { size: 24, color: 'var(--text-secondary)' })}
-                  </div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Click to upload</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>JPG, PNG or PDF · max 5MB</div>
-                </div>
-              )}
-            </div>
-            {idError && (
-              <p style={{ color: 'var(--red)', fontSize: '12px', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                {renderIcon('warning', { size: 14, color: 'var(--accent-red)' })}
-                <span>{idError}</span>
-              </p>
-            )}
-            <input id="id_doc_input" type="file" accept=".jpg,.jpeg,.png,.pdf" style={{ display: 'none' }} onChange={handleIdChange} />
-          </div>
-
-          {/* Selfie */}
-          <div>
-            <label>Selfie with ID</label>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>Hold your ID next to your face</p>
-            <div
-              style={{
-                border: `2px dashed ${selfieError ? 'var(--red)' : 'var(--navy-border)'}`,
-                borderRadius: '8px', padding: '20px', textAlign: 'center',
-                cursor: 'pointer',
-                background: selfie ? 'rgba(74, 74, 74, 0.12)' : 'transparent',
-                transition: 'all 0.2s'
-              }}
-              onClick={() => document.getElementById('selfie_input').click()}
-            >
-              {selfie ? (
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
-                    {renderIcon('selfie', { size: 24, color: 'var(--accent-green)' })}
-                  </div>
-                  <div style={{ fontSize: '13px', color: 'var(--green-light)' }}>{selfie.name}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>{(selfie.size / 1024).toFixed(0)} KB</div>
-                </div>
-              ) : (
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px' }}>
-                    {renderIcon('folder', { size: 24, color: 'var(--text-secondary)' })}
-                  </div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Click to upload (JPG or PNG only)</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px' }}>max 5MB</div>
-                </div>
-              )}
-            </div>
-            {selfieError && (
-              <p style={{ color: 'var(--red)', fontSize: '12px', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                {renderIcon('warning', { size: 14, color: 'var(--accent-red)' })}
-                <span>{selfieError}</span>
-              </p>
-            )}
-            <input id="selfie_input" type="file" accept=".jpg,.jpeg,.png" style={{ display: 'none' }} onChange={handleSelfieChange} />
-          </div>
-        </div>
-
-        <div style={{
-          marginTop: '20px', padding: '16px',
-          background: 'var(--navy-card)',
-          border: '1px solid var(--navy-border)',
-          borderRadius: '8px', marginBottom: '20px'
-        }}>
-          <p style={{ margin: '0', fontSize: '13px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {renderIcon('warning', { size: 14, color: 'var(--accent-gold)' })}
-            <span>Your documents are securely stored and only used for identity verification. We accept government-issued IDs only.</span>
-          </p>
-        </div>
-
-        <button
-          className="btn btn-accent"
-          type="submit"
-          style={{ padding: '12px 32px' }}
-          disabled={uploading || !idDocument || !selfie || !!idError || !!selfieError}
-        >
-          {uploading ? 'Uploading...' : 'Submit for Verification'}
-        </button>
-      </form>
     </div>
   )
 }

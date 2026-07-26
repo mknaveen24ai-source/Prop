@@ -1,0 +1,224 @@
+/* ============================================================================
+   Ledger Desk — shared UI primitive layer (lx-*)
+   A small, self-contained set of classes for the Button / Card / StatCell /
+   Field / Table React primitives in this folder. Everything routes through
+   tokens.css: color via --paper/--ink/--rule/--gain/--loss/--warn/--muted,
+   spacing via the --space-* scale, type via --font-*. No hardcoded hex, no
+   drop shadows, no gradients, no border-radius — theme-aware in both the
+   Rag Cotton White (light) and Charcoal Noir (dark) editions by construction.
+   The `lx-` prefix keeps this layer from colliding with the legacy .btn/.card
+   and the .admin-* / .mp-* families.
+   ============================================================================ */
+
+/* ── Button ───────────────────────────────────────────────────────────────── */
+.lx-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-family: var(--font-ui);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink);
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, opacity 0.18s ease;
+  text-decoration: none;
+}
+.lx-btn:disabled,
+.lx-btn[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.lx-btn:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* sizes — padding driven by the spacing scale */
+.lx-btn--sm { padding: var(--space-1) var(--space-3); font-size: 12px; }
+.lx-btn--md { padding: var(--space-2) var(--space-5); font-size: 13px; }
+.lx-btn--lg { padding: var(--space-3) var(--space-7); font-size: 14px; }
+
+/* variants */
+.lx-btn--primary {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+.lx-btn--primary:hover:not(:disabled) { opacity: 0.85; }
+
+.lx-btn--secondary {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--rule);
+}
+.lx-btn--secondary:hover:not(:disabled) { border-color: var(--ink); }
+
+.lx-btn--ghost {
+  background: transparent;
+  color: var(--muted);
+  border-color: transparent;
+}
+.lx-btn--ghost:hover:not(:disabled) { color: var(--ink); }
+
+.lx-btn--danger {
+  background: transparent;
+  color: var(--loss);
+  border-color: var(--loss);
+}
+.lx-btn--danger:hover:not(:disabled) { background: var(--loss); color: var(--paper); }
+
+.lx-btn--full { width: 100%; }
+
+/* ── Card ─────────────────────────────────────────────────────────────────── */
+.lx-card {
+  background: var(--paper-2);
+  border: 1px solid var(--rule);
+  padding: var(--space-6);
+}
+.lx-card--ruled { border-top: 3px double var(--ink); }
+.lx-card--flush { padding: 0; }
+
+.lx-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+.lx-card__eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: var(--space-2);
+}
+.lx-card__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1.2;
+  color: var(--ink);
+  margin: 0;
+}
+.lx-card__actions { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
+
+/* ── StatCell ─────────────────────────────────────────────────────────────── */
+.lx-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--rule);
+  background: transparent;
+}
+.lx-stat__label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.lx-stat__value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 1.1;
+  color: var(--ink);
+}
+.lx-stat__value--gain { color: var(--gain); }
+.lx-stat__value--loss { color: var(--loss); }
+.lx-stat__value--warn { color: var(--warn); }
+.lx-stat__value--muted { color: var(--muted); }
+.lx-stat__sub { font-size: 12px; color: var(--muted); }
+
+/* ── Field ────────────────────────────────────────────────────────────────── */
+.lx-field { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-5); }
+.lx-field__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.lx-field__control {
+  width: 100%;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  padding: var(--space-3) var(--space-4);
+  outline: none;
+  transition: border-color 0.18s ease;
+}
+.lx-field__control:focus { border-color: var(--ink); }
+.lx-field__control::placeholder { color: var(--muted); }
+textarea.lx-field__control { resize: vertical; min-height: 84px; }
+.lx-field__control--mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.lx-field__hint { font-size: 12px; color: var(--muted); }
+.lx-field__error { font-size: 12px; color: var(--loss); }
+.lx-field__control--invalid { border-color: var(--loss); }
+
+/* reveal-toggle affix (for masked secret fields) */
+.lx-field__affix { position: relative; display: flex; align-items: center; }
+.lx-field__affix .lx-field__control { padding-right: calc(var(--space-8) + var(--space-1)); }
+.lx-field__reveal {
+  position: absolute;
+  right: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: var(--space-2);
+}
+.lx-field__reveal:hover { color: var(--ink); }
+
+/* ── Table ────────────────────────────────────────────────────────────────── */
+.lx-table-wrap { width: 100%; overflow-x: auto; }
+.lx-table { width: 100%; border-collapse: collapse; text-align: left; }
+.lx-table thead th {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 2px solid var(--ink);
+  white-space: nowrap;
+}
+.lx-table tbody td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px;
+  color: var(--ink);
+  vertical-align: middle;
+}
+.lx-table tbody tr:last-child td { border-bottom: none; }
+.lx-table tbody tr:hover td { background: var(--paper-2); }
+.lx-table .lx-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.lx-table__empty {
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lx-btn, .lx-field__control { transition: none; }
+}

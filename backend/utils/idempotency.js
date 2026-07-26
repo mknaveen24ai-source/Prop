@@ -9,7 +9,6 @@ async function ensureIdempotencyInfrastructure() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS idempotency_requests (
         id BIGSERIAL PRIMARY KEY,
-        tenant_id BIGINT,
         actor_id TEXT,
         scope TEXT NOT NULL,
         idempotency_key TEXT NOT NULL,
@@ -20,7 +19,6 @@ async function ensureIdempotencyInfrastructure() {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `)
-    await pool.query(`ALTER TABLE idempotency_requests ADD COLUMN IF NOT EXISTS tenant_id BIGINT`)
     await pool.query(`ALTER TABLE idempotency_requests ADD COLUMN IF NOT EXISTS actor_id TEXT`)
     await pool.query(`ALTER TABLE idempotency_requests ADD COLUMN IF NOT EXISTS scope TEXT`)
     await pool.query(`ALTER TABLE idempotency_requests ADD COLUMN IF NOT EXISTS idempotency_key TEXT`)
@@ -34,15 +32,14 @@ async function ensureIdempotencyInfrastructure() {
         ON idempotency_requests(created_at DESC)
     `)
     await pool.query(`
-      CREATE INDEX IF NOT EXISTS idempotency_requests_tenant_scope_idx
-        ON idempotency_requests(tenant_id, scope, created_at DESC)
+      CREATE INDEX IF NOT EXISTS idempotency_requests_scope_idx
+        ON idempotency_requests(scope, created_at DESC)
     `)
     await pool.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS idempotency_requests_scope_key_actor_uq
         ON idempotency_requests(
           scope,
           idempotency_key,
-          COALESCE(tenant_id, 0),
           COALESCE(actor_id, '')
         )
     `)
@@ -62,7 +59,6 @@ function getIdempotencyKey(req) {
 
 async function beginIdempotentRequest(clientOrPool, {
   scope,
-  tenantId = null,
   actorId = null,
   idempotencyKey
 }) {
@@ -73,17 +69,15 @@ async function beginIdempotentRequest(clientOrPool, {
     return { enabled: false }
   }
 
-  const normalizedTenantId = tenantId == null ? null : parseInt(tenantId, 10)
   const normalizedActorId = actorId == null ? null : String(actorId)
   const existing = await db.query(
     `SELECT id, status, response_status, response_body_json
        FROM idempotency_requests
       WHERE scope = $1
         AND idempotency_key = $2
-        AND COALESCE(tenant_id, 0) = COALESCE($3::bigint, 0)
-        AND COALESCE(actor_id, '') = COALESCE($4::text, '')
+        AND COALESCE(actor_id, '') = COALESCE($3::text, '')
       LIMIT 1`,
-    [String(scope), key, normalizedTenantId, normalizedActorId]
+    [String(scope), key, normalizedActorId]
   )
 
   if (existing.rows.length > 0) {
@@ -104,12 +98,12 @@ async function beginIdempotentRequest(clientOrPool, {
 
   const inserted = await db.query(
     `INSERT INTO idempotency_requests (
-       tenant_id, actor_id, scope, idempotency_key, status
+       actor_id, scope, idempotency_key, status
      ) VALUES (
-       $1, $2, $3, $4, 'started'
+       $1, $2, $3, 'started'
      )
      RETURNING id`,
-    [normalizedTenantId, normalizedActorId, String(scope), key]
+    [normalizedActorId, String(scope), key]
   )
 
   return {

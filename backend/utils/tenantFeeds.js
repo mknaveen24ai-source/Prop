@@ -1,7 +1,8 @@
+'use strict'
+
 const pool = require('../db')
 const logger = require('./logger')
 const { ensureTenantSettingsInfrastructure } = require('./tenantSettings')
-const { runWithSystemDbContext } = require('./dbContext')
 
 const SHARED_FEED_SOURCE_KEY = 'shared'
 const FEED_STALE_MS = 15 * 1000
@@ -18,7 +19,7 @@ const sourceHourlyPersistPromises = new Map()
 async function ensureTenantFeedInfrastructure() {
   if (tenantFeedInfrastructurePromise) return tenantFeedInfrastructurePromise
 
-  tenantFeedInfrastructurePromise = runWithSystemDbContext(async () => {
+  tenantFeedInfrastructurePromise = (async () => {
     await ensureTenantSettingsInfrastructure()
 
     await pool.query(`
@@ -93,10 +94,21 @@ async function ensureTenantFeedInfrastructure() {
        ON price_feed_source_history_1h(source_key, instrument, bucket_time DESC)`
     )
 
-    await pool.query(`ALTER TABLE tenant_price_feeds ADD COLUMN IF NOT EXISTS source_key TEXT`)
-    await pool.query(`ALTER TABLE tenant_price_feeds ADD COLUMN IF NOT EXISTS fallback_to_shared BOOLEAN NOT NULL DEFAULT TRUE`)
-    await pool.query(`ALTER TABLE tenant_price_feeds ADD COLUMN IF NOT EXISTS last_status TEXT`)
-    await pool.query(`ALTER TABLE tenant_price_feeds ADD COLUMN IF NOT EXISTS last_heartbeat_at TIMESTAMPTZ`)
+    // Single global feed config row — replaces the old per-tenant tenant_price_feeds table.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS price_feed_config (
+        feed_name TEXT PRIMARY KEY DEFAULT 'default',
+        feed_mode TEXT NOT NULL DEFAULT 'shared',
+        source_key TEXT NOT NULL DEFAULT 'shared',
+        dwx_path TEXT,
+        fallback_to_shared BOOLEAN NOT NULL DEFAULT TRUE,
+        spread_markup_points_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `)
 
     await pool.query(
       `INSERT INTO price_feed_sources (source_key, source_name, source_type, status, is_shared_default, metadata_json)
@@ -109,9 +121,9 @@ async function ensureTenantFeedInfrastructure() {
          updated_at = NOW()`,
       [SHARED_FEED_SOURCE_KEY]
     )
-  }).catch((error) => {
+  })().catch((error) => {
     tenantFeedInfrastructurePromise = null
-    logger.error('[tenant-feeds] Failed to ensure infrastructure:', { error: error.message })
+    logger.error('[price-feed-config] Failed to ensure infrastructure:', { error: error.message })
     throw error
   })
 
@@ -353,10 +365,18 @@ function buildPriceMap(rows = []) {
   )
 }
 
-async function getTenantPriceFeedConfig(tenantId) {
+// Returns the single global feed config (dedicated MT5 feed vs. shared feed,
+// spread markup). Kept as an async function returning a tenant-shaped object
+// (tenant_id always null) so downstream consumers didn't need restructuring.
+async function getTenantPriceFeedConfig() {
   await ensureTenantFeedInfrastructure()
-  const normalizedTenantId = parseInt(tenantId, 10)
-  if (!Number.isFinite(normalizedTenantId) || normalizedTenantId <= 0) {
+
+  const result = await pool.query(
+    `SELECT * FROM price_feed_config WHERE feed_name = 'default' AND is_active = TRUE LIMIT 1`
+  )
+
+  const row = result.rows[0]
+  if (!row) {
     return {
       tenant_id: null,
       feed_mode: 'shared',
@@ -367,30 +387,8 @@ async function getTenantPriceFeedConfig(tenantId) {
     }
   }
 
-  const result = await pool.query(
-    `SELECT *
-       FROM tenant_price_feeds
-      WHERE tenant_id = $1
-        AND is_active = TRUE
-      ORDER BY id ASC
-      LIMIT 1`,
-    [normalizedTenantId]
-  )
-
-  const row = result.rows[0]
-  if (!row) {
-    return {
-      tenant_id: normalizedTenantId,
-      feed_mode: 'shared',
-      source_key: SHARED_FEED_SOURCE_KEY,
-      fallback_to_shared: true,
-      effective_source_key: SHARED_FEED_SOURCE_KEY,
-      effective_feed_mode: 'shared'
-    }
-  }
-
   const feedMode = normalizeFeedMode(row.feed_mode, 'shared')
-  const sourceKey = String(row.source_key || row.feed_name || SHARED_FEED_SOURCE_KEY).trim().toLowerCase()
+  const sourceKey = String(row.source_key || SHARED_FEED_SOURCE_KEY).trim().toLowerCase()
   const fallbackToShared = row.fallback_to_shared !== false
   let effectiveSourceKey = feedMode === 'dedicated' ? sourceKey : SHARED_FEED_SOURCE_KEY
   let effectiveFeedMode = feedMode
@@ -409,7 +407,7 @@ async function getTenantPriceFeedConfig(tenantId) {
 
   return {
     ...row,
-    tenant_id: normalizedTenantId,
+    tenant_id: null,
     feed_mode: feedMode,
     source_key: sourceKey,
     fallback_to_shared: fallbackToShared,
@@ -418,30 +416,20 @@ async function getTenantPriceFeedConfig(tenantId) {
   }
 }
 
-async function upsertTenantPriceFeedConfig(clientOrPool, tenantId, config = {}) {
+async function upsertTenantPriceFeedConfig(clientOrPool, config = {}) {
   await ensureTenantFeedInfrastructure()
   const db = clientOrPool && typeof clientOrPool.query === 'function' ? clientOrPool : pool
-  const normalizedTenantId = parseInt(tenantId, 10)
-  if (!Number.isFinite(normalizedTenantId) || normalizedTenantId <= 0) {
-    throw new Error('Valid tenant_id is required for tenant price feed config')
-  }
 
   const existingConfigResult = await db.query(
-    `SELECT *
-       FROM tenant_price_feeds
-      WHERE tenant_id = $1
-        AND feed_name = $2
-      LIMIT 1`,
-    [normalizedTenantId, String(config.feed_name || 'default').trim() || 'default']
+    `SELECT * FROM price_feed_config WHERE feed_name = 'default' LIMIT 1`
   )
   const existingConfig = existingConfigResult.rows[0] || null
 
-  const feedName = String(config.feed_name || 'default').trim() || 'default'
   const feedMode = normalizeFeedMode(config.feed_mode, existingConfig?.feed_mode || 'shared')
   const sourceKey = String(
     config.source_key
     || existingConfig?.source_key
-    || (feedMode === 'dedicated' ? feedName : SHARED_FEED_SOURCE_KEY)
+    || (feedMode === 'dedicated' ? 'default' : SHARED_FEED_SOURCE_KEY)
   )
     .trim()
     .toLowerCase() || SHARED_FEED_SOURCE_KEY
@@ -471,15 +459,15 @@ async function upsertTenantPriceFeedConfig(clientOrPool, tenantId, config = {}) 
          status = 'active',
          metadata_json = COALESCE(price_feed_sources.metadata_json, '{}'::jsonb) || EXCLUDED.metadata_json,
          updated_at = NOW()`,
-      [sourceKey, String(config.source_name || `${feedName} Feed`).trim() || `${feedName} Feed`, dwxPath, JSON.stringify(metadataJson)]
+      [sourceKey, String(config.source_name || 'Dedicated Feed').trim() || 'Dedicated Feed', dwxPath, JSON.stringify(metadataJson)]
     )
   }
 
   await db.query(
-    `INSERT INTO tenant_price_feeds
-      (tenant_id, feed_name, feed_mode, dwx_path, spread_markup_points_json, is_active, metadata_json, source_key, fallback_to_shared, updated_at)
-     VALUES ($1, $2, $3, $4, $5::jsonb, TRUE, $6::jsonb, $7, $8, NOW())
-     ON CONFLICT (tenant_id, feed_name)
+    `INSERT INTO price_feed_config
+      (feed_name, feed_mode, dwx_path, spread_markup_points_json, is_active, metadata_json, source_key, fallback_to_shared, updated_at)
+     VALUES ('default', $1, $2, $3::jsonb, TRUE, $4::jsonb, $5, $6, NOW())
+     ON CONFLICT (feed_name)
      DO UPDATE SET
        feed_mode = EXCLUDED.feed_mode,
        dwx_path = EXCLUDED.dwx_path,
@@ -490,8 +478,6 @@ async function upsertTenantPriceFeedConfig(clientOrPool, tenantId, config = {}) 
        fallback_to_shared = EXCLUDED.fallback_to_shared,
        updated_at = NOW()`,
     [
-      normalizedTenantId,
-      feedName,
       feedMode,
       dwxPath,
       JSON.stringify(spreadMarkupPointsJson),

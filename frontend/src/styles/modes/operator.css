@@ -21,29 +21,14 @@
 }
 
 .mode-operator .admin-layout {
-  background:
-    radial-gradient(circle at top, rgba(var(--brand-primary-rgb), 0.08), transparent 28%),
-    linear-gradient(180deg, var(--color-bg-deep) 0%, #090d18 100%);
-}
-
-.mode-operator .admin-sidebar,
-.mode-operator .admin-topbar,
-.mode-operator .admin-card,
-.mode-operator .admin-table-card,
-.mode-operator .admin-dropdown {
-  box-shadow: var(--shadow-operator);
+  background: var(--paper);
 }
 
 .mode-operator .admin-topbar {
-  background: rgba(9, 14, 25, 0.86);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
 }
 
 .mode-operator .admin-nav-item.active {
-  box-shadow: inset 0 0 0 1px rgba(var(--brand-primary-rgb), 0.12);
-}
-
-.mode-operator .admin-card {
-  border-radius: var(--radius-xl);
+  box-shadow: inset 1px 0 0 0 var(--ink);
 }

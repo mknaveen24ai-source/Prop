@@ -7,8 +7,7 @@ const pool = require('../db')
 const logger = require('../utils/logger')
 const {
   authenticateAdmin,
-  requireAdminCapability,
-  requireTenantAdminOrSuperAdmin
+  requireAdminCapability
 } = require('./middleware')
 const {
   ensureCopierRuntimeInfrastructure
@@ -23,6 +22,7 @@ const {
   normalizeCopyMode,
   normalizeEntityId,
   normalizeFollowerStatus,
+  normalizeId,
   normalizeMasterAccountTypes,
   normalizeNewsFilter,
   normalizeNonNegativeNumber,
@@ -30,8 +30,6 @@ const {
   normalizeRiskMode,
   normalizeSessionFilter,
   normalizeStringArray,
-  normalizeTenantId,
-  resolveScopedTenantId,
   safeJsonParse,
   writeCopierEvent
 } = require('../utils/copierV2')
@@ -39,48 +37,6 @@ const {
 async function ensureCopierInfrastructure() {
   await ensureCopierRuntimeInfrastructure(pool)
   await ensureCopierV2Infrastructure(pool)
-}
-
-function isSuperAdmin(req) {
-  return String(req?.admin?.role || '') === 'super_admin'
-}
-
-function getTenantFilter(req, explicitTenantId = null) {
-  const tenantId = resolveScopedTenantId(req, explicitTenantId)
-  return {
-    tenantId,
-    isSuperAdmin: isSuperAdmin(req)
-  }
-}
-
-function requireScopedTenantId(req, explicitTenantId = null) {
-  const tenantId = resolveScopedTenantId(req, explicitTenantId)
-  if (!tenantId) {
-    const error = new Error('tenant_id is required')
-    error.statusCode = 400
-    throw error
-  }
-  return tenantId
-}
-
-function buildScopedWhereClause(req, explicitTenantId = null, startIndex = 1, alias = 'tenant_id') {
-  const { tenantId, isSuperAdmin: isRoot } = getTenantFilter(req, explicitTenantId)
-  if (!isRoot) {
-    return {
-      clause: `${alias} = $${startIndex}`,
-      values: [tenantId]
-    }
-  }
-  if (tenantId) {
-    return {
-      clause: `${alias} = $${startIndex}`,
-      values: [tenantId]
-    }
-  }
-  return {
-    clause: '1=1',
-    values: []
-  }
 }
 
 function parseFollowerPayload(body = {}) {
@@ -107,8 +63,8 @@ function parseFollowerPayload(body = {}) {
 
 function parseMappingPayload(body = {}) {
   return {
-    master_id: normalizeTenantId(body.master_id),
-    follower_id: normalizeTenantId(body.follower_id),
+    master_id: normalizeId(body.master_id),
+    follower_id: normalizeId(body.follower_id),
     is_enabled: normalizeBoolean(body.is_enabled, true),
     copy_mode_override: body.copy_mode_override ? normalizeCopyMode(body.copy_mode_override, 'mirror') : null,
     allowed_master_account_types: normalizeMasterAccountTypes(body.allowed_master_account_types, COPIER_ALLOWED_MASTER_ACCOUNT_TYPES),
@@ -118,7 +74,7 @@ function parseMappingPayload(body = {}) {
 
 function parseSymbolMappingPayload(body = {}) {
   return {
-    follower_id: normalizeTenantId(body.follower_id),
+    follower_id: normalizeId(body.follower_id),
     master_symbol: String(body.master_symbol || '').trim().toUpperCase().slice(0, 24),
     follower_symbol: String(body.follower_symbol || '').trim().toUpperCase().slice(0, 24),
     is_enabled: normalizeBoolean(body.is_enabled, true)
@@ -128,7 +84,6 @@ function parseSymbolMappingPayload(body = {}) {
 function serializeFollower(row) {
   return {
     id: row.id,
-    tenant_id: row.tenant_id,
     display_name: row.display_name,
     bridge_target_key: row.bridge_target_key,
     status: row.status,
@@ -159,11 +114,10 @@ function serializeFollower(row) {
   }
 }
 
-router.use(authenticateAdmin, requireTenantAdminOrSuperAdmin)
+router.use(authenticateAdmin)
 
 router.get('/copier/masters', requireAdminCapability('copier:read:scoped'), async (req, res) => {
   try {
-    const { clause, values } = buildScopedWhereClause(req, req.query.tenant_id, 1, 'm.tenant_id')
     const result = await pool.query(
       `SELECT
          m.*,
@@ -176,14 +130,11 @@ router.get('/copier/masters', requireAdminCapability('copier:read:scoped'), asyn
        FROM copier_masters m
        JOIN accounts a ON a.id::text = m.account_id
        LEFT JOIN users u ON u.id = a.user_id
-       WHERE ${clause}
-       ORDER BY m.created_at DESC`,
-      values
+       ORDER BY m.created_at DESC`
     )
 
     res.json(result.rows.map((row) => ({
       id: row.id,
-      tenant_id: row.tenant_id,
       account_id: row.account_id,
       label: row.label,
       is_enabled: row.is_enabled,
@@ -204,7 +155,6 @@ router.get('/copier/masters', requireAdminCapability('copier:read:scoped'), asyn
 
 router.post('/copier/masters', requireAdminCapability('copier:write:scoped'), async (req, res) => {
   try {
-    const tenantId = requireScopedTenantId(req, req.body.tenant_id)
     const accountId = normalizeEntityId(req.body.account_id)
     const label = String(req.body.label || '').trim().slice(0, 120) || null
     if (!accountId) {
@@ -212,28 +162,26 @@ router.post('/copier/masters', requireAdminCapability('copier:write:scoped'), as
     }
 
     const accountResult = await pool.query(
-      `SELECT id, tenant_id, account_type, status
+      `SELECT id, account_type, status
          FROM accounts
         WHERE id = $1
-          AND tenant_id = $2
         LIMIT 1`,
-      [accountId, tenantId]
+      [accountId]
     )
     if (accountResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Account not found in this tenant' })
+      return res.status(404).json({ error: 'Account not found' })
     }
 
     const result = await pool.query(
-      `INSERT INTO copier_masters (tenant_id, account_id, label, created_by_admin_id)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO copier_masters (account_id, label, created_by_admin_id)
+       VALUES ($1, $2, $3)
        ON CONFLICT (account_id)
        DO UPDATE SET
-         tenant_id = EXCLUDED.tenant_id,
          label = COALESCE(EXCLUDED.label, copier_masters.label),
          is_enabled = TRUE,
          updated_at = NOW()
        RETURNING *`,
-      [tenantId, accountId, label, req.admin?.adminId || null]
+      [accountId, label, req.admin?.adminId || null]
     )
 
     res.status(201).json(result.rows[0])
@@ -245,12 +193,11 @@ router.post('/copier/masters', requireAdminCapability('copier:write:scoped'), as
 
 router.patch('/copier/masters/:id', requireAdminCapability('copier:write:scoped'), async (req, res) => {
   try {
-    const masterId = normalizeTenantId(req.params.id)
+    const masterId = normalizeId(req.params.id)
     if (!masterId) {
       return res.status(400).json({ error: 'Invalid master id' })
     }
 
-    const tenantId = requireScopedTenantId(req, req.body.tenant_id || req.query.tenant_id)
     const updates = []
     const values = []
     let idx = 1
@@ -268,12 +215,11 @@ router.patch('/copier/masters/:id', requireAdminCapability('copier:write:scoped'
     }
 
     updates.push(`updated_at = NOW()`)
-    values.push(masterId, tenantId)
+    values.push(masterId)
     const result = await pool.query(
       `UPDATE copier_masters
           SET ${updates.join(', ')}
-        WHERE id = $${idx++}
-          AND tenant_id = $${idx}
+        WHERE id = $${idx}
       RETURNING *`,
       values
     )
@@ -290,13 +236,10 @@ router.patch('/copier/masters/:id', requireAdminCapability('copier:write:scoped'
 
 router.get('/copier/followers', requireAdminCapability('copier:read:scoped'), async (req, res) => {
   try {
-    const { clause, values } = buildScopedWhereClause(req, req.query.tenant_id, 1, 'f.tenant_id')
     const result = await pool.query(
       `SELECT f.*
          FROM copier_followers f
-        WHERE ${clause}
-        ORDER BY f.created_at DESC`,
-      values
+        ORDER BY f.created_at DESC`
     )
 
     res.json(result.rows.map(serializeFollower))
@@ -308,7 +251,6 @@ router.get('/copier/followers', requireAdminCapability('copier:read:scoped'), as
 
 router.post('/copier/followers', requireAdminCapability('copier:write:scoped'), async (req, res) => {
   try {
-    const tenantId = requireScopedTenantId(req, req.body.tenant_id)
     const follower = parseFollowerPayload(req.body)
 
     if (!follower.display_name || !follower.bridge_target_key) {
@@ -323,7 +265,6 @@ router.post('/copier/followers', requireAdminCapability('copier:write:scoped'), 
 
     const result = await pool.query(
       `INSERT INTO copier_followers (
-         tenant_id,
          display_name,
          bridge_target_key,
          status,
@@ -342,12 +283,11 @@ router.post('/copier/followers', requireAdminCapability('copier:write:scoped'), 
          equity_floor_amount,
          equity_floor_pct
        ) VALUES (
-         $1, $2, $3, $4, $5, $6, $7, $8, $9,
-         $10::jsonb, $11::jsonb, $12::jsonb, $13, $14, $15, $16, $17, $18
+         $1, $2, $3, $4, $5, $6, $7, $8,
+         $9::jsonb, $10::jsonb, $11::jsonb, $12, $13, $14, $15, $16, $17
        )
        RETURNING *`,
       [
-        tenantId,
         follower.display_name,
         follower.bridge_target_key,
         follower.status,
@@ -371,17 +311,16 @@ router.post('/copier/followers', requireAdminCapability('copier:write:scoped'), 
     res.status(201).json(serializeFollower(result.rows[0]))
   } catch (error) {
     logger.error('[copier/followers:create] error:', { error: error.message })
-    res.status(error.code === '23505' ? 409 : 500).json({ error: error.code === '23505' ? 'bridge_target_key already exists for this tenant' : 'Could not create copier follower' })
+    res.status(error.code === '23505' ? 409 : 500).json({ error: error.code === '23505' ? 'bridge_target_key already exists' : 'Could not create copier follower' })
   }
 })
 
 router.patch('/copier/followers/:id', requireAdminCapability('copier:write:scoped'), async (req, res) => {
   try {
-    const followerId = normalizeTenantId(req.params.id)
+    const followerId = normalizeId(req.params.id)
     if (!followerId) {
       return res.status(400).json({ error: 'Invalid follower id' })
     }
-    const tenantId = requireScopedTenantId(req, req.body.tenant_id || req.query.tenant_id)
     const follower = parseFollowerPayload(req.body)
     const updates = []
     const values = []
@@ -415,12 +354,11 @@ router.patch('/copier/followers/:id', requireAdminCapability('copier:write:scope
     }
 
     updates.push('updated_at = NOW()')
-    values.push(followerId, tenantId)
+    values.push(followerId)
     const result = await pool.query(
       `UPDATE copier_followers
           SET ${updates.join(', ')}
-        WHERE id = $${idx++}
-          AND tenant_id = $${idx}
+        WHERE id = $${idx}
       RETURNING *`,
       values
     )
@@ -437,16 +375,14 @@ router.patch('/copier/followers/:id', requireAdminCapability('copier:write:scope
 
 router.post('/copier/followers/:id/pause', requireAdminCapability('copier:write:scoped'), async (req, res) => {
   try {
-    const followerId = normalizeTenantId(req.params.id)
-    const tenantId = requireScopedTenantId(req, req.body?.tenant_id || req.query.tenant_id)
+    const followerId = normalizeId(req.params.id)
     const result = await pool.query(
       `UPDATE copier_followers
           SET status = 'paused',
               updated_at = NOW()
         WHERE id = $1
-          AND tenant_id = $2
       RETURNING *`,
-      [followerId, tenantId]
+      [followerId]
     )
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Copier follower not found' })
@@ -460,16 +396,14 @@ router.post('/copier/followers/:id/pause', requireAdminCapability('copier:write:
 
 router.post('/copier/followers/:id/resume', requireAdminCapability('copier:write:scoped'), async (req, res) => {
   try {
-    const followerId = normalizeTenantId(req.params.id)
-    const tenantId = requireScopedTenantId(req, req.body?.tenant_id || req.query.tenant_id)
+    const followerId = normalizeId(req.params.id)
     const result = await pool.query(
       `UPDATE copier_followers
           SET status = 'active',
               updated_at = NOW()
         WHERE id = $1
-          AND tenant_id = $2
       RETURNING *`,
-      [followerId, tenantId]
+      [followerId]
     )
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Copier follower not found' })
@@ -483,7 +417,6 @@ router.post('/copier/followers/:id/resume', requireAdminCapability('copier:write
 
 router.get('/copier/mappings', requireAdminCapability('copier:read:scoped'), async (req, res) => {
   try {
-    const { clause, values } = buildScopedWhereClause(req, req.query.tenant_id, 1, 'mf.tenant_id')
     const result = await pool.query(
       `SELECT
          mf.*,
@@ -494,14 +427,11 @@ router.get('/copier/mappings', requireAdminCapability('copier:read:scoped'), asy
        FROM copier_master_followers mf
        JOIN copier_masters m ON m.id = mf.master_id
        JOIN copier_followers f ON f.id = mf.follower_id
-       WHERE ${clause}
-       ORDER BY mf.created_at DESC`,
-      values
+       ORDER BY mf.created_at DESC`
     )
 
     res.json(result.rows.map((row) => ({
       id: row.id,
-      tenant_id: row.tenant_id,
       master_id: row.master_id,
       follower_id: row.follower_id,
       master_account_id: row.master_account_id,
@@ -523,33 +453,31 @@ router.get('/copier/mappings', requireAdminCapability('copier:read:scoped'), asy
 
 router.post('/copier/mappings', requireAdminCapability('copier:write:scoped'), async (req, res) => {
   try {
-    const tenantId = requireScopedTenantId(req, req.body.tenant_id)
     const mapping = parseMappingPayload(req.body)
     if (!mapping.master_id || !mapping.follower_id) {
       return res.status(400).json({ error: 'master_id and follower_id are required' })
     }
 
-    const ownershipResult = await pool.query(
+    const existsResult = await pool.query(
       `SELECT
-         (SELECT tenant_id FROM copier_masters WHERE id = $1) AS master_tenant_id,
-         (SELECT tenant_id FROM copier_followers WHERE id = $2) AS follower_tenant_id`,
+         (SELECT id FROM copier_masters WHERE id = $1) AS master_exists,
+         (SELECT id FROM copier_followers WHERE id = $2) AS follower_exists`,
       [mapping.master_id, mapping.follower_id]
     )
-    const ownership = ownershipResult.rows[0] || {}
-    if (Number(ownership.master_tenant_id || 0) !== tenantId || Number(ownership.follower_tenant_id || 0) !== tenantId) {
-      return res.status(400).json({ error: 'master_id and follower_id must belong to this tenant' })
+    const exists = existsResult.rows[0] || {}
+    if (!exists.master_exists || !exists.follower_exists) {
+      return res.status(400).json({ error: 'master_id and follower_id must reference existing records' })
     }
 
     const result = await pool.query(
       `INSERT INTO copier_master_followers (
-         tenant_id,
          master_id,
          follower_id,
          is_enabled,
          copy_mode_override,
          allowed_master_account_types_json,
          symbol_allowlist_json
-       ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb)
+       ) VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb)
        ON CONFLICT (master_id, follower_id)
        DO UPDATE SET
          is_enabled = EXCLUDED.is_enabled,
@@ -559,7 +487,6 @@ router.post('/copier/mappings', requireAdminCapability('copier:write:scoped'), a
          updated_at = NOW()
        RETURNING *`,
       [
-        tenantId,
         mapping.master_id,
         mapping.follower_id,
         mapping.is_enabled,
@@ -578,11 +505,10 @@ router.post('/copier/mappings', requireAdminCapability('copier:write:scoped'), a
 
 router.patch('/copier/mappings/:id', requireAdminCapability('copier:write:scoped'), async (req, res) => {
   try {
-    const mappingId = normalizeTenantId(req.params.id)
+    const mappingId = normalizeId(req.params.id)
     if (!mappingId) {
       return res.status(400).json({ error: 'Invalid mapping id' })
     }
-    const tenantId = requireScopedTenantId(req, req.body.tenant_id || req.query.tenant_id)
     const mapping = parseMappingPayload(req.body)
     const updates = []
     const values = []
@@ -602,12 +528,11 @@ router.patch('/copier/mappings/:id', requireAdminCapability('copier:write:scoped
     }
 
     updates.push('updated_at = NOW()')
-    values.push(mappingId, tenantId)
+    values.push(mappingId)
     const result = await pool.query(
       `UPDATE copier_master_followers
           SET ${updates.join(', ')}
-        WHERE id = $${idx++}
-          AND tenant_id = $${idx}
+        WHERE id = $${idx}
       RETURNING *`,
       values
     )
@@ -624,21 +549,17 @@ router.patch('/copier/mappings/:id', requireAdminCapability('copier:write:scoped
 
 router.get('/copier/symbol-mappings', requireAdminCapability('copier:read:scoped'), async (req, res) => {
   try {
-    const { clause, values } = buildScopedWhereClause(req, req.query.tenant_id, 1, 'sm.tenant_id')
     const result = await pool.query(
       `SELECT
          sm.*,
          f.display_name AS follower_display_name
        FROM copier_symbol_mappings sm
        JOIN copier_followers f ON f.id = sm.follower_id
-       WHERE ${clause}
-       ORDER BY sm.created_at DESC`,
-      values
+       ORDER BY sm.created_at DESC`
     )
 
     res.json(result.rows.map((row) => ({
       id: row.id,
-      tenant_id: row.tenant_id,
       follower_id: row.follower_id,
       follower_display_name: row.follower_display_name,
       master_symbol: row.master_symbol,
@@ -655,30 +576,29 @@ router.get('/copier/symbol-mappings', requireAdminCapability('copier:read:scoped
 
 router.post('/copier/symbol-mappings', requireAdminCapability('copier:write:scoped'), async (req, res) => {
   try {
-    const tenantId = requireScopedTenantId(req, req.body.tenant_id)
     const mapping = parseSymbolMappingPayload(req.body)
     if (!mapping.follower_id || !mapping.master_symbol || !mapping.follower_symbol) {
       return res.status(400).json({ error: 'follower_id, master_symbol, and follower_symbol are required' })
     }
 
     const followerResult = await pool.query(
-      `SELECT id FROM copier_followers WHERE id = $1 AND tenant_id = $2 LIMIT 1`,
-      [mapping.follower_id, tenantId]
+      `SELECT id FROM copier_followers WHERE id = $1 LIMIT 1`,
+      [mapping.follower_id]
     )
     if (followerResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Follower not found in this tenant' })
+      return res.status(404).json({ error: 'Follower not found' })
     }
 
     const result = await pool.query(
-      `INSERT INTO copier_symbol_mappings (tenant_id, follower_id, master_symbol, follower_symbol, is_enabled)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO copier_symbol_mappings (follower_id, master_symbol, follower_symbol, is_enabled)
+       VALUES ($1, $2, $3, $4)
        ON CONFLICT (follower_id, master_symbol)
        DO UPDATE SET
          follower_symbol = EXCLUDED.follower_symbol,
          is_enabled = EXCLUDED.is_enabled,
          updated_at = NOW()
        RETURNING *`,
-      [tenantId, mapping.follower_id, mapping.master_symbol, mapping.follower_symbol, mapping.is_enabled]
+      [mapping.follower_id, mapping.master_symbol, mapping.follower_symbol, mapping.is_enabled]
     )
 
     res.status(201).json(result.rows[0])
@@ -690,11 +610,10 @@ router.post('/copier/symbol-mappings', requireAdminCapability('copier:write:scop
 
 router.patch('/copier/symbol-mappings/:id', requireAdminCapability('copier:write:scoped'), async (req, res) => {
   try {
-    const symbolMappingId = normalizeTenantId(req.params.id)
+    const symbolMappingId = normalizeId(req.params.id)
     if (!symbolMappingId) {
       return res.status(400).json({ error: 'Invalid symbol mapping id' })
     }
-    const tenantId = requireScopedTenantId(req, req.body.tenant_id || req.query.tenant_id)
     const mapping = parseSymbolMappingPayload(req.body)
     const updates = []
     const values = []
@@ -717,12 +636,11 @@ router.patch('/copier/symbol-mappings/:id', requireAdminCapability('copier:write
     }
 
     updates.push(`updated_at = NOW()`)
-    values.push(symbolMappingId, tenantId)
+    values.push(symbolMappingId)
     const result = await pool.query(
       `UPDATE copier_symbol_mappings
           SET ${updates.join(', ')}
-        WHERE id = $${idx++}
-          AND tenant_id = $${idx}
+        WHERE id = $${idx}
       RETURNING *`,
       values
     )
@@ -739,10 +657,8 @@ router.patch('/copier/symbol-mappings/:id', requireAdminCapability('copier:write
 
 router.get('/copier/alerts', requireAdminCapability('copier:read:scoped'), async (req, res) => {
   try {
-    const { clause, values } = buildScopedWhereClause(req, req.query.tenant_id, 1)
     const result = await pool.query(
-      `SELECT * FROM copier_alert_endpoints WHERE ${clause} ORDER BY created_at DESC`,
-      values
+      `SELECT * FROM copier_alert_endpoints ORDER BY created_at DESC`
     )
     res.json(result.rows.map((row) => ({
       ...row,
@@ -756,7 +672,6 @@ router.get('/copier/alerts', requireAdminCapability('copier:read:scoped'), async
 
 router.post('/copier/alerts', requireAdminCapability('copier:write:scoped'), async (req, res) => {
   try {
-    const tenantId = requireScopedTenantId(req, req.body.tenant_id)
     const displayName = String(req.body.display_name || '').trim().slice(0, 120)
     const endpointType = String(req.body.endpoint_type || 'webhook').trim().toLowerCase()
     if (!displayName) {
@@ -764,11 +679,10 @@ router.post('/copier/alerts', requireAdminCapability('copier:write:scoped'), asy
     }
     const result = await pool.query(
       `INSERT INTO copier_alert_endpoints (
-         tenant_id, endpoint_type, display_name, target_url, secret, is_enabled, event_allowlist_json
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+         endpoint_type, display_name, target_url, secret, is_enabled, event_allowlist_json
+       ) VALUES ($1, $2, $3, $4, $5, $6::jsonb)
        RETURNING *`,
       [
-        tenantId,
         endpointType,
         displayName,
         req.body.target_url ? String(req.body.target_url).trim().slice(0, 500) : null,
@@ -786,8 +700,7 @@ router.post('/copier/alerts', requireAdminCapability('copier:write:scoped'), asy
 
 router.patch('/copier/alerts/:id', requireAdminCapability('copier:write:scoped'), async (req, res) => {
   try {
-    const alertId = normalizeTenantId(req.params.id)
-    const tenantId = requireScopedTenantId(req, req.body.tenant_id || req.query.tenant_id)
+    const alertId = normalizeId(req.params.id)
     const updates = []
     const values = []
     let idx = 1
@@ -804,12 +717,11 @@ router.patch('/copier/alerts/:id', requireAdminCapability('copier:write:scoped')
       return res.status(400).json({ error: 'No alert fields to update' })
     }
     updates.push('updated_at = NOW()')
-    values.push(alertId, tenantId)
+    values.push(alertId)
     const result = await pool.query(
       `UPDATE copier_alert_endpoints
           SET ${updates.join(', ')}
-        WHERE id = $${idx++}
-          AND tenant_id = $${idx}
+        WHERE id = $${idx}
       RETURNING *`,
       values
     )
@@ -825,20 +737,8 @@ router.patch('/copier/alerts/:id', requireAdminCapability('copier:write:scoped')
 
 router.get('/copier/health', requireAdminCapability('copier:read:scoped'), async (req, res) => {
   try {
-    const tenantId = resolveScopedTenantId(req, req.query.tenant_id)
-    const filters = []
-    const values = []
-    let idx = 1
-    if (tenantId) {
-      filters.push(`j.tenant_id = $${idx++}`)
-      values.push(tenantId)
-    }
-    const jobWhere = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : ''
-    const followerWhere = tenantId ? 'WHERE tenant_id = $1' : ''
-    const runtimeWhere = tenantId ? 'WHERE tenant_id = $1 OR tenant_id IS NULL' : ''
-
     const [runtimeResult, jobsResult, followerResult] = await Promise.all([
-      pool.query(`SELECT * FROM copier_runtime_status ${runtimeWhere} ORDER BY updated_at DESC LIMIT 5`, tenantId ? [tenantId] : []),
+      pool.query(`SELECT * FROM copier_runtime_status ORDER BY updated_at DESC LIMIT 5`),
       pool.query(
         `SELECT
            COUNT(*) FILTER (WHERE j.state IN ('pending','retry','sent'))::INT AS queue_depth,
@@ -852,9 +752,7 @@ router.get('/copier/health', requireAdminCapability('copier:read:scoped'), async
          LEFT JOIN copier_job_attempts a
            ON a.job_id = j.id
           AND a.delivery_status = 'acknowledged'
-          AND a.latency_ms IS NOT NULL
-         ${jobWhere}`,
-        values
+          AND a.latency_ms IS NOT NULL`
       ),
       pool.query(
         `SELECT
@@ -862,9 +760,7 @@ router.get('/copier/health', requireAdminCapability('copier:read:scoped'), async
            COUNT(*) FILTER (WHERE status = 'active')::INT AS active_followers,
            COUNT(*) FILTER (WHERE status = 'paused')::INT AS paused_followers,
            COUNT(*) FILTER (WHERE status = 'breached')::INT AS breached_followers
-         FROM copier_followers
-         ${followerWhere}`,
-        tenantId ? [tenantId] : []
+         FROM copier_followers`
       )
     ])
 
@@ -882,23 +778,8 @@ router.get('/copier/health', requireAdminCapability('copier:read:scoped'), async
        FROM copier_followers f
        LEFT JOIN copier_jobs j
          ON j.follower_id = f.id
-       ${tenantId ? 'WHERE f.tenant_id = $1' : ''}
        GROUP BY f.id, f.display_name
-       ORDER BY f.display_name ASC`,
-      tenantId ? [tenantId] : []
-    )
-
-    const perTenantStatus = await pool.query(
-      `SELECT
-         tenant_id,
-         COUNT(*)::INT AS follower_count,
-         COUNT(*) FILTER (WHERE status = 'active')::INT AS active_followers,
-         MAX(last_heartbeat_at) AS latest_follower_heartbeat
-       FROM copier_followers
-       ${tenantId ? 'WHERE tenant_id = $1' : ''}
-       GROUP BY tenant_id
-       ORDER BY tenant_id ASC`,
-      tenantId ? [tenantId] : []
+       ORDER BY f.display_name ASC`
     )
 
     res.json({
@@ -926,8 +807,7 @@ router.get('/copier/health', requireAdminCapability('copier:read:scoped'), async
         retry_last_hour: Number(jobs.retry_last_hour || 0),
         skipped_last_hour: Number(jobs.skipped_last_hour || 0)
       },
-      per_follower: perFollowerRates.rows,
-      per_tenant: perTenantStatus.rows
+      per_follower: perFollowerRates.rows
     })
   } catch (error) {
     logger.error('[copier/health] error:', { error: error.message })
@@ -937,24 +817,19 @@ router.get('/copier/health', requireAdminCapability('copier:read:scoped'), async
 
 router.get('/copier/jobs', requireAdminCapability('copier:read:scoped'), async (req, res) => {
   try {
-    const tenantId = resolveScopedTenantId(req, req.query.tenant_id)
     const conditions = []
     const values = []
     let idx = 1
-    if (tenantId) {
-      conditions.push(`j.tenant_id = $${idx++}`)
-      values.push(tenantId)
-    }
     if (req.query.state) {
       conditions.push(`j.state = $${idx++}`)
       values.push(String(req.query.state).trim().toLowerCase())
     }
     if (req.query.follower_id) {
       conditions.push(`j.follower_id = $${idx++}`)
-      values.push(normalizeTenantId(req.query.follower_id))
+      values.push(normalizeId(req.query.follower_id))
     }
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
-    const limit = Math.min(500, Math.max(1, normalizeTenantId(req.query.limit, 100) || 100))
+    const limit = Math.min(500, Math.max(1, normalizeId(req.query.limit, 100) || 100))
 
     const result = await pool.query(
       `SELECT
@@ -988,21 +863,16 @@ router.get('/copier/jobs', requireAdminCapability('copier:read:scoped'), async (
 
 router.get('/copier/dead-letters', requireAdminCapability('copier:read:scoped'), async (req, res) => {
   try {
-    const tenantId = resolveScopedTenantId(req, req.query.tenant_id)
     const conditions = [`j.state = 'dead'`]
     const values = []
     let idx = 1
 
-    if (tenantId) {
-      conditions.push(`j.tenant_id = $${idx++}`)
-      values.push(tenantId)
-    }
     if (req.query.follower_id) {
       conditions.push(`j.follower_id = $${idx++}`)
-      values.push(normalizeTenantId(req.query.follower_id))
+      values.push(normalizeId(req.query.follower_id))
     }
 
-    const limit = Math.min(500, Math.max(1, normalizeTenantId(req.query.limit, 100) || 100))
+    const limit = Math.min(500, Math.max(1, normalizeId(req.query.limit, 100) || 100))
     const result = await pool.query(
       `SELECT
          j.*,
@@ -1031,11 +901,10 @@ router.get('/copier/dead-letters', requireAdminCapability('copier:read:scoped'),
 
 router.post('/copier/jobs/:id/retry', requireAdminCapability('copier:write:scoped'), async (req, res) => {
   try {
-    const jobId = normalizeTenantId(req.params.id)
+    const jobId = normalizeId(req.params.id)
     if (!jobId) {
       return res.status(400).json({ error: 'Invalid job id' })
     }
-    const tenantId = resolveScopedTenantId(req, req.body?.tenant_id || req.query.tenant_id)
     const result = await pool.query(
       `UPDATE copier_jobs
           SET state = 'retry',
@@ -1044,9 +913,8 @@ router.post('/copier/jobs/:id/retry', requireAdminCapability('copier:write:scope
               last_error = NULL,
               updated_at = NOW()
         WHERE id = $1
-          ${tenantId ? 'AND tenant_id = $2' : ''}
       RETURNING *`,
-      tenantId ? [jobId, tenantId] : [jobId]
+      [jobId]
     )
 
     if (result.rows.length === 0) {
@@ -1061,17 +929,12 @@ router.post('/copier/jobs/:id/retry', requireAdminCapability('copier:write:scope
 
 router.get('/copier/reconciliation', requireAdminCapability('copier:read:scoped'), async (req, res) => {
   try {
-    const tenantId = resolveScopedTenantId(req, req.query.tenant_id)
     const values = []
     const conditions = []
     let idx = 1
-    if (tenantId) {
-      conditions.push(`m.tenant_id = $${idx++}`)
-      values.push(tenantId)
-    }
     if (req.query.follower_id) {
       conditions.push(`mf.follower_id = $${idx++}`)
-      values.push(normalizeTenantId(req.query.follower_id))
+      values.push(normalizeId(req.query.follower_id))
     }
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
 
@@ -1207,9 +1070,8 @@ router.get('/copier/reconciliation', requireAdminCapability('copier:read:scoped'
 
 router.post('/copier/reconciliation/resync', requireAdminCapability('copier:write:scoped'), async (req, res) => {
   try {
-    const tenantId = requireScopedTenantId(req, req.body.tenant_id || req.query.tenant_id)
     const action = String(req.body.action || '').trim().toLowerCase()
-    const followerId = normalizeTenantId(req.body.follower_id)
+    const followerId = normalizeId(req.body.follower_id)
     const masterTradeId = normalizeEntityId(req.body.master_trade_id)
 
     if (!['resync position', 'resync pending', 'sync sl/tp', 'requeue last actionable event', 'flatten orphan follower position'].includes(action)) {
@@ -1220,8 +1082,8 @@ router.post('/copier/reconciliation/resync', requireAdminCapability('copier:writ
     }
 
     const followerResult = await pool.query(
-      `SELECT * FROM copier_followers WHERE id = $1 AND tenant_id = $2 LIMIT 1`,
-      [followerId, tenantId]
+      `SELECT * FROM copier_followers WHERE id = $1 LIMIT 1`,
+      [followerId]
     )
     if (followerResult.rows.length === 0) {
       return res.status(404).json({ error: 'Follower not found' })
@@ -1242,14 +1104,13 @@ router.post('/copier/reconciliation/resync', requireAdminCapability('copier:writ
             SELECT j.id
               FROM copier_jobs j
               JOIN copier_events e ON e.id = j.event_id
-             WHERE j.tenant_id = $1
-               AND j.follower_id = $2
-               AND e.master_trade_id = $3
+             WHERE j.follower_id = $1
+               AND e.master_trade_id = $2
              ORDER BY j.created_at DESC
              LIMIT 1
           )
         RETURNING *`,
-        [tenantId, followerId, masterTradeId]
+        [followerId, masterTradeId]
       )
       if (jobResult.rows.length === 0) {
         return res.status(404).json({ error: 'No actionable copier job found for that follower/master trade' })
@@ -1260,13 +1121,11 @@ router.post('/copier/reconciliation/resync', requireAdminCapability('copier:writ
     const tradeResult = masterTradeId
       ? await pool.query(
           `SELECT t.id, t.account_id, t.instrument, t.direction, t.status, t.order_type, t.pending_price,
-                  t.open_price, t.stop_loss, t.take_profit, t.lot_size, a.tenant_id
+                  t.open_price, t.stop_loss, t.take_profit, t.lot_size
              FROM trades t
-             JOIN accounts a ON a.id = t.account_id
             WHERE t.id = $1
-              AND a.tenant_id = $2
             LIMIT 1`,
-          [masterTradeId, tenantId]
+          [masterTradeId]
         )
       : { rows: [] }
 
@@ -1320,13 +1179,11 @@ router.post('/copier/reconciliation/resync', requireAdminCapability('copier:writ
       const orphanEventResult = await pool.query(
         `SELECT e.master_id
            FROM copier_events e
-          WHERE e.tenant_id = $1
           ORDER BY e.created_at DESC
-          LIMIT 1`,
-        [tenantId]
+          LIMIT 1`
       )
       if (orphanEventResult.rows.length === 0) {
-        return res.status(400).json({ error: 'No copier master context exists yet for this tenant' })
+        return res.status(400).json({ error: 'No copier master context exists yet' })
       }
       eventType = 'CLOSE_POSITION'
       eventPayload = {
@@ -1337,34 +1194,31 @@ router.post('/copier/reconciliation/resync', requireAdminCapability('copier:writ
       }
       const syntheticEvent = await pool.query(
         `INSERT INTO copier_events (
-           tenant_id,
            master_id,
            master_account_id,
            master_trade_id,
            event_type,
            payload_json,
            dedupe_key
-         ) VALUES ($1, $2, 0, 0, $3, $4::jsonb, $5)
+         ) VALUES ($1, 0, 0, $2, $3::jsonb, $4)
          RETURNING *`,
-        [tenantId, orphanEventResult.rows[0].master_id, eventType, JSON.stringify(eventPayload), uuidv4()]
+        [orphanEventResult.rows[0].master_id, eventType, JSON.stringify(eventPayload), uuidv4()]
       )
 
       const latestMapping = await pool.query(
         `SELECT id
            FROM copier_master_followers
-          WHERE tenant_id = $1
-            AND follower_id = $2
+          WHERE follower_id = $1
             AND is_enabled = TRUE
           ORDER BY updated_at DESC
           LIMIT 1`,
-        [tenantId, followerId]
+        [followerId]
       )
       if (latestMapping.rows.length === 0) {
         return res.status(400).json({ error: 'No active copier mapping exists for this follower' })
       }
       const jobResult = await pool.query(
         `INSERT INTO copier_jobs (
-           tenant_id,
            event_id,
            follower_id,
            mapping_id,
@@ -1373,10 +1227,9 @@ router.post('/copier/reconciliation/resync', requireAdminCapability('copier:writ
            scheduled_at,
            expires_at,
            command_json
-         ) VALUES ($1, $2, $3, $4, $5, 'pending', NOW(), NOW() + INTERVAL '10 seconds', $6::jsonb)
+         ) VALUES ($1, $2, $3, $4, 'pending', NOW(), NOW() + INTERVAL '10 seconds', $5::jsonb)
          RETURNING *`,
         [
-          tenantId,
           syntheticEvent.rows[0].id,
           followerId,
           latestMapping.rows[0].id,
@@ -1388,7 +1241,6 @@ router.post('/copier/reconciliation/resync', requireAdminCapability('copier:writ
     }
 
     const createdEvent = await writeCopierEvent(pool, {
-      tenantId,
       masterAccountId: trade.account_id,
       masterTradeId: trade.id,
       eventType,

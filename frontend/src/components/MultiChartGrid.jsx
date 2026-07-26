@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createChart, CandlestickSeries } from 'lightweight-charts'
+import { createChart, BarSeries } from 'lightweight-charts'
 import api from '../services/api'
 import { useTheme } from '../ThemeContext'
 import { SUPPORTED_INSTRUMENTS } from '../utils/instruments'
@@ -15,43 +15,42 @@ const SESSION_SPECS = [
   { label: 'NEW YORK', hour: 13, color: '#fb7185' }
 ]
 
-function getTraderChartPalette(theme = 'dark') {
-  if (theme === 'light') {
-    return {
-      background: '#ffffff',
-      panelBg: 'rgba(255, 255, 255, 0.84)',
-      optionBg: '#ffffff',
-      paneBg: 'rgba(255, 255, 255, 0.92)',
-      paneBorder: 'rgba(37, 99, 235, 0.14)',
-      text: '#0f172a',
-      muted: '#64748b',
-      grid: 'rgba(15, 23, 42, 0.08)',
-      scaleBorder: 'rgba(15, 23, 42, 0.12)',
-      lineLabelBg: 'rgba(255, 255, 255, 0.96)',
-      toolbarButtonBg: 'rgba(15, 23, 42, 0.04)',
-      toolbarButtonBorder: 'rgba(15, 23, 42, 0.08)',
-      toolbarChipBg: 'rgba(37, 99, 235, 0.08)',
-      toolbarChipBorder: 'rgba(37, 99, 235, 0.14)',
-      shadow: '0 10px 24px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.72)'
-    }
-  }
+// Ledger Desk: resolve real CSS tokens at draw time (canvas can't read CSS
+// vars directly), so the chart re-themes with the page instead of carrying
+// its own hardcoded palette.
+function readToken(name, fallback) {
+  if (typeof document === 'undefined') return fallback
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return value || fallback
+}
+
+function getTraderChartPalette() {
+  const paper = readToken('--paper', '#161616')
+  const paper2 = readToken('--paper-2', '#1f1f1f')
+  const ink = readToken('--ink', '#e8e4d8')
+  const rule = readToken('--rule', '#3a3a3a')
+  const muted = readToken('--muted', '#8a8a82')
+  const gain = readToken('--gain', '#4ade80')
+  const loss = readToken('--loss', '#f87171')
 
   return {
-    background: '#090B0E',
-    panelBg: 'rgba(9, 11, 14, 0.84)',
-    optionBg: '#090B0E',
-    paneBg: 'rgba(13, 17, 23, 0.6)',
-    paneBorder: 'rgba(74, 144, 226, 0.12)',
-    text: '#E8ECF1',
-    muted: '#8B949E',
-    grid: 'rgba(255, 255, 255, 0.05)',
-    scaleBorder: 'rgba(255, 255, 255, 0.1)',
-    lineLabelBg: 'rgba(9, 11, 14, 0.92)',
-    toolbarButtonBg: 'rgba(255, 255, 255, 0.04)',
-    toolbarButtonBorder: 'rgba(255, 255, 255, 0.08)',
-    toolbarChipBg: 'rgba(255, 255, 255, 0.04)',
-    toolbarChipBorder: 'rgba(255, 255, 255, 0.08)',
-    shadow: '0 2px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.02)'
+    background: paper,
+    panelBg: paper,
+    optionBg: paper,
+    paneBg: paper,
+    paneBorder: rule,
+    text: ink,
+    muted,
+    grid: rule,
+    scaleBorder: rule,
+    lineLabelBg: paper,
+    toolbarButtonBg: paper2,
+    toolbarButtonBorder: rule,
+    toolbarChipBg: paper2,
+    toolbarChipBorder: rule,
+    shadow: 'none',
+    up: gain,
+    down: loss
   }
 }
 
@@ -120,7 +119,7 @@ function ChartPane({
   onInstrumentChange
 }) {
   const { theme } = useTheme()
-  const chartPalette = useMemo(() => getTraderChartPalette(theme), [theme])
+  const chartPalette = useMemo(() => getTraderChartPalette(), [theme])
   const chartContainerRef = useRef(null)
   const chartRef = useRef(null)
   const candleSeriesRef = useRef(null)
@@ -157,12 +156,12 @@ function ChartPane({
       }
     })
 
-    const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#00C899',
-      downColor: '#FF4757',
-      borderVisible: false,
-      wickUpColor: '#00C899',
-      wickDownColor: '#FF4757'
+    // Hand-ruled ink ticks (Ledger Desk spec) — stroke-only OHLC bars.
+    const candleSeries = chart.addSeries(BarSeries, {
+      upColor: chartPalette.up,
+      downColor: chartPalette.down,
+      openVisible: true,
+      thinBars: true
     })
 
     chartRef.current = chart
@@ -206,6 +205,10 @@ function ChartPane({
       rightPriceScale: {
         borderColor: chartPalette.scaleBorder
       }
+    })
+    candleSeriesRef.current?.applyOptions({
+      upColor: chartPalette.up,
+      downColor: chartPalette.down
     })
   }, [chartPalette])
 
@@ -391,7 +394,7 @@ export default function MultiChartGrid({
   onPrimaryInstrumentChange
 }) {
   const { theme } = useTheme()
-  const chartPalette = useMemo(() => getTraderChartPalette(theme), [theme])
+  const chartPalette = useMemo(() => getTraderChartPalette(), [theme])
   const [layoutSpec, setLayoutSpec] = useState(1)
   const [selectedTimeframe, setSelectedTimeframe] = useState(DEFAULT_CHART_TIMEFRAME)
   const [paneSymbols, setPaneSymbols] = useState(() => buildPaneSymbols(selectedInstrument, availableInstruments, 1))

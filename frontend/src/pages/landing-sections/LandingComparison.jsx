@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useBranding } from '../../BrandingContext';
-import { buildTenantPath } from '../../utils/tenant';
 
 const ROWS = [
   {
@@ -50,7 +49,7 @@ export default function LandingComparison() {
                 Traders compare firms before they register. This grid makes the difference obvious without shouting.
               </p>
             </div>
-            <Link to={buildTenantPath('/register')} className="mp-btn-secondary mp-comparison-cta">
+            <Link to="/register" className="mp-btn-secondary mp-comparison-cta">
               Start with {brandName}
             </Link>
           </div>

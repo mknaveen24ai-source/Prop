@@ -6,8 +6,7 @@ const {
   authenticateAdminPre2FA,
   buildAdminSessionPayload,
   requireAdminCapability,
-  requireSuperAdmin,
-  requireTenantAdminOrSuperAdmin
+  requireSuperAdmin
 } = require('./middleware')
 const jwt = require('jsonwebtoken')
 const bcrypt = require('bcryptjs')
@@ -39,8 +38,8 @@ const {
   enqueuePayoutRejectedEmail
 } = require('../utils/emailQueue')
 const { sanitizeString } = require('../utils/validation')
-const { DEFAULT_TENANT_SLUG } = require('../utils/tenants')
 const { fetchProgressionSettings, promotePassedAccount } = require('../services/progressionService')
+const { fetchStepModels, fetchStepModelBySlug, toggleStepModel } = require('../utils/stepModels')
 const { ensureViolationTables } = require('../services/violationEngine')
 const { getTenantSettings } = require('../services/tenantPolicyService')
 const { getPriceForTenant } = require('../priceFeed')
@@ -48,8 +47,7 @@ const { ensureDisputesInfrastructure } = require('./disputes')
 const { ensureChatTables } = require('./chat')
 const {
   ensureTenantSettingsInfrastructure,
-  getTenantSettingsMap,
-  upsertTenantSettings
+  getTenantSettingsMap
 } = require('../utils/tenantSettings')
 require('../loadEnv')
 
@@ -66,20 +64,10 @@ const adminLoginLimiter = rateLimit({
   skipSuccessfulRequests: true // don't count successful logins against the limit
 })
 
-const ADMIN_VALID_ACCOUNT_SIZES = [1000, 2000, 2500, 5000, 10000, 25000, 50000, 100000, 200000]
+const ADMIN_VALID_ACCOUNT_SIZES = [5000, 10000, 25000, 50000, 100000]
 
 let _featureTablesReady = false
 let _featureTablesPromise = null
-
-function getScopedTenantId(req) {
-  if (req.admin?.tenantId) {
-    return parseInt(req.admin.tenantId, 10) || null
-  }
-  if (req.tenant?.id && req.tenant?.slug && req.tenant.slug !== DEFAULT_TENANT_SLUG) {
-    return req.tenant.id
-  }
-  return null
-}
 
 function getAdminActorLabel(admin) {
   const role = String(admin?.role || 'admin')
@@ -92,8 +80,7 @@ function buildAdminActorPayload(admin) {
     admin_id: admin?.adminId || null,
     role: admin?.role || null,
     email: admin?.email || null,
-    full_name: admin?.full_name || null,
-    tenant_id: admin?.tenantId || null
+    full_name: admin?.full_name || null
   }
 }
 
@@ -179,7 +166,6 @@ function buildAdminJwtPayload(admin, overrides = {}) {
   return {
     role: admin?.role || 'super_admin',
     adminId: admin?.id || admin?.adminId || null,
-    tid: admin?.tenant_id || admin?.tenantId || null,
     atv: admin?.token_version || admin?.atv || 1,
     email: admin?.email || null,
     full_name: admin?.full_name || null,
@@ -204,15 +190,6 @@ function looksLikeDefaultSecret(value) {
     normalized.startsWith('propfirm_') ||
     normalized.includes('secret_key') ||
     normalized.length < 32
-}
-
-function quarantineLegacyGlobalAdminSurface(req, res, next) {
-  const delegatedAdminNamespaces = ['/copier', '/tenants', '/violations', '/kyc-sla', '/kyc-quality-flags', '/kyc/document']
-  const requestPath = String(req.path || '')
-  if (delegatedAdminNamespaces.some((prefix) => requestPath === prefix || requestPath.startsWith(`${prefix}/`))) {
-    return next()
-  }
-  return requireSuperAdmin(req, res, next)
 }
 
 function parsePositiveInteger(value, { fallback = null, min = 1, max = 365 } = {}) {
@@ -340,7 +317,7 @@ function buildSavedViewCapabilities(resource) {
   }
 }
 
-async function upsertAdminEntityMeta(client, { tenantId = null, entityType, entityId, patch = {} }) {
+async function upsertAdminEntityMeta(client, { entityType, entityId, patch = {} }) {
   const normalizedEntityType = normalizeEntityType(entityType)
   const normalizedEntityId = normalizeEntityId(entityId)
   const hasLinkedCaseId = Object.prototype.hasOwnProperty.call(patch, 'linked_case_id')
@@ -350,13 +327,12 @@ async function upsertAdminEntityMeta(client, { tenantId = null, entityType, enti
 
   const result = await client.query(
     `INSERT INTO admin_entity_meta
-      (tenant_id, entity_type, entity_id, owner_admin_id, priority, workflow_status, classification,
+      (entity_type, entity_id, owner_admin_id, priority, workflow_status, classification,
        risk_tier, status_reason, sla_state, linked_case_id, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, COALESCE($5, 'normal'), COALESCE($6, 'open'), $7,
-       COALESCE($8, 'low'), $9, $10, $11, NOW(), NOW())
+     VALUES ($1, $2, $3, COALESCE($4, 'normal'), COALESCE($5, 'open'), $6,
+       COALESCE($7, 'low'), $8, $9, $10, NOW(), NOW())
      ON CONFLICT (entity_type, entity_id)
      DO UPDATE SET
-       tenant_id = EXCLUDED.tenant_id,
        owner_admin_id = COALESCE(EXCLUDED.owner_admin_id, admin_entity_meta.owner_admin_id),
        priority = COALESCE(EXCLUDED.priority, admin_entity_meta.priority),
        workflow_status = COALESCE(EXCLUDED.workflow_status, admin_entity_meta.workflow_status),
@@ -364,11 +340,10 @@ async function upsertAdminEntityMeta(client, { tenantId = null, entityType, enti
        risk_tier = COALESCE(EXCLUDED.risk_tier, admin_entity_meta.risk_tier),
        status_reason = COALESCE(EXCLUDED.status_reason, admin_entity_meta.status_reason),
        sla_state = COALESCE(EXCLUDED.sla_state, admin_entity_meta.sla_state),
-       linked_case_id = CASE WHEN $12 THEN EXCLUDED.linked_case_id ELSE admin_entity_meta.linked_case_id END,
+       linked_case_id = CASE WHEN $11 THEN EXCLUDED.linked_case_id ELSE admin_entity_meta.linked_case_id END,
        updated_at = NOW()
      RETURNING *`,
     [
-      tenantId,
       normalizedEntityType,
       normalizedEntityId,
       patch.owner_admin_id || null,
@@ -391,7 +366,7 @@ function computePhaseEndDateForAccountType(accountType, settings = {}, baseDate 
   }
 
   const normalizedType = String(accountType || '').toLowerCase()
-  const days = normalizedType === 'phase2'
+  const days = (normalizedType === 'phase2' || normalizedType === 'phase3')
     ? parsePositiveInteger(settings.phase2_day_limit, { fallback: 30, min: 1, max: 3650 })
     : parsePositiveInteger(settings.phase1_day_limit, { fallback: 30, min: 1, max: 3650 })
 
@@ -405,7 +380,6 @@ function normalizeAccountSnapshot(account) {
   if (!account) return null
   return {
     id: account.id,
-    tenant_id: account.tenant_id || null,
     user_id: account.user_id,
     account_type: account.account_type,
     account_size: account.account_size,
@@ -427,7 +401,6 @@ function normalizeUserSnapshot(user) {
   if (!user) return null
   return {
     id: user.id,
-    tenant_id: user.tenant_id || null,
     email: user.email || null,
     full_name: user.full_name || null,
     is_banned: !!user.is_banned,
@@ -440,7 +413,6 @@ function normalizePayoutSnapshot(payout) {
   if (!payout) return null
   return {
     id: payout.id,
-    tenant_id: payout.tenant_id || null,
     user_id: payout.user_id || null,
     account_id: payout.account_id || null,
     status: payout.status || null,
@@ -456,7 +428,6 @@ function normalizeViolationSnapshot(violation) {
   if (!violation) return null
   return {
     id: violation.id,
-    tenant_id: violation.tenant_id || null,
     account_id: violation.account_id || null,
     user_id: violation.user_id || null,
     violation_type: violation.violation_type || null,
@@ -532,9 +503,9 @@ function buildAllowedViolationActions(violation) {
   return actions
 }
 
-async function fetchAccountForAdmin(client, accountId, tenantId = null, { forUpdate = false } = {}) {
+async function fetchAccountForAdmin(client, accountId, { forUpdate = false } = {}) {
   const result = await client.query(
-    `SELECT a.id, a.tenant_id, a.user_id, a.account_type, a.account_size,
+    `SELECT a.id, a.user_id, a.account_type, a.account_size,
             a.current_balance, a.starting_balance, a.peak_balance, a.status,
             a.max_drawdown_pct, a.profit_target, a.phase_start_date, a.phase_end_date,
             a.account_uid, a.review_flagged, a.review_flag_reason,
@@ -542,9 +513,8 @@ async function fetchAccountForAdmin(client, accountId, tenantId = null, { forUpd
        FROM accounts a
        JOIN users u ON u.id = a.user_id
       WHERE a.id = $1
-        AND ($2::bigint IS NULL OR COALESCE(a.tenant_id, u.tenant_id, $2) = $2)
       ${forUpdate ? 'FOR UPDATE' : ''}`,
-    [String(accountId), tenantId]
+    [String(accountId)]
   )
   return result.rows[0] || null
 }
@@ -554,39 +524,35 @@ function normalizeEntityId(value) {
   return normalized ? normalized.slice(0, 128) : null
 }
 
-async function fetchUserForAdmin(client, userId, tenantId = null, { forUpdate = false } = {}) {
+async function fetchUserForAdmin(client, userId, { forUpdate = false } = {}) {
   const result = await client.query(
-    `SELECT id, tenant_id, email, full_name, kyc_status, is_banned, token_version
+    `SELECT id, email, full_name, kyc_status, is_banned, token_version
        FROM users
        WHERE id = $1
-         AND ($2::bigint IS NULL OR COALESCE(tenant_id, $2) = $2)
       ${forUpdate ? 'FOR UPDATE' : ''}`,
-    [normalizeEntityId(userId), tenantId]
+    [normalizeEntityId(userId)]
   )
   return result.rows[0] || null
 }
 
-async function fetchPayoutForAdmin(client, payoutId, tenantId = null, { forUpdate = false } = {}) {
+async function fetchPayoutForAdmin(client, payoutId, { forUpdate = false } = {}) {
   const result = await client.query(
-    `SELECT p.id, p.tenant_id, p.user_id, p.account_id, p.amount_requested, p.amount_payable,
+    `SELECT p.id, p.user_id, p.account_id, p.amount_requested, p.amount_payable,
             p.status, p.is_flagged, p.flag_reason, p.admin_notes, p.requested_at,
             u.email, u.full_name
        FROM payouts p
        JOIN users u ON u.id = p.user_id
       WHERE p.id = $1
-        AND ($2::bigint IS NULL OR COALESCE(p.tenant_id, u.tenant_id, $2) = $2)
       ${forUpdate ? 'FOR UPDATE' : ''}`,
-    [parseInt(payoutId, 10), tenantId]
+    [parseInt(payoutId, 10)]
   )
   return result.rows[0] || null
 }
 
-async function emitSuperAdminPowerEvent(req, tenantId, payload = {}) {
-  const scopedTenantId = tenantId || null
+async function emitSuperAdminPowerEvent(req, payload = {}) {
   emitAdminEvent('admin_command_center_updated', {
-    ...payload,
-    tenant_id: scopedTenantId
-  }, scopedTenantId)
+    ...payload
+  })
 }
 
 function serializeCsv(rows, columns) {
@@ -605,7 +571,7 @@ function serializeCsv(rows, columns) {
   return [header, ...body].join('\n')
 }
 
-async function buildTraderListResult({ tenantId = null, query = {} } = {}) {
+async function buildTraderListResult({ query = {} } = {}) {
   const search = String(query.search || '').trim().toLowerCase()
   const page = Number.isFinite(query.page) ? query.page : 1
   const pageSize = Number.isFinite(query.pageSize) ? query.pageSize : 25
@@ -616,12 +582,6 @@ async function buildTraderListResult({ tenantId = null, query = {} } = {}) {
   const params = []
   const where = []
   let index = 1
-
-  if (tenantId) {
-    params.push(tenantId)
-    where.push(`COALESCE(u.tenant_id, $${index}) = $${index}`)
-    index += 1
-  }
 
   if (search) {
     params.push(`%${search}%`)
@@ -725,7 +685,6 @@ async function buildTraderListResult({ tenantId = null, query = {} } = {}) {
         u.id,
         u.id::text AS entity_id,
         'user'::text AS entity_type,
-        u.tenant_id,
         u.email,
         u.full_name,
         u.country,
@@ -856,7 +815,7 @@ async function buildTraderListResult({ tenantId = null, query = {} } = {}) {
   }
 }
 
-async function buildAccountListResult({ tenantId = null, query = {} } = {}) {
+async function buildAccountListResult({ query = {} } = {}) {
   const search = String(query.search || '').trim().toLowerCase()
   const page = Number.isFinite(query.page) ? query.page : 1
   const pageSize = Number.isFinite(query.pageSize) ? query.pageSize : 25
@@ -867,12 +826,6 @@ async function buildAccountListResult({ tenantId = null, query = {} } = {}) {
   const params = []
   const where = []
   let index = 1
-
-  if (tenantId) {
-    params.push(tenantId)
-    where.push(`COALESCE(a.tenant_id, u.tenant_id, $${index}) = $${index}`)
-    index += 1
-  }
 
   if (search) {
     params.push(`%${search}%`)
@@ -940,7 +893,6 @@ async function buildAccountListResult({ tenantId = null, query = {} } = {}) {
         a.id::text AS entity_id,
         'account'::text AS entity_type,
         a.user_id,
-        a.tenant_id,
         a.account_type,
         a.account_size,
         a.current_balance,
@@ -1080,7 +1032,7 @@ async function buildAccountListResult({ tenantId = null, query = {} } = {}) {
   }
 }
 
-async function buildPayoutListResult({ tenantId = null, query = {} } = {}) {
+async function buildPayoutListResult({ query = {} } = {}) {
   await ensureDisputesInfrastructure()
   const search = String(query.search || '').trim().toLowerCase()
   const page = Number.isFinite(query.page) ? query.page : 1
@@ -1092,12 +1044,6 @@ async function buildPayoutListResult({ tenantId = null, query = {} } = {}) {
   const params = []
   const where = []
   let index = 1
-
-  if (tenantId) {
-    params.push(tenantId)
-    where.push(`COALESCE(p.tenant_id, u.tenant_id, $${index}) = $${index}`)
-    index += 1
-  }
 
   if (search) {
     params.push(`%${search}%`)
@@ -1159,7 +1105,6 @@ async function buildPayoutListResult({ tenantId = null, query = {} } = {}) {
         p.id,
         p.id::text AS entity_id,
         'payout'::text AS entity_type,
-        p.tenant_id,
         p.user_id,
         p.account_id,
         p.amount_requested,
@@ -1222,10 +1167,6 @@ async function buildPayoutListResult({ tenantId = null, query = {} } = {}) {
           OR
           (p.account_id IS NULL AND CAST(d.user_id AS TEXT) = CAST(p.user_id AS TEXT))
         )
-          AND (
-            p.tenant_id IS NULL
-            OR COALESCE(d.tenant_id, p.tenant_id, u.tenant_id, p.tenant_id) = COALESCE(p.tenant_id, u.tenant_id, d.tenant_id)
-          )
         ORDER BY d.created_at DESC
         LIMIT 1
       ) dispute_link ON TRUE
@@ -1283,7 +1224,7 @@ async function buildPayoutListResult({ tenantId = null, query = {} } = {}) {
   }
 }
 
-async function createAdminIssuedAccount(client, { tenantId, userId, accountType, accountSize, settings, overrides = {} }) {
+async function createAdminIssuedAccount(client, { userId, accountType, accountSize, settings, overrides = {} }) {
   const normalizedType = String(accountType || 'phase1').toLowerCase()
   const size = parseInt(accountSize, 10)
   const startingBalance = size
@@ -1297,7 +1238,7 @@ async function createAdminIssuedAccount(client, { tenantId, userId, accountType,
     const pct = parseFloat(overrides.profit_target_pct || settings.phase1_profit_target_pct || '10')
     profitTarget = overrides.profit_target != null ? parseFloat(overrides.profit_target) : parseFloat((size * (pct / 100)).toFixed(2))
     maxDrawdownPct = overrides.max_drawdown_pct != null ? parseFloat(overrides.max_drawdown_pct) : parseFloat(settings.phase1_max_drawdown_pct || '10')
-  } else if (normalizedType === 'phase2') {
+  } else if (normalizedType === 'phase2' || normalizedType === 'phase3') {
     const pct = parseFloat(overrides.profit_target_pct || settings.phase2_profit_target_pct || '5')
     profitTarget = overrides.profit_target != null ? parseFloat(overrides.profit_target) : parseFloat((size * (pct / 100)).toFixed(2))
     maxDrawdownPct = overrides.max_drawdown_pct != null ? parseFloat(overrides.max_drawdown_pct) : parseFloat(settings.phase2_max_drawdown_pct || '5')
@@ -1312,16 +1253,15 @@ async function createAdminIssuedAccount(client, { tenantId, userId, accountType,
 
   const result = await client.query(
     `INSERT INTO accounts (
-       tenant_id, user_id, account_type, account_size, current_balance, starting_balance,
+       user_id, account_type, account_size, current_balance, starting_balance,
        peak_balance, profit_target, max_drawdown_pct, status, phase_start_date, phase_end_date, account_uid
      ) VALUES (
-       $1, $2, $3, $4, $5, $4, $6, $7, $8, 'active', NOW(), $9, $10
+       $1, $2, $3, $4, $3, $5, $6, $7, 'active', NOW(), $8, $9
      )
-     RETURNING id, tenant_id, user_id, account_type, account_size, current_balance, starting_balance,
+     RETURNING id, user_id, account_type, account_size, current_balance, starting_balance,
                peak_balance, profit_target, max_drawdown_pct, status, phase_start_date, phase_end_date,
                account_uid`,
     [
-      tenantId,
       userId,
       normalizedType,
       size,
@@ -1493,7 +1433,6 @@ async function runEnsureFeatureTables() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS admin_saved_views (
       id BIGSERIAL PRIMARY KEY,
-      tenant_id BIGINT,
       admin_id TEXT NOT NULL DEFAULT '',
       admin_role TEXT NOT NULL DEFAULT 'admin',
       resource TEXT NOT NULL,
@@ -1509,7 +1448,6 @@ async function runEnsureFeatureTables() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS admin_entity_meta (
       id BIGSERIAL PRIMARY KEY,
-      tenant_id BIGINT,
       entity_type TEXT NOT NULL,
       entity_id TEXT NOT NULL,
       owner_admin_id TEXT,
@@ -1525,12 +1463,11 @@ async function runEnsureFeatureTables() {
       UNIQUE (entity_type, entity_id)
     )
   `)
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_admin_entity_meta_type_tenant ON admin_entity_meta(entity_type, tenant_id, updated_at DESC)`)
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_admin_entity_meta_type_updated ON admin_entity_meta(entity_type, updated_at DESC)`)
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS admin_entity_tags (
       id BIGSERIAL PRIMARY KEY,
-      tenant_id BIGINT,
       entity_type TEXT NOT NULL,
       entity_id TEXT NOT NULL,
       tag TEXT NOT NULL,
@@ -1544,7 +1481,6 @@ async function runEnsureFeatureTables() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS admin_entity_notes (
       id BIGSERIAL PRIMARY KEY,
-      tenant_id BIGINT,
       entity_type TEXT NOT NULL,
       entity_id TEXT NOT NULL,
       note_text TEXT NOT NULL,
@@ -1612,18 +1548,12 @@ async function runEnsureFeatureTables() {
   await pool.query(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS review_flag_reason TEXT`)
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 1`)
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS kyc_rejection_reason TEXT`)
-  await pool.query(`ALTER TABLE payouts ADD COLUMN IF NOT EXISTS tenant_id BIGINT`)
   await pool.query(`ALTER TABLE payouts ADD COLUMN IF NOT EXISTS is_flagged BOOLEAN NOT NULL DEFAULT FALSE`)
   await pool.query(`ALTER TABLE payouts ADD COLUMN IF NOT EXISTS flag_reason TEXT`)
   await pool.query(`ALTER TABLE payouts ADD COLUMN IF NOT EXISTS admin_notes TEXT`)
-  await pool.query(`ALTER TABLE admin_enforcement_events ADD COLUMN IF NOT EXISTS tenant_id BIGINT`)
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_accounts_tenant_status_created ON accounts(tenant_id, status, created_at DESC)`)
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_tenant_created ON users(tenant_id, created_at DESC)`)
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_payouts_tenant_status_requested ON payouts(tenant_id, status, requested_at DESC)`)
-  await pool.query(`ALTER TABLE tenant_admins ADD COLUMN IF NOT EXISTS totp_temp_secret TEXT`)
-  await pool.query(`ALTER TABLE tenant_admins ADD COLUMN IF NOT EXISTS totp_backup_codes TEXT`)
-  await pool.query(`ALTER TABLE tenant_admins ADD COLUMN IF NOT EXISTS full_name TEXT`)
-  await pool.query(`ALTER TABLE tenant_admins ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ`)
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_accounts_status_created ON accounts(status, created_at DESC)`)
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_created ON users(created_at DESC)`)
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_payouts_status_requested ON payouts(status, requested_at DESC)`)
 
   _featureTablesReady = true
 }
@@ -1772,7 +1702,7 @@ async function forceCloseOpenTradesForAccount(client, accountId, options) {
   const localCopierEvents = []
   const copierEventsTarget = Array.isArray(options.copierEvents) ? options.copierEvents : localCopierEvents
   const openTrades = await client.query(
-    `SELECT t.*, a.tenant_id, a.user_id
+    `SELECT t.*, a.user_id
        FROM trades t
        JOIN accounts a ON a.id = t.account_id
       WHERE t.account_id = $1 AND t.status = 'open'
@@ -1789,7 +1719,7 @@ async function forceCloseOpenTradesForAccount(client, accountId, options) {
     const openPrice = parseFloat(t.open_price || 0)
     const lots = parseFloat(t.lot_size || 0)
     const fallbackPrice = openPrice
-    const livePrice = await getPriceForTenant(t.tenant_id || 1, t.instrument).catch(function() { return null })
+    const livePrice = await getPriceForTenant(t.instrument).catch(function() { return null })
     const currentPrice = t.direction === 'buy'
       ? parseFloat((livePrice && livePrice.bid) || fallbackPrice)
       : parseFloat((livePrice && livePrice.ask) || fallbackPrice)
@@ -1813,7 +1743,6 @@ async function forceCloseOpenTradesForAccount(client, accountId, options) {
       throw new Error('Failed to force-close trade ' + t.id)
     }
     queueAdminCopierEvent(copierEventsTarget, {
-      tenantId: t.tenant_id,
       masterAccountId: accountId,
       masterTradeId: t.id,
       eventType: 'CLOSE_POSITION',
@@ -1846,7 +1775,7 @@ async function forceCloseOpenTradesForAccount(client, accountId, options) {
 async function cancelPendingTradesForAccount(client, accountId, closeReason, options) {
   if (!options) options = {}
   const pendingTrades = await client.query(
-    `SELECT t.*, a.tenant_id
+    `SELECT t.*
        FROM trades t
        JOIN accounts a ON a.id = t.account_id
       WHERE t.account_id = $1 AND t.status = 'pending'
@@ -1870,7 +1799,6 @@ async function cancelPendingTradesForAccount(client, accountId, closeReason, opt
   for (var ti = 0; ti < pendingTrades.rows.length; ti++) {
     var trade = pendingTrades.rows[ti]
     queueAdminCopierEvent(options.copierEvents, {
-      tenantId: trade.tenant_id,
       masterAccountId: accountId,
       masterTradeId: trade.id,
       eventType: 'CANCEL_PENDING',
@@ -1889,7 +1817,7 @@ async function forceCloseTradeById(client, tradeId, closeReason, options) {
   if (!options) options = {}
   const result = await client.query(
     `SELECT t.id, t.account_id, t.instrument, t.direction, t.open_price, t.lot_size, t.commission,
-            a.user_id, a.tenant_id
+            a.user_id
        FROM trades t
        JOIN accounts a ON a.id = t.account_id
       WHERE t.id = $1 AND t.status = 'open'
@@ -1902,7 +1830,7 @@ async function forceCloseTradeById(client, tradeId, closeReason, options) {
   const trade = result.rows[0]
   const openPrice = parseFloat(trade.open_price || 0)
   const fallbackPrice = openPrice
-  const livePrice = await getPriceForTenant(trade.tenant_id || 1, trade.instrument).catch(function() { return null })
+  const livePrice = await getPriceForTenant(trade.instrument).catch(function() { return null })
   const closePrice = trade.direction === 'buy'
     ? parseFloat((livePrice && livePrice.bid) || fallbackPrice)
     : parseFloat((livePrice && livePrice.ask) || fallbackPrice)
@@ -1940,7 +1868,6 @@ async function forceCloseTradeById(client, tradeId, closeReason, options) {
   )
 
   queueAdminCopierEvent(options.copierEvents, {
-    tenantId: trade.tenant_id,
     masterAccountId: trade.account_id,
     masterTradeId: trade.id,
     eventType: 'CLOSE_POSITION',
@@ -1962,7 +1889,7 @@ async function forceCloseTradeById(client, tradeId, closeReason, options) {
     close_price: closePrice
   }
 }
-async function getExposureData(pool, tenantId = null) {
+async function getExposureData(pool) {
   const pricesResult = await pool.query('SELECT instrument, bid, ask FROM price_feed');
   const priceMap = {};
   pricesResult.rows.forEach(p => priceMap[p.instrument] = p);
@@ -1972,8 +1899,7 @@ async function getExposureData(pool, tenantId = null) {
     FROM trades t
     JOIN accounts a ON a.id = t.account_id
     WHERE t.status = 'open'
-      AND ($1::bigint IS NULL OR COALESCE(a.tenant_id, $1) = $1)
-  `, [tenantId]);
+  `);
 
   const exposureGroups = {};
   let total_open_trades = 0;
@@ -2025,91 +1951,10 @@ async function getExposureData(pool, tenantId = null) {
 // FIX (BUG-C3): adminLoginLimiter applied before the handler (defined above)
 router.post('/login', adminLoginLimiter, async function(req, res) {
   try {
-    if (req.tenant?.id && req.tenant?.slug !== DEFAULT_TENANT_SLUG && String(req.tenant.status || '').toLowerCase() !== 'active') {
-      return res.status(403).json({ error: 'This tenant portal is currently unavailable' })
-    }
     await ensureFeatureTables()
 
     const { email, password } = req.body
     const normalizedEmail = normalizeAdminEmail(email)
-    const tenantId = req.tenant?.id && req.tenant?.slug !== DEFAULT_TENANT_SLUG
-      ? req.tenant.id
-      : null
-    if (normalizedEmail && tenantId) {
-      await ensureTenantSettingsInfrastructure()
-      const tenantAdminResult = await pool.query(
-        `SELECT id, tenant_id, email, full_name, password_hash, role, status, token_version,
-                totp_enabled, totp_secret, totp_temp_secret, totp_backup_codes
-           FROM tenant_admins
-          WHERE tenant_id = $1
-            AND LOWER(email) = LOWER($2)
-          LIMIT 1`,
-        [tenantId, normalizedEmail]
-      )
-
-      if (tenantAdminResult.rows.length > 0) {
-        const tenantAdmin = tenantAdminResult.rows[0]
-        if (tenantAdmin.status !== 'active') {
-          return res.status(403).json({ error: 'Tenant admin account is inactive' })
-        }
-
-        const tenantPasswordOk = await bcrypt.compare(String(password || ''), tenantAdmin.password_hash)
-        if (!tenantPasswordOk) {
-          return res.status(401).json({ error: 'Invalid tenant admin credentials' })
-        }
-
-        if (tenantAdmin.totp_enabled && tenantAdmin.totp_secret) {
-          const pre2faToken = signAdminToken(
-            {
-              id: tenantAdmin.id,
-              tenant_id: tenantAdmin.tenant_id,
-              token_version: tenantAdmin.token_version || 1,
-              email: tenantAdmin.email,
-              full_name: tenantAdmin.full_name,
-              role: tenantAdmin.role || 'tenant_admin',
-              auth_source: 'tenant_admin'
-            },
-            { type: 'pre_2fa_admin' },
-            '5m'
-          )
-          return res.json({ requires2FA: true, pre2faToken, role: tenantAdmin.role || 'tenant_admin' })
-        }
-
-        const token = signAdminToken({
-          id: tenantAdmin.id,
-          tenant_id: tenantAdmin.tenant_id,
-          token_version: tenantAdmin.token_version || 1,
-          email: tenantAdmin.email,
-          full_name: tenantAdmin.full_name,
-          role: tenantAdmin.role || 'tenant_admin',
-          auth_source: 'tenant_admin'
-        })
-
-        await pool.query(
-          `UPDATE tenant_admins
-              SET last_login_at = NOW(),
-                  updated_at = NOW()
-            WHERE id = $1`,
-          [tenantAdmin.id]
-        )
-
-        setAdminCookie(res, token)
-
-        return res.json({
-          message: 'Tenant admin login successful',
-          token,
-          admin: {
-            id: tenantAdmin.id,
-            email: tenantAdmin.email,
-            full_name: tenantAdmin.full_name,
-            role: tenantAdmin.role || 'tenant_admin',
-            tenant_id: tenantAdmin.tenant_id,
-            auth_source: 'tenant_admin',
-            totp_enabled: !!tenantAdmin.totp_enabled
-          }
-        })
-      }
-    }
 
     const activePlatformAdminCount = await getActivePlatformAdminCount()
     const platformAdmin = normalizedEmail ? await getPlatformAdminByEmail(normalizedEmail) : null
@@ -2243,7 +2088,7 @@ router.post('/login', adminLoginLimiter, async function(req, res) {
         admin2faEnabled = true
         admin2faSecret  = s2fa.rows[0].value
       }
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     if (admin2faEnabled) {
       // Step 1 of 2 — password OK, but issue a short-lived pre_2fa_admin token
@@ -2299,38 +2144,12 @@ async function getAuthenticatedAdminRecord(admin) {
   if (String(admin.auth_source || '') === 'env_fallback' || !admin.adminId) {
     return null
   }
-  if (String(admin.role || '') === 'tenant_admin') {
-    await ensureTenantSettingsInfrastructure()
-    const result = await pool.query(
-      `SELECT id, tenant_id, email, full_name, password_hash, role, status, token_version,
-              totp_secret, totp_temp_secret, totp_backup_codes, totp_enabled, last_login_at
-         FROM tenant_admins
-        WHERE id = $1`,
-      [admin.adminId]
-    )
-    if (result.rows.length === 0) return null
-    return { ...result.rows[0], auth_source: 'tenant_admin' }
-  }
-
   const platformAdmin = await getPlatformAdminById(admin.adminId)
   return platformAdmin ? { ...platformAdmin, auth_source: 'platform_admin' } : null
 }
 
 async function getAdminRecordForPre2faSession(adminPre2fa) {
   if (!adminPre2fa?.adminId) return null
-  if (String(adminPre2fa.role || '') === 'tenant_admin') {
-    await ensureTenantSettingsInfrastructure()
-    const result = await pool.query(
-      `SELECT id, tenant_id, email, full_name, password_hash, role, status, token_version,
-              totp_secret, totp_temp_secret, totp_backup_codes, totp_enabled, last_login_at
-         FROM tenant_admins
-        WHERE id = $1`,
-      [adminPre2fa.adminId]
-    )
-    if (result.rows.length === 0) return null
-    return { ...result.rows[0], auth_source: 'tenant_admin' }
-  }
-
   const platformAdmin = await getPlatformAdminById(adminPre2fa.adminId)
   return platformAdmin ? { ...platformAdmin, auth_source: 'platform_admin' } : null
 }
@@ -2365,7 +2184,6 @@ function buildAdminSessionAdmin(record) {
   return {
     adminId: record.id || record.adminId || null,
     role: record.role || null,
-    tenantId: record.tenant_id || record.tenantId || null,
     email: record.email || null,
     full_name: record.full_name || null,
     auth_source: record.auth_source || null,
@@ -2380,25 +2198,6 @@ function sanitizePlatformAdminRecord(row) {
     email: row.email,
     full_name: row.full_name,
     role: row.role || 'super_admin',
-    status: row.status || 'active',
-    token_version: row.token_version || 1,
-    totp_enabled: !!row.totp_enabled,
-    last_login_at: row.last_login_at || null,
-    created_at: row.created_at || null,
-    updated_at: row.updated_at || null
-  }
-}
-
-function sanitizeTenantAdminAccessRecord(row) {
-  if (!row) return null
-  return {
-    id: row.id,
-    tenant_id: row.tenant_id,
-    tenant_name: row.tenant_name || null,
-    tenant_slug: row.tenant_slug || null,
-    email: row.email,
-    full_name: row.full_name,
-    role: row.role || 'tenant_admin',
     status: row.status || 'active',
     token_version: row.token_version || 1,
     totp_enabled: !!row.totp_enabled,
@@ -2423,7 +2222,6 @@ async function persistAdminSecurityFields(record, patch = {}) {
     last_login_at = null
   } = patch
 
-  const isTenantAdmin = String(record.auth_source || '') === 'tenant_admin' || String(record.role || '') === 'tenant_admin'
   const params = [
     record.id,
     totp_secret,
@@ -2436,25 +2234,6 @@ async function persistAdminSecurityFields(record, patch = {}) {
     full_name,
     last_login_at
   ]
-
-  if (isTenantAdmin) {
-    await pool.query(
-      `UPDATE tenant_admins
-          SET totp_secret = $2,
-              totp_temp_secret = $3,
-              totp_backup_codes = $4,
-              totp_enabled = $5,
-              token_version = COALESCE($6, token_version),
-              status = COALESCE($7, status),
-              password_hash = COALESCE($8, password_hash),
-              full_name = COALESCE($9, full_name),
-              last_login_at = COALESCE($10, last_login_at),
-              updated_at = NOW()
-        WHERE id = $1`,
-      params
-    )
-    return
-  }
 
   await pool.query(
     `UPDATE platform_admins
@@ -2516,7 +2295,7 @@ async function getLegacyAdminTokenVersion() {
          ON CONFLICT (key) DO NOTHING`
       )
     }
-  } catch (_) {}
+  } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
   return adminTokenVersion
 }
 
@@ -2524,27 +2303,16 @@ async function buildAdminSecurityStatus(currentAdmin) {
   await ensureFeatureTables()
   await ensureTenantSettingsInfrastructure()
 
-  const [platformResult, tenantResult] = await Promise.all([
-    pool.query(
-      `SELECT
-         COUNT(*)::int AS total,
-         COUNT(*) FILTER (WHERE status = 'active')::int AS active,
-         COUNT(*) FILTER (WHERE status = 'active' AND totp_enabled = TRUE)::int AS totp_enabled
-       FROM platform_admins`
-    ),
-    pool.query(
-      `SELECT
-         COUNT(*)::int AS total,
-         COUNT(*) FILTER (WHERE status = 'active')::int AS active,
-         COUNT(*) FILTER (WHERE status = 'active' AND totp_enabled = TRUE)::int AS totp_enabled
-       FROM tenant_admins`
-    )
-  ])
+  const platformResult = await pool.query(
+    `SELECT
+       COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE status = 'active')::int AS active,
+       COUNT(*) FILTER (WHERE status = 'active' AND totp_enabled = TRUE)::int AS totp_enabled
+     FROM platform_admins`
+  )
 
   const platformCounts = platformResult.rows[0] || {}
-  const tenantCounts = tenantResult.rows[0] || {}
   const activePlatformAdmins = parseInt(platformCounts.active || 0, 10) || 0
-  const activeTenantAdmins = parseInt(tenantCounts.active || 0, 10) || 0
 
   const base = {
     checked_at: new Date().toISOString(),
@@ -2552,7 +2320,6 @@ async function buildAdminSecurityStatus(currentAdmin) {
       admin_id: currentAdmin?.adminId || null,
       role: currentAdmin?.role || null,
       email: currentAdmin?.email || null,
-      tenant_id: currentAdmin?.tenantId || null,
       auth_source: currentAdmin?.auth_source || null,
       totp_enabled: currentAdmin?.totp_enabled === true
     },
@@ -2577,15 +2344,11 @@ async function buildAdminSecurityStatus(currentAdmin) {
       platform_admin_bootstrap_complete: activePlatformAdmins > 0,
       env_fallback_enabled: activePlatformAdmins === 0,
       platform_admin_count: parseInt(platformCounts.total || 0, 10) || 0,
-      active_platform_admin_count: activePlatformAdmins,
-      tenant_admin_count: parseInt(tenantCounts.total || 0, 10) || 0,
-      active_tenant_admin_count: activeTenantAdmins
+      active_platform_admin_count: activePlatformAdmins
     },
     totp: {
       platform_admins_enabled: parseInt(platformCounts.totp_enabled || 0, 10) || 0,
       platform_admins_total: activePlatformAdmins,
-      tenant_admins_enabled: parseInt(tenantCounts.totp_enabled || 0, 10) || 0,
-      tenant_admins_total: activeTenantAdmins,
       current_admin_totp_enabled: currentAdmin?.totp_enabled === true
     },
     secrets: {
@@ -2611,8 +2374,7 @@ router.get('/2fa/status', authenticateAdmin, async function(req, res) {
     const record = await getAuthenticatedAdminRecord(req.admin)
     res.json({
       ...getAdmin2faStatusPayload(req.admin, record),
-      email: req.admin?.email || null,
-      tenant_id: req.admin?.tenantId || null
+      email: req.admin?.email || null
     })
   } catch (err) {
     logger.error('[admin/2fa/status] error:', { error: err.message })
@@ -2693,7 +2455,7 @@ router.post('/2fa/verify-setup', authenticateAdmin, async function(req, res) {
         entityId: String(record.id),
         payload: { auth_source: record.auth_source || null }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     logger.info('[admin/2fa] Admin 2FA enabled', { adminId: record.id, role: req.admin?.role })
     res.json({
@@ -2750,12 +2512,11 @@ router.post('/2fa/validate', adminTwoFaValidateLimiter, authenticateAdminPre2FA,
 
     const fullToken = signAdminToken({
       id: record.id,
-      tenant_id: record.tenant_id || null,
       token_version: record.token_version || req.adminPre2fa.atv || 1,
       email: record.email,
       full_name: record.full_name,
-      role: record.role || (record.tenant_id ? 'tenant_admin' : 'super_admin'),
-      auth_source: record.auth_source || (record.tenant_id ? 'tenant_admin' : 'platform_admin')
+      role: record.role || 'super_admin',
+      auth_source: record.auth_source || 'platform_admin'
     })
 
     await persistAdminSecurityFields(record, {
@@ -2820,7 +2581,7 @@ router.post('/2fa/disable', authenticateAdmin, async function(req, res) {
         entityId: String(record.id),
         payload: { auth_source: record.auth_source || null }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     logger.info('[admin/2fa] Admin 2FA disabled')
     res.json({ message: 'Admin 2FA disabled' })
@@ -2848,28 +2609,19 @@ router.get('/admin-users', authenticateAdmin, requireSuperAdmin, async function(
     await ensureFeatureTables()
     await ensureTenantSettingsInfrastructure()
 
-    const [platformResult, tenantResult, securityStatus] = await Promise.all([
+    const [platformResult, securityStatus] = await Promise.all([
       pool.query(
         `SELECT id, email, full_name, role, status, token_version, totp_enabled,
                 last_login_at, created_at, updated_at
            FROM platform_admins
           ORDER BY created_at ASC`
       ),
-      pool.query(
-        `SELECT ta.id, ta.tenant_id, ta.email, ta.full_name, ta.role, ta.status, ta.token_version,
-                ta.totp_enabled, ta.last_login_at, ta.created_at, ta.updated_at,
-                t.name AS tenant_name, t.slug AS tenant_slug
-           FROM tenant_admins ta
-           JOIN tenants t ON t.id = ta.tenant_id
-          ORDER BY t.created_at ASC, ta.created_at ASC`
-      ),
       buildAdminSecurityStatus(req.admin)
     ])
 
     res.json({
       summary: securityStatus,
-      platform_admins: platformResult.rows.map(sanitizePlatformAdminRecord).filter(Boolean),
-      tenant_admins: tenantResult.rows.map(sanitizeTenantAdminAccessRecord).filter(Boolean)
+      platform_admins: platformResult.rows.map(sanitizePlatformAdminRecord).filter(Boolean)
     })
   } catch (err) {
     logger.error('[admin/admin-users] list error:', { error: err.message })
@@ -2912,7 +2664,7 @@ router.post('/admin-users', authenticateAdmin, requireSuperAdmin, async function
         entityId: String(insert.rows[0].id),
         payload: { email, role }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     res.status(201).json({
       message: 'Platform admin created',
@@ -2974,7 +2726,7 @@ router.patch('/admin-users/:id', authenticateAdmin, requireSuperAdmin, async fun
         entityId: adminId,
         payload: { status: nextStatus, full_name: nextFullName }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     res.json({
       message: 'Platform admin updated',
@@ -3017,7 +2769,7 @@ router.post('/admin-users/:id/reset-password', authenticateAdmin, requireSuperAd
         entityId: adminId,
         payload: { email: current.email }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     res.json({ message: 'Platform admin password reset successfully' })
   } catch (err) {
@@ -3051,7 +2803,7 @@ router.post('/admin-users/:id/revoke-sessions', authenticateAdmin, requireSuperA
         entityId: adminId,
         payload: { email: current.email }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     res.json({ message: 'Platform admin sessions revoked' })
   } catch (err) {
@@ -3098,7 +2850,7 @@ router.post('/admin-users/:id/disable', authenticateAdmin, requireSuperAdmin, as
         entityId: adminId,
         payload: { email: current.email }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     res.json({ message: 'Platform admin disabled' })
   } catch (err) {
@@ -3107,10 +2859,9 @@ router.post('/admin-users/:id/disable', authenticateAdmin, requireSuperAdmin, as
   }
 })
 
-router.get('/overview', authenticateAdmin, requireTenantAdminOrSuperAdmin, async function(req, res) {
+router.get('/overview', authenticateAdmin, async function(req, res) {
 
   try {
-    const tenantId = getScopedTenantId(req)
     const accounts = await pool.query(
       `SELECT
         COUNT(*) FILTER (WHERE status = 'active' AND account_type = 'phase1') AS phase1_active,
@@ -3119,9 +2870,7 @@ router.get('/overview', authenticateAdmin, requireTenantAdminOrSuperAdmin, async
         COUNT(*) FILTER (WHERE status = 'failed') AS total_failed,
         COUNT(*) FILTER (WHERE status = 'passed') AS total_passed,
         COUNT(*) FILTER (WHERE status = 'expired') AS total_expired
-       FROM accounts
-       WHERE ($1::bigint IS NULL OR COALESCE(tenant_id, $1) = $1)`,
-      [tenantId]
+       FROM accounts`
     )
 
     const users = await pool.query(
@@ -3129,9 +2878,7 @@ router.get('/overview', authenticateAdmin, requireTenantAdminOrSuperAdmin, async
         COUNT(*) AS total_users,
         COUNT(*) FILTER (WHERE kyc_status = 'pending') AS kyc_pending,
         COUNT(*) FILTER (WHERE kyc_status = 'approved') AS kyc_approved
-       FROM users
-       WHERE ($1::bigint IS NULL OR COALESCE(tenant_id, $1) = $1)`,
-      [tenantId]
+       FROM users`
     )
 
     const pnl = await pool.query(
@@ -3141,9 +2888,7 @@ router.get('/overview', authenticateAdmin, requireTenantAdminOrSuperAdmin, async
         COUNT(*) FILTER (WHERE t.status = 'closed') AS total_closed_trades,
         COUNT(*) FILTER (WHERE t.status = 'open') AS total_open_trades
        FROM trades t
-       JOIN accounts a ON a.id = t.account_id
-       WHERE ($1::bigint IS NULL OR COALESCE(a.tenant_id, $1) = $1)`,
-      [tenantId]
+       JOIN accounts a ON a.id = t.account_id`
     )
 
     const payouts = await pool.query(
@@ -3151,28 +2896,22 @@ router.get('/overview', authenticateAdmin, requireTenantAdminOrSuperAdmin, async
         COUNT(*) FILTER (WHERE status = 'pending') AS pending_payouts,
         COALESCE(SUM(amount_payable) FILTER (WHERE status = 'paid'), 0) AS total_paid_out
        FROM payouts p
-       JOIN users u ON u.id = p.user_id
-       WHERE ($1::bigint IS NULL OR COALESCE(u.tenant_id, $1) = $1)`,
-      [tenantId]
+       JOIN users u ON u.id = p.user_id`
     )
 
     const bannedUsers = await pool.query(
       `SELECT COUNT(*) as banned
        FROM users
-       WHERE is_banned = true
-         AND ($1::bigint IS NULL OR COALESCE(tenant_id, $1) = $1)`,
-      [tenantId]
+       WHERE is_banned = true`
     );
     const flaggedPayouts = await pool.query(
       `SELECT COUNT(*) as flagged
        FROM payouts p
        JOIN users u ON u.id = p.user_id
-       WHERE p.status = 'flagged'
-         AND ($1::bigint IS NULL OR COALESCE(u.tenant_id, $1) = $1)`,
-      [tenantId]
+       WHERE p.status = 'flagged'`
     );
 
-    const { exposureData } = await getExposureData(pool, tenantId);
+    const { exposureData } = await getExposureData(pool);
 
     res.json({
       accounts: {
@@ -3261,7 +3000,7 @@ router.post('/announcement', authenticateAdmin, requireSuperAdmin, async functio
         entityId: 'announcement',
         payload: { enabled, type, message_length: message.length }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     await client.query('COMMIT')
     res.json({ message, type, enabled, updated_at: updatedAt })
@@ -3276,7 +3015,6 @@ router.post('/announcement', authenticateAdmin, requireSuperAdmin, async functio
 
 router.get('/leaderboard', authenticateAdmin, requireSuperAdmin, async function(req, res) {
   try {
-    const tenantId = getScopedTenantId(req)
     const result = await pool.query(
       `
         WITH ranked_accounts AS (
@@ -3312,7 +3050,6 @@ router.get('/leaderboard', authenticateAdmin, requireSuperAdmin, async function(
           WHERE a.account_type = 'funded'
             AND a.status = 'active'
             AND COALESCE(u.is_banned, FALSE) = FALSE
-            AND ($1::bigint IS NULL OR COALESCE(u.tenant_id, a.tenant_id, $1) = $1)
         ),
         closed_trade_stats AS (
           SELECT
@@ -3330,7 +3067,6 @@ router.get('/leaderboard', authenticateAdmin, requireSuperAdmin, async function(
             ) AS win_rate
           FROM accounts a
           LEFT JOIN trades t ON t.account_id = a.id AND t.status = 'closed'
-          WHERE ($1::bigint IS NULL OR COALESCE(a.tenant_id, $1) = $1)
           GROUP BY a.user_id
         )
         SELECT
@@ -3351,8 +3087,7 @@ router.get('/leaderboard', authenticateAdmin, requireSuperAdmin, async function(
         WHERE r.rn = 1
         ORDER BY r.profit_pct DESC, r.profit_usd DESC, r.user_id ASC
         LIMIT 100
-      `,
-      [tenantId]
+      `
     )
 
     res.json(result.rows.map((row, index) => ({
@@ -3375,7 +3110,6 @@ router.get('/leaderboard', authenticateAdmin, requireSuperAdmin, async function(
 
 router.post('/leaderboard/visibility', authenticateAdmin, requireSuperAdmin, async function(req, res) {
   try {
-    const tenantId = getScopedTenantId(req)
     const userId = normalizeEntityId(req.body?.userId)
     if (!userId) {
       return res.status(400).json({ error: 'Valid userId is required' })
@@ -3386,9 +3120,8 @@ router.post('/leaderboard/visibility', authenticateAdmin, requireSuperAdmin, asy
       `UPDATE users
           SET leaderboard_visible = $1
         WHERE id = $2
-          AND ($3::bigint IS NULL OR COALESCE(tenant_id, $3) = $3)
         RETURNING id, leaderboard_visible`,
-      [visible, userId, tenantId]
+      [visible, userId]
     )
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Trader not found' })
@@ -3401,7 +3134,7 @@ router.post('/leaderboard/visibility', authenticateAdmin, requireSuperAdmin, asy
         entityId: String(userId),
         payload: { visible }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     res.json({
       userId,
@@ -3413,10 +3146,9 @@ router.post('/leaderboard/visibility', authenticateAdmin, requireSuperAdmin, asy
   }
 })
 
-router.get('/signup-trends', authenticateAdmin, requireTenantAdminOrSuperAdmin, async function(req, res) {
+router.get('/signup-trends', authenticateAdmin, async function(req, res) {
   try {
     const days = Math.min(parseInt(req.query.days) || 30, 90)
-    const tenantId = getScopedTenantId(req)
 
     const signupResult = await pool.query(
       `SELECT
@@ -3424,10 +3156,9 @@ router.get('/signup-trends', authenticateAdmin, requireTenantAdminOrSuperAdmin, 
          COUNT(*)::int AS signups
        FROM users
        WHERE created_at >= NOW() - ($1 || ' days')::interval
-         AND ($2::bigint IS NULL OR COALESCE(tenant_id, $2) = $2)
        GROUP BY day
        ORDER BY day ASC`,
-      [days, tenantId]
+      [days]
     )
 
     const challengeResult = await pool.query(
@@ -3437,10 +3168,9 @@ router.get('/signup-trends', authenticateAdmin, requireTenantAdminOrSuperAdmin, 
        FROM accounts
        WHERE account_type = 'phase1'
          AND created_at >= NOW() - ($1 || ' days')::interval
-         AND ($2::bigint IS NULL OR COALESCE(tenant_id, $2) = $2)
        GROUP BY day
        ORDER BY day ASC`,
-      [days, tenantId]
+      [days]
     )
 
     const signupMap = {}
@@ -3472,7 +3202,7 @@ router.get('/signup-trends', authenticateAdmin, requireTenantAdminOrSuperAdmin, 
   }
 })
 
-router.get('/saved-views', authenticateAdmin, requireTenantAdminOrSuperAdmin, async function(req, res) {
+router.get('/saved-views', authenticateAdmin, async function(req, res) {
   try {
     await ensureFeatureTables()
     const resource = String(req.query?.resource || '').trim().toLowerCase()
@@ -3480,16 +3210,14 @@ router.get('/saved-views', authenticateAdmin, requireTenantAdminOrSuperAdmin, as
       return res.status(400).json({ error: 'resource is required' })
     }
 
-    const tenantId = getScopedTenantId(req)
     const adminId = getAdminOwnerId(req.admin)
     const result = await pool.query(
-      `SELECT id, tenant_id, resource, name, config_json, is_default, created_at, updated_at
+      `SELECT id, resource, name, config_json, is_default, created_at, updated_at
        FROM admin_saved_views
        WHERE admin_id = $1
          AND resource = $2
-         AND tenant_id IS NOT DISTINCT FROM $3
        ORDER BY is_default DESC, updated_at DESC, id DESC`,
-      [adminId, resource, tenantId]
+      [adminId, resource]
     )
     res.json(result.rows)
   } catch (error) {
@@ -3498,7 +3226,7 @@ router.get('/saved-views', authenticateAdmin, requireTenantAdminOrSuperAdmin, as
   }
 })
 
-router.post('/saved-views', authenticateAdmin, requireTenantAdminOrSuperAdmin, async function(req, res) {
+router.post('/saved-views', authenticateAdmin, async function(req, res) {
   const client = await pool.connect()
   try {
     await ensureFeatureTables()
@@ -3506,7 +3234,6 @@ router.post('/saved-views', authenticateAdmin, requireTenantAdminOrSuperAdmin, a
     const name = String(req.body?.name || '').trim()
     const config = req.body?.config && typeof req.body.config === 'object' ? req.body.config : {}
     const isDefault = !!req.body?.is_default
-    const tenantId = getScopedTenantId(req)
     const adminId = getAdminOwnerId(req.admin)
 
     if (!resource) return res.status(400).json({ error: 'resource is required' })
@@ -3518,18 +3245,17 @@ router.post('/saved-views', authenticateAdmin, requireTenantAdminOrSuperAdmin, a
         `UPDATE admin_saved_views
             SET is_default = FALSE, updated_at = NOW()
           WHERE admin_id = $1
-            AND resource = $2
-            AND tenant_id IS NOT DISTINCT FROM $3`,
-        [adminId, resource, tenantId]
+            AND resource = $2`,
+        [adminId, resource]
       )
     }
 
     const result = await client.query(
       `INSERT INTO admin_saved_views
-        (tenant_id, admin_id, admin_role, resource, name, config_json, is_default, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, NOW(), NOW())
-       RETURNING id, tenant_id, resource, name, config_json, is_default, created_at, updated_at`,
-      [tenantId, adminId, req.admin?.role || 'admin', resource, name.slice(0, 120), JSON.stringify(config), isDefault]
+        (admin_id, admin_role, resource, name, config_json, is_default, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6, NOW(), NOW())
+       RETURNING id, resource, name, config_json, is_default, created_at, updated_at`,
+      [adminId, req.admin?.role || 'admin', resource, name.slice(0, 120), JSON.stringify(config), isDefault]
     )
     await client.query('COMMIT')
     res.status(201).json(result.rows[0])
@@ -3542,12 +3268,11 @@ router.post('/saved-views', authenticateAdmin, requireTenantAdminOrSuperAdmin, a
   }
 })
 
-router.patch('/saved-views/:id', authenticateAdmin, requireTenantAdminOrSuperAdmin, async function(req, res) {
+router.patch('/saved-views/:id', authenticateAdmin, async function(req, res) {
   const client = await pool.connect()
   try {
     await ensureFeatureTables()
     const id = parseInt(req.params.id, 10)
-    const tenantId = getScopedTenantId(req)
     const adminId = getAdminOwnerId(req.admin)
     if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: 'Valid saved view id is required' })
 
@@ -3555,9 +3280,8 @@ router.patch('/saved-views/:id', authenticateAdmin, requireTenantAdminOrSuperAdm
       `SELECT id, resource
        FROM admin_saved_views
        WHERE id = $1
-         AND admin_id = $2
-         AND tenant_id IS NOT DISTINCT FROM $3`,
-      [id, adminId, tenantId]
+         AND admin_id = $2`,
+      [id, adminId]
     )
     if (existing.rows.length === 0) return res.status(404).json({ error: 'Saved view not found' })
 
@@ -3571,9 +3295,8 @@ router.patch('/saved-views/:id', authenticateAdmin, requireTenantAdminOrSuperAdm
         `UPDATE admin_saved_views
             SET is_default = FALSE, updated_at = NOW()
           WHERE admin_id = $1
-            AND resource = $2
-            AND tenant_id IS NOT DISTINCT FROM $3`,
-        [adminId, existing.rows[0].resource, tenantId]
+            AND resource = $2`,
+        [adminId, existing.rows[0].resource]
       )
     }
 
@@ -3585,9 +3308,8 @@ router.patch('/saved-views/:id', authenticateAdmin, requireTenantAdminOrSuperAdm
               updated_at = NOW()
         WHERE id = $4
           AND admin_id = $5
-          AND tenant_id IS NOT DISTINCT FROM $6
-        RETURNING id, tenant_id, resource, name, config_json, is_default, created_at, updated_at`,
-      [name || null, config ? JSON.stringify(config) : null, isDefault, id, adminId, tenantId]
+        RETURNING id, resource, name, config_json, is_default, created_at, updated_at`,
+      [name || null, config ? JSON.stringify(config) : null, isDefault, id, adminId]
     )
     await client.query('COMMIT')
     res.json(result.rows[0])
@@ -3600,11 +3322,10 @@ router.patch('/saved-views/:id', authenticateAdmin, requireTenantAdminOrSuperAdm
   }
 })
 
-router.delete('/saved-views/:id', authenticateAdmin, requireTenantAdminOrSuperAdmin, async function(req, res) {
+router.delete('/saved-views/:id', authenticateAdmin, async function(req, res) {
   try {
     await ensureFeatureTables()
     const id = parseInt(req.params.id, 10)
-    const tenantId = getScopedTenantId(req)
     const adminId = getAdminOwnerId(req.admin)
     if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: 'Valid saved view id is required' })
 
@@ -3612,9 +3333,8 @@ router.delete('/saved-views/:id', authenticateAdmin, requireTenantAdminOrSuperAd
       `DELETE FROM admin_saved_views
         WHERE id = $1
           AND admin_id = $2
-          AND tenant_id IS NOT DISTINCT FROM $3
       RETURNING id`,
-      [id, adminId, tenantId]
+      [id, adminId]
     )
     if (result.rows.length === 0) return res.status(404).json({ error: 'Saved view not found' })
     res.json({ message: 'Saved view deleted' })
@@ -3624,7 +3344,7 @@ router.delete('/saved-views/:id', authenticateAdmin, requireTenantAdminOrSuperAd
   }
 })
 
-router.post('/tags/assign', authenticateAdmin, requireTenantAdminOrSuperAdmin, async function(req, res) {
+router.post('/tags/assign', authenticateAdmin, async function(req, res) {
   const client = await pool.connect()
   try {
     await ensureFeatureTables()
@@ -3632,7 +3352,6 @@ router.post('/tags/assign', authenticateAdmin, requireTenantAdminOrSuperAdmin, a
     const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(normalizeEntityId).filter(Boolean).slice(0, 100) : []
     const tags = Array.isArray(req.body?.tags) ? req.body.tags.map(normalizeAdminTag).filter(Boolean).slice(0, 20) : []
     const mode = String(req.body?.mode || 'add').trim().toLowerCase()
-    const tenantId = getScopedTenantId(req)
     const adminActor = getAdminActorLabel(req.admin)
 
     if (!entityType) return res.status(400).json({ error: 'Valid entity_type is required' })
@@ -3673,10 +3392,10 @@ router.post('/tags/assign', authenticateAdmin, requireTenantAdminOrSuperAdmin, a
       } else {
         for (const tag of tags) {
           await client.query(
-            `INSERT INTO admin_entity_tags (tenant_id, entity_type, entity_id, tag, created_by, created_at)
-             VALUES ($1, $2, $3, $4, $5, NOW())
+            `INSERT INTO admin_entity_tags (entity_type, entity_id, tag, created_by, created_at)
+             VALUES ($1, $2, $3, $4, NOW())
              ON CONFLICT (entity_type, entity_id, tag) DO NOTHING`,
-            [tenantId, entityType, entityId, tag, adminActor]
+            [entityType, entityId, tag, adminActor]
           )
         }
       }
@@ -3692,7 +3411,7 @@ router.post('/tags/assign', authenticateAdmin, requireTenantAdminOrSuperAdmin, a
   }
 })
 
-router.get('/notes', authenticateAdmin, requireTenantAdminOrSuperAdmin, async function(req, res) {
+router.get('/notes', authenticateAdmin, async function(req, res) {
   try {
     await ensureFeatureTables()
     const entityType = normalizeEntityType(req.query?.entity_type)
@@ -3702,7 +3421,7 @@ router.get('/notes', authenticateAdmin, requireTenantAdminOrSuperAdmin, async fu
     }
 
     const result = await pool.query(
-      `SELECT id, tenant_id, entity_type, entity_id, note_text, created_by, created_at
+      `SELECT id, entity_type, entity_id, note_text, created_by, created_at
        FROM admin_entity_notes
        WHERE entity_type = $1
          AND entity_id = $2
@@ -3717,14 +3436,13 @@ router.get('/notes', authenticateAdmin, requireTenantAdminOrSuperAdmin, async fu
   }
 })
 
-router.post('/notes', authenticateAdmin, requireTenantAdminOrSuperAdmin, async function(req, res) {
+router.post('/notes', authenticateAdmin, async function(req, res) {
   const client = await pool.connect()
   try {
     await ensureFeatureTables()
     const entityType = normalizeEntityType(req.body?.entity_type)
     const entityId = normalizeEntityId(req.body?.entity_id)
     const noteText = String(req.body?.note || '').trim()
-    const tenantId = getScopedTenantId(req)
     const createdBy = getAdminActorLabel(req.admin)
 
     if (!entityType || !entityId) return res.status(400).json({ error: 'Valid entity_type and entity_id are required' })
@@ -3732,10 +3450,10 @@ router.post('/notes', authenticateAdmin, requireTenantAdminOrSuperAdmin, async f
 
     const result = await client.query(
       `INSERT INTO admin_entity_notes
-        (tenant_id, entity_type, entity_id, note_text, created_by, created_at)
-       VALUES ($1, $2, $3, $4, $5, NOW())
-       RETURNING id, tenant_id, entity_type, entity_id, note_text, created_by, created_at`,
-      [tenantId, entityType, entityId, noteText.slice(0, 4000), createdBy]
+        (entity_type, entity_id, note_text, created_by, created_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       RETURNING id, entity_type, entity_id, note_text, created_by, created_at`,
+      [entityType, entityId, noteText.slice(0, 4000), createdBy]
     )
     res.status(201).json(result.rows[0])
   } catch (error) {
@@ -3746,14 +3464,13 @@ router.post('/notes', authenticateAdmin, requireTenantAdminOrSuperAdmin, async f
   }
 })
 
-router.post('/cases/link', authenticateAdmin, requireTenantAdminOrSuperAdmin, async function(req, res) {
+router.post('/cases/link', authenticateAdmin, async function(req, res) {
   const client = await pool.connect()
   try {
     await ensureFeatureTables()
     const entityType = normalizeEntityType(req.body?.entity_type)
     const entityId = normalizeEntityId(req.body?.entity_id)
     const caseId = req.body?.case_id == null || req.body?.case_id === '' ? null : parseInt(req.body.case_id, 10)
-    const tenantId = getScopedTenantId(req)
 
     if (!entityType || !entityId) return res.status(400).json({ error: 'Valid entity_type and entity_id are required' })
     if (caseId !== null) {
@@ -3762,7 +3479,6 @@ router.post('/cases/link', authenticateAdmin, requireTenantAdminOrSuperAdmin, as
     }
 
     const meta = await upsertAdminEntityMeta(client, {
-      tenantId,
       entityType,
       entityId,
       patch: { linked_case_id: caseId }
@@ -3776,13 +3492,12 @@ router.post('/cases/link', authenticateAdmin, requireTenantAdminOrSuperAdmin, as
   }
 })
 
-router.post('/entity-meta', authenticateAdmin, requireTenantAdminOrSuperAdmin, async function(req, res) {
+router.post('/entity-meta', authenticateAdmin, async function(req, res) {
   const client = await pool.connect()
   try {
     await ensureFeatureTables()
     const entityType = normalizeEntityType(req.body?.entity_type)
     const entityId = normalizeEntityId(req.body?.entity_id)
-    const tenantId = getScopedTenantId(req)
     if (!entityType || !entityId) {
       return res.status(400).json({ error: 'Valid entity_type and entity_id are required' })
     }
@@ -3798,7 +3513,7 @@ router.post('/entity-meta', authenticateAdmin, requireTenantAdminOrSuperAdmin, a
       linked_case_id: req.body?.linked_case_id ? parseInt(req.body.linked_case_id, 10) : null
     }
 
-    const meta = await upsertAdminEntityMeta(client, { tenantId, entityType, entityId, patch })
+    const meta = await upsertAdminEntityMeta(client, { entityType, entityId, patch })
     res.json({ message: 'Entity metadata updated', meta })
   } catch (error) {
     logger.error('Entity meta update error:', { error: error.message })
@@ -3820,7 +3535,7 @@ function buildAllowedEmailJobActions(job) {
   return actions
 }
 
-async function buildEmailJobListResult({ tenantId = null, query = {} } = {}) {
+async function buildEmailJobListResult({ query = {} } = {}) {
   await ensureEmailQueueInfrastructure()
 
   const search = String(query.search || '').trim().toLowerCase()
@@ -3832,12 +3547,6 @@ async function buildEmailJobListResult({ tenantId = null, query = {} } = {}) {
   const where = []
   const params = []
   let index = 1
-
-  if (tenantId !== null && tenantId !== undefined) {
-    params.push(tenantId)
-    where.push(`ej.tenant_id = $${index}`)
-    index += 1
-  }
 
   if (search) {
     params.push(`%${search}%`)
@@ -3887,7 +3596,6 @@ async function buildEmailJobListResult({ tenantId = null, query = {} } = {}) {
   const rowsResult = await pool.query(
     `SELECT
         ej.id,
-        ej.tenant_id,
         ej.user_id,
         ej.to_email,
         ej.template_key,
@@ -3994,10 +3702,9 @@ async function buildEmailJobListResult({ tenantId = null, query = {} } = {}) {
   }
 }
 
-router.post('/export', authenticateAdmin, requireTenantAdminOrSuperAdmin, async function(req, res) {
+router.post('/export', authenticateAdmin, async function(req, res) {
   try {
     await ensureFeatureTables()
-    const tenantId = getScopedTenantId(req)
     const resource = String(req.body?.resource || '').trim().toLowerCase()
     const query = {
       search: req.body?.search || '',
@@ -4011,7 +3718,7 @@ router.post('/export', authenticateAdmin, requireTenantAdminOrSuperAdmin, async 
     let result
     let columns
     if (resource === 'traders') {
-      result = await buildTraderListResult({ tenantId, query })
+      result = await buildTraderListResult({ query })
       columns = [
         { header: 'Trader ID', key: 'id' },
         { header: 'Email', key: 'email' },
@@ -4025,7 +3732,7 @@ router.post('/export', authenticateAdmin, requireTenantAdminOrSuperAdmin, async 
         { header: 'Created At', key: 'created_at' }
       ]
     } else if (resource === 'accounts') {
-      result = await buildAccountListResult({ tenantId, query })
+      result = await buildAccountListResult({ query })
       columns = [
         { header: 'Account ID', key: 'id' },
         { header: 'Trader Email', key: 'user_email' },
@@ -4039,7 +3746,7 @@ router.post('/export', authenticateAdmin, requireTenantAdminOrSuperAdmin, async 
         { header: 'Created At', key: 'created_at' }
       ]
     } else if (resource === 'payouts') {
-      result = await buildPayoutListResult({ tenantId, query })
+      result = await buildPayoutListResult({ query })
       columns = [
         { header: 'Payout ID', key: 'id' },
         { header: 'Trader Email', key: 'email' },
@@ -4053,10 +3760,9 @@ router.post('/export', authenticateAdmin, requireTenantAdminOrSuperAdmin, async 
         { header: 'Requested At', key: 'requested_at' }
       ]
     } else if (resource === 'email_jobs') {
-      result = await buildEmailJobListResult({ tenantId, query })
+      result = await buildEmailJobListResult({ query })
       columns = [
         { header: 'Job ID', key: 'id' },
-        { header: 'Tenant ID', key: 'tenant_id' },
         { header: 'Recipient', key: 'to_email' },
         { header: 'Template', key: 'template_key' },
         { header: 'Delivery Type', key: 'delivery_type' },
@@ -4075,10 +3781,6 @@ router.post('/export', authenticateAdmin, requireTenantAdminOrSuperAdmin, async 
       const where = []
       const params = []
 
-      if (tenantId !== null && tenantId !== undefined) {
-        params.push(tenantId)
-        where.push(`COALESCE(u.tenant_id, $${params.length}) = $${params.length}`)
-      }
       if (query.search) {
         params.push(`%${String(query.search).trim().toLowerCase()}%`)
         where.push(`(
@@ -4145,12 +3847,11 @@ router.post('/export', authenticateAdmin, requireTenantAdminOrSuperAdmin, async 
       ]
     } else if (resource === 'leaderboard') {
       const filters = query.filters || {}
-      const params = [tenantId]
+      const params = []
       const conditions = [
         `a.account_type = 'funded'`,
         `a.status = 'active'`,
-        `COALESCE(u.is_banned, FALSE) = FALSE`,
-        `($1::bigint IS NULL OR COALESCE(u.tenant_id, a.tenant_id, $1) = $1)`
+        `COALESCE(u.is_banned, FALSE) = FALSE`
       ]
 
       if (query.search) {
@@ -4218,7 +3919,6 @@ router.post('/export', authenticateAdmin, requireTenantAdminOrSuperAdmin, async 
               ) AS win_rate
             FROM accounts a
             LEFT JOIN trades t ON t.account_id = a.id AND t.status = 'closed'
-            WHERE ($1::bigint IS NULL OR COALESCE(a.tenant_id, $1) = $1)
             GROUP BY a.user_id
           )
           SELECT
@@ -4279,10 +3979,6 @@ router.post('/export', authenticateAdmin, requireTenantAdminOrSuperAdmin, async 
       ]
       const params = []
 
-      if (tenantId !== null && tenantId !== undefined) {
-        params.push(tenantId)
-        where.push(`COALESCE(a.tenant_id, $${params.length}) = $${params.length}`)
-      }
       if (query.search) {
         params.push(`%${String(query.search).trim().toLowerCase()}%`)
         where.push(`(
@@ -4340,10 +4036,6 @@ router.post('/export', authenticateAdmin, requireTenantAdminOrSuperAdmin, async 
       const conditions = []
       const values = []
 
-      if (tenantId !== null && tenantId !== undefined) {
-        values.push(tenantId)
-        conditions.push(`c.tenant_id = $${values.length}`)
-      }
       if (query.search) {
         values.push(`%${String(query.search).trim().toLowerCase()}%`)
         conditions.push(`(
@@ -4420,10 +4112,6 @@ router.post('/export', authenticateAdmin, requireTenantAdminOrSuperAdmin, async 
       const conditions = []
       const values = []
 
-      if (tenantId !== null && tenantId !== undefined) {
-        values.push(tenantId)
-        conditions.push(`COALESCE(tenant_id, $${values.length}) = $${values.length}`)
-      }
       if (query.search) {
         values.push(`%${String(query.search).trim().toLowerCase()}%`)
         conditions.push(`(
@@ -4483,10 +4171,6 @@ router.post('/export', authenticateAdmin, requireTenantAdminOrSuperAdmin, async 
       const conditions = []
       const values = []
 
-      if (tenantId !== null && tenantId !== undefined) {
-        values.push(tenantId)
-        conditions.push(`COALESCE(d.tenant_id, $${values.length}) = $${values.length}`)
-      }
       if (query.search) {
         values.push(`%${String(query.search).trim().toLowerCase()}%`)
         conditions.push(`(
@@ -4570,14 +4254,12 @@ router.post('/export', authenticateAdmin, requireTenantAdminOrSuperAdmin, async 
   }
 })
 
-router.get('/email-jobs', authenticateAdmin, requireTenantAdminOrSuperAdmin, async function(req, res) {
+router.get('/email-jobs', authenticateAdmin, async function(req, res) {
   try {
     await ensureFeatureTables()
     await ensureEmailQueueInfrastructure()
-    const tenantId = getScopedTenantId(req)
     const paging = parseListPaging(req)
     const listResult = await buildEmailJobListResult({
-      tenantId,
       query: {
         page: paging.page,
         pageSize: paging.pageSize,
@@ -4601,10 +4283,9 @@ router.get('/email-jobs', authenticateAdmin, requireTenantAdminOrSuperAdmin, asy
   }
 })
 
-router.post('/email-jobs/:jobId/retry', authenticateAdmin, requireTenantAdminOrSuperAdmin, async function(req, res) {
+router.post('/email-jobs/:jobId/retry', authenticateAdmin, async function(req, res) {
   try {
     await ensureEmailQueueInfrastructure()
-    const tenantId = getScopedTenantId(req)
     const jobId = parseInt(req.params.jobId, 10)
     if (!Number.isFinite(jobId) || jobId <= 0) {
       return res.status(400).json({ error: 'Valid email job id is required' })
@@ -4614,9 +4295,8 @@ router.post('/email-jobs/:jobId/retry', authenticateAdmin, requireTenantAdminOrS
       `SELECT id, status
          FROM email_jobs
         WHERE id = $1
-          AND ($2::bigint IS NULL OR tenant_id = $2)
         LIMIT 1`,
-      [jobId, tenantId]
+      [jobId]
     )
     if (lookup.rows.length === 0) {
       return res.status(404).json({ error: 'Email job not found' })
@@ -4647,10 +4327,8 @@ router.post('/email-jobs/:jobId/retry', authenticateAdmin, requireTenantAdminOrS
 router.get('/traders', authenticateAdmin, requireAdminCapability('trader:read'), async function(req, res) {
   try {
     await ensureFeatureTables()
-    const tenantId = getScopedTenantId(req)
     const paging = parseListPaging(req)
     const listResult = await buildTraderListResult({
-      tenantId,
       query: {
         search: req.query?.search || req.query?.q || '',
         page: paging.page,
@@ -4684,7 +4362,6 @@ router.post('/kyc/approve', authenticateAdmin, requireAdminCapability('kyc:revie
   try {
     // FIX (BUG-H1): Added user_id validation and immutable audit log
     const user_id = normalizeEntityId(req.body.user_id)
-    const tenantId = getScopedTenantId(req)
     if (!user_id) {
       return res.status(400).json({ error: 'Valid user_id is required' })
     }
@@ -4693,9 +4370,8 @@ router.post('/kyc/approve', authenticateAdmin, requireAdminCapability('kyc:revie
       `UPDATE users
        SET kyc_status = 'approved'
        WHERE id = $1
-         AND ($2::bigint IS NULL OR COALESCE(tenant_id, $2) = $2)
-       RETURNING id, email, full_name, tenant_id`,
-      [user_id, tenantId]
+       RETURNING id, email, full_name`,
+      [user_id]
     )
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' })
 
@@ -4706,11 +4382,10 @@ router.post('/kyc/approve', authenticateAdmin, requireAdminCapability('kyc:revie
         entityId: String(user_id),
         payload: { email: result.rows[0].email }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     // Send automated email to the user
     await enqueueKycApprovedEmail(result.rows[0].email, result.rows[0].full_name, {
-      tenantId: result.rows[0].tenant_id,
       userId: result.rows[0].id
     })
 
@@ -4726,7 +4401,6 @@ router.post('/kyc/reject', authenticateAdmin, requireAdminCapability('kyc:review
     // FIX (BUG-H1): Added user_id validation and immutable audit log
     const user_id = normalizeEntityId(req.body.user_id)
     const { reason } = req.body
-    const tenantId = getScopedTenantId(req)
     if (!user_id) {
       return res.status(400).json({ error: 'Valid user_id is required' })
     }
@@ -4735,9 +4409,8 @@ router.post('/kyc/reject', authenticateAdmin, requireAdminCapability('kyc:review
       `UPDATE users SET kyc_status = 'rejected'
        ${ reason ? `, kyc_rejection_reason = $2` : '' }
        WHERE id = $1
-         AND ($${reason ? 3 : 2}::bigint IS NULL OR COALESCE(tenant_id, $${reason ? 3 : 2}) = $${reason ? 3 : 2})
-       RETURNING id, email, full_name, tenant_id`,
-      reason ? [user_id, String(reason).slice(0, 500), tenantId] : [user_id, tenantId]
+       RETURNING id, email, full_name`,
+      reason ? [user_id, String(reason).slice(0, 500)] : [user_id]
     )
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' })
 
@@ -4748,11 +4421,10 @@ router.post('/kyc/reject', authenticateAdmin, requireAdminCapability('kyc:review
         entityId: String(user_id),
         payload: { email: result.rows[0].email, reason: reason || '' }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     // Send automated email to the user
     await enqueueKycRejectedEmail(result.rows[0].email, result.rows[0].full_name, reason, {
-      tenantId: result.rows[0].tenant_id,
       userId: result.rows[0].id
     })
 
@@ -4767,7 +4439,6 @@ router.post('/ban', authenticateAdmin, requireAdminCapability('trader:moderate:s
   try {
     // FIX (BUG-H1): Added user_id validation and immutable audit log
     const user_id = normalizeEntityId(req.body.user_id)
-    const tenantId = getScopedTenantId(req)
     if (!user_id) {
       return res.status(400).json({ error: 'Valid user_id is required' })
     }
@@ -4776,9 +4447,8 @@ router.post('/ban', authenticateAdmin, requireAdminCapability('trader:moderate:s
       `UPDATE users
        SET is_banned = true
        WHERE id = $1
-         AND ($2::bigint IS NULL OR COALESCE(tenant_id, $2) = $2)
        RETURNING id, email`,
-      [user_id, tenantId]
+      [user_id]
     )
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' })
 
@@ -4789,7 +4459,7 @@ router.post('/ban', authenticateAdmin, requireAdminCapability('trader:moderate:s
         entityId: String(user_id),
         payload: { email: result.rows[0].email }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     res.json({ message: 'Trader banned successfully' })
   } catch (error) {
@@ -4802,7 +4472,6 @@ router.post('/unban', authenticateAdmin, requireAdminCapability('trader:moderate
   try {
     // FIX (BUG-H1): Added user_id validation and immutable audit log
     const user_id = normalizeEntityId(req.body.user_id)
-    const tenantId = getScopedTenantId(req)
     if (!user_id) {
       return res.status(400).json({ error: 'Valid user_id is required' })
     }
@@ -4811,9 +4480,8 @@ router.post('/unban', authenticateAdmin, requireAdminCapability('trader:moderate
       `UPDATE users
        SET is_banned = false
        WHERE id = $1
-         AND ($2::bigint IS NULL OR COALESCE(tenant_id, $2) = $2)
        RETURNING id, email`,
-      [user_id, tenantId]
+      [user_id]
     )
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' })
 
@@ -4824,7 +4492,7 @@ router.post('/unban', authenticateAdmin, requireAdminCapability('trader:moderate
         entityId: String(user_id),
         payload: { email: result.rows[0].email }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     res.json({ message: 'Trader unbanned successfully' })
   } catch (error) {
@@ -4838,7 +4506,6 @@ router.post('/users/:userId/revoke-sessions', authenticateAdmin, requireAdminCap
   try {
     await ensureFeatureTables()
     const userId = normalizeEntityId(req.params.userId)
-    const tenantId = getScopedTenantId(req)
     const reason = requireReasonText(req.body?.reason)
 
     if (!userId) {
@@ -4846,7 +4513,7 @@ router.post('/users/:userId/revoke-sessions', authenticateAdmin, requireAdminCap
     }
 
     await client.query('BEGIN')
-    const user = await fetchUserForAdmin(client, userId, tenantId, { forUpdate: true })
+    const user = await fetchUserForAdmin(client, userId, { forUpdate: true })
     if (!user) {
       await client.query('ROLLBACK')
       return res.status(404).json({ error: 'User not found' })
@@ -4857,7 +4524,7 @@ router.post('/users/:userId/revoke-sessions', authenticateAdmin, requireAdminCap
       `UPDATE users
           SET token_version = COALESCE(token_version, 1) + 1
         WHERE id = $1
-        RETURNING id, tenant_id, email, full_name, kyc_status, is_banned, token_version`,
+        RETURNING id, email, full_name, kyc_status, is_banned, token_version`,
       [userId]
     )
     const updatedUser = result.rows[0]
@@ -4870,7 +4537,6 @@ router.post('/users/:userId/revoke-sessions', authenticateAdmin, requireAdminCap
       payload: {
         reason,
         actor: buildAdminActorPayload(req.admin),
-        tenant_scope: tenantId,
         before_snapshot: beforeSnapshot,
         after_snapshot: normalizeUserSnapshot(updatedUser)
       }
@@ -4885,7 +4551,7 @@ router.post('/users/:userId/revoke-sessions', authenticateAdmin, requireAdminCap
       })
     }
 
-    await emitSuperAdminPowerEvent(req, updatedUser.tenant_id || tenantId, {
+    await emitSuperAdminPowerEvent(req, {
       entity: 'user',
       entity_id: userId,
       action: 'revoke_sessions'
@@ -4910,7 +4576,6 @@ router.post('/users/:userId/manual-account', authenticateAdmin, requireAdminCapa
   try {
     await ensureFeatureTables()
     const userId = normalizeEntityId(req.params.userId)
-    const tenantId = getScopedTenantId(req)
     const reason = requireReasonText(req.body?.reason)
     const accountType = String(req.body?.account_type || 'phase1').trim().toLowerCase()
     const accountSize = parseInt(req.body?.account_size, 10)
@@ -4918,21 +4583,21 @@ router.post('/users/:userId/manual-account', authenticateAdmin, requireAdminCapa
     if (!userId) {
       return res.status(400).json({ error: 'Valid user id is required' })
     }
-    if (!['phase1', 'phase2', 'funded'].includes(accountType)) {
-      return res.status(400).json({ error: 'account_type must be phase1, phase2, or funded' })
+    if (!['phase1', 'phase2', 'phase3', 'funded'].includes(accountType)) {
+      return res.status(400).json({ error: 'account_type must be phase1, phase2, phase3, or funded' })
     }
     if (!Number.isFinite(accountSize) || !ADMIN_VALID_ACCOUNT_SIZES.includes(accountSize)) {
       return res.status(400).json({ error: `account_size must be one of: ${ADMIN_VALID_ACCOUNT_SIZES.join(', ')}` })
     }
 
     await client.query('BEGIN')
-    const user = await fetchUserForAdmin(client, userId, tenantId, { forUpdate: true })
+    const user = await fetchUserForAdmin(client, userId, { forUpdate: true })
     if (!user) {
       await client.query('ROLLBACK')
       return res.status(404).json({ error: 'User not found' })
     }
 
-    const settings = await getTenantSettings(user.tenant_id || tenantId || 1, [
+    const settings = await getTenantSettings([
       'phase1_day_limit',
       'phase2_day_limit',
       'phase1_profit_target_pct',
@@ -4943,7 +4608,6 @@ router.post('/users/:userId/manual-account', authenticateAdmin, requireAdminCapa
     ])
 
     const account = await createAdminIssuedAccount(client, {
-      tenantId: user.tenant_id || tenantId || 1,
       userId,
       accountType,
       accountSize,
@@ -4958,7 +4622,6 @@ router.post('/users/:userId/manual-account', authenticateAdmin, requireAdminCapa
       payload: {
         reason,
         actor: buildAdminActorPayload(req.admin),
-        tenant_scope: tenantId,
         issued_for_user: normalizeUserSnapshot(user),
         after_snapshot: normalizeAccountSnapshot(account),
         bypassed_account_limits: true
@@ -4978,7 +4641,7 @@ router.post('/users/:userId/manual-account', authenticateAdmin, requireAdminCapa
       })
     }
 
-    await emitSuperAdminPowerEvent(req, account.tenant_id || tenantId, {
+    await emitSuperAdminPowerEvent(req, {
       entity: 'account',
       entity_id: account.id,
       action: 'manual_account'
@@ -5002,10 +4665,8 @@ router.post('/users/:userId/manual-account', authenticateAdmin, requireAdminCapa
 router.get('/accounts', authenticateAdmin, requireAdminCapability('account:read:scoped'), async function(req, res) {
   try {
     await ensureFeatureTables()
-    const tenantId = getScopedTenantId(req)
     const paging = parseListPaging(req)
     const listResult = await buildAccountListResult({
-      tenantId,
       query: {
         search: req.query?.search || req.query?.q || '',
         page: paging.page,
@@ -5039,7 +4700,6 @@ router.post('/accounts/:accountId/adjust-balance', authenticateAdmin, requireAdm
     const accountId = String(req.params.accountId || '').trim()
     const amount = parseFloat(req.body?.amount)
     const reason = requireReasonText(req.body?.reason)
-    const tenantId = getScopedTenantId(req)
 
     if (!accountId) return res.status(400).json({ error: 'Valid account id is required' })
     if (!Number.isFinite(amount) || amount === 0) {
@@ -5047,7 +4707,7 @@ router.post('/accounts/:accountId/adjust-balance', authenticateAdmin, requireAdm
     }
 
     await client.query('BEGIN')
-    const account = await fetchAccountForAdmin(client, accountId, tenantId, { forUpdate: true })
+    const account = await fetchAccountForAdmin(client, accountId, { forUpdate: true })
     if (!account) {
       await client.query('ROLLBACK')
       return res.status(404).json({ error: 'Account not found' })
@@ -5060,7 +4720,7 @@ router.post('/accounts/:accountId/adjust-balance', authenticateAdmin, requireAdm
               peak_balance = GREATEST(peak_balance, current_balance + $1),
               updated_at = NOW()
         WHERE id = $2
-        RETURNING id, tenant_id, user_id, account_type, current_balance, starting_balance,
+        RETURNING id, user_id, account_type, current_balance, starting_balance,
                   peak_balance, status, profit_target, max_drawdown_pct, phase_start_date,
                   phase_end_date, account_uid, review_flagged, review_flag_reason`,
       [amount, account.id]
@@ -5090,12 +4750,11 @@ router.post('/accounts/:accountId/adjust-balance', authenticateAdmin, requireAdm
           amount,
           reason,
           actor: buildAdminActorPayload(req.admin),
-          tenant_scope: tenantId,
           before_snapshot: beforeSnapshot,
           after_snapshot: normalizeAccountSnapshot(updated.rows[0])
         }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     await client.query('COMMIT')
 
@@ -5111,7 +4770,7 @@ router.post('/accounts/:accountId/adjust-balance', authenticateAdmin, requireAdm
       })
     }
 
-    await emitSuperAdminPowerEvent(req, updated.rows[0].tenant_id || tenantId, {
+    await emitSuperAdminPowerEvent(req, {
       entity: 'account',
       entity_id: account.id,
       action: 'adjust_balance'
@@ -5142,21 +4801,19 @@ router.post('/accounts/:accountId/override', authenticateAdmin, requireAdminCapa
       min: 1,
       max: 365
     })
-    const tenantId = getScopedTenantId(req)
 
     if (!accountId) return res.status(400).json({ error: 'Valid account id is required' })
     if (!action) return res.status(400).json({ error: 'action is required' })
 
     await client.query('BEGIN')
-    const account = await fetchAccountForAdmin(client, accountId, tenantId, { forUpdate: true })
+    const account = await fetchAccountForAdmin(client, accountId, { forUpdate: true })
     if (!account) {
       await client.query('ROLLBACK')
       return res.status(404).json({ error: 'Account not found' })
     }
 
     const beforeSnapshot = normalizeAccountSnapshot(account)
-    const normalizedTenantId = account.tenant_id || tenantId || 1
-    const tenantSettings = await getTenantSettings(normalizedTenantId, [
+    const platformSettings = await getTenantSettings([
       'phase1_day_limit',
       'phase2_day_limit',
       'phase1_profit_target_pct',
@@ -5194,7 +4851,7 @@ router.post('/accounts/:accountId/override', authenticateAdmin, requireAdminCapa
         [account.id]
       )
 
-      const settings = await fetchProgressionSettings(client, normalizedTenantId)
+      const settings = await fetchProgressionSettings(client)
       promoted = await promotePassedAccount(client, account, settings)
       if (!promoted) {
         await client.query('ROLLBACK')
@@ -5282,7 +4939,7 @@ router.post('/accounts/:accountId/override', authenticateAdmin, requireAdminCapa
 
       closeResult = await forceCloseOpenTradesForAccount(client, account.id)
       cancelledCount = await cancelPendingTradesForAccount(client, account.id, 'Admin Restore With Reset')
-      const phaseEndDate = computePhaseEndDateForAccountType(account.account_type, tenantSettings)
+      const phaseEndDate = computePhaseEndDateForAccountType(account.account_type, platformSettings)
 
       await client.query(
         `UPDATE accounts
@@ -5307,11 +4964,10 @@ router.post('/accounts/:accountId/override', authenticateAdmin, requireAdminCapa
       closeResult = await forceCloseOpenTradesForAccount(client, account.id)
       cancelledCount = await cancelPendingTradesForAccount(client, account.id, 'Admin Replace Account')
       replacementAccount = await createAdminIssuedAccount(client, {
-        tenantId: normalizedTenantId,
         userId: account.user_id,
         accountType: account.account_type,
         accountSize: account.account_size,
-        settings: tenantSettings,
+        settings: platformSettings,
         overrides: {
           profit_target: account.profit_target,
           max_drawdown_pct: account.max_drawdown_pct
@@ -5344,7 +5000,7 @@ router.post('/accounts/:accountId/override', authenticateAdmin, requireAdminCapa
       return res.status(400).json({ error: `Unsupported action: ${action}` })
     }
 
-    updatedAccount = await fetchAccountForAdmin(client, account.id, tenantId, { forUpdate: false })
+    updatedAccount = await fetchAccountForAdmin(client, account.id, { forUpdate: false })
 
     try {
       await appendImmutableAudit(client, {
@@ -5356,7 +5012,6 @@ router.post('/accounts/:accountId/override', authenticateAdmin, requireAdminCapa
           action,
           reason,
           actor: buildAdminActorPayload(req.admin),
-          tenant_scope: tenantId,
           before_snapshot: beforeSnapshot,
           after_snapshot: normalizeAccountSnapshot(updatedAccount),
           closed_trades: closeResult.closedCount,
@@ -5367,7 +5022,7 @@ router.post('/accounts/:accountId/override', authenticateAdmin, requireAdminCapa
           extension_days: extensionDays || null
         }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     await client.query('COMMIT')
 
@@ -5392,7 +5047,6 @@ router.post('/accounts/:accountId/override', authenticateAdmin, requireAdminCapa
       action,
       status: 'applied',
       message,
-      tenant_id: normalizedTenantId,
       payload_json: {
         closed_trades: closeResult.closedCount,
         cancelled_pending: cancelledCount,
@@ -5400,9 +5054,9 @@ router.post('/accounts/:accountId/override', authenticateAdmin, requireAdminCapa
         replacement_account_id: replacementAccount?.id || null,
         promoted_to_account_id: promoted?.new_account_id || null
       }
-    }, normalizedTenantId)
+    })
 
-    await emitSuperAdminPowerEvent(req, normalizedTenantId, {
+    await emitSuperAdminPowerEvent(req, {
       entity: 'account',
       entity_id: account.id,
       action,
@@ -5509,7 +5163,7 @@ router.post('/trades/:tradeId/close', authenticateAdmin, requireAdminCapability(
           pnl: closed.pnl
         }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     await client.query('COMMIT')
 
@@ -5543,10 +5197,8 @@ router.get('/payouts', authenticateAdmin, requireAdminCapability('payout:read:sc
   try {
     await ensureFeatureTables()
     await ensureDisputesInfrastructure()
-    const tenantId = getScopedTenantId(req)
     const paging = parseListPaging(req)
     const listResult = await buildPayoutListResult({
-      tenantId,
       query: {
         search: req.query?.search || req.query?.q || '',
         page: paging.page,
@@ -5577,7 +5229,6 @@ router.post('/payouts/approve', authenticateAdmin, requireAdminCapability('payou
   let client
   try {
     const { payout_id, transaction_id } = req.body
-    const tenantId = getScopedTenantId(req)
 
     client = await pool.connect()
     await client.query('BEGIN')
@@ -5585,13 +5236,12 @@ router.post('/payouts/approve', authenticateAdmin, requireAdminCapability('payou
     // Fetch payout details and user email/name first
     const payoutData = await client.query(
       `SELECT p.amount_requested, p.amount_payable, p.payment_method, p.account_id, p.status,
-              u.id::text AS user_id, u.email, u.full_name, u.tenant_id
+              u.id::text AS user_id, u.email, u.full_name
        FROM payouts p
        JOIN users u ON p.user_id = u.id
        WHERE p.id = $1
-         AND ($2::bigint IS NULL OR COALESCE(u.tenant_id, $2) = $2)
        FOR UPDATE`,
-      [payout_id, tenantId]
+      [payout_id]
     )
 
     if (payoutData.rows.length === 0) {
@@ -5599,7 +5249,7 @@ router.post('/payouts/approve', authenticateAdmin, requireAdminCapability('payou
       return res.status(404).json({ error: 'Payout not found' })
     }
 
-    const { amount_requested, amount_payable, payment_method, account_id, status, user_id, email, full_name, tenant_id } = payoutData.rows[0]
+    const { amount_requested, amount_payable, payment_method, account_id, status, user_id, email, full_name } = payoutData.rows[0]
     if (status !== 'pending') {
       await client.query('ROLLBACK')
       return res.status(400).json({ error: 'Payout is not pending' })
@@ -5638,7 +5288,6 @@ router.post('/payouts/approve', authenticateAdmin, requireAdminCapability('payou
 
     // Send automated email to the user
     await enqueuePayoutApprovedEmail(email, full_name, amount_payable, payment_method, {
-      tenantId: tenant_id,
       userId: user_id || null
     })
 
@@ -5655,25 +5304,23 @@ router.post('/payouts/approve', authenticateAdmin, requireAdminCapability('payou
 router.post('/payouts/reject', authenticateAdmin, requireAdminCapability('payout:review:scoped'), async function(req, res) {
   try {
     const { payout_id, reason } = req.body
-    const tenantId = getScopedTenantId(req)
 
     if (!payout_id) return res.status(400).json({ error: 'payout_id is required' })
 
     // Fetch payout details and user email/name
     const payoutData = await pool.query(
-      `SELECT p.amount_requested, u.id::text AS user_id, u.email, u.full_name, u.tenant_id
+      `SELECT p.amount_requested, u.id::text AS user_id, u.email, u.full_name
        FROM payouts p
        JOIN users u ON p.user_id = u.id
-       WHERE p.id = $1
-         AND ($2::bigint IS NULL OR COALESCE(u.tenant_id, $2) = $2)`,
-      [payout_id, tenantId]
+       WHERE p.id = $1`,
+      [payout_id]
     )
 
     if (payoutData.rows.length === 0) {
       return res.status(404).json({ error: 'Payout not found' })
     }
 
-    const { amount_requested, user_id, email, full_name, tenant_id } = payoutData.rows[0]
+    const { amount_requested, user_id, email, full_name } = payoutData.rows[0]
 
     await pool.query(
       `UPDATE payouts SET
@@ -5686,7 +5333,6 @@ router.post('/payouts/reject', authenticateAdmin, requireAdminCapability('payout
 
     // Send automated email to the user
     await enqueuePayoutRejectedEmail(email, full_name, amount_requested, reason, {
-      tenantId: tenant_id,
       userId: user_id || null
     })
 
@@ -5702,7 +5348,6 @@ router.post('/payouts/:payoutId/flag', authenticateAdmin, requireAdminCapability
   try {
     await ensureFeatureTables()
     const payoutId = parseInt(req.params.payoutId, 10)
-    const tenantId = getScopedTenantId(req)
     const reason = requireReasonText(req.body?.reason, 'flag reason')
 
     if (!Number.isFinite(payoutId) || payoutId <= 0) {
@@ -5710,7 +5355,7 @@ router.post('/payouts/:payoutId/flag', authenticateAdmin, requireAdminCapability
     }
 
     await client.query('BEGIN')
-    const payout = await fetchPayoutForAdmin(client, payoutId, tenantId, { forUpdate: true })
+    const payout = await fetchPayoutForAdmin(client, payoutId, { forUpdate: true })
     if (!payout) {
       await client.query('ROLLBACK')
       return res.status(404).json({ error: 'Payout not found' })
@@ -5726,7 +5371,7 @@ router.post('/payouts/:payoutId/flag', authenticateAdmin, requireAdminCapability
                 $3,
               updated_at = NOW()
         WHERE id = $1
-        RETURNING id, tenant_id, user_id, account_id, amount_requested, amount_payable,
+        RETURNING id, user_id, account_id, amount_requested, amount_payable,
                   status, is_flagged, flag_reason, admin_notes`,
       [payoutId, reason, `[FLAGGED ${new Date().toISOString()}] ${reason}`]
     )
@@ -5740,14 +5385,13 @@ router.post('/payouts/:payoutId/flag', authenticateAdmin, requireAdminCapability
       payload: {
         reason,
         actor: buildAdminActorPayload(req.admin),
-        tenant_scope: tenantId,
         before_snapshot: beforeSnapshot,
         after_snapshot: normalizePayoutSnapshot(updatedPayout)
       }
     })
 
     await client.query('COMMIT')
-    await emitSuperAdminPowerEvent(req, updatedPayout.tenant_id || tenantId, {
+    await emitSuperAdminPowerEvent(req, {
       entity: 'payout',
       entity_id: payoutId,
       action: 'flag_payout'
@@ -5772,7 +5416,6 @@ router.post('/payouts/:payoutId/unflag', authenticateAdmin, requireAdminCapabili
   try {
     await ensureFeatureTables()
     const payoutId = parseInt(req.params.payoutId, 10)
-    const tenantId = getScopedTenantId(req)
     const reason = requireReasonText(req.body?.reason, 'unflag reason')
 
     if (!Number.isFinite(payoutId) || payoutId <= 0) {
@@ -5780,7 +5423,7 @@ router.post('/payouts/:payoutId/unflag', authenticateAdmin, requireAdminCapabili
     }
 
     await client.query('BEGIN')
-    const payout = await fetchPayoutForAdmin(client, payoutId, tenantId, { forUpdate: true })
+    const payout = await fetchPayoutForAdmin(client, payoutId, { forUpdate: true })
     if (!payout) {
       await client.query('ROLLBACK')
       return res.status(404).json({ error: 'Payout not found' })
@@ -5796,7 +5439,7 @@ router.post('/payouts/:payoutId/unflag', authenticateAdmin, requireAdminCapabili
                 $2,
               updated_at = NOW()
         WHERE id = $1
-        RETURNING id, tenant_id, user_id, account_id, amount_requested, amount_payable,
+        RETURNING id, user_id, account_id, amount_requested, amount_payable,
                   status, is_flagged, flag_reason, admin_notes`,
       [payoutId, `[UNFLAGGED ${new Date().toISOString()}] ${reason}`]
     )
@@ -5810,14 +5453,13 @@ router.post('/payouts/:payoutId/unflag', authenticateAdmin, requireAdminCapabili
       payload: {
         reason,
         actor: buildAdminActorPayload(req.admin),
-        tenant_scope: tenantId,
         before_snapshot: beforeSnapshot,
         after_snapshot: normalizePayoutSnapshot(updatedPayout)
       }
     })
 
     await client.query('COMMIT')
-    await emitSuperAdminPowerEvent(req, updatedPayout.tenant_id || tenantId, {
+    await emitSuperAdminPowerEvent(req, {
       entity: 'payout',
       entity_id: payoutId,
       action: 'unflag_payout'
@@ -6044,18 +5686,9 @@ router.get('/account-health', authenticateAdmin, requireSuperAdmin, async (req, 
 router.get('/command-center/accounts', authenticateAdmin, requireAdminCapability('command_center:read'), async (req, res) => {
   try {
     await ensureFeatureTables()
-    const tenantId = getScopedTenantId(req) || parsePositiveInteger(req.query.tenant, {
-      fallback: null,
-      min: 1,
-      max: 2147483647
-    })
     const conditions = []
     const values = []
 
-    if (tenantId) {
-      values.push(tenantId)
-      conditions.push(`COALESCE(a.tenant_id, u.tenant_id, $${values.length}) = $${values.length}`)
-    }
     if (req.query.status) {
       values.push(String(req.query.status).trim().toLowerCase())
       conditions.push(`LOWER(a.status) = $${values.length}`)
@@ -6092,7 +5725,7 @@ router.get('/command-center/accounts', authenticateAdmin, requireAdminCapability
     values.push(limit)
 
     const result = await pool.query(
-      `SELECT a.id, a.tenant_id, a.user_id, a.account_type, a.account_size, a.status,
+      `SELECT a.id, a.user_id, a.account_type, a.account_size, a.status,
               a.current_balance, a.starting_balance, a.peak_balance, a.profit_target,
               a.max_drawdown_pct, a.phase_start_date, a.phase_end_date, a.account_uid,
               COALESCE(a.review_flagged, FALSE) AS review_flagged,
@@ -6140,18 +5773,9 @@ router.get('/command-center/accounts', authenticateAdmin, requireAdminCapability
 router.get('/command-center/users', authenticateAdmin, requireAdminCapability('command_center:read'), async (req, res) => {
   try {
     await ensureFeatureTables()
-    const tenantId = getScopedTenantId(req) || parsePositiveInteger(req.query.tenant, {
-      fallback: null,
-      min: 1,
-      max: 2147483647
-    })
     const conditions = []
     const values = []
 
-    if (tenantId) {
-      values.push(tenantId)
-      conditions.push(`COALESCE(u.tenant_id, $${values.length}) = $${values.length}`)
-    }
     const bannedFilter = parseBooleanFilter(req.query.is_banned)
     if (bannedFilter !== null) {
       values.push(bannedFilter)
@@ -6182,7 +5806,7 @@ router.get('/command-center/users', authenticateAdmin, requireAdminCapability('c
     values.push(limit)
 
     const result = await pool.query(
-      `SELECT u.id, u.tenant_id, u.email, u.full_name, u.country, u.phone,
+      `SELECT u.id, u.email, u.full_name, u.country, u.phone,
               COALESCE(u.kyc_status, 'pending') AS kyc_status,
               COALESCE(u.is_banned, FALSE) AS is_banned,
               u.created_at, COALESCE(u.token_version, 1) AS token_version,
@@ -6227,18 +5851,9 @@ router.get('/command-center/money-risk', authenticateAdmin, requireAdminCapabili
     await ensureViolationTables()
     await ensureDisputesInfrastructure()
 
-    const tenantId = getScopedTenantId(req) || parsePositiveInteger(req.query.tenant, {
-      fallback: null,
-      min: 1,
-      max: 2147483647
-    })
     const conditions = []
     const values = []
 
-    if (tenantId) {
-      values.push(tenantId)
-      conditions.push(`COALESCE(p.tenant_id, u.tenant_id, $${values.length}) = $${values.length}`)
-    }
     if (req.query.payout_status) {
       values.push(String(req.query.payout_status).trim().toLowerCase())
       conditions.push(`LOWER(p.status) = $${values.length}`)
@@ -6275,7 +5890,7 @@ router.get('/command-center/money-risk', authenticateAdmin, requireAdminCapabili
     values.push(limit)
 
     const result = await pool.query(
-      `SELECT p.id, p.tenant_id, p.user_id, p.account_id, p.amount_requested, p.amount_payable,
+      `SELECT p.id, p.user_id, p.account_id, p.amount_requested, p.amount_payable,
               p.status, COALESCE(p.is_flagged, FALSE) AS is_flagged, p.flag_reason, p.admin_notes,
               p.requested_at, u.email, u.full_name,
               COALESCE(ds.open_disputes_count, 0)::int AS open_disputes_count,
@@ -6363,11 +5978,6 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
       return res.status(400).json({ error: 'ids must contain between 1 and 100 items' })
     }
 
-    const tenantId = getScopedTenantId(req) || parsePositiveInteger(req.body?.tenant || options?.tenant, {
-      fallback: null,
-      min: 1,
-      max: 2147483647
-    })
     const results = []
 
     for (const rawId of ids) {
@@ -6377,12 +5987,11 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
         await client.query('BEGIN')
 
         if (entity === 'account') {
-          const account = await fetchAccountForAdmin(client, rawId, tenantId, { forUpdate: true })
+          const account = await fetchAccountForAdmin(client, rawId, { forUpdate: true })
           if (!account) throw createHttpError('Account not found', 404)
 
           const beforeSnapshot = normalizeAccountSnapshot(account)
-          const normalizedTenantId = account.tenant_id || tenantId || 1
-          const tenantSettings = await getTenantSettings(normalizedTenantId, [
+          const platformSettings = await getTenantSettings([
             'phase1_day_limit',
             'phase2_day_limit',
             'phase1_profit_target_pct',
@@ -6431,7 +6040,7 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
                       review_flag_reason = NULL,
                       updated_at = NOW()
                 WHERE id = $1`,
-              [account.id, computePhaseEndDateForAccountType(account.account_type, tenantSettings)]
+              [account.id, computePhaseEndDateForAccountType(account.account_type, platformSettings)]
             )
             message = 'Account restored with reset'
           } else if (action === 'replace_account') {
@@ -6441,11 +6050,10 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
             closeResult = await forceCloseOpenTradesForAccount(client, account.id)
             cancelledCount = await cancelPendingTradesForAccount(client, account.id, 'Bulk Replace Account')
             const replacement = await createAdminIssuedAccount(client, {
-              tenantId: normalizedTenantId,
               userId: account.user_id,
               accountType: account.account_type,
               accountSize: account.account_size,
-              settings: tenantSettings,
+              settings: platformSettings,
               overrides: {
                 profit_target: account.profit_target,
                 max_drawdown_pct: account.max_drawdown_pct
@@ -6497,7 +6105,7 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
             throw createHttpError(`Unsupported bulk account action: ${action}`, 400)
           }
 
-          const afterAccount = await fetchAccountForAdmin(client, rawId, tenantId)
+          const afterAccount = await fetchAccountForAdmin(client, rawId)
           await appendImmutableAudit(client, {
             eventType: 'admin_bulk_action',
             entityType: 'account',
@@ -6508,7 +6116,6 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
               action,
               reason,
               actor: buildAdminActorPayload(req.admin),
-              tenant_scope: tenantId,
               before_snapshot: beforeSnapshot,
               after_snapshot: normalizeAccountSnapshot(afterAccount),
               closed_trades: closeResult.closedCount,
@@ -6524,10 +6131,9 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
             user_id: account.user_id,
             action,
             status: 'applied',
-            message,
-            tenant_id: normalizedTenantId
-          }, normalizedTenantId)
-          await emitSuperAdminPowerEvent(req, normalizedTenantId, {
+            message
+          })
+          await emitSuperAdminPowerEvent(req, {
             entity,
             entity_id: account.id,
             action,
@@ -6541,7 +6147,7 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
             new_account_id: linkedAccountId || null
           })
         } else if (entity === 'user') {
-          const user = await fetchUserForAdmin(client, rawId, tenantId, { forUpdate: true })
+          const user = await fetchUserForAdmin(client, rawId, { forUpdate: true })
           if (!user) throw createHttpError('User not found', 404)
 
           const beforeSnapshot = normalizeUserSnapshot(user)
@@ -6552,7 +6158,7 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
           if (action === 'ban') {
             const result = await client.query(
               `UPDATE users SET is_banned = TRUE WHERE id = $1
-               RETURNING id, tenant_id, email, full_name, kyc_status, is_banned, token_version`,
+               RETURNING id, email, full_name, kyc_status, is_banned, token_version`,
               [user.id]
             )
             updatedUser = result.rows[0]
@@ -6560,7 +6166,7 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
           } else if (action === 'unban') {
             const result = await client.query(
               `UPDATE users SET is_banned = FALSE WHERE id = $1
-               RETURNING id, tenant_id, email, full_name, kyc_status, is_banned, token_version`,
+               RETURNING id, email, full_name, kyc_status, is_banned, token_version`,
               [user.id]
             )
             updatedUser = result.rows[0]
@@ -6570,7 +6176,7 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
               `UPDATE users
                   SET token_version = COALESCE(token_version, 1) + 1
                 WHERE id = $1
-                RETURNING id, tenant_id, email, full_name, kyc_status, is_banned, token_version`,
+                RETURNING id, email, full_name, kyc_status, is_banned, token_version`,
               [user.id]
             )
             updatedUser = result.rows[0]
@@ -6582,7 +6188,7 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
                   SET kyc_status = 'approved',
                       kyc_rejection_reason = NULL
                 WHERE id = $1
-                RETURNING id, tenant_id, email, full_name, kyc_status, is_banned, token_version`,
+                RETURNING id, email, full_name, kyc_status, is_banned, token_version`,
               [user.id]
             )
             updatedUser = result.rows[0]
@@ -6593,7 +6199,7 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
                   SET kyc_status = 'rejected',
                       kyc_rejection_reason = $2
                 WHERE id = $1
-                RETURNING id, tenant_id, email, full_name, kyc_status, is_banned, token_version`,
+                RETURNING id, email, full_name, kyc_status, is_banned, token_version`,
               [user.id, reason]
             )
             updatedUser = result.rows[0]
@@ -6601,13 +6207,13 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
           } else if (action === 'manual_account') {
             const accountType = String(options?.account_type || 'phase1').trim().toLowerCase()
             const accountSize = parseInt(options?.account_size, 10)
-            if (!['phase1', 'phase2', 'funded'].includes(accountType)) {
-              throw createHttpError('options.account_type must be phase1, phase2, or funded', 400)
+            if (!['phase1', 'phase2', 'phase3', 'funded'].includes(accountType)) {
+              throw createHttpError('options.account_type must be phase1, phase2, phase3, or funded', 400)
             }
             if (!Number.isFinite(accountSize) || !ADMIN_VALID_ACCOUNT_SIZES.includes(accountSize)) {
               throw createHttpError(`options.account_size must be one of: ${ADMIN_VALID_ACCOUNT_SIZES.join(', ')}`, 400)
             }
-            const settings = await getTenantSettings(user.tenant_id || tenantId || 1, [
+            const settings = await getTenantSettings([
               'phase1_day_limit',
               'phase2_day_limit',
               'phase1_profit_target_pct',
@@ -6617,7 +6223,6 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
               'funded_max_drawdown_pct'
             ])
             createdAccount = await createAdminIssuedAccount(client, {
-              tenantId: user.tenant_id || tenantId || 1,
               userId: user.id,
               accountType,
               accountSize,
@@ -6638,7 +6243,6 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
               action,
               reason,
               actor: buildAdminActorPayload(req.admin),
-              tenant_scope: tenantId,
               before_snapshot: beforeSnapshot,
               after_snapshot: normalizeUserSnapshot(updatedUser),
               linked_account_id: createdAccount?.id || null
@@ -6650,7 +6254,7 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
           if (postCommitInvalidateUserId) {
             await invalidateAllUserTokens(postCommitInvalidateUserId)
           }
-          await emitSuperAdminPowerEvent(req, updatedUser.tenant_id || tenantId, {
+          await emitSuperAdminPowerEvent(req, {
             entity,
             entity_id: user.id,
             action,
@@ -6664,7 +6268,7 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
             new_account_id: createdAccount?.id || null
           })
         } else if (entity === 'payout') {
-          const payout = await fetchPayoutForAdmin(client, rawId, tenantId, { forUpdate: true })
+          const payout = await fetchPayoutForAdmin(client, rawId, { forUpdate: true })
           if (!payout) throw createHttpError('Payout not found', 404)
 
           const beforeSnapshot = normalizePayoutSnapshot(payout)
@@ -6678,7 +6282,7 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
                       flag_reason = $2,
                       updated_at = NOW()
                 WHERE id = $1
-                RETURNING id, tenant_id, user_id, account_id, amount_requested, amount_payable,
+                RETURNING id, user_id, account_id, amount_requested, amount_payable,
                           status, is_flagged, flag_reason, admin_notes`,
               [payout.id, reason]
             )
@@ -6691,7 +6295,7 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
                       flag_reason = NULL,
                       updated_at = NOW()
                 WHERE id = $1
-                RETURNING id, tenant_id, user_id, account_id, amount_requested, amount_payable,
+                RETURNING id, user_id, account_id, amount_requested, amount_payable,
                           status, is_flagged, flag_reason, admin_notes`,
               [payout.id]
             )
@@ -6721,7 +6325,7 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
                       transaction_id = COALESCE($2, transaction_id),
                       updated_at = NOW()
                 WHERE id = $1
-                RETURNING id, tenant_id, user_id, account_id, amount_requested, amount_payable,
+                RETURNING id, user_id, account_id, amount_requested, amount_payable,
                           status, is_flagged, flag_reason, admin_notes`,
               [payout.id, options?.transaction_id ? String(options.transaction_id) : null]
             )
@@ -6734,7 +6338,7 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
                       admin_notes = $2,
                       updated_at = NOW()
                 WHERE id = $1
-                RETURNING id, tenant_id, user_id, account_id, amount_requested, amount_payable,
+                RETURNING id, user_id, account_id, amount_requested, amount_payable,
                           status, is_flagged, flag_reason, admin_notes`,
               [payout.id, reason]
             )
@@ -6754,14 +6358,13 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
               action,
               reason,
               actor: buildAdminActorPayload(req.admin),
-              tenant_scope: tenantId,
               before_snapshot: beforeSnapshot,
               after_snapshot: normalizePayoutSnapshot(updatedPayout)
             }
           })
 
           await client.query('COMMIT')
-          await emitSuperAdminPowerEvent(req, updatedPayout.tenant_id || tenantId, {
+          await emitSuperAdminPowerEvent(req, {
             entity,
             entity_id: payout.id,
             action
@@ -6782,9 +6385,8 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
             `SELECT *
                FROM admin_rule_violations
               WHERE id = $1
-                AND ($2::bigint IS NULL OR COALESCE(tenant_id, $2) = $2)
               FOR UPDATE`,
-            [violationId, tenantId]
+            [violationId]
           )
           if (violationResult.rows.length === 0) throw createHttpError('Violation not found', 404)
 
@@ -6810,12 +6412,11 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
                     resolution_type = $3,
                     payload_json = COALESCE(payload_json, '{}'::jsonb) || jsonb_build_object(
                       'resolution_type', $3,
-                      'resolved_by_role', $4,
-                      'resolved_tenant_scope', $5
+                      'resolved_by_role', $4
                     )
               WHERE id = $1
               RETURNING *`,
-            [violationId, reason, resolutionType, req.admin?.role || 'admin', tenantId]
+            [violationId, reason, resolutionType, req.admin?.role || 'admin']
           )
           const updatedViolation = updateResult.rows[0]
 
@@ -6829,14 +6430,13 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
               action,
               reason,
               actor: buildAdminActorPayload(req.admin),
-              tenant_scope: tenantId,
               before_snapshot: beforeSnapshot,
               after_snapshot: normalizeViolationSnapshot(updatedViolation)
             }
           })
 
           await client.query('COMMIT')
-          emitAdminEvent('admin_violation_updated', updatedViolation, updatedViolation.tenant_id || tenantId)
+          emitAdminEvent('admin_violation_updated', updatedViolation)
 
           results.push({
             id: rawId,
@@ -6872,7 +6472,6 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
 
 router.get('/suspicious-accounts', authenticateAdmin, requireSuperAdmin, async (req, res) => {
   try {
-    const tenantId = getScopedTenantId(req)
     // FIX (BUG-H3): Wired to real DB query — returns genuinely flagged/banned accounts
     const result = await pool.query(`
       SELECT
@@ -6882,10 +6481,9 @@ router.get('/suspicious-accounts', authenticateAdmin, requireSuperAdmin, async (
       FROM accounts a
       JOIN users u ON a.user_id = u.id
       WHERE (a.review_flagged = true OR u.is_banned = true)
-        AND ($1::bigint IS NULL OR COALESCE(a.tenant_id, u.tenant_id, $1) = $1)
       ORDER BY a.created_at DESC
       LIMIT 500
-    `, [tenantId]);
+    `);
     res.json({
       total_flags: result.rows.filter(r => r.review_flagged).length,
       flagged: result.rows
@@ -6935,9 +6533,8 @@ router.get('/settings-log', authenticateAdmin, requireSuperAdmin, async (req, re
   }
 });
 
-router.get('/platform-analytics', authenticateAdmin, requireTenantAdminOrSuperAdmin, async (req, res) => {
+router.get('/platform-analytics', authenticateAdmin, async (req, res) => {
   try {
-    const tenantId = getScopedTenantId(req)
     // FIX (BUG-L1): Replaced wrong "estimation" calculations. The old code used
     // phase2 total as "phase1_passed" and funded total as "phase2_passed" — both wrong.
     // Now uses explicit status='passed' + account_type filter for accurate pass counts.
@@ -6950,8 +6547,7 @@ router.get('/platform-analytics', authenticateAdmin, requireTenantAdminOrSuperAd
         COUNT(*) FILTER (WHERE status = 'passed' AND account_type = 'phase1')   AS p1_passed,
         COUNT(*) FILTER (WHERE status = 'passed' AND account_type = 'phase2')   AS p2_passed
       FROM accounts
-      WHERE ($1::bigint IS NULL OR COALESCE(tenant_id, $1) = $1)
-    `, [tenantId]);
+    `);
     res.json({
       funnel: {
         phase1_total:  parseInt(r.rows[0].p1t || 0),
@@ -6970,7 +6566,6 @@ router.get('/platform-analytics', authenticateAdmin, requireTenantAdminOrSuperAd
 
 router.get('/bbook', authenticateAdmin, requireSuperAdmin, async (req, res) => {
   try {
-    const tenantId = getScopedTenantId(req)
     const result = await pool.query(`
       SELECT
         t.id,
@@ -6985,10 +6580,9 @@ router.get('/bbook', authenticateAdmin, requireSuperAdmin, async (req, res) => {
       JOIN accounts a ON a.id = t.account_id
       WHERE t.status = 'closed'
         AND a.account_type = 'funded'
-        AND ($1::bigint IS NULL OR COALESCE(a.tenant_id, $1) = $1)
       ORDER BY t.close_time DESC NULLS LAST, t.id DESC
       LIMIT 120
-    `, [tenantId])
+    `)
 
     res.json(result.rows)
   } catch (err) {
@@ -6999,21 +6593,18 @@ router.get('/bbook', authenticateAdmin, requireSuperAdmin, async (req, res) => {
 
 router.get('/bbook-report', authenticateAdmin, requireSuperAdmin, async (req, res) => {
   try {
-    const tenantId = getScopedTenantId(req)
     const q1 = await pool.query(`
       SELECT COALESCE(SUM(p.amount_payable), 0) as paid
       FROM payouts p
       JOIN users u ON u.id = p.user_id
       WHERE p.status = 'paid'
-        AND ($1::bigint IS NULL OR COALESCE(u.tenant_id, $1) = $1)
-    `, [tenantId]);
+    `);
     const q2 = await pool.query(`
       SELECT
         COUNT(*) FILTER(WHERE status='failed') as fails,
         COUNT(*) FILTER(WHERE status='active' AND account_type='funded') as active
       FROM accounts
-      WHERE ($1::bigint IS NULL OR COALESCE(tenant_id, $1) = $1)
-    `, [tenantId]);
+    `);
     // FIX (BUG-L8): Replaced hardcoded 0 values with real PnL sums from trades table
     const q3 = await pool.query(`
       SELECT
@@ -7021,8 +6612,7 @@ router.get('/bbook-report', authenticateAdmin, requireSuperAdmin, async (req, re
         ABS(COALESCE(SUM(t.demo_pnl) FILTER (WHERE t.demo_pnl < 0 AND t.status = 'closed'), 0)) AS gross_loss
       FROM trades t
       JOIN accounts a ON a.id = t.account_id
-      WHERE ($1::bigint IS NULL OR COALESCE(a.tenant_id, $1) = $1)
-    `, [tenantId]);
+    `);
 
     const grossProfit = parseFloat(q3.rows[0].gross_profit || 0);
     const grossLoss   = parseFloat(q3.rows[0].gross_loss || 0);
@@ -7044,14 +6634,8 @@ router.get('/bbook-report', authenticateAdmin, requireSuperAdmin, async (req, re
   }
 });
 
-router.get('/settings', authenticateAdmin, requireTenantAdminOrSuperAdmin, async (req, res) => {
+router.get('/settings', authenticateAdmin, async (req, res) => {
   try {
-    const tenantId = getScopedTenantId(req)
-    if (tenantId) {
-      const settings = await getTenantSettingsMap(tenantId)
-      return res.json(settings)
-    }
-
     const result = await pool.query('SELECT key, value FROM platform_settings')
     const settings = {}
     result.rows.forEach(r => { settings[r.key] = r.value })
@@ -7061,14 +6645,12 @@ router.get('/settings', authenticateAdmin, requireTenantAdminOrSuperAdmin, async
   }
 });
 
-router.get('/settings/account-availability', authenticateAdmin, requireTenantAdminOrSuperAdmin, async (req, res) => {
+router.get('/settings/account-availability', authenticateAdmin, async (req, res) => {
   try {
-    const tenantId = getScopedTenantId(req) || req.tenant?.id || 1
-    const settings = await getTenantSettingsMap(tenantId)
-    const sizes = await buildAccountAvailability(pool, tenantId, settings)
+    const settings = await getTenantSettingsMap()
+    const sizes = await buildAccountAvailability(pool, settings)
 
     res.json({
-      tenant_id: tenantId,
       period_start: settings.max_accounts_period_start || null,
       period_end: settings.max_accounts_period_end || null,
       sizes
@@ -7078,32 +6660,27 @@ router.get('/settings/account-availability', authenticateAdmin, requireTenantAdm
   }
 });
 
-router.post('/settings', authenticateAdmin, requireTenantAdminOrSuperAdmin, async (req, res) => {
+router.post('/settings', authenticateAdmin, async (req, res) => {
   const client = await pool.connect();
   try {
-    const tenantId = getScopedTenantId(req)
     await client.query('BEGIN');
     const keys = Object.keys(req.body);
-    if (tenantId) {
-      await upsertTenantSettings(client, tenantId, req.body)
-    } else {
-      for (const key of keys) {
-        await client.query(
-          `INSERT INTO platform_settings (key, value, updated_at) 
-           VALUES ($1, $2, NOW()) 
-           ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
-          [key, String(req.body[key])]
-        );
-      }
+    for (const key of keys) {
+      await client.query(
+        `INSERT INTO platform_settings (key, value, updated_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+        [key, String(req.body[key])]
+      );
     }
     try {
       await appendImmutableAudit(client, {
         eventType: 'settings_updated',
-        entityType: tenantId ? 'tenant_settings' : 'platform_settings',
-        entityId: tenantId ? String(tenantId) : 'global',
-        payload: { keys, tenant_id: tenantId || null }
+        entityType: 'platform_settings',
+        entityId: 'global',
+        payload: { keys }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
     await client.query('COMMIT');
     res.json({ message: 'Settings saved successfully' });
   } catch (err) {
@@ -7113,8 +6690,6 @@ router.post('/settings', authenticateAdmin, requireTenantAdminOrSuperAdmin, asyn
     client.release();
   }
 });
-
-router.use(quarantineLegacyGlobalAdminSurface)
 
 router.get('/price-feed-health', authenticateAdmin, async (req, res) => {
   try {
@@ -7151,8 +6726,7 @@ router.get('/price-feed-health', authenticateAdmin, async (req, res) => {
 
 router.get('/risk-dashboard', authenticateAdmin, async (req, res) => {
   try {
-    const tenantId = getScopedTenantId(req)
-    const { exposureData, total_open_trades, total_floating_pnl } = await getExposureData(pool, tenantId);
+    const { exposureData, total_open_trades, total_floating_pnl } = await getExposureData(pool);
 
     res.json({
       exposure: exposureData,
@@ -7216,7 +6790,7 @@ router.post('/incidents', authenticateAdmin, async (req, res) => {
           source: String(source || 'manual').trim()
         }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
     res.status(201).json(result.rows[0])
   } catch (err) {
     res.status(500).json({ error: 'Failed to create incident' })
@@ -7254,7 +6828,7 @@ router.post('/incidents/:id/status', authenticateAdmin, async (req, res) => {
         entityId: String(id),
         payload: { status: String(status) }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
     res.json(r.rows[0])
   } catch (err) {
     res.status(500).json({ error: 'Failed to update incident status' })
@@ -7314,7 +6888,7 @@ router.post('/rules', authenticateAdmin, async (req, res) => {
           scope: String(scope || 'global').trim()
         }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
     res.status(201).json(r.rows[0])
   } catch (err) {
     res.status(500).json({ error: 'Failed to create rule' })
@@ -7342,7 +6916,7 @@ router.post('/rules/:id/toggle', authenticateAdmin, async (req, res) => {
         entityId: String(id),
         payload: { enabled: !!r.rows[0].enabled }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
     res.json(r.rows[0])
   } catch (err) {
     res.status(500).json({ error: 'Failed to toggle rule' })
@@ -7363,7 +6937,7 @@ router.delete('/rules/:id', authenticateAdmin, async (req, res) => {
         entityId: String(id),
         payload: {}
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
     res.json({ message: 'Rule deleted' })
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete rule' })
@@ -7410,7 +6984,7 @@ router.post('/rules/reorder', authenticateAdmin, async (req, res) => {
         entityId: 'bulk',
         payload: { ordered_ids: orderedIds.slice(0, 200) }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     await client.query('COMMIT')
     res.json(result.rows)
@@ -7419,6 +6993,145 @@ router.post('/rules/reorder', authenticateAdmin, async (req, res) => {
     res.status(500).json({ error: 'Failed to reorder rules' })
   } finally {
     client.release()
+  }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step-model (1-step / 2-step / 3-step challenge) admin management.
+// Global/platform-wide — super-admin only.
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/step-models', authenticateAdmin, requireSuperAdmin, async (req, res) => {
+  try {
+    const models = await fetchStepModels()
+    res.json(models)
+  } catch (err) {
+    logger.error('[admin] Failed to load step models:', { error: err.message })
+    res.status(500).json({ error: 'Failed to load step models' })
+  }
+})
+
+router.post('/step-models/:slug/toggle', authenticateAdmin, requireSuperAdmin, async (req, res) => {
+  try {
+    const slug = String(req.params.slug || '').trim().toLowerCase()
+    const enabled = req.body?.enabled
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: '`enabled` (boolean) is required' })
+    }
+    const updated = await toggleStepModel(slug, enabled)
+    if (!updated) return res.status(404).json({ error: 'Step model not found' })
+    try {
+      await appendImmutableAudit(pool, {
+        eventType: 'step_model_toggled',
+        entityType: 'step_model',
+        entityId: slug,
+        actor: getAdminActorLabel(req.admin),
+        payload: { slug, enabled: !!updated.is_active }
+      })
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
+    res.json(updated)
+  } catch (err) {
+    logger.error('[admin] Failed to toggle step model:', { error: err.message })
+    res.status(500).json({ error: 'Failed to toggle step model' })
+  }
+})
+
+router.patch('/step-models/:slug/phases/:phaseIndex', authenticateAdmin, requireSuperAdmin, async (req, res) => {
+  try {
+    const slug = String(req.params.slug || '').trim().toLowerCase()
+    const phaseIndex = parseInt(req.params.phaseIndex, 10)
+    if (!Number.isFinite(phaseIndex) || phaseIndex < 1) {
+      return res.status(400).json({ error: 'Invalid phase index' })
+    }
+
+    const model = await fetchStepModelBySlug(slug)
+    if (!model) return res.status(404).json({ error: 'Step model not found' })
+    if (phaseIndex > model.steps) return res.status(400).json({ error: `This model only has ${model.steps} phase(s)` })
+
+    const phaseIdx0 = phaseIndex - 1
+    const profitTargets = Array.isArray(model.profit_targets_pct) ? [...model.profit_targets_pct] : []
+    const timeLimits = Array.isArray(model.time_limits_days) ? [...model.time_limits_days] : []
+    const consistencyByPhase = Array.isArray(model.consistency_max_day_pct_by_phase) ? [...model.consistency_max_day_pct_by_phase] : []
+
+    const body = req.body || {}
+    if (body.profit_target_pct !== undefined) profitTargets[phaseIdx0] = parseFloat(body.profit_target_pct)
+    if (body.max_time_limit_days !== undefined) timeLimits[phaseIdx0] = parseInt(body.max_time_limit_days, 10)
+    if (body.consistency_rule_pct !== undefined) consistencyByPhase[phaseIdx0] = parseFloat(body.consistency_rule_pct)
+
+    const trailingMaxDrawdownPct = body.trailing_max_drawdown_pct !== undefined ? parseFloat(body.trailing_max_drawdown_pct) : model.max_drawdown_pct
+    const dailyLossLimitPct = body.daily_loss_limit_pct !== undefined ? parseFloat(body.daily_loss_limit_pct) : model.daily_drawdown_pct
+    const minTradingDays = body.min_trading_days !== undefined ? parseInt(body.min_trading_days, 10) : model.min_trading_days
+
+    const result = await pool.query(
+      `UPDATE challenge_models SET
+         profit_targets_pct = $2::jsonb,
+         time_limits_days = $3::jsonb,
+         consistency_max_day_pct_by_phase = $4::jsonb,
+         max_drawdown_pct = $5,
+         daily_drawdown_pct = $6,
+         min_trading_days = $7,
+         updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [
+        model.id, JSON.stringify(profitTargets), JSON.stringify(timeLimits), JSON.stringify(consistencyByPhase),
+        trailingMaxDrawdownPct, dailyLossLimitPct, minTradingDays
+      ]
+    )
+
+    try {
+      await appendImmutableAudit(pool, {
+        eventType: 'step_model_phase_updated',
+        entityType: 'step_model',
+        entityId: slug,
+        actor: getAdminActorLabel(req.admin),
+        payload: { slug, phase_index: phaseIndex, changes: body }
+      })
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
+
+    res.json(result.rows[0])
+  } catch (err) {
+    logger.error('[admin] Failed to update step model phase:', { error: err.message })
+    res.status(500).json({ error: 'Failed to update step model phase' })
+  }
+})
+
+router.patch('/step-models/:slug/pricing/:accountSize', authenticateAdmin, requireSuperAdmin, async (req, res) => {
+  try {
+    const slug = String(req.params.slug || '').trim().toLowerCase()
+    const accountSize = parseInt(req.params.accountSize, 10)
+    const price = parseFloat(req.body?.price)
+    const isActive = req.body?.is_active
+
+    if (!Number.isFinite(accountSize)) return res.status(400).json({ error: 'Invalid account size' })
+    if (!Number.isFinite(price) || price < 0) return res.status(400).json({ error: 'Invalid price' })
+
+    const model = await fetchStepModelBySlug(slug)
+    if (!model) return res.status(404).json({ error: 'Step model not found' })
+
+    const result = await pool.query(
+      `UPDATE challenge_model_pricing
+          SET price = $3,
+              is_active = COALESCE($4, is_active)
+        WHERE challenge_model_id = $1 AND account_size = $2
+        RETURNING *`,
+      [model.id, accountSize, price, typeof isActive === 'boolean' ? isActive : null]
+    )
+    if (result.rows.length === 0) return res.status(404).json({ error: 'No pricing row for this model/size' })
+
+    try {
+      await appendImmutableAudit(pool, {
+        eventType: 'step_model_pricing_updated',
+        entityType: 'step_model',
+        entityId: slug,
+        actor: getAdminActorLabel(req.admin),
+        payload: { slug, account_size: accountSize, price }
+      })
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
+
+    res.json(result.rows[0])
+  } catch (err) {
+    logger.error('[admin] Failed to update step model pricing:', { error: err.message })
+    res.status(500).json({ error: 'Failed to update step model pricing' })
   }
 })
 
@@ -7516,7 +7229,7 @@ router.post('/enforcement/apply', authenticateAdmin, requireSuperAdmin, async (r
           rule_id: Number.isFinite(parseInt(rule_id, 10)) ? parseInt(rule_id, 10) : null
         }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     await client.query('COMMIT')
     res.json({ message, event: eventResult.rows[0] })
@@ -7608,7 +7321,7 @@ router.get('/payout-fraud-scores', authenticateAdmin, requireSuperAdmin, async (
             reasons.push('IP shared by multiple users')
           }
         }
-      } catch (_) {}
+      } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
       const risk_level = score >= 70 ? 'high' : score >= 40 ? 'medium' : 'low'
       scored.push({
@@ -7753,7 +7466,7 @@ router.post('/news-protection', authenticateAdmin, async (req, res) => {
           block_new_orders: toBool(body.block_new_orders, true)
         }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
     await client.query('COMMIT')
     res.json({ message: 'News protection settings saved' })
   } catch (err) {
@@ -7805,7 +7518,7 @@ router.post('/rollover-guard', authenticateAdmin, async (req, res) => {
           block_new_orders: toBool(body.block_new_orders, true)
         }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
     await client.query('COMMIT')
     res.json({ message: 'Rollover guard settings saved' })
   } catch (err) {
@@ -8202,7 +7915,6 @@ router.get('/aml-velocity', authenticateAdmin, async (req, res) => {
 
 router.get('/kyc-sla', authenticateAdmin, requireAdminCapability('kyc:review:scoped'), async (req, res) => {
   try {
-    const tenantId = getScopedTenantId(req)
     const slaHoursRaw = parseInt(req.query.sla_hours || '24', 10)
     const slaHours = Number.isFinite(slaHoursRaw) ? Math.max(1, Math.min(168, slaHoursRaw)) : 24
 
@@ -8219,11 +7931,9 @@ router.get('/kyc-sla', authenticateAdmin, requireAdminCapability('kyc:review:sco
        FROM users u
        LEFT JOIN accounts a ON a.user_id = u.id
        WHERE u.kyc_status = 'pending'
-         AND ($1::bigint IS NULL OR COALESCE(u.tenant_id, $1) = $1)
        GROUP BY u.id, u.full_name, u.email, u.country, u.kyc_submitted_at, u.created_at
        ORDER BY COALESCE(u.kyc_submitted_at, u.created_at) ASC
-       LIMIT 600`,
-      [tenantId]
+       LIMIT 600`
     )
 
     const queue = pending.rows.map(r => {
@@ -8266,7 +7976,6 @@ router.get('/kyc-sla', authenticateAdmin, requireAdminCapability('kyc:review:sco
 
 router.get('/kyc-quality-flags', authenticateAdmin, requireAdminCapability('kyc:review:scoped'), async (req, res) => {
   try {
-    const tenantId = getScopedTenantId(req)
     const uploadsRoot = path.resolve(__dirname, '../uploads')
     const docs = await pool.query(
       `SELECT
@@ -8279,10 +7988,8 @@ router.get('/kyc-quality-flags', authenticateAdmin, requireAdminCapability('kyc:
          u.selfie_path
        FROM users u
        WHERE ${buildKycDocumentPresencePredicate('u')}
-         AND ($1::bigint IS NULL OR COALESCE(u.tenant_id, $1) = $1)
        ORDER BY COALESCE(u.kyc_submitted_at, u.created_at) DESC
-       LIMIT 500`,
-      [tenantId]
+       LIMIT 500`
     )
 
     function inspectRelativeFile(relPath) {
@@ -8380,7 +8087,7 @@ router.get('/immutable-audit', authenticateAdmin, async (req, res) => {
           entityId: 'bootstrap',
           payload: { initialized_at: new Date().toISOString() }
         })
-      } catch (_) {}
+      } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
     }
 
     const result = await pool.query(
@@ -8495,7 +8202,7 @@ router.post('/four-eyes/request', authenticateAdmin, async (req, res) => {
           required_approvals: requiredApprovals
         }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
     res.status(201).json(ins.rows[0])
   } catch (err) {
     res.status(500).json({ error: 'Failed to create 4-eyes request' })
@@ -8573,7 +8280,7 @@ router.post('/four-eyes/:id/decision', authenticateAdmin, async (req, res) => {
           approvals_count: approvals.length
         }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     await client.query('COMMIT')
     res.json(update.rows[0])
@@ -8647,7 +8354,7 @@ router.post('/feature-flags', authenticateAdmin, async (req, res) => {
           rollout_pct: rollout
         }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
     res.json(upsert.rows[0])
   } catch (err) {
     res.status(500).json({ error: 'Failed to save feature flag' })
@@ -8679,7 +8386,7 @@ router.post('/feature-flags/:id/toggle', authenticateAdmin, async (req, res) => 
           enabled: !!result.rows[0].enabled
         }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
     res.json(result.rows[0])
   } catch (err) {
     res.status(500).json({ error: 'Failed to toggle feature flag' })
@@ -8745,7 +8452,7 @@ router.post('/notifications', authenticateAdmin, async (req, res) => {
         entityId: String(ins.rows[0].id),
         payload: { type: t, channel: c, status }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
     res.status(201).json(ins.rows[0])
   } catch (err) {
     res.status(500).json({ error: 'Failed to create notification' })
@@ -8777,7 +8484,7 @@ router.post('/notifications/:id/status', authenticateAdmin, async (req, res) => 
         entityId: String(id),
         payload: { status }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
     res.json(update.rows[0])
   } catch (err) {
     res.status(500).json({ error: 'Failed to update notification status' })
@@ -8853,7 +8560,7 @@ router.post('/cases', authenticateAdmin, async (req, res) => {
         entityId: String(ins.rows[0].id),
         payload: { source_type: String(source_type || 'manual'), severity: sev, priority: prio }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
     res.status(201).json(ins.rows[0])
   } catch (err) {
     res.status(500).json({ error: 'Failed to create case' })
@@ -8883,7 +8590,7 @@ router.post('/cases/:id/assign', authenticateAdmin, async (req, res) => {
         entityId: String(id),
         payload: { owner }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
     res.json(update.rows[0])
   } catch (err) {
     res.status(500).json({ error: 'Failed to assign case owner' })
@@ -8915,7 +8622,7 @@ router.post('/cases/:id/status', authenticateAdmin, async (req, res) => {
         entityId: String(id),
         payload: { status }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
     res.json(update.rows[0])
   } catch (err) {
     res.status(500).json({ error: 'Failed to update case status' })
@@ -8926,7 +8633,6 @@ router.get('/dispute-workflow', authenticateAdmin, async (req, res) => {
   try {
     await ensureFeatureTables()
     await ensureDisputesInfrastructure()
-    const scopedTenantId = getScopedTenantId(req)
     let rows = []
     try {
       const result = await pool.query(
@@ -8952,10 +8658,8 @@ router.get('/dispute-workflow', authenticateAdmin, async (req, res) => {
          LEFT JOIN users u ON u.id::text = d.user_id::text
          LEFT JOIN accounts a ON a.id::text = d.account_id::text
          LEFT JOIN admin_dispute_meta m ON m.dispute_id = d.id::text
-         WHERE ($1::bigint IS NULL OR COALESCE(d.tenant_id, $1) = $1)
          ORDER BY d.created_at DESC
-         LIMIT 500`,
-        [scopedTenantId]
+         LIMIT 500`
       )
       rows = result.rows.map(r => {
         const ageHours = r.created_at ? (Date.now() - new Date(r.created_at).getTime()) / 3600000 : 0
@@ -9000,7 +8704,6 @@ router.post('/dispute-workflow/:id/meta', authenticateAdmin, async (req, res) =>
     await ensureDisputesInfrastructure()
     const disputeId = String(req.params.id || '').trim()
     if (!disputeId) return res.status(400).json({ error: 'Invalid dispute id' })
-    const scopedTenantId = getScopedTenantId(req)
 
     const owner = req.body?.owner ? String(req.body.owner).trim() : null
     const priorityRaw = req.body?.priority ? String(req.body.priority).trim().toLowerCase() : 'normal'
@@ -9012,9 +8715,8 @@ router.post('/dispute-workflow/:id/meta', authenticateAdmin, async (req, res) =>
       `SELECT id
          FROM disputes
         WHERE id::text = $1
-          AND ($2::bigint IS NULL OR COALESCE(tenant_id, $2) = $2)
         LIMIT 1`,
-      [disputeId, scopedTenantId]
+      [disputeId]
     )
     if (disputeResult.rows.length === 0) {
       return res.status(404).json({ error: 'Dispute not found' })
@@ -9041,7 +8743,7 @@ router.post('/dispute-workflow/:id/meta', authenticateAdmin, async (req, res) =>
         entityId: disputeId,
         payload: { owner, priority, sla_hours: slaHours }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     res.json(upsert.rows[0])
   } catch (err) {
@@ -9055,7 +8757,6 @@ router.post('/dispute-workflow/:id/status', authenticateAdmin, async (req, res) 
     await ensureDisputesInfrastructure()
     const disputeId = String(req.params.id || '').trim()
     if (!disputeId) return res.status(400).json({ error: 'Invalid dispute id' })
-    const scopedTenantId = getScopedTenantId(req)
     const status = String(req.body?.status || '').trim()
     const adminResponse = String(req.body?.admin_response || '')
     const allowed = ['open', 'under_review', 'resolved', 'rejected']
@@ -9069,9 +8770,8 @@ router.post('/dispute-workflow/:id/status', authenticateAdmin, async (req, res) 
               admin_response = CASE WHEN $3 <> '' THEN $3 ELSE admin_response END,
               updated_at = NOW()
         WHERE id::text = $1
-          AND ($4::bigint IS NULL OR COALESCE(tenant_id, $4) = $4)
         RETURNING *`,
-      [disputeId, status, adminResponse, scopedTenantId]
+      [disputeId, status, adminResponse]
     )
     if (result.rows.length === 0) return res.status(404).json({ error: 'Dispute not found' })
 
@@ -9082,7 +8782,7 @@ router.post('/dispute-workflow/:id/status', authenticateAdmin, async (req, res) 
         entityId: disputeId,
         payload: { status }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     res.json(result.rows[0])
   } catch (err) {
@@ -9324,7 +9024,7 @@ router.post('/scheduled-reports', authenticateAdmin, async (req, res) => {
           channel: saved.channel
         }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     res.json(saved)
   } catch (err) {
@@ -9353,7 +9053,7 @@ router.post('/scheduled-reports/:id/toggle', authenticateAdmin, async (req, res)
         entityId: String(id),
         payload: { enabled: !!updated.rows[0].enabled }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
     res.json(updated.rows[0])
   } catch (err) {
     res.status(500).json({ error: 'Failed to toggle scheduled report' })
@@ -9437,7 +9137,7 @@ router.post('/emergency-kill/execute', authenticateAdmin, async (req, res) => {
           total_pnl: parseFloat(totalPnl.toFixed(2))
         }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     await client.query('COMMIT')
     res.json({
@@ -9476,7 +9176,7 @@ router.post('/emergency-kill/reset', authenticateAdmin, async (req, res) => {
         entityId: 'global',
         payload: { reenable_copier: reEnableCopier }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     await client.query('COMMIT')
     res.json({
@@ -9496,18 +9196,16 @@ router.post('/emergency-kill/reset', authenticateAdmin, async (req, res) => {
 router.get('/kyc/document/:userId/:type', authenticateAdmin, requireAdminCapability('kyc:review:scoped'), async (req, res) => {
   try {
     const { userId, type } = req.params;
-    const scopedTenantId = getScopedTenantId(req)
 
     // FIX: kyc.js saves file paths into the `users` table (not `user_kyc`).
     // Column mapping: type='id' -> id_document_path | type='selfie' -> selfie_path
     const columnName = type === 'selfie' ? 'selfie_path' : 'id_document_path';
 
     const userRow = await pool.query(
-      `SELECT ${columnName} AS doc_path, tenant_id
+      `SELECT ${columnName} AS doc_path
          FROM users
-        WHERE id = $1
-          AND ($2::bigint IS NULL OR COALESCE(tenant_id, $2) = $2)`,
-      [userId, scopedTenantId]
+        WHERE id = $1`,
+      [userId]
     );
 
     if (userRow.rows.length === 0 || !userRow.rows[0].doc_path) {
@@ -9543,7 +9241,7 @@ router.get('/kyc/document/:userId/:type', authenticateAdmin, requireAdminCapabil
         entityId: String(userId),
         payload: { type: String(type || 'id') }
       })
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     res.sendFile(absoluteFilePath);
   } catch (err) {
@@ -9608,6 +9306,5 @@ router._internals = {
   buildKycDocumentPresencePredicate,
   getExposureData,
   buildAccountListResult,
-  getScopedTenantId,
 }
 module.exports = router;

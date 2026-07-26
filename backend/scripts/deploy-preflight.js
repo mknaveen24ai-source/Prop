@@ -56,17 +56,9 @@ async function checkAdminState(failures) {
        COUNT(*) FILTER (WHERE status = 'active' AND totp_enabled = TRUE)::int AS active_totp
      FROM platform_admins`
   )
-  const tenant = await pool.query(
-    `SELECT
-       COUNT(*) FILTER (WHERE status = 'active')::int AS active,
-       COUNT(*) FILTER (WHERE status = 'active' AND totp_enabled = TRUE)::int AS active_totp
-     FROM tenant_admins`
-  ).catch(() => ({ rows: [{ active: 0, active_totp: 0 }] }))
 
   const activePlatformAdmins = parseInt(platform.rows[0]?.active || 0, 10)
   const activePlatformAdminsWithTotp = parseInt(platform.rows[0]?.active_totp || 0, 10)
-  const activeTenantAdmins = parseInt(tenant.rows[0]?.active || 0, 10)
-  const activeTenantAdminsWithTotp = parseInt(tenant.rows[0]?.active_totp || 0, 10)
 
   if (activePlatformAdmins < 1) {
     fail(failures, 'At least one active DB-backed platform admin is required')
@@ -78,12 +70,6 @@ async function checkAdminState(failures) {
     fail(failures, `Platform admin 2FA incomplete: ${activePlatformAdminsWithTotp}/${activePlatformAdmins}`)
   } else {
     pass(`Platform admin 2FA coverage: ${activePlatformAdminsWithTotp}/${activePlatformAdmins}`)
-  }
-
-  if (strict && activeTenantAdminsWithTotp < activeTenantAdmins) {
-    fail(failures, `Tenant admin 2FA incomplete: ${activeTenantAdminsWithTotp}/${activeTenantAdmins}`)
-  } else {
-    pass(`Tenant admin 2FA coverage: ${activeTenantAdminsWithTotp}/${activeTenantAdmins}`)
   }
 }
 

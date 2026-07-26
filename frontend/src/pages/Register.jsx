@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import axios from 'axios'
 import { useBranding } from '../BrandingContext'
-import { buildTenantPath, getTenantHeaders } from '../utils/tenant'
 
 function EyeIcon({ hidden }) {
   return (
@@ -27,7 +26,7 @@ function getPasswordStrength(password) {
   ]
   const score = checks.filter(c => c.pass).length
   const label = score <= 2 ? 'Weak' : score <= 3 ? 'Fair' : score === 4 ? 'Good' : 'Strong'
-  const color = score <= 2 ? '#ef4444' : score <= 3 ? '#f59e0b' : score === 4 ? '#84cc16' : '#22c55e'
+  const color = score <= 2 ? 'var(--loss)' : score <= 3 ? 'var(--warn)' : score === 4 ? 'var(--warn)' : 'var(--gain)'
   return { score, label, color, checks }
 }
 
@@ -94,8 +93,7 @@ function Register({ onLogin }) {
     try {
       await axios.post(
         `${API_URL}/api/auth/phone-otp/send`,
-        { phone },
-        { headers: getTenantHeaders() }
+        { phone }
       )
       setOtpSent(true)
       setStep(STEP_OTP)
@@ -119,8 +117,7 @@ function Register({ onLogin }) {
     try {
       await axios.post(
         `${API_URL}/api/auth/phone-otp/send`,
-        { phone: form.phone.trim() },
-        { headers: getTenantHeaders() }
+        { phone: form.phone.trim() }
       )
       setSuccess('A new code has been sent.')
       startCooldown(60)
@@ -155,8 +152,7 @@ function Register({ onLogin }) {
     try {
       const res = await axios.post(
         `${API_URL}/api/auth/phone-otp/verify`,
-        { phone: form.phone.trim(), code: otpCode },
-        { headers: getTenantHeaders() }
+        { phone: form.phone.trim(), code: otpCode }
       )
       const token = res.data.phone_verified_token
       setPhoneVerifiedToken(token)
@@ -175,8 +171,7 @@ function Register({ onLogin }) {
     try {
       const response = await axios.post(
         `${API_URL}/api/auth/register`,
-        { ...form, phone_verified_token: token },
-        { headers: getTenantHeaders() }
+        { ...form, phone_verified_token: token }
       )
       onLogin(response.data.user)
     } catch (err) {
@@ -234,7 +229,7 @@ function Register({ onLogin }) {
                     width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: '11px', fontWeight: 700,
                     background: done ? 'var(--accent)' : active ? 'var(--accent)' : 'var(--bg-hover)',
-                    color: done || active ? '#fff' : 'var(--text-muted)',
+                    color: done || active ? 'var(--paper)' : 'var(--text-muted)',
                     border: `1.5px solid ${done || active ? 'var(--accent)' : 'var(--border)'}`,
                     transition: 'all 0.3s'
                   }}>
@@ -388,7 +383,7 @@ function Register({ onLogin }) {
 
             <p style={{ textAlign: 'center', marginTop: '24px', color: 'var(--text-muted)', fontSize: '14px' }}>
               Already have an account?{' '}
-              <a href={buildTenantPath('/login')} style={{ color: 'var(--accent)' }}>Sign in here</a>
+              <a href="/login" style={{ color: 'var(--accent)' }}>Sign in here</a>
             </p>
           </form>
         )}

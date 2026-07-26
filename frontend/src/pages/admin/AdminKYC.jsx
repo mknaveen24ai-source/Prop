@@ -162,7 +162,7 @@ function KycDocViewer({ userId, zoom, adminAxios }) {
               width: `${Math.min(100, 90 * zoom)}%`,
               height: `${Math.min(100, 90 * zoom)}%`,
               borderRadius: '12px',
-              background: '#fff'
+              background: 'var(--paper)'
             }}
           >
             <div className="admin-kyc-viewer-empty" style={{ display: 'flex' }}>
@@ -257,13 +257,15 @@ export default function AdminKYC() {
     }
   };
 
-  const fetchKycQueue = async ({ silent = false } = {}) => {
+  // FIX (AUDIT): stale-closure race — see AdminUsers.jsx for full explanation.
+  const fetchKycQueue = async ({ silent = false, pageOverride } = {}) => {
+    const effectivePage = pageOverride ?? page;
     if (!silent) setLoading(true);
     try {
       const res = await adminAxios.get('/api/admin/traders', {
         params: {
           format: 'list',
-          page,
+          page: effectivePage,
           page_size: 25,
           search,
           sort: sort.key,
@@ -306,7 +308,7 @@ export default function AdminKYC() {
   useEffect(() => {
     const timeout = setTimeout(() => {
       setPage(1);
-      fetchKycQueue({ silent: true });
+      fetchKycQueue({ silent: true, pageOverride: 1 });
     }, 150);
     return () => clearTimeout(timeout);
   // eslint-disable-next-line react-hooks/exhaustive-deps

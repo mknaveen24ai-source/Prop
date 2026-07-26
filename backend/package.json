@@ -13,7 +13,6 @@
         "email:verify": "node scripts/verify-email-config.js",
         "email:worker": "node workers/emailWorker.js",
         "launch:smoke": "node scripts/launch-smoke.js",
-        "launch:verify-isolation": "node scripts/verify-tenant-isolation.js",
         "copier:mock-bridge": "node scripts/mock-copier-bridge.js",
         "copier:smoke": "node scripts/copier-smoke.js",
         "migrate": "knex migrate:latest",
@@ -27,6 +26,7 @@
     "license": "ISC",
     "type": "commonjs",
     "dependencies": {
+        "@sentry/node": "^10.56.0",
         "axios": "^1.13.5",
         "bcrypt": "^6.0.0",
         "bcryptjs": "^3.0.3",

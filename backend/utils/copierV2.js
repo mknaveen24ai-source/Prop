@@ -25,7 +25,7 @@ const COPIER_JOB_STATES = [
 const COPIER_COPY_MODES = ['mirror', 'reverse']
 const COPIER_RISK_MODES = ['fixed_lots', 'balance_ratio', 'equity_ratio', 'risk_percent']
 const COPIER_FOLLOWER_STATUSES = ['active', 'paused', 'stopped', 'breached']
-const COPIER_ALLOWED_MASTER_ACCOUNT_TYPES = ['phase1', 'phase2', 'funded']
+const COPIER_ALLOWED_MASTER_ACCOUNT_TYPES = ['phase1', 'phase2', 'phase3', 'funded']
 
 function safeJsonParse(value, fallback) {
   if (value == null) return fallback
@@ -64,7 +64,7 @@ function normalizeInteger(value, fallback = null) {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
-function normalizeTenantId(value, fallback = null) {
+function normalizeId(value, fallback = null) {
   const parsed = normalizeInteger(value, fallback)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
 }
@@ -155,32 +155,19 @@ function normalizeNewsFilter(value) {
   }
 }
 
-function buildEventDedupeKey({ tenantId, masterId, masterTradeId, eventType, payload }) {
+function buildEventDedupeKey({ masterId, masterTradeId, eventType, payload }) {
   const payloadFingerprint = crypto
     .createHash('sha1')
     .update(JSON.stringify(payload || {}))
     .digest('hex')
 
-  return [tenantId || 'default', masterId || 'none', masterTradeId || 'none', eventType, payloadFingerprint].join(':')
-}
-
-function resolveScopedTenantId(req, explicitTenantId = null) {
-  const requestTenantId = normalizeTenantId(explicitTenantId)
-  const adminTenantId = normalizeTenantId(req?.admin?.tenantId)
-  const isSuperAdmin = String(req?.admin?.role || '') === 'super_admin'
-
-  if (!isSuperAdmin) {
-    return adminTenantId
-  }
-
-  return requestTenantId || adminTenantId || null
+  return [masterId || 'none', masterTradeId || 'none', eventType, payloadFingerprint].join(':')
 }
 
 async function ensureCopierV2Infrastructure(pool) {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS copier_masters (
       id BIGSERIAL PRIMARY KEY,
-      tenant_id BIGINT NOT NULL,
       account_id TEXT NOT NULL UNIQUE,
       label TEXT,
       is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
@@ -189,12 +176,11 @@ async function ensureCopierV2Infrastructure(pool) {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `)
-  await pool.query(`CREATE INDEX IF NOT EXISTS copier_masters_tenant_idx ON copier_masters(tenant_id, is_enabled)`)
+  await pool.query(`CREATE INDEX IF NOT EXISTS copier_masters_enabled_idx ON copier_masters(is_enabled)`)
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS copier_followers (
       id BIGSERIAL PRIMARY KEY,
-      tenant_id BIGINT NOT NULL,
       display_name TEXT NOT NULL,
       bridge_target_key TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'active',
@@ -222,15 +208,14 @@ async function ensureCopierV2Infrastructure(pool) {
       stats_json JSONB NOT NULL DEFAULT '{}'::jsonb,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (tenant_id, bridge_target_key)
+      UNIQUE (bridge_target_key)
     )
   `)
-  await pool.query(`CREATE INDEX IF NOT EXISTS copier_followers_tenant_status_idx ON copier_followers(tenant_id, status)`)
+  await pool.query(`CREATE INDEX IF NOT EXISTS copier_followers_status_idx ON copier_followers(status)`)
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS copier_master_followers (
       id BIGSERIAL PRIMARY KEY,
-      tenant_id BIGINT NOT NULL,
       master_id BIGINT NOT NULL REFERENCES copier_masters(id) ON DELETE CASCADE,
       follower_id BIGINT NOT NULL REFERENCES copier_followers(id) ON DELETE CASCADE,
       is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
@@ -242,12 +227,11 @@ async function ensureCopierV2Infrastructure(pool) {
       UNIQUE (master_id, follower_id)
     )
   `)
-  await pool.query(`CREATE INDEX IF NOT EXISTS copier_master_followers_tenant_idx ON copier_master_followers(tenant_id, is_enabled)`)
+  await pool.query(`CREATE INDEX IF NOT EXISTS copier_master_followers_enabled_idx ON copier_master_followers(is_enabled)`)
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS copier_symbol_mappings (
       id BIGSERIAL PRIMARY KEY,
-      tenant_id BIGINT NOT NULL,
       follower_id BIGINT NOT NULL REFERENCES copier_followers(id) ON DELETE CASCADE,
       master_symbol TEXT NOT NULL,
       follower_symbol TEXT NOT NULL,
@@ -257,12 +241,11 @@ async function ensureCopierV2Infrastructure(pool) {
       UNIQUE (follower_id, master_symbol)
     )
   `)
-  await pool.query(`CREATE INDEX IF NOT EXISTS copier_symbol_mappings_tenant_idx ON copier_symbol_mappings(tenant_id, follower_id, is_enabled)`)
+  await pool.query(`CREATE INDEX IF NOT EXISTS copier_symbol_mappings_follower_idx ON copier_symbol_mappings(follower_id, is_enabled)`)
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS copier_events (
       id BIGSERIAL PRIMARY KEY,
-      tenant_id BIGINT NOT NULL,
       master_id BIGINT NOT NULL REFERENCES copier_masters(id) ON DELETE CASCADE,
       master_account_id TEXT NOT NULL,
       master_trade_id TEXT NOT NULL,
@@ -275,12 +258,11 @@ async function ensureCopierV2Infrastructure(pool) {
     )
   `)
   await pool.query(`CREATE INDEX IF NOT EXISTS copier_events_dispatch_idx ON copier_events(dispatch_state, created_at)`)
-  await pool.query(`CREATE INDEX IF NOT EXISTS copier_events_tenant_trade_idx ON copier_events(tenant_id, master_trade_id, created_at DESC)`)
+  await pool.query(`CREATE INDEX IF NOT EXISTS copier_events_trade_idx ON copier_events(master_trade_id, created_at DESC)`)
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS copier_jobs (
       id BIGSERIAL PRIMARY KEY,
-      tenant_id BIGINT NOT NULL,
       event_id BIGINT NOT NULL REFERENCES copier_events(id) ON DELETE CASCADE,
       follower_id BIGINT NOT NULL REFERENCES copier_followers(id) ON DELETE CASCADE,
       mapping_id BIGINT NOT NULL REFERENCES copier_master_followers(id) ON DELETE CASCADE,
@@ -307,7 +289,6 @@ async function ensureCopierV2Infrastructure(pool) {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS copier_job_attempts (
       id BIGSERIAL PRIMARY KEY,
-      tenant_id BIGINT NOT NULL,
       job_id BIGINT NOT NULL REFERENCES copier_jobs(id) ON DELETE CASCADE,
       attempt_no INTEGER NOT NULL,
       stage TEXT NOT NULL,
@@ -324,7 +305,6 @@ async function ensureCopierV2Infrastructure(pool) {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS copier_position_links (
       id BIGSERIAL PRIMARY KEY,
-      tenant_id BIGINT NOT NULL,
       master_id BIGINT NOT NULL REFERENCES copier_masters(id) ON DELETE CASCADE,
       follower_id BIGINT NOT NULL REFERENCES copier_followers(id) ON DELETE CASCADE,
       master_trade_id TEXT NOT NULL,
@@ -345,7 +325,6 @@ async function ensureCopierV2Infrastructure(pool) {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS copier_alert_endpoints (
       id BIGSERIAL PRIMARY KEY,
-      tenant_id BIGINT NOT NULL,
       endpoint_type TEXT NOT NULL DEFAULT 'webhook',
       display_name TEXT NOT NULL,
       target_url TEXT,
@@ -356,10 +335,9 @@ async function ensureCopierV2Infrastructure(pool) {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `)
-  await pool.query(`CREATE INDEX IF NOT EXISTS copier_alert_endpoints_tenant_idx ON copier_alert_endpoints(tenant_id, is_enabled)`)
+  await pool.query(`CREATE INDEX IF NOT EXISTS copier_alert_endpoints_enabled_idx ON copier_alert_endpoints(is_enabled)`)
 
   await pool.query(`ALTER TABLE copier_runtime_status ADD COLUMN IF NOT EXISTS runtime_scope TEXT NOT NULL DEFAULT 'shared_worker'`)
-  await pool.query(`ALTER TABLE copier_runtime_status ADD COLUMN IF NOT EXISTS tenant_id BIGINT`)
   await pool.query(`ALTER TABLE copier_runtime_status ADD COLUMN IF NOT EXISTS follower_id BIGINT`)
   await pool.query(`ALTER TABLE copier_runtime_status ADD COLUMN IF NOT EXISTS bridge_heartbeat_at TIMESTAMPTZ`)
   await pool.query(`ALTER TABLE copier_runtime_status ADD COLUMN IF NOT EXISTS last_snapshot_at TIMESTAMPTZ`)
@@ -368,7 +346,7 @@ async function ensureCopierV2Infrastructure(pool) {
   await pool.query(`ALTER TABLE copier_runtime_status ADD COLUMN IF NOT EXISTS throughput_last_minute INTEGER`)
   await pool.query(`ALTER TABLE copier_runtime_status ADD COLUMN IF NOT EXISTS retry_rate_last_hour NUMERIC(18,6)`)
   await pool.query(`ALTER TABLE copier_runtime_status ADD COLUMN IF NOT EXISTS dead_letter_count INTEGER`)
-  await pool.query(`CREATE INDEX IF NOT EXISTS copier_runtime_scope_idx ON copier_runtime_status(runtime_scope, tenant_id, follower_id)`)
+  await pool.query(`CREATE INDEX IF NOT EXISTS copier_runtime_scope_idx ON copier_runtime_status(runtime_scope, follower_id)`)
   await pool.query(`ALTER TABLE copier_masters ALTER COLUMN account_id TYPE TEXT USING account_id::text`)
   await pool.query(`ALTER TABLE copier_events ALTER COLUMN master_account_id TYPE TEXT USING master_account_id::text`)
   await pool.query(`ALTER TABLE copier_events ALTER COLUMN master_trade_id TYPE TEXT USING master_trade_id::text`)
@@ -376,23 +354,21 @@ async function ensureCopierV2Infrastructure(pool) {
 }
 
 async function writeCopierEvent(db, payload = {}) {
-  const tenantId = normalizeTenantId(payload.tenantId)
   const masterAccountId = normalizeEntityId(payload.masterAccountId)
   const masterTradeId = normalizeEntityId(payload.masterTradeId)
   const eventType = String(payload.eventType || '').trim().toUpperCase()
 
-  if (!tenantId || !masterAccountId || !masterTradeId || !COPIER_EVENT_TYPES.includes(eventType)) {
+  if (!masterAccountId || !masterTradeId || !COPIER_EVENT_TYPES.includes(eventType)) {
     return null
   }
 
   const masterResult = await db.query(
     `SELECT id
        FROM copier_masters
-      WHERE tenant_id = $1
-        AND account_id = $2
+      WHERE account_id = $1
         AND is_enabled = TRUE
       LIMIT 1`,
-    [tenantId, masterAccountId]
+    [masterAccountId]
   )
 
   if (masterResult.rows.length === 0) {
@@ -402,7 +378,6 @@ async function writeCopierEvent(db, payload = {}) {
   const masterId = masterResult.rows[0].id
   const eventPayload = payload.payload || {}
   const dedupeKey = payload.dedupeKey || buildEventDedupeKey({
-    tenantId,
     masterId,
     masterTradeId,
     eventType,
@@ -411,17 +386,16 @@ async function writeCopierEvent(db, payload = {}) {
 
   const result = await db.query(
     `INSERT INTO copier_events (
-       tenant_id,
        master_id,
        master_account_id,
        master_trade_id,
        event_type,
        payload_json,
        dedupe_key
-     ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
+     ) VALUES ($1, $2, $3, $4, $5::jsonb, $6)
      ON CONFLICT (dedupe_key) DO NOTHING
-     RETURNING id, master_id, tenant_id, master_trade_id, event_type, payload_json, created_at`,
-    [tenantId, masterId, masterAccountId, masterTradeId, eventType, JSON.stringify(eventPayload), dedupeKey]
+     RETURNING id, master_id, master_trade_id, event_type, payload_json, created_at`,
+    [masterId, masterAccountId, masterTradeId, eventType, JSON.stringify(eventPayload), dedupeKey]
   )
 
   return result.rows[0] || null
@@ -448,8 +422,7 @@ module.exports = {
   normalizeRiskMode,
   normalizeSessionFilter,
   normalizeStringArray,
-  normalizeTenantId,
-  resolveScopedTenantId,
+  normalizeId,
   safeJsonParse,
   writeCopierEvent
 }

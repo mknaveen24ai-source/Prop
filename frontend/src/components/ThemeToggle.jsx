@@ -37,10 +37,10 @@ export default function ThemeToggle() {
           transform: 'translateY(-50%)',
           width: '24px',
           height: '22px',
-          background: isDark ? 'var(--accent)' : '#fff',
+          background: isDark ? 'var(--accent)' : 'var(--paper)',
           borderRadius: '50%',
           transition: 'all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
-          boxShadow: isDark ? '0 0 10px rgba(37, 99, 235, 0.5)' : '0 1px 3px rgba(0,0,0,0.2)',
+          boxShadow: isDark ? '0 0 10px rgba(var(--brand-primary-rgb), 0.5)' : '0 1px 3px rgba(0,0,0,0.2)',
           zIndex: 1
         }}
       />

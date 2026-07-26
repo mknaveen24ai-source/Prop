@@ -73,13 +73,15 @@ export default function AdminChallenges() {
     }
   };
 
-  const fetchAccounts = async ({ silent = false } = {}) => {
+  // FIX (AUDIT): stale-closure race — see AdminUsers.jsx for full explanation.
+  const fetchAccounts = async ({ silent = false, pageOverride } = {}) => {
+    const effectivePage = pageOverride ?? page;
     if (!silent) setLoading(true);
     try {
       const res = await adminAxios.get('/api/admin/accounts', {
         params: {
           format: 'list',
-          page,
+          page: effectivePage,
           page_size: 25,
           search,
           sort: sort.key,
@@ -110,7 +112,7 @@ export default function AdminChallenges() {
   useEffect(() => {
     const timeout = setTimeout(() => {
       setPage(1);
-      fetchAccounts({ silent: true });
+      fetchAccounts({ silent: true, pageOverride: 1 });
     }, 150);
     return () => clearTimeout(timeout);
   // eslint-disable-next-line react-hooks/exhaustive-deps

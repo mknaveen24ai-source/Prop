@@ -27,24 +27,12 @@ const { performanceMonitor, wrapDatabaseQuery, getMetrics, resetMetrics, getHeal
 const { getFeedHealthForTenant, getLaunchHealthStatus } = require('./utils/launchReadiness')
 const { registerIO } = require('./utils/realtime')
 const {
-  ensureTenantInfrastructure,
-  attachTenantContext,
-  isAllowedOrigin,
-  resolveTenant,
-  getRequestedTenantSlug,
-  extractHostname
-} = require('./utils/tenants')
-const {
-  attachDbRequestContext,
-  runWithSystemDbContext
-} = require('./utils/dbContext')
-const {
   ensureTenantSettingsInfrastructure
 } = require('./utils/tenantSettings')
 const { ensureIdempotencyInfrastructure } = require('./utils/idempotency')
-const { ensureTenantIsolationInfrastructure } = require('./utils/tenantIsolation')
 const { ensureEmailQueueInfrastructure } = require('./utils/emailQueue')
 const { sanitizeString } = require('./utils/validation')
+const { isAllowedOrigin } = require('./utils/allowedOrigins')
 
 // ── Services (extracted from the old monolithic server.js) ────────────────────
 const { configureSocket } = require('./services/socketService')
@@ -65,6 +53,10 @@ const {
   weekendForceCloseByTenant,
   setIo: setWeekendIo
 } = require('./services/weekendCloseService')
+const {
+  flatByCloseForAccounts,
+  setIo: setFlatByCloseIo
+} = require('./services/flatByCloseService')
 
 // ── Price feed ────────────────────────────────────────────────────────────────
 const {
@@ -88,8 +80,6 @@ const payoutRoutes         = require('./routes/payouts')
 const kycRoutes            = require('./routes/kyc')
 const chatRoutes           = require('./routes/chat')
 const swaggerRoutes        = require('./routes/swagger')
-const tenantRoutes         = require('./routes/tenant')
-const adminTenantRoutes    = require('./routes/adminTenants')
 const { router: billingRoutes, billingWebhookHandler, ensureBillingInfrastructure } = require('./routes/billing')
 const { router: copierRoutes, ensureCopierSettings } = require('./routes/copier-routes')
 const {
@@ -139,7 +129,7 @@ async function getAnnouncementState() {
   return { message, type, enabled, updated_at: settings.announcement_updated_at || null }
 }
 
-async function fetchLeaderboardRows({ tenantId = null, includeHidden = false, limit = 20 }) {
+async function fetchLeaderboardRows({ includeHidden = false, limit = 20 }) {
   const result = await pool.query(
     `
       WITH ranked_accounts AS (
@@ -165,7 +155,6 @@ async function fetchLeaderboardRows({ tenantId = null, includeHidden = false, li
         JOIN accounts a ON a.user_id = u.id
         WHERE a.account_type = 'funded' AND a.status = 'active'
           AND COALESCE(u.is_banned, FALSE) = FALSE
-          AND ($1::bigint IS NULL OR COALESCE(u.tenant_id, a.tenant_id, $1) = $1)
       ),
       closed_trade_stats AS (
         SELECT
@@ -178,7 +167,6 @@ async function fetchLeaderboardRows({ tenantId = null, includeHidden = false, li
           ), 0) AS win_rate
         FROM accounts a
         LEFT JOIN trades t ON t.account_id = a.id AND t.status = 'closed'
-        WHERE ($1::bigint IS NULL OR COALESCE(a.tenant_id, $1) = $1)
         GROUP BY a.user_id
       )
       SELECT r.user_id, r.full_name, r.country, r.trader_uid, r.visible,
@@ -186,11 +174,11 @@ async function fetchLeaderboardRows({ tenantId = null, includeHidden = false, li
              COALESCE(s.total_trades, 0) AS total_trades, COALESCE(s.win_rate, 0) AS win_rate
       FROM ranked_accounts r
       LEFT JOIN closed_trade_stats s ON s.user_id = r.user_id
-      WHERE r.rn = 1 AND ($2::boolean = TRUE OR r.visible = TRUE)
+      WHERE r.rn = 1 AND ($1::boolean = TRUE OR r.visible = TRUE)
       ORDER BY r.profit_pct DESC, r.profit_usd DESC, r.user_id ASC
-      LIMIT $3
+      LIMIT $2
     `,
-    [tenantId, includeHidden, limit]
+    [includeHidden, limit]
   )
   return result.rows.map((row, index) => ({
     ...row, rank: index + 1,
@@ -211,16 +199,13 @@ async function ensureUniqueIds() {
     await pool.query(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS account_uid TEXT`)
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS accounts_account_uid_uq ON accounts(account_uid)`)
     await pool.query(`CREATE TABLE IF NOT EXISTS bbook_pnl (
-      tenant_id         BIGINT NOT NULL DEFAULT 1,
-      date              DATE NOT NULL,
+      date              DATE PRIMARY KEY,
       accounts_passed   INT NOT NULL DEFAULT 0,
       accounts_failed   INT NOT NULL DEFAULT 0,
       accounts_expired  INT NOT NULL DEFAULT 0,
-      new_funded        INT NOT NULL DEFAULT 0,
-      PRIMARY KEY (tenant_id, date)
+      new_funded        INT NOT NULL DEFAULT 0
     )`)
-    await pool.query(`ALTER TABLE bbook_pnl ADD COLUMN IF NOT EXISTS tenant_id BIGINT NOT NULL DEFAULT 1`)
-    await pool.query(`CREATE INDEX IF NOT EXISTS bbook_pnl_tenant_date_idx ON bbook_pnl(tenant_id, date DESC)`)
+    await pool.query(`CREATE INDEX IF NOT EXISTS bbook_pnl_date_idx ON bbook_pnl(date DESC)`)
     await pool.query(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ`)
     await pool.query(`UPDATE accounts SET updated_at = created_at WHERE updated_at IS NULL`)
     await pool.query(`
@@ -241,7 +226,6 @@ async function ensureUniqueIds() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS trade_logs (
         id          BIGSERIAL PRIMARY KEY,
-        tenant_id   BIGINT,
         trade_id    TEXT,
         user_id     TEXT,
         account_id  TEXT,
@@ -249,7 +233,6 @@ async function ensureUniqueIds() {
         logged_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `)
-    await pool.query(`ALTER TABLE trade_logs ADD COLUMN IF NOT EXISTS tenant_id BIGINT`)
     await pool.query(`
       DO $$
       BEGIN
@@ -270,18 +253,15 @@ async function ensureUniqueIds() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS login_logs (
         id           BIGSERIAL PRIMARY KEY,
-        tenant_id    BIGINT,
         user_id      TEXT,
         ip_address   TEXT,
         logged_in_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `)
-    await pool.query(`ALTER TABLE login_logs ADD COLUMN IF NOT EXISTS tenant_id BIGINT`)
     // FIX (BUG-M5): support_tickets DDL moved from inline route handlers to startup.
     await pool.query(`
       CREATE TABLE IF NOT EXISTS support_tickets (
         id          BIGSERIAL PRIMARY KEY,
-        tenant_id   BIGINT NOT NULL DEFAULT 1,
         user_id     INTEGER,
         email       TEXT,
         name        TEXT,
@@ -292,11 +272,9 @@ async function ensureUniqueIds() {
         created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `)
-    await pool.query(`ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS tenant_id BIGINT NOT NULL DEFAULT 1`)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS support_ticket_messages (
         id          BIGSERIAL PRIMARY KEY,
-        tenant_id   BIGINT NOT NULL DEFAULT 1,
         ticket_id   BIGINT NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
         sender_type TEXT NOT NULL CHECK (sender_type IN ('user', 'admin')),
         sender_name TEXT,
@@ -304,24 +282,8 @@ async function ensureUniqueIds() {
         created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `)
-    await pool.query(`ALTER TABLE support_ticket_messages ADD COLUMN IF NOT EXISTS tenant_id BIGINT NOT NULL DEFAULT 1`)
     await pool.query(`CREATE INDEX IF NOT EXISTS support_ticket_messages_ticket_idx ON support_ticket_messages(ticket_id, created_at ASC)`)
-    await pool.query(`CREATE INDEX IF NOT EXISTS support_tickets_tenant_created_idx ON support_tickets(tenant_id, created_at DESC)`)
-    await pool.query(`CREATE INDEX IF NOT EXISTS support_ticket_messages_tenant_ticket_idx ON support_ticket_messages(tenant_id, ticket_id, created_at ASC)`)
-    await pool.query(`
-      UPDATE support_tickets st
-         SET tenant_id = COALESCE(u.tenant_id, st.tenant_id, 1)
-        FROM users u
-       WHERE st.user_id::text = u.id::text
-         AND (st.tenant_id IS NULL OR st.tenant_id = 1)
-    `)
-    await pool.query(`
-      UPDATE support_ticket_messages stm
-         SET tenant_id = st.tenant_id
-        FROM support_tickets st
-       WHERE stm.ticket_id = st.id
-         AND (stm.tenant_id IS NULL OR stm.tenant_id <> st.tenant_id)
-    `)
+    await pool.query(`CREATE INDEX IF NOT EXISTS support_tickets_created_idx ON support_tickets(created_at DESC)`)
     const users = await pool.query(`SELECT id FROM users WHERE trader_uid IS NULL`)
     for (const row of users.rows) {
       await pool.query(`UPDATE users SET trader_uid = $1 WHERE id = $2`, [uuidv4(), row.id])
@@ -339,7 +301,6 @@ async function ensureDisputesTable() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS disputes (
       id             BIGSERIAL PRIMARY KEY,
-      tenant_id      BIGINT NOT NULL DEFAULT 1,
       user_id        INTEGER   NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       account_id     INTEGER,
       reason         TEXT      NOT NULL,
@@ -350,28 +311,17 @@ async function ensureDisputesTable() {
       updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `)
-  await pool.query(`ALTER TABLE disputes ADD COLUMN IF NOT EXISTS tenant_id BIGINT NOT NULL DEFAULT 1`)
-  await pool.query(`CREATE INDEX IF NOT EXISTS disputes_tenant_created_idx ON disputes(tenant_id, created_at DESC)`)
-  await pool.query(`
-    UPDATE disputes d
-       SET tenant_id = COALESCE(u.tenant_id, d.tenant_id, 1)
-      FROM users u
-     WHERE d.user_id = u.id
-       AND (d.tenant_id IS NULL OR d.tenant_id = 1)
-  `)
+  await pool.query(`CREATE INDEX IF NOT EXISTS disputes_created_idx ON disputes(created_at DESC)`)
 }
 
 // ─── Startup infrastructure ───────────────────────────────────────────────────
-runWithSystemDbContext(() => ensureUniqueIds()).catch(err => {
+ensureUniqueIds().catch(err => {
   logger.error('[startup] Failed to ensure unique ids/infrastructure:', { error: err.message })
 })
-ensureTenantInfrastructure().catch(err => {
-  logger.error('[startup] Failed to ensure tenant infrastructure:', { error: err.message })
-})
-runWithSystemDbContext(() => pool.query(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS original_commission NUMERIC(10,2)`)).catch(err => {
+pool.query(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS original_commission NUMERIC(10,2)`).catch(err => {
   logger.warn('[startup] Could not add original_commission column:', { error: err.message })
 })
-runWithSystemDbContext(() => ensureChatTables()).catch(err => {
+ensureChatTables().catch(err => {
   logger.error('[startup] Failed to ensure chat tables:', { error: err.message })
 })
 ensureCopierSettings().catch(err => {
@@ -383,16 +333,13 @@ ensureBillingInfrastructure().catch(err => {
 ensureTradeExperienceInfrastructure().catch(err => {
   logger.error('[startup] Failed to ensure trade experience infrastructure:', { error: err.message })
 })
-ensureTenantIsolationInfrastructure().catch(err => {
-  logger.error('[startup] Failed to ensure tenant isolation infrastructure:', { error: err.message })
-})
 ensureIdempotencyInfrastructure().catch(err => {
   logger.error('[startup] Failed to ensure idempotency infrastructure:', { error: err.message })
 })
 ensureEmailQueueInfrastructure().catch(err => {
   logger.error('[startup] Failed to ensure email queue infrastructure:', { error: err.message })
 })
-runWithSystemDbContext(() => ensureDisputesTable()).catch(err => {
+ensureDisputesTable().catch(err => {
   logger.error('[startup] Failed to ensure disputes table:', { error: err.message })
 })
 
@@ -416,9 +363,7 @@ const supportLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, message: {
 const io = new Server(httpServer, {
   cors: {
     origin: function (origin, callback) {
-      isAllowedOrigin(origin)
-        .then((allowed) => callback(null, allowed ? origin || true : false))
-        .catch((error) => callback(error))
+      callback(null, isAllowedOrigin(origin) ? (origin || true) : false)
     },
     methods: ['GET', 'POST'],
     credentials: true
@@ -429,6 +374,7 @@ const io = new Server(httpServer, {
 configureSocket(io, pool)
 setNewsIo(io)
 setWeekendIo(io)
+setFlatByCloseIo(io)
 
 // ── HTTP socket tracking (for graceful shutdown) ──────────────────────────────
 const activeHttpSockets = new Set()
@@ -452,9 +398,7 @@ app.use(helmet({
 }))
 app.use(cors({
   origin: function (origin, callback) {
-    isAllowedOrigin(origin)
-      .then((allowed) => callback(null, allowed ? origin || true : false))
-      .catch((error) => callback(error))
+    callback(null, isAllowedOrigin(origin) ? (origin || true) : false)
   },
   credentials: true
 }))
@@ -463,8 +407,6 @@ app.use(express.json({ limit: '1mb' }))
 app.use(cookieParser())
 app.disable('x-powered-by')
 app.use(logger.httpMiddleware)
-app.use(attachTenantContext)
-app.use(attachDbRequestContext)
 
 // ─── Secure uploads ───────────────────────────────────────────────────────────
 const uploadsRoot = path.resolve(__dirname, 'uploads')
@@ -485,12 +427,10 @@ wrapDatabaseQuery(pool)
 app.use('/api/setup',    require('./routes/setup'))
 app.use('/api/auth',     authLimiter,   authRoutes)
 app.use('/api/docs',     swaggerRoutes)
-app.use('/api/tenant',   tenantRoutes)
 app.use('/api/accounts', accountRoutes)
 app.use('/api/trades',   tradeRoutes)
 app.use('/api/admin',    adminRoutes)
 app.use('/api/admin',    adminViolationRoutes)
-app.use('/api/admin',    adminTenantRoutes)
 app.use('/api/admin',    copierRoutes)
 app.use('/api/payouts',  payoutRoutes)
 app.use('/api/kyc',      kycRoutes)
@@ -501,8 +441,7 @@ app.use('/api/billing',  billingRoutes)
 // ─── Performance & Health endpoints ──────────────────────────────────────────
 app.get('/api/health', async function (req, res) {
   try {
-    const tenantId = req.tenant?.id || null
-    res.json(await getLaunchHealthStatus(tenantId))
+    res.json(await getLaunchHealthStatus())
   } catch (error) {
     logger.error('Health endpoint error:', { error: error.message })
     res.status(503).json({ ...getHealthStatus(), status: 'unhealthy', launch_ready: false, error: 'Could not build launch health summary' })
@@ -524,8 +463,7 @@ app.get('/api/announcement', async function (req, res) {
 
 app.get('/api/leaderboard', async function (req, res) {
   try {
-    const tenantId = req.tenant?.id || 1
-    res.json(await fetchLeaderboardRows({ tenantId, includeHidden: false, limit: 20 }))
+    res.json(await fetchLeaderboardRows({ includeHidden: false, limit: 20 }))
   } catch (error) {
     logger.error('Leaderboard error:', { error: error.message })
     res.status(500).json({ error: 'Could not load leaderboard' })
@@ -544,11 +482,10 @@ app.post('/api/support/ticket', supportLimiter, function optionalAuth(req, res, 
     const subject = sanitizeString(String(req.body?.subject || ''), 200)
     const message = sanitizeString(String(req.body?.message || ''), 5000)
     const user_id = req.user?.userId
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
     if (!subject || !message) return res.status(400).json({ error: 'Subject and message are required' })
     await pool.query(
-      `INSERT INTO support_tickets (tenant_id, user_id, email, name, category, subject, message) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [tenantId, user_id || null, sanitizeString(String(email || ''), 200), sanitizeString(String(name || ''), 100), category || 'other', subject, message]
+      `INSERT INTO support_tickets (user_id, email, name, category, subject, message) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [user_id || null, sanitizeString(String(email || ''), 200), sanitizeString(String(name || ''), 100), category || 'other', subject, message]
     )
     res.status(201).json({ message: 'Support ticket submitted successfully' })
   } catch (error) {
@@ -559,10 +496,9 @@ app.post('/api/support/ticket', supportLimiter, function optionalAuth(req, res, 
 
 async function loadUserSupportTickets(req, res) {
   try {
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
     const result = await pool.query(
-      `SELECT id, category, subject, message, status, created_at FROM support_tickets WHERE user_id = $1 AND tenant_id = $2 ORDER BY created_at DESC`,
-      [req.user.userId, tenantId]
+      `SELECT id, category, subject, message, status, created_at FROM support_tickets WHERE user_id = $1 ORDER BY created_at DESC`,
+      [req.user.userId]
     )
     res.json(result.rows)
   } catch (error) {
@@ -576,17 +512,16 @@ app.get('/api/support/my-tickets', authTok, loadUserSupportTickets)
 
 app.get('/api/support/ticket/:id', authTok, async function (req, res) {
   try {
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
     const ticketId = parseInt(req.params.id, 10)
     if (!Number.isFinite(ticketId)) return res.status(400).json({ error: 'Invalid ticket id' })
     const ticketResult = await pool.query(
-      `SELECT id, user_id, category, subject, message, status, created_at FROM support_tickets WHERE id = $1 AND user_id = $2 AND tenant_id = $3`,
-      [ticketId, req.user.userId, tenantId]
+      `SELECT id, user_id, category, subject, message, status, created_at FROM support_tickets WHERE id = $1 AND user_id = $2`,
+      [ticketId, req.user.userId]
     )
     if (ticketResult.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' })
     const messagesResult = await pool.query(
-      `SELECT id, sender_type, sender_name, message, created_at FROM support_ticket_messages WHERE ticket_id = $1 AND tenant_id = $2 ORDER BY created_at ASC, id ASC`,
-      [ticketId, tenantId]
+      `SELECT id, sender_type, sender_name, message, created_at FROM support_ticket_messages WHERE ticket_id = $1 ORDER BY created_at ASC, id ASC`,
+      [ticketId]
     )
     res.json({ ticket: ticketResult.rows[0], messages: messagesResult.rows })
   } catch (error) {
@@ -597,20 +532,19 @@ app.get('/api/support/ticket/:id', authTok, async function (req, res) {
 
 app.post('/api/support/ticket/:id/reply', authTok, async function (req, res) {
   try {
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
     const ticketId = parseInt(req.params.id, 10)
     if (!Number.isFinite(ticketId)) return res.status(400).json({ error: 'Invalid ticket id' })
     const message = sanitizeString(String(req.body?.message || ''), 2000)
     if (!message) return res.status(400).json({ error: 'Reply message is required' })
     const ticketResult = await pool.query(
-      `SELECT id, status FROM support_tickets WHERE id = $1 AND user_id = $2 AND tenant_id = $3`,
-      [ticketId, req.user.userId, tenantId]
+      `SELECT id, status FROM support_tickets WHERE id = $1 AND user_id = $2`,
+      [ticketId, req.user.userId]
     )
     if (ticketResult.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' })
     if (ticketResult.rows[0].status === 'closed') return res.status(400).json({ error: 'Closed tickets cannot receive new replies' })
     const replyResult = await pool.query(
-      `INSERT INTO support_ticket_messages (tenant_id, ticket_id, sender_type, sender_name, message) VALUES ($1, $2, 'user', $3, $4) RETURNING id, sender_type, sender_name, message, created_at`,
-      [tenantId, ticketId, 'You', message]
+      `INSERT INTO support_ticket_messages (ticket_id, sender_type, sender_name, message) VALUES ($1, 'user', $2, $3) RETURNING id, sender_type, sender_name, message, created_at`,
+      [ticketId, 'You', message]
     )
     res.status(201).json({ message: 'Reply sent successfully', reply: replyResult.rows[0] })
   } catch (error) {
@@ -621,10 +555,8 @@ app.post('/api/support/ticket/:id/reply', authTok, async function (req, res) {
 
 app.get('/api/admin/support-tickets', authAdm, async function (req, res) {
   try {
-    const tenantId = req.admin?.tenantId || null
     const result = await pool.query(
-      `SELECT * FROM support_tickets WHERE ($1::bigint IS NULL OR tenant_id = $1) ORDER BY created_at DESC`,
-      [tenantId]
+      `SELECT * FROM support_tickets ORDER BY created_at DESC`
     )
     res.json(result.rows)
   } catch (error) { res.status(500).json({ error: 'Could not fetch tickets' }) }
@@ -632,12 +564,11 @@ app.get('/api/admin/support-tickets', authAdm, async function (req, res) {
 
 app.patch('/api/admin/support-tickets/:id', authAdm, async function (req, res) {
   try {
-    const tenantId = req.admin?.tenantId || null
     const { status } = req.body
     if (!['open', 'resolved', 'closed'].includes(status)) return res.status(400).json({ error: 'Invalid status' })
     const result = await pool.query(
-      `UPDATE support_tickets SET status = $1 WHERE id = $2 AND ($3::bigint IS NULL OR tenant_id = $3) RETURNING *`,
-      [status, req.params.id, tenantId]
+      `UPDATE support_tickets SET status = $1 WHERE id = $2 RETURNING *`,
+      [status, req.params.id]
     )
     if (result.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' })
     res.json({ message: 'Ticket updated', ticket: result.rows[0] })
@@ -647,7 +578,6 @@ app.patch('/api/admin/support-tickets/:id', authAdm, async function (req, res) {
 // ── Disputes (user-facing + admin-facing) ─────────────────────────────────────
 app.post('/api/disputes/submit', authTok, async function (req, res) {
   try {
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
     const { account_id } = req.body
     const reason = sanitizeString(String(req.body?.reason || ''), 200)
     const description = sanitizeString(String(req.body?.description || ''), 5000)
@@ -656,19 +586,19 @@ app.post('/api/disputes/submit', authTok, async function (req, res) {
     if (description.trim().length < 30) return res.status(400).json({ error: 'Description must be at least 30 characters' })
     if (accountId !== null && !String(accountId).trim()) return res.status(400).json({ error: 'Invalid account ID' })
     if (accountId !== null) {
-      const owned = await pool.query(`SELECT id FROM accounts WHERE id = $1 AND user_id = $2 AND COALESCE(tenant_id, $3) = $3`, [accountId, req.user.userId, tenantId])
+      const owned = await pool.query(`SELECT id FROM accounts WHERE id = $1 AND user_id = $2`, [accountId, req.user.userId])
       if (owned.rows.length === 0) return res.status(404).json({ error: 'Account not found' })
       const existing = await pool.query(`SELECT id FROM disputes WHERE user_id = $1 AND account_id = $2 AND status IN ('open','under_review')`, [req.user.userId, accountId])
       if (existing.rows.length > 0) return res.status(400).json({ error: 'You already have an open dispute for this account' })
     }
     const tradeCheck = await pool.query(
-      `SELECT COUNT(*) FROM trades t JOIN accounts a ON t.account_id = a.id WHERE a.user_id = $1 AND COALESCE(a.tenant_id, $2) = $2 AND t.status = 'closed'`,
-      [req.user.userId, tenantId]
+      `SELECT COUNT(*) FROM trades t JOIN accounts a ON t.account_id = a.id WHERE a.user_id = $1 AND t.status = 'closed'`,
+      [req.user.userId]
     )
     if (parseInt(tradeCheck.rows[0].count) < 1) return res.status(400).json({ error: 'You must have at least one completed trade before filing a dispute.' })
     const result = await pool.query(
-      `INSERT INTO disputes (tenant_id, user_id, account_id, reason, description) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [tenantId, req.user.userId, accountId, reason, description.trim()]
+      `INSERT INTO disputes (user_id, account_id, reason, description) VALUES ($1, $2, $3, $4) RETURNING *`,
+      [req.user.userId, accountId, reason, description.trim()]
     )
     res.status(201).json({ message: 'Dispute submitted', dispute: result.rows[0] })
   } catch (error) {
@@ -679,10 +609,9 @@ app.post('/api/disputes/submit', authTok, async function (req, res) {
 
 app.get('/api/disputes/my-disputes', authTok, async function (req, res) {
   try {
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
     const result = await pool.query(
-      `SELECT d.*, a.account_uid, a.account_type, a.account_size FROM disputes d LEFT JOIN accounts a ON d.account_id = a.id WHERE d.user_id = $1 AND d.tenant_id = $2 ORDER BY d.created_at DESC`,
-      [req.user.userId, tenantId]
+      `SELECT d.*, a.account_uid, a.account_type, a.account_size FROM disputes d LEFT JOIN accounts a ON d.account_id = a.id WHERE d.user_id = $1 ORDER BY d.created_at DESC`,
+      [req.user.userId]
     )
     res.json(result.rows)
   } catch (error) { res.status(500).json({ error: 'Could not load disputes.' }) }
@@ -690,10 +619,8 @@ app.get('/api/disputes/my-disputes', authTok, async function (req, res) {
 
 app.get('/api/disputes/all', authAdm, async function (req, res) {
   try {
-    const tenantId = req.admin?.tenantId || null
     const result = await pool.query(
-      `SELECT d.*, u.email, u.full_name, u.trader_uid, a.account_uid, a.account_type, a.account_size, a.status as account_status FROM disputes d JOIN users u ON d.user_id = u.id LEFT JOIN accounts a ON d.account_id = a.id WHERE ($1::bigint IS NULL OR d.tenant_id = $1) ORDER BY d.created_at DESC`,
-      [tenantId]
+      `SELECT d.*, u.email, u.full_name, u.trader_uid, a.account_uid, a.account_type, a.account_size, a.status as account_status FROM disputes d JOIN users u ON d.user_id = u.id LEFT JOIN accounts a ON d.account_id = a.id ORDER BY d.created_at DESC`
     )
     res.json(result.rows)
   } catch (error) { res.status(500).json({ error: 'Could not load disputes.' }) }
@@ -701,14 +628,13 @@ app.get('/api/disputes/all', authAdm, async function (req, res) {
 
 app.patch('/api/disputes/:id', authAdm, async function (req, res) {
   try {
-    const tenantId = req.admin?.tenantId || null
     const { id } = req.params
     const { status, admin_response } = req.body
     const valid = ['open', 'under_review', 'resolved', 'rejected']
     if (!valid.includes(status)) return res.status(400).json({ error: `status must be one of: ${valid.join(', ')}` })
     const result = await pool.query(
-      `UPDATE disputes SET status = $1, admin_response = $2, updated_at = NOW() WHERE id = $3 AND ($4::bigint IS NULL OR tenant_id = $4) RETURNING *`,
-      [status, admin_response || null, id, tenantId]
+      `UPDATE disputes SET status = $1, admin_response = $2, updated_at = NOW() WHERE id = $3 RETURNING *`,
+      [status, admin_response || null, id]
     )
     if (result.rows.length === 0) return res.status(404).json({ error: 'Dispute not found' })
     res.json({ message: 'Dispute updated', dispute: result.rows[0] })
@@ -725,9 +651,8 @@ app.get('/', function (req, res) {
 
 app.get('/api/prices', async function (req, res) {
   try {
-    const { getCurrentPrices, getCurrentPricesForTenant } = require('./priceFeed')
-    const tenantId = req.tenant?.id || null
-    const prices = tenantId ? await getCurrentPricesForTenant(tenantId) : await getCurrentPrices()
+    const { getCurrentPrices } = require('./priceFeed')
+    const prices = await getCurrentPrices()
     res.json(prices)
   } catch (error) {
     logger.error('Prices error:', { error: error.message })
@@ -763,8 +688,7 @@ app.get('/api/prices/chart/:instrument', async function (req, res) {
 
 app.get('/api/price-status', async function (req, res) {
   try {
-    const tenantId = req.tenant?.id || null
-    res.json(await getFeedHealthForTenant(tenantId))
+    res.json(await getFeedHealthForTenant())
   } catch (error) {
     logger.error('Price status error:', { error: error.message })
     res.status(500).json({ error: 'Could not check price status', healthy: false })
@@ -790,10 +714,10 @@ startAllSchedulers(io, {
   runChallengeEngine,
   checkNewsForceClose,
   weekendForceCloseByTenant,
+  flatByCloseForAccounts,
   pruneOldPriceHistory:          require('./priceFeed').pruneOldPriceHistory,
   syncHourlyPriceHistory:        require('./priceFeed').syncHourlyPriceHistory,
-  syncDedicatedPriceFeedWatchers: require('./priceFeed').syncDedicatedPriceFeedWatchers,
-  emitTenantPriceUpdates:        require('./services/priceBroadcast').emitTenantPriceUpdates
+  syncDedicatedPriceFeedWatchers: require('./priceFeed').syncDedicatedPriceFeedWatchers
 })
 
 // ─── Sentry error handler (before global handler) ─────────────────────────────

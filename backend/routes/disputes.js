@@ -6,18 +6,16 @@ const logger = require('../utils/logger')
 const rateLimit = require('express-rate-limit')
 const { ipKeyGenerator } = require('express-rate-limit')
 const { sanitizeString } = require('../utils/validation')
-const { runWithSystemDbContext } = require('../utils/dbContext')
 
 let disputesInfrastructurePromise = null
 
 async function ensureDisputesInfrastructure() {
   if (disputesInfrastructurePromise) return disputesInfrastructurePromise
 
-  disputesInfrastructurePromise = runWithSystemDbContext(async () => {
+  disputesInfrastructurePromise = (async () => {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS disputes (
         id BIGSERIAL PRIMARY KEY,
-        tenant_id BIGINT NOT NULL DEFAULT 1,
         user_id TEXT NOT NULL,
         account_id TEXT,
         reason TEXT NOT NULL,
@@ -28,20 +26,12 @@ async function ensureDisputesInfrastructure() {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `)
-    await pool.query(`ALTER TABLE disputes ADD COLUMN IF NOT EXISTS tenant_id BIGINT NOT NULL DEFAULT 1`)
     await pool.query(`ALTER TABLE disputes ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'open'`)
     await pool.query(`ALTER TABLE disputes ADD COLUMN IF NOT EXISTS admin_response TEXT`)
     await pool.query(`ALTER TABLE disputes ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`)
     await pool.query(`ALTER TABLE disputes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`)
-    await pool.query(`CREATE INDEX IF NOT EXISTS disputes_tenant_created_idx ON disputes(tenant_id, created_at DESC)`)
-    await pool.query(`
-      UPDATE disputes d
-         SET tenant_id = COALESCE(d.tenant_id, u.tenant_id, 1)
-        FROM users u
-       WHERE d.user_id::text = u.id::text
-         AND (d.tenant_id IS NULL OR d.tenant_id = 1)
-    `).catch(() => {})
-  }).catch((error) => {
+    await pool.query(`CREATE INDEX IF NOT EXISTS disputes_created_idx ON disputes(created_at DESC)`)
+  })().catch((error) => {
     disputesInfrastructurePromise = null
     throw error
   })
@@ -75,7 +65,6 @@ router.post('/submit', authenticateToken, disputeLimiter, async (req, res) => {
   try {
     await ensureDisputesInfrastructure()
     const { userId } = req.user
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
     const { account_id, reason, description } = req.body
 
     if (!account_id || !reason || !description) {
@@ -98,9 +87,8 @@ router.post('/submit', authenticateToken, disputeLimiter, async (req, res) => {
       `SELECT status
          FROM accounts
         WHERE id = $1
-          AND user_id = $2
-          AND COALESCE(tenant_id, $3) = $3`,
-      [account_id, userId, tenantId]
+          AND user_id = $2`,
+      [account_id, userId]
     )
     if (accountCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Account not found or belongs to another user.' })
@@ -111,10 +99,10 @@ router.post('/submit', authenticateToken, disputeLimiter, async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO disputes (tenant_id, user_id, account_id, reason, description, status)
-       VALUES ($1, $2, $3, $4, $5, 'open')
+      `INSERT INTO disputes (user_id, account_id, reason, description, status)
+       VALUES ($1, $2, $3, $4, 'open')
        RETURNING id, status, created_at`,
-      [tenantId, userId, account_id, reason, sanitizedDescription]
+      [userId, account_id, reason, sanitizedDescription]
     )
 
     res.json({ message: 'Dispute submitted successfully', dispute: result.rows[0] })
@@ -129,15 +117,13 @@ router.get('/my-disputes', authenticateToken, async (req, res) => {
   try {
     await ensureDisputesInfrastructure()
     const { userId } = req.user
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
     const result = await pool.query(
       `SELECT d.*, a.account_size, a.status as account_status
        FROM disputes d
        JOIN accounts a ON d.account_id::text = a.id::text
        WHERE d.user_id::text = $1::text
-         AND COALESCE(d.tenant_id, $2) = $2
        ORDER BY d.created_at DESC`,
-      [String(userId), tenantId]
+      [String(userId)]
     )
     res.json(result.rows)
   } catch (error) {

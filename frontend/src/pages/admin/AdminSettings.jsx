@@ -6,7 +6,7 @@ function currentMonth() {
   return new Date().toISOString().slice(0, 7)
 }
 
-const ACCOUNT_SIZES = [1000, 2000, 5000, 10000, 25000, 50000, 100000, 200000]
+const ACCOUNT_SIZES = [5000, 10000, 25000, 50000, 100000]
 
 function formatMoney(value) {
   const parsed = Number(value)
@@ -17,10 +17,7 @@ const SETTINGS_GROUPS = [
   {
     title: 'Account Allocation',
     fields: [
-      { key: 'allow_free_claims', label: 'Allow Free Claims', type: 'select', options: ['true', 'false'], hint: 'false = close free challenge claiming without deleting availability quotas' },
-      { key: 'free_account_monthly_claim_limit', label: 'Free Claims / User / Month', type: 'number', hint: 'Default 1. Use 0 to close free claims this month.' },
-      { key: 'free_account_monthly_claim_mode', label: 'Free Claim Limit Mode', type: 'select', options: ['total', 'active'], hint: 'total = all claimed accounts/orders. active = active accounts plus reserved claims.' },
-      { key: 'challenge_start_requires_kyc', label: 'Require KYC Before Challenge', type: 'select', options: ['true', 'false'], hint: 'true = traders must be KYC approved before claiming or creating a challenge' },
+      { key: 'challenge_start_requires_kyc', label: 'Require KYC Before Challenge', type: 'select', options: ['true', 'false'], hint: 'true = traders must be KYC approved before starting a challenge' },
       { key: 'hide_unavailable_sizes_on_landing', label: 'Hide Sold-Out Sizes On Landing', type: 'select', options: ['true', 'false'] },
       { key: 'sold_out_message', label: 'Sold-Out Message', type: 'textarea', hint: 'Shown when a monthly size batch is full or set to 0' },
     ]
@@ -28,12 +25,6 @@ const SETTINGS_GROUPS = [
   {
     title: 'Challenge Workflow',
     fields: [
-      { key: 'phase1_profit_target_pct', label: 'Phase 1 Profit Target (%)', type: 'number', hint: 'e.g. 10' },
-      { key: 'phase1_max_drawdown_pct', label: 'Phase 1 Max Drawdown (%)', type: 'number', hint: 'e.g. 10' },
-      { key: 'phase1_day_limit', label: 'Phase 1 Time Limit (days)', type: 'number', hint: 'e.g. 30' },
-      { key: 'phase2_profit_target_pct', label: 'Profit Target (%)', type: 'number', hint: 'e.g. 5' },
-      { key: 'phase2_max_drawdown_pct', label: 'Max Drawdown (%)', type: 'number', hint: 'e.g. 10' },
-      { key: 'phase2_day_limit', label: 'Time Limit (days)', type: 'number', hint: 'e.g. 30' },
       { key: 'promotion_requires_admin_review', label: 'Promotion Requires Admin Review', type: 'select', options: ['true', 'false'], hint: 'Default true for batch-wise firms' },
       { key: 'promotion_review_sla_hours', label: 'Promotion Review SLA (hours)', type: 'number', hint: 'e.g. 24' },
       { key: 'failed_account_visibility_days', label: 'Failed Account Visibility (days)', type: 'number', hint: 'Frontend hide window only' },
@@ -87,16 +78,6 @@ const SETTINGS_GROUPS = [
     ]
   },
   {
-    title: 'Challenge Checkout',
-    fields: [
-      { key: 'requires_payment', label: 'Requires Payment', type: 'select', options: ['true', 'false'], hint: 'true = traders must pay before challenge creation' },
-      { key: 'challenge_checkout_mode', label: 'Checkout Mode', type: 'select', options: ['free', 'paid'] },
-      { key: 'challenge_fee_amount', label: 'Challenge Fee Amount', type: 'number', hint: 'e.g. 99' },
-      { key: 'challenge_fee_currency', label: 'Challenge Fee Currency', type: 'text', hint: 'e.g. USD' },
-      { key: 'challenge_fee_label', label: 'Challenge Fee Label', type: 'text', hint: 'e.g. FREE / $99' },
-    ]
-  },
-  {
     title: 'Trade Copier',
     fields: [
       { key: 'copier_enabled', label: 'Copier Enabled', type: 'select', options: ['true', 'false'] },
@@ -117,19 +98,15 @@ const SETTINGS_GROUPS = [
       { key: 'payment_provider_secret_key', label: 'Secret Key', type: 'text' },
       { key: 'payment_provider_webhook_secret', label: 'Webhook Secret', type: 'text' },
       { key: 'payment_provider_account_id', label: 'Stripe Account Id', type: 'text', hint: 'Optional for connected accounts' },
-      { key: 'revenue_share_enabled', label: 'Revenue Share Enabled', type: 'select', options: ['true', 'false'] },
-      { key: 'revenue_share_pct', label: 'Revenue Share %', type: 'number', hint: 'Platform share of tenant challenge revenue' },
     ]
   },
 ]
 
 export default function AdminSettings() {
-  const { adminAxios, session } = useOutletContext()
+  const { adminAxios } = useOutletContext()
   const toast = useToast()
-  const isSuperAdmin = session?.role === 'super_admin'
 
   const [values, setValues] = useState({})
-  const [quotaTenantScope, setQuotaTenantScope] = useState('')
   const [quotaMonth, setQuotaMonth] = useState(currentMonth())
   const [quotaRows, setQuotaRows] = useState([])
   const [quotaDrafts, setQuotaDrafts] = useState({})
@@ -139,10 +116,8 @@ export default function AdminSettings() {
   const [dirty, setDirty] = useState(false)
 
   const getQuotaParams = useCallback(() => {
-    const params = { month: `${quotaMonth || currentMonth()}-01` }
-    if (isSuperAdmin && quotaTenantScope.trim()) params.tenant_id = quotaTenantScope.trim()
-    return params
-  }, [isSuperAdmin, quotaMonth, quotaTenantScope])
+    return { month: `${quotaMonth || currentMonth()}-01` }
+  }, [quotaMonth])
 
   const applyQuotaRows = useCallback((payload) => {
     const rows = Array.isArray(payload?.sizes) ? payload.sizes : []
@@ -292,15 +267,6 @@ export default function AdminSettings() {
             </p>
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {isSuperAdmin && (
-              <input
-                className="admin-input"
-                style={{ width: 140 }}
-                placeholder="Tenant ID"
-                value={quotaTenantScope}
-                onChange={(event) => setQuotaTenantScope(event.target.value)}
-              />
-            )}
             <input
               className="admin-input"
               style={{ width: 150 }}

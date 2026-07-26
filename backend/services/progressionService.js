@@ -2,6 +2,7 @@ const pool = require('../db')
 const { v4: uuidv4 } = require('uuid')
 const logger = require('../utils/logger')
 const { getTenantSettings } = require('./tenantPolicyService')
+const { fetchStepModelBySlug } = require('../utils/stepModels')
 const {
   assertTenantMonthlyQuotaAvailable,
   createPromotionReview,
@@ -15,29 +16,26 @@ async function ensureBbookPnlConflictTarget(db) {
   if (bbookPnlConflictTargetReady) return
 
   await db.query(`CREATE TABLE IF NOT EXISTS bbook_pnl (
-    tenant_id         BIGINT NOT NULL DEFAULT 1,
     date              DATE NOT NULL,
     accounts_passed   INT NOT NULL DEFAULT 0,
     accounts_failed   INT NOT NULL DEFAULT 0,
     accounts_expired  INT NOT NULL DEFAULT 0,
     new_funded        INT NOT NULL DEFAULT 0
   )`)
-  await db.query(`ALTER TABLE bbook_pnl ADD COLUMN IF NOT EXISTS tenant_id BIGINT NOT NULL DEFAULT 1`)
   await db.query(`ALTER TABLE bbook_pnl ADD COLUMN IF NOT EXISTS date DATE NOT NULL DEFAULT CURRENT_DATE`)
   await db.query(`ALTER TABLE bbook_pnl ADD COLUMN IF NOT EXISTS accounts_passed INT NOT NULL DEFAULT 0`)
   await db.query(`ALTER TABLE bbook_pnl ADD COLUMN IF NOT EXISTS accounts_failed INT NOT NULL DEFAULT 0`)
   await db.query(`ALTER TABLE bbook_pnl ADD COLUMN IF NOT EXISTS accounts_expired INT NOT NULL DEFAULT 0`)
   await db.query(`ALTER TABLE bbook_pnl ADD COLUMN IF NOT EXISTS new_funded INT NOT NULL DEFAULT 0`)
-  await db.query(`UPDATE bbook_pnl SET tenant_id = 1 WHERE tenant_id IS NULL`)
   await db.query(`UPDATE bbook_pnl SET date = CURRENT_DATE WHERE date IS NULL`)
   await db.query(`
     WITH ranked AS (
       SELECT ctid,
-             ROW_NUMBER() OVER (PARTITION BY tenant_id, date ORDER BY ctid) AS rn,
-             SUM(accounts_passed) OVER (PARTITION BY tenant_id, date) AS accounts_passed_sum,
-             SUM(accounts_failed) OVER (PARTITION BY tenant_id, date) AS accounts_failed_sum,
-             SUM(accounts_expired) OVER (PARTITION BY tenant_id, date) AS accounts_expired_sum,
-             SUM(new_funded) OVER (PARTITION BY tenant_id, date) AS new_funded_sum
+             ROW_NUMBER() OVER (PARTITION BY date ORDER BY ctid) AS rn,
+             SUM(accounts_passed) OVER (PARTITION BY date) AS accounts_passed_sum,
+             SUM(accounts_failed) OVER (PARTITION BY date) AS accounts_failed_sum,
+             SUM(accounts_expired) OVER (PARTITION BY date) AS accounts_expired_sum,
+             SUM(new_funded) OVER (PARTITION BY date) AS new_funded_sum
       FROM bbook_pnl
     )
     UPDATE bbook_pnl b
@@ -52,7 +50,7 @@ async function ensureBbookPnlConflictTarget(db) {
   await db.query(`
     WITH ranked AS (
       SELECT ctid,
-             ROW_NUMBER() OVER (PARTITION BY tenant_id, date ORDER BY ctid) AS rn
+             ROW_NUMBER() OVER (PARTITION BY date ORDER BY ctid) AS rn
       FROM bbook_pnl
     )
     DELETE FROM bbook_pnl b
@@ -60,7 +58,7 @@ async function ensureBbookPnlConflictTarget(db) {
      WHERE b.ctid = r.ctid
        AND r.rn > 1
   `)
-  await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS bbook_pnl_tenant_date_uq ON bbook_pnl(tenant_id, date)`)
+  await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS bbook_pnl_date_uq ON bbook_pnl(date)`)
   bbookPnlConflictTargetReady = true
 }
 
@@ -98,32 +96,22 @@ function normalizeProgressionSettings(input) {
   }
 }
 
-async function fetchProgressionSettings(db, tenantId = null) {
-  const normalizedTenantId = parseInt(tenantId, 10)
-  if (Number.isFinite(normalizedTenantId) && normalizedTenantId > 0) {
-    const settings = await getTenantSettings(normalizedTenantId, [
-      'phase2_profit_target_pct',
-      'phase2_max_drawdown_pct',
-      'phase2_day_limit',
-      'funded_max_drawdown_pct',
-      'phase1_drawdown_type',
-      'phase2_drawdown_type',
-      'funded_drawdown_type'
-    ])
-    return normalizeProgressionSettings(settings)
-  }
-
-  const result = await db.query(
-    `SELECT key, value FROM platform_settings
-     WHERE key IN (
-       'phase2_profit_target_pct', 'phase2_max_drawdown_pct', 'phase2_day_limit',
-       'funded_max_drawdown_pct',
-       'phase1_drawdown_type', 'phase2_drawdown_type', 'funded_drawdown_type'
-     )`
-  )
-  return normalizeProgressionSettings(result.rows)
+async function fetchProgressionSettings() {
+  const settings = await getTenantSettings([
+    'phase2_profit_target_pct',
+    'phase2_max_drawdown_pct',
+    'phase2_day_limit',
+    'funded_max_drawdown_pct',
+    'phase1_drawdown_type',
+    'phase2_drawdown_type',
+    'funded_drawdown_type'
+  ])
+  return normalizeProgressionSettings(settings)
 }
 
+// Legacy fallback path — used only if an account somehow has no `challenge_model_slug`
+// (e.g. created before the step-model system existed). New accounts always carry
+// a step_model, so buildNextPhaseStepModelPlan below is the normal path.
 function buildPhase2InsertArgs(acc, settings) {
   // BUG FIX 15: use UTC date for phase_end_date to avoid timezone off-by-one
   const phaseEndDate = new Date()
@@ -134,74 +122,144 @@ function buildPhase2InsertArgs(acc, settings) {
     (parseFloat(acc.account_size) * (settings.phase2_profit_target_pct / 100)).toFixed(2)
   )
 
-  logger.info(
-    `[progression] Creating Phase 2 for user ${acc.user_id}: ` +
-    `size=$${acc.account_size} target=${settings.phase2_profit_target_pct}% ($${profitTarget}) ` +
-    `maxDD=${settings.phase2_max_drawdown_pct}% days=${settings.phase2_day_limit}`
-  )
-
   return {
     sql: `INSERT INTO accounts
-          (tenant_id, user_id, account_type, account_size, current_balance, starting_balance,
+          (user_id, account_type, account_size, current_balance, starting_balance,
            peak_balance, profit_target, max_drawdown_pct, status,
            phase_start_date, phase_end_date, account_uid)
-          VALUES ($1, $2, 'phase2', $3, $3, $3, $3, $4, $5, 'active', NOW(), $6, $7)
+          VALUES ($1, 'phase2', $2, $2, $2, $2, $3, $4, 'active', NOW(), $5, $6)
           RETURNING id`,
-    values: [acc.tenant_id || 1, acc.user_id, acc.account_size, profitTarget, settings.phase2_max_drawdown_pct, phaseEndDate, uuidv4()],
-    bbookSql: `INSERT INTO bbook_pnl (tenant_id, date, accounts_passed)
-               VALUES ($1, CURRENT_DATE, 1)
-               ON CONFLICT (tenant_id, date) DO UPDATE
+    values: [acc.user_id, acc.account_size, profitTarget, settings.phase2_max_drawdown_pct, phaseEndDate, uuidv4()],
+    bbookSql: `INSERT INTO bbook_pnl (date, accounts_passed)
+               VALUES (CURRENT_DATE, 1)
+               ON CONFLICT (date) DO UPDATE
                SET accounts_passed = bbook_pnl.accounts_passed + 1`,
-    bbookValues: [acc.tenant_id || 1],
+    bbookValues: [],
     socketEvent: 'phase1_passed',
     socketMessage: `Phase 1 PASSED! Your Phase 2 challenge is now active. Target: ${settings.phase2_profit_target_pct}%`
   }
 }
 
 function buildFundedInsertArgs(acc, settings) {
-  logger.info(
-    `[progression] Creating Funded account for user ${acc.user_id}: ` +
-    `size=$${acc.account_size} maxDD=${settings.funded_max_drawdown_pct}%`
-  )
-
   return {
     sql: `INSERT INTO accounts
-          (tenant_id, user_id, account_type, account_size, current_balance, starting_balance,
+          (user_id, account_type, account_size, current_balance, starting_balance,
            peak_balance, profit_target, max_drawdown_pct, status, phase_start_date, account_uid)
-          VALUES ($1, $2, 'funded', $3, $3, $3, $3, 0, $4, 'active', NOW(), $5)
+          VALUES ($1, 'funded', $2, $2, $2, $2, 0, $3, 'active', NOW(), $4)
           RETURNING id`,
-    values: [acc.tenant_id || 1, acc.user_id, acc.account_size, settings.funded_max_drawdown_pct, uuidv4()],
-    bbookSql: `INSERT INTO bbook_pnl (tenant_id, date, new_funded)
-               VALUES ($1, CURRENT_DATE, 1)
-               ON CONFLICT (tenant_id, date) DO UPDATE
+    values: [acc.user_id, acc.account_size, settings.funded_max_drawdown_pct, uuidv4()],
+    bbookSql: `INSERT INTO bbook_pnl (date, new_funded)
+               VALUES (CURRENT_DATE, 1)
+               ON CONFLICT (date) DO UPDATE
                SET new_funded = bbook_pnl.new_funded + 1`,
-    bbookValues: [acc.tenant_id || 1],
+    bbookValues: [],
     socketEvent: 'phase2_passed',
     socketMessage: 'Phase 2 PASSED! You are now a Funded Trader. Welcome to the team!'
   }
 }
 
-function buildPromotionPlan(acc, settings) {
+// Step-model-aware promotion — every account created since the 1/2/3-step
+// system shipped carries `challenge_model_slug`/`step_number`, so the next
+// phase (or funded promotion) is resolved from `challenge_models` instead of
+// hardcoded phase1/phase2 settings.
+async function buildNextPhaseStepModelPlan(acc, stepModel) {
+  const currentStep = parseInt(acc.step_number || 1, 10)
+  const nextStep = currentStep + 1
+  const accountUid = uuidv4()
+  const currentPhaseName = Array.isArray(stepModel.profit_targets_pct) && stepModel.profit_targets_pct.length > 1
+    ? `Phase ${currentStep}`
+    : stepModel.name
+
+  logger.info(
+    `[progression] Promoting ${stepModel.slug} account for user ${acc.user_id}: ` +
+    `step ${currentStep} -> ${nextStep <= stepModel.steps ? `phase${nextStep}` : 'funded'} (size=$${acc.account_size})`
+  )
+
+  if (nextStep <= stepModel.steps) {
+    const phaseIdx0 = nextStep - 1
+    const profitTargetPct = parseFloat(stepModel.profit_targets_pct[phaseIdx0])
+    const dayLimit = parseInt(stepModel.time_limits_days[phaseIdx0], 10)
+    const consistencyPct = Array.isArray(stepModel.consistency_max_day_pct_by_phase)
+      ? parseFloat(stepModel.consistency_max_day_pct_by_phase[phaseIdx0])
+      : parseFloat(stepModel.consistency_max_day_pct)
+    const profitTarget = parseFloat((parseFloat(acc.account_size) * (profitTargetPct / 100)).toFixed(2))
+
+    const phaseEndDate = new Date()
+    phaseEndDate.setUTCDate(phaseEndDate.getUTCDate() + dayLimit)
+    phaseEndDate.setUTCHours(23, 59, 59, 999)
+
+    return {
+      sql: `INSERT INTO accounts
+            (user_id, account_type, account_size, current_balance, starting_balance,
+             peak_balance, profit_target, max_drawdown_pct, status, phase_start_date, phase_end_date, account_uid,
+             challenge_model_id, challenge_model_slug, step_number, daily_drawdown_pct, drawdown_type,
+             consistency_max_day_pct, min_trading_days, min_daily_profit_pct, eod_peak_equity, qualifying_days_count,
+             parent_account_id)
+            VALUES ($1, $2, $3, $3, $3, $3, $4, $5, 'active', NOW(), $6, $7,
+                    $8, $9, $10, $11, $12,
+                    $13, $14, $15, $3, 0,
+                    $16)
+            RETURNING id`,
+      values: [
+        acc.user_id, `phase${nextStep}`, acc.account_size,
+        profitTarget, stepModel.max_drawdown_pct, phaseEndDate, accountUid,
+        stepModel.id, stepModel.slug, nextStep, stepModel.daily_drawdown_pct, stepModel.drawdown_type,
+        consistencyPct, stepModel.min_trading_days, stepModel.min_daily_profit_pct,
+        acc.id
+      ],
+      bbookSql: `INSERT INTO bbook_pnl (date, accounts_passed)
+                 VALUES (CURRENT_DATE, 1)
+                 ON CONFLICT (date) DO UPDATE
+                 SET accounts_passed = bbook_pnl.accounts_passed + 1`,
+      bbookValues: [],
+      socketEvent: `phase${currentStep}_passed`,
+      socketMessage: `${currentPhaseName} PASSED! Your Phase ${nextStep} challenge is now active. Target: ${profitTargetPct}%`
+    }
+  }
+
+  // Final phase passed — promote to funded.
+  return {
+    sql: `INSERT INTO accounts
+          (user_id, account_type, account_size, current_balance, starting_balance,
+           peak_balance, profit_target, max_drawdown_pct, status, phase_start_date, account_uid,
+           challenge_model_id, challenge_model_slug, step_number, daily_drawdown_pct, drawdown_type,
+           consistency_max_day_pct, min_trading_days, min_daily_profit_pct, eod_peak_equity, qualifying_days_count,
+           parent_account_id)
+          VALUES ($1, 'funded', $2, $2, $2, $2, 0, $3, 'active', NOW(), $4,
+                  $5, $6, NULL, $7, $8,
+                  $9, $10, $11, $2, 0,
+                  $12)
+          RETURNING id`,
+    values: [
+      acc.user_id, acc.account_size, stepModel.funded_max_drawdown_pct, accountUid,
+      stepModel.id, stepModel.slug, stepModel.funded_daily_drawdown_pct, stepModel.drawdown_type,
+      stepModel.funded_consistency_max_day_pct, stepModel.funded_min_trading_days_for_payout, stepModel.min_daily_profit_pct,
+      acc.id
+    ],
+    bbookSql: `INSERT INTO bbook_pnl (date, new_funded)
+               VALUES (CURRENT_DATE, 1)
+               ON CONFLICT (date) DO UPDATE
+               SET new_funded = bbook_pnl.new_funded + 1`,
+    bbookValues: [],
+    socketEvent: `phase${currentStep}_passed`,
+    socketMessage: `${currentPhaseName} PASSED! You are now a Funded Trader. Welcome to the team!`
+  }
+}
+
+async function buildPromotionPlan(acc, settings, db = pool) {
+  if (acc.challenge_model_slug) {
+    const stepModel = await fetchStepModelBySlug(acc.challenge_model_slug)
+    if (stepModel) return buildNextPhaseStepModelPlan(acc, stepModel)
+    logger.error(`[progression] Account ${acc.id} references unknown step model "${acc.challenge_model_slug}" — falling back to legacy settings.`)
+  }
   if (acc.account_type === 'phase1') return buildPhase2InsertArgs(acc, settings)
   if (acc.account_type === 'phase2') return buildFundedInsertArgs(acc, settings)
   return null
 }
 
 async function promotePassedAccount(db, acc, settings) {
-  const plan = buildPromotionPlan(acc, settings)
+  const plan = await buildPromotionPlan(acc, settings, db)
   if (!plan) return null
-
-  // BUG-13 FIX: Reject promotions where tenant_id is missing instead of
-  // silently defaulting to tenant 1. Defaulting causes the new funded account
-  // to appear under the wrong tenant's dashboard permanently.
-  if (!acc.tenant_id) {
-    logger.error('[progression] Cannot promote account — tenant_id is missing', {
-      accountId: acc.id,
-      userId: acc.user_id,
-      accountType: acc.account_type
-    })
-    throw new Error(`Cannot promote account ${acc.id}: tenant_id is null. Verify user tenant assignment.`)
-  }
 
   await ensureBbookPnlConflictTarget(db)
 
@@ -248,9 +306,8 @@ async function approvePromotionReview(db, review, settings, options = {}) {
     `SELECT *
        FROM accounts
       WHERE id::text = $1
-        AND COALESCE(tenant_id, $2) = $2
       FOR UPDATE`,
-    [String(review.source_account_id), review.tenant_id || 1]
+    [String(review.source_account_id)]
   )
   const sourceAccount = sourceResult.rows[0]
   if (!sourceAccount) {
@@ -266,7 +323,6 @@ async function approvePromotionReview(db, review, settings, options = {}) {
 
   await assertTenantMonthlyQuotaAvailable(
     db,
-    sourceAccount.tenant_id || review.tenant_id || 1,
     undefined,
     sourceAccount.account_size || review.account_size
   )

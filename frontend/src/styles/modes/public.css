@@ -1,14 +1,11 @@
 .mode-public {
-  --public-glass-bg: rgba(12, 18, 32, 0.72);
-  --public-glass-bg-solid: rgba(12, 18, 32, 0.9);
+  --public-glass-bg: var(--paper-2);
+  --public-glass-bg-solid: var(--paper-2);
 }
 
 .mode-public .masterpiece-landing {
   color: var(--text-primary);
-  background:
-    radial-gradient(circle at top, rgba(var(--brand-primary-rgb), 0.18), transparent 30%),
-    radial-gradient(circle at 80% 15%, rgba(var(--brand-accent-rgb), 0.12), transparent 22%),
-    linear-gradient(180deg, var(--color-bg-deep) 0%, var(--color-bg-base) 100%);
+  background: var(--paper);
 }
 
 .mode-public .masterpiece-landing main,
@@ -17,17 +14,9 @@
   z-index: 1;
 }
 
-.mode-public .mp-btn-primary,
-.mode-public .mp-btn-secondary {
-  border-radius: var(--radius-lg);
-}
-
 .mode-public .mp-glass-card {
   background: var(--public-glass-bg);
   border-color: var(--border);
-  box-shadow: var(--shadow-surface);
-  backdrop-filter: blur(22px);
-  -webkit-backdrop-filter: blur(22px);
 }
 
 .mode-public .mp-container {
@@ -37,6 +26,5 @@
 }
 
 .mode-public .nav-transparent.scrolled {
-  background: rgba(8, 12, 24, 0.88);
-  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.18);
+  background: var(--nav-bg);
 }

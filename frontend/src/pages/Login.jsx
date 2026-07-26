@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useBranding } from '../BrandingContext'
-import { buildTenantPath } from '../utils/tenant'
 import { authAPI } from '../services/api'
 
 function EyeIcon({ hidden }) {
@@ -25,7 +24,7 @@ function getPasswordStrength(password) {
   ]
   const score  = checks.filter(c => c.pass).length
   const label  = score <= 2 ? 'Weak' : score <= 3 ? 'Fair' : score === 4 ? 'Good' : 'Strong'
-  const color  = score <= 2 ? '#7a7a7a' : score <= 3 ? '#8b8b8b' : score === 4 ? '#797979' : '#4a4a4a'
+  const color  = score <= 2 ? 'var(--muted)' : score <= 3 ? 'var(--muted)' : score === 4 ? 'var(--muted)' : 'var(--muted)'
   return { score, label, color, checks }
 }
 
@@ -483,7 +482,7 @@ function Login({ onLogin, initialMode = 'login' }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px' }}>
                   {resetStrength.checks.map(c => (
                     <div key={c.label} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <span style={{ fontSize: '10px', color: c.pass ? '#797979' : 'var(--text-dim)' }}>
+                      <span style={{ fontSize: '10px', color: c.pass ? 'var(--muted)' : 'var(--text-dim)' }}>
                         {c.pass ? '✓' : '○'}
                       </span>
                       <span style={{ fontSize: '11px', color: c.pass ? 'var(--text-muted)' : 'var(--text-dim)' }}>
@@ -509,7 +508,7 @@ function Login({ onLogin, initialMode = 'login' }) {
         {mode === 'login' && (
           <p style={{ textAlign: 'center', marginTop: '24px', color: 'var(--text-muted)', fontSize: '14px' }}>
             No account?{' '}
-            <a href={buildTenantPath('/register')} style={{ color: 'var(--accent)' }}>Register here</a>
+            <a href="/register" style={{ color: 'var(--accent)' }}>Register here</a>
           </p>
         )}
       </div>

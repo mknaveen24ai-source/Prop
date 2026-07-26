@@ -4,7 +4,6 @@ const axios = require('axios')
 const pool = require('../db')
 
 const BASE_URL = String(process.env.COPIER_SMOKE_BASE_URL || 'http://127.0.0.1:5000').replace(/\/+$/, '')
-const TENANT_SLUG = String(process.env.COPIER_SMOKE_TENANT_SLUG || '').trim()
 const TEST_INSTRUMENT = String(process.env.COPIER_SMOKE_INSTRUMENT || 'EURUSD').trim().toUpperCase()
 const CLOSE_WAIT_SECONDS = parseInt(process.env.COPIER_SMOKE_CLOSE_WAIT_SECONDS || '65', 10)
 const DEFAULT_ACCOUNT_SIZE = parseInt(process.env.COPIER_SMOKE_ACCOUNT_SIZE || '10000', 10)
@@ -21,7 +20,6 @@ const FALLBACK_PRICES = {
 
 function buildHeaders(extra = {}, cookie = '') {
   const headers = { ...extra }
-  if (TENANT_SLUG) headers['X-Tenant-Slug'] = TENANT_SLUG
   if (cookie) headers.Cookie = cookie
   return headers
 }
@@ -281,9 +279,8 @@ async function ensureTradeAccount(adminCookie, traderCookie, traderUserId) {
   }
 }
 
-async function ensureMaster(adminCookie, tenantId, accountId) {
+async function ensureMaster(adminCookie, accountId) {
   const listResponse = await getJson('/api/admin/copier/masters', {
-    params: { tenant_id: tenantId },
     headers: buildHeaders({}, adminCookie)
   })
   assertStatus(listResponse, [200], 'List copier masters')
@@ -291,7 +288,6 @@ async function ensureMaster(adminCookie, tenantId, accountId) {
   if (existing) return existing
 
   const createResponse = await postJson('/api/admin/copier/masters', {
-    tenant_id: tenantId,
     account_id: accountId,
     label: `Smoke Master ${accountId}`
   }, {
@@ -301,12 +297,11 @@ async function ensureMaster(adminCookie, tenantId, accountId) {
   return createResponse.data
 }
 
-async function ensureFollower(adminCookie, tenantId) {
+async function ensureFollower(adminCookie) {
   const bridgeTargetKey = String(process.env.COPIER_SMOKE_FOLLOWER_KEY || `smoke-follower-${SMOKE_RUN_ID}`).trim()
   const displayName = String(process.env.COPIER_SMOKE_FOLLOWER_NAME || `Smoke Follower ${SMOKE_RUN_ID}`).trim()
 
   const listResponse = await getJson('/api/admin/copier/followers', {
-    params: { tenant_id: tenantId },
     headers: buildHeaders({}, adminCookie)
   })
   assertStatus(listResponse, [200], 'List copier followers')
@@ -314,7 +309,6 @@ async function ensureFollower(adminCookie, tenantId) {
   if (existing) return existing
 
   const createResponse = await postJson('/api/admin/copier/followers', {
-    tenant_id: tenantId,
     display_name: displayName,
     bridge_target_key: bridgeTargetKey,
     status: 'active',
@@ -329,9 +323,8 @@ async function ensureFollower(adminCookie, tenantId) {
   return createResponse.data
 }
 
-async function ensureMapping(adminCookie, tenantId, masterId, followerId) {
+async function ensureMapping(adminCookie, masterId, followerId) {
   const listResponse = await getJson('/api/admin/copier/mappings', {
-    params: { tenant_id: tenantId },
     headers: buildHeaders({}, adminCookie)
   })
   assertStatus(listResponse, [200], 'List copier mappings')
@@ -339,7 +332,6 @@ async function ensureMapping(adminCookie, tenantId, masterId, followerId) {
   if (existing) return existing
 
   const createResponse = await postJson('/api/admin/copier/mappings', {
-    tenant_id: tenantId,
     master_id: masterId,
     follower_id: followerId,
     is_enabled: true,
@@ -352,14 +344,13 @@ async function ensureMapping(adminCookie, tenantId, masterId, followerId) {
   return createResponse.data
 }
 
-async function ensureSymbolMapping(adminCookie, tenantId, followerId, symbol) {
+async function ensureSymbolMapping(adminCookie, followerId, symbol) {
   const normalizedSymbol = String(symbol || '').trim().toUpperCase()
   if (!normalizedSymbol) {
     throw new Error('A copier smoke symbol mapping requires a symbol')
   }
 
   const listResponse = await getJson('/api/admin/copier/symbol-mappings', {
-    params: { tenant_id: tenantId },
     headers: buildHeaders({}, adminCookie)
   })
   assertStatus(listResponse, [200], 'List copier symbol mappings')
@@ -372,7 +363,6 @@ async function ensureSymbolMapping(adminCookie, tenantId, followerId, symbol) {
   if (existing) return existing
 
   const createResponse = await postJson('/api/admin/copier/symbol-mappings', {
-    tenant_id: tenantId,
     follower_id: followerId,
     master_symbol: normalizedSymbol,
     follower_symbol: normalizedSymbol,
@@ -384,25 +374,9 @@ async function ensureSymbolMapping(adminCookie, tenantId, followerId, symbol) {
   return createResponse.data
 }
 
-async function fetchTenantIdForAccount(accountId, adminCookie) {
-  const response = await getJson('/api/admin/copier/masters', {
-    headers: buildHeaders({}, adminCookie)
-  })
-  assertStatus(response, [200], 'Probe copier masters')
-  const found = (Array.isArray(response.data) ? response.data : []).find((row) => String(row.account_id) === String(accountId))
-  if (found?.tenant_id) return found.tenant_id
-
-  const accountResponse = await getJson('/api/admin/accounts', {
-    headers: buildHeaders({}, adminCookie)
-  })
-  assertStatus(accountResponse, [200], 'Load admin accounts')
-  const account = (Array.isArray(accountResponse.data) ? accountResponse.data : []).find((row) => String(row.id) === String(accountId))
-  return account?.tenant_id || 1
-}
-
-async function findJob(adminCookie, tenantId, masterTradeId, followerId, expectedEventType) {
+async function findJob(adminCookie, masterTradeId, followerId, expectedEventType) {
   const response = await getJson('/api/admin/copier/jobs', {
-    params: { tenant_id: tenantId, limit: 200 },
+    params: { limit: 200 },
     headers: buildHeaders({}, adminCookie)
   })
   assertStatus(response, [200], 'List copier jobs')
@@ -424,12 +398,12 @@ async function findJob(adminCookie, tenantId, masterTradeId, followerId, expecte
   return job
 }
 
-async function waitForReconciliationToSettle(adminCookie, tenantId, followerId) {
+async function waitForReconciliationToSettle(adminCookie, followerId) {
   return pollUntil(
     'copier reconciliation settle',
     async () => {
       const response = await getJson('/api/admin/copier/reconciliation', {
-        params: { tenant_id: tenantId, follower_id: followerId },
+        params: { follower_id: followerId },
         headers: buildHeaders({}, adminCookie)
       })
       assertStatus(response, [200], 'Copier reconciliation')
@@ -446,7 +420,6 @@ async function waitForReconciliationToSettle(adminCookie, tenantId, followerId) 
 }
 
 async function main() {
-  const explicitTenantId = String(process.env.COPIER_SMOKE_TENANT_ID || '').trim()
   console.log(`[copier-smoke] base=${BASE_URL} instrument=${TEST_INSTRUMENT}`)
   const adminCookie = await loginAdmin()
   const traderSession = await ensureTraderSession()
@@ -454,12 +427,10 @@ async function main() {
   const accountSelection = await ensureTradeAccount(adminCookie, traderCookie, traderSession.user?.id || traderSession.user?.trader_id || null)
   const masterAccountId = accountSelection.masterAccountId
   const tradeAccountId = accountSelection.tradeAccountId
-  const tenantId = explicitTenantId || await fetchTenantIdForAccount(masterAccountId, adminCookie)
 
   console.log(`[copier-smoke] trader=${traderSession.credentials.email} registered=${traderSession.registered}`)
 
   const healthResponse = await getJson('/api/admin/copier/health', {
-    params: { tenant_id: tenantId },
     headers: buildHeaders({}, adminCookie)
   })
   assertStatus(healthResponse, [200], 'Copier health')
@@ -467,12 +438,12 @@ async function main() {
     throw new Error('Copier worker is not reporting running=true')
   }
 
-  const master = await ensureMaster(adminCookie, tenantId, masterAccountId)
-  const follower = await ensureFollower(adminCookie, tenantId)
-  await ensureMapping(adminCookie, tenantId, master.id, follower.id)
-  await ensureSymbolMapping(adminCookie, tenantId, follower.id, TEST_INSTRUMENT)
+  const master = await ensureMaster(adminCookie, masterAccountId)
+  const follower = await ensureFollower(adminCookie)
+  await ensureMapping(adminCookie, master.id, follower.id)
+  await ensureSymbolMapping(adminCookie, follower.id, TEST_INSTRUMENT)
 
-  console.log(`[copier-smoke] master=${master.id} follower=${follower.id} tenant=${tenantId}`)
+  console.log(`[copier-smoke] master=${master.id} follower=${follower.id}`)
 
   await bootstrapLocalFeedQuote(TEST_INSTRUMENT)
 
@@ -493,7 +464,7 @@ async function main() {
 
   const openJob = await pollUntil(
     'open copier ack',
-    () => findJob(adminCookie, tenantId, tradeId, follower.id, 'OPEN_MARKET'),
+    () => findJob(adminCookie, tradeId, follower.id, 'OPEN_MARKET'),
     30000,
     1000
   )
@@ -513,13 +484,13 @@ async function main() {
 
   const closeJob = await pollUntil(
     'close copier ack',
-    () => findJob(adminCookie, tenantId, tradeId, follower.id, 'CLOSE_POSITION'),
+    () => findJob(adminCookie, tradeId, follower.id, 'CLOSE_POSITION'),
     30000,
     1000
   )
   console.log(`[copier-smoke] close job acknowledged: ${closeJob.id}`)
 
-  const diffs = await waitForReconciliationToSettle(adminCookie, tenantId, follower.id)
+  const diffs = await waitForReconciliationToSettle(adminCookie, follower.id)
   console.log(`[copier-smoke] reconciliation diffs after smoke run: ${diffs.length}`)
   console.log('[copier-smoke] PASS')
 }

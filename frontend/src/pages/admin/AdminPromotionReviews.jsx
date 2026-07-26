@@ -19,23 +19,17 @@ function formatDate(value) {
 }
 
 export default function AdminPromotionReviews() {
-  const { adminAxios, session } = useOutletContext()
+  const { adminAxios } = useOutletContext()
   const toast = useToast()
-  const isSuperAdmin = session?.role === 'super_admin'
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [tenantScope, setTenantScope] = useState('')
   const [month, setMonth] = useState(currentMonth())
   const [status, setStatus] = useState('pending')
   const [quota, setQuota] = useState(null)
   const [reviews, setReviews] = useState([])
 
-  const params = useMemo(() => {
-    const out = { month: `${month}-01` }
-    if (isSuperAdmin && tenantScope.trim()) out.tenant_id = tenantScope.trim()
-    return out
-  }, [isSuperAdmin, month, tenantScope])
+  const params = useMemo(() => ({ month: `${month}-01` }), [month])
 
   async function fetchData({ silent = false } = {}) {
     if (!silent) setLoading(true)
@@ -124,9 +118,6 @@ export default function AdminPromotionReviews() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          {isSuperAdmin && (
-            <input className="admin-input" style={{ width: 150 }} placeholder="Tenant ID" value={tenantScope} onChange={(event) => setTenantScope(event.target.value)} />
-          )}
           <input className="admin-input" style={{ width: 150 }} type="month" value={month} onChange={(event) => setMonth(event.target.value || currentMonth())} />
           <select className="admin-select" style={{ width: 150 }} value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="pending">Pending</option>

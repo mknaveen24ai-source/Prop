@@ -1,6 +1,5 @@
 const pool = require('../db')
 const logger = require('./logger')
-const { getTenantById } = require('./tenants')
 const { getTenantSettings } = require('../services/tenantPolicyService')
 const {
   buildEmailMessage,
@@ -14,11 +13,6 @@ const EMAIL_SENDING_STALE_MS = 15 * 60_000
 let emailQueueReady = false
 let emailQueuePromise = null
 const DEFAULT_KYC_REMINDER_DELAY_HOURS = Math.max(1, parseInt(process.env.EMAIL_KYC_REMINDER_DELAY_HOURS || '24', 10) || 24)
-
-function toNullableTenantId(value) {
-  const parsed = parseInt(value, 10)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
-}
 
 function toNullableString(value) {
   if (value == null) return null
@@ -56,7 +50,6 @@ async function ensureEmailQueueInfrastructure(db = pool) {
     await db.query(`
       CREATE TABLE IF NOT EXISTS email_jobs (
         id BIGSERIAL PRIMARY KEY,
-        tenant_id BIGINT,
         user_id TEXT,
         to_email TEXT NOT NULL,
         template_key TEXT NOT NULL,
@@ -75,7 +68,7 @@ async function ensureEmailQueueInfrastructure(db = pool) {
       )
     `)
     await db.query(`CREATE INDEX IF NOT EXISTS idx_email_jobs_status_schedule ON email_jobs(status, scheduled_for ASC, id ASC)`)
-    await db.query(`CREATE INDEX IF NOT EXISTS idx_email_jobs_tenant_created ON email_jobs(tenant_id, created_at DESC)`)
+    await db.query(`CREATE INDEX IF NOT EXISTS idx_email_jobs_created ON email_jobs(created_at DESC)`)
     await db.query(`ALTER TABLE email_jobs ADD COLUMN IF NOT EXISTS unique_key TEXT`)
     await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_email_jobs_unique_key ON email_jobs(unique_key)`)
     emailQueueReady = true
@@ -88,7 +81,7 @@ async function ensureEmailQueueInfrastructure(db = pool) {
   return emailQueuePromise
 }
 
-async function enqueueEmailJob({ tenantId = null, userId = null, toEmail, templateKey, payload = {}, scheduledFor = null, uniqueKey = null }) {
+async function enqueueEmailJob({ userId = null, toEmail, templateKey, payload = {}, scheduledFor = null, uniqueKey = null }) {
   const normalizedTemplateKey = String(templateKey || '').trim().toLowerCase()
   const normalizedToEmail = String(toEmail || '').trim().toLowerCase()
   const normalizedUniqueKey = normalizeUniqueKey(uniqueKey)
@@ -99,7 +92,6 @@ async function enqueueEmailJob({ tenantId = null, userId = null, toEmail, templa
 
   await ensureEmailQueueInfrastructure()
   const insertValues = [
-    toNullableTenantId(tenantId),
     toNullableString(userId),
     normalizedToEmail,
     normalizedTemplateKey,
@@ -111,8 +103,8 @@ async function enqueueEmailJob({ tenantId = null, userId = null, toEmail, templa
   if (normalizedUniqueKey) {
     const result = await pool.query(
       `INSERT INTO email_jobs
-        (tenant_id, user_id, to_email, template_key, payload_json, status, scheduled_for, unique_key, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5::jsonb, 'pending', COALESCE($6, NOW()), $7, NOW(), NOW())
+        (user_id, to_email, template_key, payload_json, status, scheduled_for, unique_key, created_at, updated_at)
+       VALUES ($1, $2, $3, $4::jsonb, 'pending', COALESCE($5, NOW()), $6, NOW(), NOW())
        ON CONFLICT (unique_key) DO NOTHING
        RETURNING id, status, scheduled_for, created_at`,
       insertValues
@@ -132,8 +124,8 @@ async function enqueueEmailJob({ tenantId = null, userId = null, toEmail, templa
 
   const result = await pool.query(
     `INSERT INTO email_jobs
-      (tenant_id, user_id, to_email, template_key, payload_json, status, scheduled_for, unique_key, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5::jsonb, 'pending', COALESCE($6, NOW()), $7, NOW(), NOW())
+      (user_id, to_email, template_key, payload_json, status, scheduled_for, unique_key, created_at, updated_at)
+     VALUES ($1, $2, $3, $4::jsonb, 'pending', COALESCE($5, NOW()), $6, NOW(), NOW())
      RETURNING id, status, scheduled_for, created_at`,
     insertValues
   )
@@ -142,7 +134,6 @@ async function enqueueEmailJob({ tenantId = null, userId = null, toEmail, templa
 
 async function enqueueTemplateEmail(templateKey, payload = {}, options = {}) {
   return enqueueEmailJob({
-    tenantId: options?.tenantId || options?.tenant?.id || null,
     userId: options?.userId || payload?.userId || null,
     toEmail: payload?.toEmail,
     templateKey,
@@ -270,25 +261,12 @@ async function markEmailJobRetry(job, error) {
 }
 
 async function processEmailJob(job) {
-  let tenant = null
-  try {
-    if (job.tenant_id) {
-      tenant = await getTenantById(job.tenant_id)
-    }
-  } catch (error) {
-    logger.warn('[email-worker] Failed to resolve tenant branding for email job', {
-      jobId: job.id,
-      tenantId: job.tenant_id,
-      error: error.message
-    })
-  }
-
   try {
     const payload = job.payload_json && typeof job.payload_json === 'object'
       ? job.payload_json
       : JSON.parse(job.payload_json || '{}')
-    const message = buildEmailMessage(job.template_key, payload, { tenant })
-    const result = await sendEmailMessage(message, { tenant })
+    const message = buildEmailMessage(job.template_key, payload)
+    const result = await sendEmailMessage(message)
     if (result.ok) {
       await markEmailJobSent(job.id, result)
       return { status: 'sent' }
@@ -335,7 +313,6 @@ async function scheduleKycPendingReminderEmails(options = {}) {
 
   const result = await pool.query(
     `SELECT u.id::text AS user_id,
-            u.tenant_id,
             u.email,
             u.full_name,
             u.created_at
@@ -364,7 +341,6 @@ async function scheduleKycPendingReminderEmails(options = {}) {
       row.full_name || 'Trader',
       hoursSinceSignup,
       {
-        tenantId: row.tenant_id || null,
         userId: row.user_id,
         uniqueKey: `kyc-pending-reminder:${row.user_id}:${periodKey}`
       }
@@ -389,7 +365,6 @@ async function scheduleChallengeExpiryReminderEmails(options = {}) {
 
   const result = await pool.query(
     `SELECT a.id,
-            a.tenant_id,
             a.user_id::text AS user_id,
             a.account_type,
             a.account_size,
@@ -423,7 +398,6 @@ async function scheduleChallengeExpiryReminderEmails(options = {}) {
       daysRemaining,
       phaseEndDate.toISOString(),
       {
-        tenantId: row.tenant_id || null,
         userId: row.user_id,
         uniqueKey: `challenge-expiry:${row.id}:${phaseEndDate.toISOString().slice(0, 10)}:${daysRemaining}`
       }
@@ -446,7 +420,6 @@ async function scheduleChallengeInactivityReminderEmails(options = {}) {
   const result = await pool.query(
     `SELECT
         a.id,
-        a.tenant_id,
         a.user_id::text AS user_id,
         a.account_type,
         a.account_size,
@@ -468,23 +441,22 @@ async function scheduleChallengeInactivityReminderEmails(options = {}) {
       LEFT JOIN trades t ON t.account_id = a.id
       WHERE a.status = 'active'
         AND a.account_type IN ('phase1', 'phase2')
-      GROUP BY a.id, a.tenant_id, a.user_id, a.account_type, a.account_size, a.phase_start_date, a.created_at, u.email, u.full_name
+      GROUP BY a.id, a.user_id, a.account_type, a.account_size, a.phase_start_date, a.created_at, u.email, u.full_name
       ORDER BY COALESCE(MAX(GREATEST(COALESCE(t.open_time, '-infinity'::timestamptz), COALESCE(t.close_time, '-infinity'::timestamptz))), a.phase_start_date, a.created_at) ASC
       LIMIT $1`,
     [limit]
   )
 
-  const settingsCache = new Map()
+  let cachedSettings = null
   let scheduled = 0
   const now = Date.now()
   const maxThreshold = Math.max(...thresholds, 1)
 
   for (const row of result.rows) {
-    const tenantKey = row.tenant_id || 1
-    if (!settingsCache.has(tenantKey)) {
-      settingsCache.set(tenantKey, await getTenantSettings(tenantKey, ['inactivity_auto_fail_enabled', 'inactivity_fail_days']))
+    if (!cachedSettings) {
+      cachedSettings = await getTenantSettings(['inactivity_auto_fail_enabled', 'inactivity_fail_days'])
     }
-    const settings = settingsCache.get(tenantKey) || {}
+    const settings = cachedSettings || {}
     const inactivityEnabled = settings.inactivity_auto_fail_enabled !== 'false'
     const inactivityFailDays = Math.max(1, parseInt(settings.inactivity_fail_days || '30', 10) || 30)
     if (!inactivityEnabled || inactivityFailDays <= 0) continue
@@ -506,7 +478,6 @@ async function scheduleChallengeInactivityReminderEmails(options = {}) {
       daysUntilFail,
       lastActivityDate.toISOString(),
       {
-        tenantId: row.tenant_id || null,
         userId: row.user_id,
         uniqueKey: `challenge-inactivity:${row.id}:${lastActivityDate.toISOString().slice(0, 10)}:${daysUntilFail}`
       }

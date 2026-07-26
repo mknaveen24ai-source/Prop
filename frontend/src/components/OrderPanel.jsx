@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { renderIcon } from '../utils/iconMap'
+import Button from './ui/Button'
 import {
   CONTRACT_SIZES,
   SUPPORTED_INSTRUMENTS,
@@ -258,7 +259,7 @@ export default function OrderPanel({
         </select>
         {availableInstruments.length === 0 && (
           <div style={{ fontSize: '11px', color: 'var(--red)', marginTop: '6px' }}>
-            No live instruments are currently available for this tenant feed.
+            No live instruments are currently available on this feed.
           </div>
         )}
       </div>
@@ -277,32 +278,26 @@ export default function OrderPanel({
         </div>
       </div>
 
-      <div className="order-panel-mode-toggle">
-        <button
-          className="order-panel-mode-btn"
+      <div className="order-panel-mode-toggle" style={{ display: 'flex', gap: '6px' }}>
+        <Button
+          variant={orderMode === 'market' ? 'primary' : 'ghost'}
+          size="sm"
+          full
           onClick={() => {
             setOrderMode('market')
             setMarketPreviewDirection('buy')
           }}
-          style={{
-            background: orderMode === 'market' ? 'var(--accent)' : 'transparent',
-            color: orderMode === 'market' ? 'var(--navy)' : 'var(--text-muted)',
-            boxShadow: orderMode === 'market' ? '0 10px 18px rgba(37,99,235,0.24)' : 'none'
-          }}
         >
           Market
-        </button>
-        <button
-          className="order-panel-mode-btn"
+        </Button>
+        <Button
+          variant={orderMode === 'pending' ? 'primary' : 'ghost'}
+          size="sm"
+          full
           onClick={() => setOrderMode('pending')}
-          style={{
-            background: orderMode === 'pending' ? 'var(--accent)' : 'transparent',
-            color: orderMode === 'pending' ? 'var(--navy)' : 'var(--text-muted)',
-            boxShadow: orderMode === 'pending' ? '0 10px 18px rgba(37,99,235,0.24)' : 'none'
-          }}
         >
           Pending
-        </button>
+        </Button>
       </div>
 
       <div style={{ marginBottom: '14px' }}>
@@ -506,7 +501,7 @@ export default function OrderPanel({
             </div>
             <div>
               <div style={{ color: 'var(--text-dim)', fontSize: '10px', marginBottom: '2px' }}>R:R RATIO</div>
-              <div style={{ color: rrSummary.rr >= 2 ? 'var(--green)' : rrSummary.rr >= 1 ? '#8b8b8b' : 'var(--red)', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>
+              <div style={{ color: rrSummary.rr >= 2 ? 'var(--green)' : rrSummary.rr >= 1 ? 'var(--muted)' : 'var(--red)', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>
                 {rrSummary.rr != null ? `1:${rrSummary.rr}` : '-'}
               </div>
             </div>
@@ -615,71 +610,46 @@ export default function OrderPanel({
 
       {orderMode === 'market' && (
         <div className="order-submit-grid">
-          <button
-            className="btn"
+          <Button
+            variant="secondary"
             onClick={() => handleMarketOrder('sell')}
             onMouseEnter={() => setMarketPreviewDirection('sell')}
             onFocus={() => setMarketPreviewDirection('sell')}
             disabled={!selectedAccount || !priceData || !marketStatus.open || isSubmitting}
-            style={{
-              padding: '16px 14px',
-              fontSize: '13px',
-              fontWeight: '800',
-              background: 'linear-gradient(180deg, rgba(239, 68, 68, 0.12) 0%, rgba(239, 68, 68, 0.04) 100%)',
-              border: '1px solid var(--red)',
-              color: 'var(--red)',
-              borderRadius: '14px',
-              opacity: isSubmitting ? 0.6 : 1,
-              cursor: isSubmitting ? 'not-allowed' : 'pointer'
-            }}
+            style={{ flexDirection: 'column', padding: '16px 14px', fontWeight: 800, borderColor: 'var(--loss)', color: 'var(--loss)' }}
           >
             <div style={{ fontSize: '10px', marginBottom: '4px', opacity: 0.7, letterSpacing: '0.1em' }}>SELL</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: '18px' }}>{isSubmitting ? '...' : bid}</div>
-          </button>
-          <button
-            className="btn"
+          </Button>
+          <Button
+            variant="secondary"
             onClick={() => handleMarketOrder('buy')}
             onMouseEnter={() => setMarketPreviewDirection('buy')}
             onFocus={() => setMarketPreviewDirection('buy')}
             disabled={!selectedAccount || !priceData || !marketStatus.open || isSubmitting}
-            style={{
-              padding: '16px 14px',
-              fontSize: '13px',
-              fontWeight: '800',
-              background: 'linear-gradient(180deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.04) 100%)',
-              border: '1px solid var(--green)',
-              color: 'var(--green)',
-              borderRadius: '14px',
-              opacity: isSubmitting ? 0.6 : 1,
-              cursor: isSubmitting ? 'not-allowed' : 'pointer'
-            }}
+            style={{ flexDirection: 'column', padding: '16px 14px', fontWeight: 800, borderColor: 'var(--gain)', color: 'var(--gain)' }}
           >
             <div style={{ fontSize: '10px', marginBottom: '4px', opacity: 0.7, letterSpacing: '0.1em' }}>BUY</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: '18px' }}>{isSubmitting ? '...' : ask}</div>
-          </button>
+          </Button>
         </div>
       )}
 
       {orderMode === 'pending' && (
-        <button
-          className="btn"
+        <Button
+          variant="secondary"
+          full
           onClick={handlePendingOrder}
           disabled={!selectedAccount || !priceData || !pendingPrice || parseFloat(pendingPrice) <= 0 || !marketStatus.open || isSubmitting}
           style={{
-            width: '100%',
             padding: '14px',
-            fontSize: '13px',
-            fontWeight: '700',
-            background: pendingType.startsWith('buy') ? 'rgba(74, 74, 74, 0.15)' : 'rgba(97, 97, 97, 0.15)',
-            border: `1px solid ${pendingType.startsWith('buy') ? 'var(--green)' : 'var(--red)'}`,
-            color: pendingType.startsWith('buy') ? 'var(--green)' : 'var(--red)',
-            borderRadius: '8px',
-            opacity: isSubmitting ? 0.6 : 1,
-            cursor: isSubmitting ? 'not-allowed' : 'pointer'
+            fontWeight: 700,
+            borderColor: pendingType.startsWith('buy') ? 'var(--gain)' : 'var(--loss)',
+            color: pendingType.startsWith('buy') ? 'var(--gain)' : 'var(--loss)',
           }}
         >
           {isSubmitting ? 'Placing...' : `Place ${pendingType.replaceAll('_', ' ').toUpperCase()} @ ${pendingPrice || '-'}`}
-        </button>
+        </Button>
       )}
 
       {selectedAccount && (

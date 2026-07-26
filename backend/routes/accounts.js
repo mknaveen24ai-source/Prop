@@ -28,6 +28,13 @@ const {
   parseBooleanSetting: parseTenantBoolean
 } = require('../utils/tenantSettings')
 const { createChallengePaymentSession } = require('./billing')
+const {
+  ACCOUNT_SIZES: STEP_MODEL_ACCOUNT_SIZES,
+  ensureStepModelInfrastructure,
+  fetchStepModels,
+  fetchStepModelBySlug,
+  fetchStepModelPrice
+} = require('../utils/stepModels')
 
 const createAccountLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,     // 1 hour
@@ -65,18 +72,18 @@ function buildPublicAvailabilityFallback(settings = DEFAULT_TENANT_SETTINGS) {
   })
 }
 
-async function loadTenantAvailability(tenantId) {
-  const settings = await loadTenantSettings(tenantId)
-  const sizes = await buildAccountAvailability(pool, tenantId, settings)
+async function loadTenantAvailability() {
+  const settings = await loadTenantSettings()
+  const sizes = await buildAccountAvailability(pool, settings)
   return {
     settings,
     sizes
   }
 }
 
-async function loadTenantSettings(tenantId, keys = []) {
+async function loadTenantSettings(keys = []) {
   await ensureTenantSettingsInfrastructure()
-  return getTenantSettingsMap(tenantId, keys)
+  return getTenantSettingsMap(keys)
 }
 
 async function ensureChallengeOrderInfrastructure() {
@@ -114,10 +121,10 @@ function computeDaysRemaining(phaseEndDate) {
 
 function buildResolvedRules(account, settings = {}) {
   const accountType = account?.account_type || 'phase1'
-  const phaseKey = accountType === 'phase2'
-    ? 'phase2'
-    : accountType === 'funded'
-      ? 'funded'
+  const phaseKey = accountType === 'funded'
+    ? 'funded'
+    : ['phase1', 'phase2', 'phase3'].includes(accountType)
+      ? accountType
       : 'phase1'
   const startingBalance = parseFloat(account?.starting_balance || 0)
   const storedProfitTarget = parseFloat(account?.profit_target || 0)
@@ -169,8 +176,7 @@ function buildResolvedRules(account, settings = {}) {
 // competitors or bots scrape capacity data indefinitely.
 router.get('/available-sizes', authenticateToken, async function(req, res) {
   try {
-    const tenantId = req.user.tenantId || req.tenant?.id || 1
-    const { sizes } = await loadTenantAvailability(tenantId)
+    const { sizes } = await loadTenantAvailability()
     res.json(sizes)
   } catch (error) {
     logger.error('Available sizes error:', { error: error.message })
@@ -180,7 +186,6 @@ router.get('/available-sizes', authenticateToken, async function(req, res) {
 
 router.get('/rules/:account_id', authenticateToken, async function(req, res) {
   try {
-    const tenantId = req.user.tenantId || req.tenant?.id || 1
     const accountIdStr = String(req.params.account_id || '').trim()
     if (!accountIdStr || isNaN(parseInt(accountIdStr))) {
       return res.status(400).json({ error: 'Invalid account ID' })
@@ -190,14 +195,14 @@ router.get('/rules/:account_id', authenticateToken, async function(req, res) {
       `SELECT id, user_id, account_type, account_size, current_balance, starting_balance,
               peak_balance, status, profit_target, max_drawdown_pct, phase_start_date, phase_end_date, created_at
        FROM accounts
-       WHERE id = $1 AND user_id = $2 AND COALESCE(tenant_id, $3) = $3`,
-      [accountIdStr, req.user.userId, tenantId]
+       WHERE id = $1 AND user_id = $2`,
+      [accountIdStr, req.user.userId]
     )
     if (accountResult.rows.length === 0) {
       return res.status(404).json({ error: 'Account not found' })
     }
 
-    const settings = await loadTenantSettings(tenantId, [
+    const settings = await loadTenantSettings([
       'phase1_profit_target_pct', 'phase1_max_drawdown_pct', 'phase1_day_limit',
       'phase2_profit_target_pct', 'phase2_max_drawdown_pct', 'phase2_day_limit',
       'funded_max_drawdown_pct', 'profit_share_pct',
@@ -237,8 +242,7 @@ router.get('/rules/:account_id', authenticateToken, async function(req, res) {
 // Returns live usage statistics to match the private endpoint.
 router.get('/available-sizes-public', async function(req, res) {
   try {
-    const tenantId = req.tenant?.id || 1
-    const { sizes } = await loadTenantAvailability(tenantId)
+    const { sizes } = await loadTenantAvailability()
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
     res.set('Pragma', 'no-cache')
     res.set('Expires', '0')
@@ -254,23 +258,16 @@ router.get('/available-sizes-public', async function(req, res) {
 
 router.get('/platform-rules', authenticateToken, async function(req, res) {
   try {
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
-    const settings = await loadTenantSettings(tenantId, [
-      'phase1_profit_target_pct', 'phase1_max_drawdown_pct', 'phase1_day_limit',
-      'phase2_profit_target_pct', 'phase2_max_drawdown_pct', 'phase2_day_limit',
-      'funded_max_drawdown_pct', 'profit_share_pct',
+    const settings = await loadTenantSettings([
+      'profit_share_pct',
       'max_daily_trades', 'min_hold_seconds', 'min_lot_size',
       'forex_lots_per_1k', 'commodity_lots_per_1k', 'max_trades_per_1k',
-      'weekend_holding_enabled', 'inactivity_auto_fail_enabled', 'inactivity_fail_days',
-      'requires_payment', 'challenge_checkout_mode', 'challenge_fee_amount',
-      'challenge_fee_currency', 'challenge_fee_label', 'marketing_mode'
+      'weekend_holding_enabled', 'inactivity_auto_fail_enabled', 'inactivity_fail_days'
     ])
     const rules = {}
     Object.entries(settings).forEach(([key, value]) => {
-      if (['weekend_holding_enabled', 'inactivity_auto_fail_enabled', 'requires_payment'].includes(key)) {
+      if (['weekend_holding_enabled', 'inactivity_auto_fail_enabled'].includes(key)) {
         rules[key] = parseTenantBoolean(value)
-      } else if (['challenge_checkout_mode', 'challenge_fee_currency', 'challenge_fee_label', 'marketing_mode'].includes(key)) {
-        rules[key] = value
       } else {
         const parsed = parseFloat(value)
         rules[key] = Number.isFinite(parsed) ? parsed : value
@@ -280,6 +277,41 @@ router.get('/platform-rules', authenticateToken, async function(req, res) {
   } catch (error) {
     logger.error('Platform rules error:', { error: error.message })
     res.status(500).json({ error: 'Could not fetch platform rules' })
+  }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/accounts/step-models
+// Public (authenticated trader) view of the 1-step/2-step/3-step challenge
+// models: rules per phase, funded-stage terms, and per-size pricing. Only
+// enabled models are returned — this is what the admin availability toggle
+// controls.
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/step-models', authenticateToken, async function(req, res) {
+  try {
+    const models = await fetchStepModels({ onlyEnabled: true })
+    res.json({
+      account_sizes: STEP_MODEL_ACCOUNT_SIZES,
+      models: models.map((m) => ({
+        slug: m.slug,
+        name: m.name,
+        description: m.description,
+        steps: m.steps,
+        profit_targets_pct: m.profit_targets_pct,
+        daily_drawdown_pct: parseFloat(m.daily_drawdown_pct),
+        max_drawdown_pct: parseFloat(m.max_drawdown_pct),
+        time_limits_days: m.time_limits_days,
+        min_trading_days: m.min_trading_days,
+        consistency_max_day_pct_by_phase: m.consistency_max_day_pct_by_phase,
+        profit_split_pct: parseFloat(m.profit_split_pct),
+        funded_max_drawdown_pct: parseFloat(m.funded_max_drawdown_pct),
+        funded_daily_drawdown_pct: parseFloat(m.funded_daily_drawdown_pct),
+        pricing: m.pricing
+      }))
+    })
+  } catch (error) {
+    logger.error('Step models error:', { error: error.message })
+    res.status(500).json({ error: 'Could not fetch challenge models' })
   }
 })
 
@@ -297,12 +329,10 @@ router.post('/create', authenticateToken, createAccountLimiter, async function(r
   let idempotencyClaim = null
   try {
     await ensureChallengeOrderInfrastructure()
-    const tenantId = req.user.tenantId || req.tenant?.id || 1
     const account_size = parseInt(req.body.account_size)
     const challengeOrderId = req.body.challenge_order_id ? parseInt(req.body.challenge_order_id, 10) : null
     const idempotencyResult = await beginIdempotentRequest(pool, {
       scope: 'accounts:create',
-      tenantId,
       actorId: req.user.userId,
       idempotencyKey: getIdempotencyKey(req)
     })
@@ -346,20 +376,9 @@ router.post('/create', authenticateToken, createAccountLimiter, async function(r
       return res.status(403).json({ error: 'KYC approval required before starting a challenge' })
     }
 
-    const settings = await loadTenantSettings(tenantId)
+    const settings = await loadTenantSettings()
 
-    const maxPerUser            = parseInt(settings.max_accounts_per_user     || '999999')
-    const phase1ProfitTargetPct = parseFloat(settings.phase1_profit_target_pct || '10')
-    const phase1MaxDrawdownPct  = parseFloat(settings.phase1_max_drawdown_pct  || '10')
-    const phase1DayLimit        = parseInt(settings.phase1_day_limit           || '30')
-    const requiresPayment       = parseTenantBoolean(settings.requires_payment, false)
-    const checkoutMode          = String(settings.challenge_checkout_mode || 'free').trim().toLowerCase()
-
-    if (isNaN(phase1ProfitTargetPct) || isNaN(phase1MaxDrawdownPct) || isNaN(phase1DayLimit)) {
-      await client.query('ROLLBACK')
-      logger.error('Platform configuration error - invalid settings')
-      return res.status(500).json({ error: 'Platform configuration error. Contact support.' })
-    }
+    const maxPerUser = parseInt(settings.max_accounts_per_user || '999999')
 
     // ——— Quota check ——————————————————————————————————————————————————————————
     const key   = quotaKey(account_size)
@@ -374,7 +393,7 @@ router.post('/create', authenticateToken, createAccountLimiter, async function(r
     }
 
     if (quota < 999999) {
-      const usedCount = await countUsedQuotaSlots(client, tenantId, account_size, settings)
+      const usedCount = await countUsedQuotaSlots(client, account_size, settings)
 
       if (usedCount >= quota) {
         await client.query('ROLLBACK')
@@ -397,10 +416,9 @@ router.post('/create', authenticateToken, createAccountLimiter, async function(r
     const userActiveResult = await client.query(
       `SELECT COUNT(*) FROM accounts
        WHERE user_id = $1
-         AND COALESCE(tenant_id, $2) = $2
          AND status = 'active'
-         AND account_type IN ('phase1', 'phase2', 'funded')`,
-      [req.user.userId, tenantId]
+         AND account_type IN ('phase1', 'phase2', 'phase3', 'funded')`,
+      [req.user.userId]
     )
     if (parseInt(userActiveResult.rows[0].count) >= maxPerUser) {
       await client.query('ROLLBACK')
@@ -409,80 +427,87 @@ router.post('/create', authenticateToken, createAccountLimiter, async function(r
       })
     }
 
-    let challengeOrder = null
-    if (requiresPayment || checkoutMode === 'paid') {
-      if (!Number.isFinite(challengeOrderId)) {
-        await client.query('ROLLBACK')
-        return res.status(402).json({
-          error: 'A paid challenge order is required before creating this account.',
-          requires_payment: true
-        })
-      }
+    if (!Number.isFinite(challengeOrderId)) {
+      await client.query('ROLLBACK')
+      return res.status(402).json({
+        error: 'A paid challenge order is required before creating this account.',
+        requires_payment: true
+      })
+    }
 
-      const challengeOrderResult = await client.query(
-        `SELECT id, tenant_id, user_id, account_size, status, checkout_mode, paid_via, paid_at
-           FROM challenge_orders
-          WHERE id = $1
-            AND tenant_id = $2
-            AND user_id = $3
-          FOR UPDATE`,
-        [challengeOrderId, tenantId, req.user.userId]
-      )
-      if (challengeOrderResult.rows.length === 0) {
-        await client.query('ROLLBACK')
-        return res.status(404).json({ error: 'Challenge order not found for this tenant.' })
-      }
+    const challengeOrderResult = await client.query(
+      `SELECT id, user_id, account_size, status, challenge_model_id, challenge_model_slug, paid_at
+         FROM challenge_orders
+        WHERE id = $1
+          AND user_id = $2
+        FOR UPDATE`,
+      [challengeOrderId, req.user.userId]
+    )
+    if (challengeOrderResult.rows.length === 0) {
+      await client.query('ROLLBACK')
+      return res.status(404).json({ error: 'Challenge order not found.' })
+    }
 
-      challengeOrder = challengeOrderResult.rows[0]
-      if (parseInt(challengeOrder.account_size, 10) !== account_size) {
-        await client.query('ROLLBACK')
-        return res.status(400).json({ error: 'Challenge order account size does not match your selected size.' })
-      }
-      if (challengeOrder.status !== 'paid') {
-        await client.query('ROLLBACK')
-        return res.status(402).json({
-          error: 'Challenge payment is not completed yet.',
-          requires_payment: true,
-          order_status: challengeOrder.status
-        })
-      }
-    } else {
-      const freeOrderResult = await client.query(
-        `INSERT INTO challenge_orders (
-           tenant_id, user_id, account_size, amount, currency, status, checkout_mode, paid_via, paid_at, metadata_json
-         ) VALUES (
-           $1, $2, $3, 0, $4, 'paid', 'free', 'internal_free_issue', NOW(), '{}'::jsonb
-         )
-         RETURNING *`,
-        [tenantId, req.user.userId, account_size, String(settings.challenge_fee_currency || 'USD')]
-      )
-      challengeOrder = freeOrderResult.rows[0]
+    const challengeOrder = challengeOrderResult.rows[0]
+    if (parseInt(challengeOrder.account_size, 10) !== account_size) {
+      await client.query('ROLLBACK')
+      return res.status(400).json({ error: 'Challenge order account size does not match your selected size.' })
+    }
+    if (challengeOrder.status !== 'paid') {
+      await client.query('ROLLBACK')
+      return res.status(402).json({
+        error: 'Challenge payment is not completed yet.',
+        requires_payment: true,
+        order_status: challengeOrder.status
+      })
+    }
+    if (!challengeOrder.challenge_model_slug) {
+      await client.query('ROLLBACK')
+      return res.status(400).json({ error: 'This order is missing its challenge model. Please start a new challenge order.' })
+    }
+
+    const stepModel = await fetchStepModelBySlug(challengeOrder.challenge_model_slug)
+    if (!stepModel) {
+      await client.query('ROLLBACK')
+      return res.status(400).json({ error: 'The challenge model for this order is no longer available.' })
     }
 
     // â”€â”€ Create the account â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    const profit_target  = account_size * (phase1ProfitTargetPct / 100)
+    const profitTargetPct = parseFloat(stepModel.profit_targets_pct[0])
+    const dayLimit = parseInt(stepModel.time_limits_days[0], 10)
+    const consistencyPct = Array.isArray(stepModel.consistency_max_day_pct_by_phase)
+      ? parseFloat(stepModel.consistency_max_day_pct_by_phase[0])
+      : parseFloat(stepModel.consistency_max_day_pct)
+    const profit_target  = account_size * (profitTargetPct / 100)
     const account_uid    = uuidv4()
 
     // Phase end date in UTC to avoid timezone off-by-one
     const phase_end_date = new Date()
-    phase_end_date.setUTCDate(phase_end_date.getUTCDate() + phase1DayLimit)
+    phase_end_date.setUTCDate(phase_end_date.getUTCDate() + dayLimit)
     phase_end_date.setUTCHours(23, 59, 59, 999)
 
     const newAccount = await client.query(
       `INSERT INTO accounts
        (user_id, account_type, account_size, current_balance, starting_balance, peak_balance,
-        profit_target, max_drawdown_pct, status, phase_start_date, phase_end_date, account_uid, tenant_id)
-       VALUES ($1, 'phase1', $2, $2, $2, $2, $3, $4, 'active', NOW(), $5, $6, $7)
+        profit_target, max_drawdown_pct, status, phase_start_date, phase_end_date, account_uid,
+        challenge_model_id, challenge_model_slug, step_number, daily_drawdown_pct, drawdown_type,
+        consistency_max_day_pct, min_trading_days, min_daily_profit_pct, eod_peak_equity, qualifying_days_count)
+       VALUES ($1, 'phase1', $2, $2, $2, $2, $3, $4, 'active', NOW(), $5, $6,
+               $7, $8, 1, $9, $10, $11, $12, $13, $2, 0)
        RETURNING *`,
-      [req.user.userId, account_size, profit_target, phase1MaxDrawdownPct, phase_end_date, account_uid, tenantId]
+      [
+        req.user.userId, account_size, profit_target, stepModel.max_drawdown_pct, phase_end_date, account_uid,
+        stepModel.id, stepModel.slug, stepModel.daily_drawdown_pct, stepModel.drawdown_type,
+        consistencyPct, stepModel.min_trading_days, stepModel.min_daily_profit_pct
+      ]
     )
 
     await client.query('COMMIT')
 
     logger.info(
-      `Phase 1 created for user ${req.user.userId}: $${account_size} ` +
-      `| target: ${phase1ProfitTargetPct}% ($${profit_target}) ` +
-      `| max DD: ${phase1MaxDrawdownPct}% | days: ${phase1DayLimit}`
+      `${stepModel.name} account created for user ${req.user.userId}: $${account_size} ` +
+      `| target: ${profitTargetPct}% ($${profit_target}) ` +
+      `| max DD: ${stepModel.max_drawdown_pct}% | days: ${dayLimit}`
     )
 
     const account = newAccount.rows[0]
@@ -502,7 +527,7 @@ router.post('/create', authenticateToken, createAccountLimiter, async function(r
       }
     }
     const responseBody = {
-      message: 'Phase 1 challenge account created successfully',
+      message: `${stepModel.name} challenge account created successfully`,
       account_id:  account.id,
       account_uid: account.account_uid,
       order_id: challengeOrder?.id || null,
@@ -526,13 +551,12 @@ router.post('/create', authenticateToken, createAccountLimiter, async function(r
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get('/my-accounts', authenticateToken, async function(req, res) {
   try {
-    const tenantId = req.user.tenantId || req.tenant?.id || 1
     const result = await pool.query(
       `SELECT id, user_id, account_type, account_size, current_balance, starting_balance,
               peak_balance, status, profit_target, max_drawdown_pct, created_at,
               phase_start_date, phase_end_date, account_uid, updated_at
-       FROM accounts WHERE user_id = $1 AND COALESCE(tenant_id, $2) = $2 ORDER BY created_at DESC`,
-      [req.user.userId, tenantId]
+       FROM accounts WHERE user_id = $1 ORDER BY created_at DESC`,
+      [req.user.userId]
     )
     res.json(result.rows)
   } catch (error) {
@@ -546,7 +570,6 @@ router.get('/my-accounts', authenticateToken, async function(req, res) {
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get('/history', authenticateToken, async function(req, res) {
   try {
-    const tenantId = req.user.tenantId || req.tenant?.id || 1
     const accountsResult = await pool.query(
       `SELECT a.*,
          COUNT(t.id) FILTER (WHERE t.status = 'closed') as total_trades,
@@ -554,10 +577,10 @@ router.get('/history', authenticateToken, async function(req, res) {
          COUNT(t.id) FILTER (WHERE t.status = 'closed' AND t.demo_pnl > 0) as winning_trades
        FROM accounts a
        LEFT JOIN trades t ON t.account_id = a.id
-       WHERE a.user_id = $1 AND COALESCE(a.tenant_id, $2) = $2
+       WHERE a.user_id = $1
        GROUP BY a.id
        ORDER BY a.created_at DESC`,
-      [req.user.userId, tenantId]
+      [req.user.userId]
     )
     res.json(accountsResult.rows)
   } catch (error) {
@@ -571,7 +594,6 @@ router.get('/history', authenticateToken, async function(req, res) {
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get('/stats/:account_id', authenticateToken, async function(req, res) {
   try {
-    const tenantId = req.user.tenantId || req.tenant?.id || 1
     const account_id = req.params.account_id
 
     const accountIdStr = String(account_id || '').trim()
@@ -582,8 +604,8 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
     const result = await pool.query(
       `SELECT id, user_id, account_type, account_size, current_balance, starting_balance,
               peak_balance, status, profit_target, max_drawdown_pct, phase_end_date
-       FROM accounts WHERE id = $1 AND user_id = $2 AND COALESCE(tenant_id, $3) = $3`,
-      [accountIdStr, req.user.userId, tenantId]
+       FROM accounts WHERE id = $1 AND user_id = $2`,
+      [accountIdStr, req.user.userId]
     )
 
     if (result.rows.length === 0) {
@@ -591,7 +613,7 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
     }
 
     const account = result.rows[0]
-    const settings = await loadTenantSettings(tenantId, [
+    const settings = await loadTenantSettings([
       'phase1_profit_target_pct', 'phase1_max_drawdown_pct', 'phase1_day_limit',
       'phase2_profit_target_pct', 'phase2_max_drawdown_pct', 'phase2_day_limit',
       'funded_max_drawdown_pct', 'profit_share_pct',
@@ -683,58 +705,58 @@ router.post('/orders', authenticateToken, async function(req, res) {
   const client = await pool.connect()
   try {
     await ensureChallengeOrderInfrastructure()
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
+    await ensureStepModelInfrastructure()
     const accountSize = parseInt(req.body.account_size, 10)
-    if (!Number.isFinite(accountSize) || !VALID_ACCOUNT_SIZES.includes(accountSize)) {
+    const stepModelSlug = String(req.body.step_model || '').trim().toLowerCase()
+
+    if (!Number.isFinite(accountSize) || !STEP_MODEL_ACCOUNT_SIZES.includes(accountSize)) {
       return res.status(400).json({ error: 'Invalid account size' })
     }
 
-    const settings = await loadTenantSettings(tenantId, [
-      'requires_payment',
-      'challenge_checkout_mode',
-      'challenge_fee_amount',
-      'challenge_fee_currency',
-      'payment_provider'
-    ])
+    const stepModel = await fetchStepModelBySlug(stepModelSlug)
+    if (!stepModel || !stepModel.is_active) {
+      return res.status(400).json({ error: 'This challenge model is not available right now.' })
+    }
 
-    const requiresPayment = parseTenantBoolean(settings.requires_payment, false)
-    const checkoutMode = String(settings.challenge_checkout_mode || (requiresPayment ? 'paid' : 'free')).trim().toLowerCase()
-    const currency = String(settings.challenge_fee_currency || 'USD').trim() || 'USD'
-    const amount = parseFloat(settings.challenge_fee_amount || 0) || 0
+    const priceRow = await fetchStepModelPrice(stepModelSlug, accountSize)
+    if (!priceRow || !priceRow.is_active) {
+      return res.status(400).json({ error: 'This account size is not available for the selected challenge model.' })
+    }
+
+    const settings = await loadTenantSettings(['payment_provider'])
     const paymentProvider = String(settings.payment_provider || '').trim()
+    const amount = parseFloat(priceRow.price)
+    const currency = 'USD'
 
     await client.query('BEGIN')
 
-    const orderStatus = checkoutMode === 'paid' && requiresPayment ? 'pending' : 'paid'
-    const paidVia = orderStatus === 'paid' ? 'internal_free_issue' : null
-    const paidAt = orderStatus === 'paid' ? 'NOW()' : 'NULL'
+    // Every challenge requires payment now — the order stays 'pending'
+    // until Stripe confirms payment via webhook.
     const orderInsert = await client.query(
       `INSERT INTO challenge_orders (
-         tenant_id, user_id, account_size, amount, currency, status, checkout_mode, payment_provider, paid_via, paid_at, metadata_json
+         user_id, account_size, amount, currency, status, checkout_mode, payment_provider, paid_via, paid_at,
+         challenge_model_id, challenge_model_slug, metadata_json
        ) VALUES (
-         $1, $2, $3, $4, $5, $6, $7, $8, $9, ${paidAt}, '{}'::jsonb
+         $1, $2, $3, $4, 'pending', 'paid', $5, NULL, NULL, $6, $7, '{}'::jsonb
        )
        RETURNING *`,
       [
-        tenantId,
         req.user.userId,
         accountSize,
         amount,
         currency,
-        orderStatus,
-        checkoutMode,
         paymentProvider || null,
-        paidVia
+        stepModel.id,
+        stepModelSlug
       ]
     )
 
     await client.query('COMMIT')
 
     let checkout = null
-    if (orderStatus === 'pending' && paymentProvider.toLowerCase() === 'stripe') {
+    if (paymentProvider.toLowerCase() === 'stripe') {
       checkout = await createChallengePaymentSession({
         req,
-        tenantId,
         orderId: orderInsert.rows[0].id,
         userId: req.user.userId
       })
@@ -742,9 +764,8 @@ router.post('/orders', authenticateToken, async function(req, res) {
 
     res.status(201).json({
       order: orderInsert.rows[0],
-      requires_payment: requiresPayment || checkoutMode === 'paid',
+      requires_payment: true,
       payment_configured: !!paymentProvider,
-      checkout_mode: checkoutMode,
       checkout_url: checkout?.checkout_url || null,
       checkout_session_id: checkout?.checkout_session_id || null
     })
@@ -758,14 +779,40 @@ router.post('/orders', authenticateToken, async function(req, res) {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// GET /api/accounts/orders/:id
+// Lets the frontend poll an order's payment status after returning from Stripe
+// checkout (webhook delivery can lag a few seconds behind the redirect).
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/orders/:id', authenticateToken, async function(req, res) {
+  try {
+    const orderId = parseInt(req.params.id, 10)
+    if (!Number.isFinite(orderId)) {
+      return res.status(400).json({ error: 'Invalid order id' })
+    }
+    const result = await pool.query(
+      `SELECT id, account_size, amount, currency, status, challenge_model_slug, created_at, paid_at
+         FROM challenge_orders
+        WHERE id = $1 AND user_id = $2`,
+      [orderId, req.user.userId]
+    )
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Order not found' })
+    }
+    res.json({ order: result.rows[0] })
+  } catch (error) {
+    logger.error('Fetch order error:', { error: error.message })
+    res.status(500).json({ error: 'Could not fetch order' })
+  }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GET /api/accounts/my-purchase-limit
 // Returns the user's purchase count within the current rolling period and the
 // date when the limit resets (i.e. when the oldest purchase exits the window).
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/my-purchase-limit', authenticateToken, async function(req, res) {
   try {
-    const tenantId = req.user.tenantId || req.tenant?.id || 1
-    const settings = await loadTenantSettings(tenantId, ['max_accounts_per_user_per_period', 'user_purchase_period_days'])
+    const settings = await loadTenantSettings(['max_accounts_per_user_per_period', 'user_purchase_period_days'])
 
     const max         = parseInt(settings.max_accounts_per_user_per_period || '0')
     const periodDays  = parseInt(settings.user_purchase_period_days || '30')
@@ -778,9 +825,9 @@ router.get('/my-purchase-limit', authenticateToken, async function(req, res) {
     periodStart.setDate(periodStart.getDate() - periodDays)
     const r = await pool.query(
       `SELECT id, created_at FROM accounts
-       WHERE user_id = $1 AND COALESCE(tenant_id, $3) = $3 AND created_at >= $2
+       WHERE user_id = $1 AND created_at >= $2
        ORDER BY created_at ASC`,
-      [req.user.userId, periodStart.toISOString(), tenantId]
+      [req.user.userId, periodStart.toISOString()]
     )
     const used = r.rows.length
     let resetsAt = null

@@ -230,7 +230,7 @@ function buildWelcomeOnboardingEmail(payload, tenant = null) {
       <div style="background:#13253a;border:1px solid #1e2d3d;border-radius:8px;padding:16px 18px;margin:18px 0;">
         <p style="margin:0 0 10px;font-weight:700;color:#e8e0d0;">Best next steps</p>
         <ol style="margin:0;padding-left:18px;color:#cbd5e1;">
-          <li style="margin-bottom:8px;">Open your dashboard and start your free evaluation.</li>
+          <li style="margin-bottom:8px;">Open your dashboard and start your challenge.</li>
           <li style="margin-bottom:8px;">Complete KYC early so payouts are not delayed later.</li>
           <li>Review the rules and payout flow before your first trade.</li>
         </ol>
@@ -358,7 +358,7 @@ function buildAccountFailedEmail(payload, tenant = null) {
     html: htmlWrap(`Hi ${fullName}, your challenge account has been closed.`, `
       <p>Your ${phase} account ($${accountSize.toLocaleString()}) has been closed because:</p>
       <div style="background:#1a0a0a;border-left:3px solid #c0392b;padding:12px 16px;border-radius:4px;margin:16px 0;color:#e74c3c;font-size:14px;">${reason}</div>
-      <p>Since our challenge is free, you can start a new one immediately.</p>
+      <p>You can start a new challenge immediately.</p>
       <p style="margin:24px 0;"><a href="${context.baseUrl}/dashboard" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">Start New Challenge</a></p>
     `, tenant),
     text: `Your challenge was closed: ${reason}`
@@ -376,7 +376,7 @@ function buildAccountExpiredEmail(payload, tenant = null) {
     subject: `${context.firmName} - Challenge Time Limit Reached`,
     html: htmlWrap(`Hi ${fullName}, your challenge time limit has been reached.`, `
       <p>Your ${phase} account ($${accountSize.toLocaleString()}) has expired because the 30-day time limit was reached before the profit target.</p>
-      <p>Since our challenge is free, you can start fresh right away.</p>
+      <p>You can start a new challenge right away.</p>
       <p style="margin:24px 0;"><a href="${context.baseUrl}/dashboard" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">Start New Challenge</a></p>
     `, tenant),
     text: `Your ${phase} challenge expired. Start a new one at ${context.baseUrl}/dashboard`

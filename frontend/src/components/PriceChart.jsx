@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
-import { createChart, CandlestickSeries } from 'lightweight-charts'
+import { createChart, BarSeries } from 'lightweight-charts'
 import axios from 'axios'
 import { renderIcon } from '../utils/iconMap'
 import {
@@ -34,12 +34,19 @@ function PriceChart({ instrument, prices }) {
     return () => observer.disconnect()
   }, [])
 
-  const isDark = theme !== 'light'
+  // Resolve Ledger Desk tokens at draw time (canvas can't read CSS vars directly).
+  function readToken(name, fallback) {
+    const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+    return value || fallback
+  }
+
   const chartColors = {
-    bg:     isDark ? '#0b0b0b' : '#ffffff',
-    text:   isDark ? '#ffffff' : '#111111',
-    grid:   isDark ? '#1f1f1f' : '#e5e5e5',
-    border: isDark ? '#1f1f1f' : '#e5e5e5',
+    bg:     readToken('--paper', '#161616'),
+    text:   readToken('--muted', '#8a8a82'),
+    grid:   readToken('--rule', '#3a3a3a'),
+    border: readToken('--rule', '#3a3a3a'),
+    up:     readToken('--gain', '#4ade80'),
+    down:   readToken('--loss', '#f87171'),
   }
 
   // Store chartColors in a ref so mount-only useEffect doesn't need it as a dep
@@ -63,8 +70,8 @@ function PriceChart({ instrument, prices }) {
         horzLines: { color: colors.grid },
       },
       crosshair: {
-        vertLine: { color: '#d4af37', labelBackgroundColor: '#d4af37' },
-        horzLine: { color: '#d4af37', labelBackgroundColor: '#d4af37' },
+        vertLine: { color: colors.text, labelBackgroundColor: colors.text },
+        horzLine: { color: colors.text, labelBackgroundColor: colors.text },
       },
       rightPriceScale: { borderColor: colors.border },
       timeScale: {
@@ -74,13 +81,14 @@ function PriceChart({ instrument, prices }) {
       },
     })
 
-    const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor:         '#2ecc71',
-      downColor:       '#e74c3c',
-      borderUpColor:   '#2ecc71',
-      borderDownColor: '#e74c3c',
-      wickUpColor:     '#2ecc71',
-      wickDownColor:   '#e74c3c',
+    // Hand-ruled ink ticks (Ledger Desk spec) — stroke-only OHLC bars, not
+    // filled candlesticks: a vertical stem with a left open-tick and a right
+    // close-tick.
+    const candleSeries = chart.addSeries(BarSeries, {
+      upColor:   colors.up,
+      downColor: colors.down,
+      openVisible: true,
+      thinBars: true,
     })
 
     chartRef.current        = chart
@@ -110,6 +118,14 @@ function PriceChart({ instrument, prices }) {
       grid:            { vertLines: { color: colors.grid }, horzLines: { color: colors.grid } },
       rightPriceScale: { borderColor: colors.border },
       timeScale:       { borderColor: colors.border },
+      crosshair: {
+        vertLine: { color: colors.text, labelBackgroundColor: colors.text },
+        horzLine: { color: colors.text, labelBackgroundColor: colors.text },
+      },
+    })
+    candleSeriesRef.current?.applyOptions({
+      upColor: colors.up,
+      downColor: colors.down,
     })
   }, [theme])
 

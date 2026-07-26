@@ -1,24 +1,21 @@
 import React, { useState } from 'react';
 import { TRADABLE_INSTRUMENTS_SUMMARY } from '../../utils/instruments';
-import { useBranding } from '../../BrandingContext';
-import { getTenantLandingCopy, isPaidTenant } from '../../utils/tenantMarketing';
+import { getTenantLandingCopy } from '../../utils/tenantMarketing';
 
 export default function LandingFAQ() {
-  const { tenant } = useBranding();
-  const landingCopy = getTenantLandingCopy(tenant);
-  const paidTenant = isPaidTenant(tenant);
+  const landingCopy = getTenantLandingCopy();
   const [openIndex, setOpenIndex] = useState(null);
 
   const faqs = [
     {
       category: "General",
-      q: paidTenant ? "How do I start a challenge?" : "Is this really 100% free?",
-      a: landingCopy.faqItems[0]?.a || "Select an account size, start your challenge, and trade under the published rules."
+      q: "How do I start a challenge?",
+      a: landingCopy.faqItems[0]?.a || "Choose a 1-step, 2-step, or 3-step model and account size, complete checkout, and trade under the published rules."
     },
     {
       category: "General",
-      q: "Why would you fund traders for free?",
-      a: "We back traders with real capital and earn returns from successful trading. When you profit, it benefits both of us. We are selective about who we fund, which is why there is a 2-phase evaluation and limited spots each month."
+      q: "Why is there a challenge fee?",
+      a: "The fee covers the cost of backing your evaluation with real market data and, once you pass, real capital. We are selective about who we fund, which is why there is a multi-phase evaluation and limited spots each month."
     },
     {
       category: "General",
@@ -33,17 +30,17 @@ export default function LandingFAQ() {
     {
       category: "Rules",
       q: "What are the evaluation rules?",
-      a: "Both Phase 1 and Phase 2 have identical core rules: hit the profit target within 30 calendar days without breaching the maximum drawdown limit. The rules are exactly the same across both phases — no surprises."
+      a: "Every phase of your chosen model has identical core rules: hit that phase's profit target within its time limit without breaching the maximum drawdown limit. The rules are exactly the same across every phase — no surprises."
     },
     {
       category: "Rules",
       q: "What is the drawdown limit?",
-      a: "The drawdown limits are set relative to your account size and are clearly displayed on your dashboard. They are the same for both Phase 1 and Phase 2."
+      a: "The drawdown limits are set relative to your account size and model, and are clearly displayed on your dashboard before you start. They stay the same across every phase of your challenge."
     },
     {
       category: "Rules",
       q: "What is the time limit?",
-      a: "Each phase has a 30 calendar day time limit. If you do not reach the profit target within 30 days, the evaluation is failed and you may claim a new account when spots are available."
+      a: "Each phase has its own time limit, shown before you start. If you do not reach the profit target in time, the evaluation is failed and you may start a new challenge when spots are available."
     },
     {
       category: "Rules",
@@ -72,8 +69,8 @@ export default function LandingFAQ() {
     },
     {
       category: "Funded",
-      q: "What happens after I pass both phases?",
-      a: "You receive a funded account . You can request payouts based on your trading profits."
+      q: "What happens after I pass every phase?",
+      a: "You receive a funded account. You can request payouts based on your trading profits."
     },
     {
       category: "Funded",
@@ -96,15 +93,13 @@ export default function LandingFAQ() {
   const [activeCat, setActiveCat] = useState(categories[0]);
 
   const catColors = {
-    'General': '#2962ff',
-    'Rules': '#7b61ff',
-    'Funded': '#00c896',
+    'General': 'var(--muted)',
+    'Rules': 'var(--muted)',
+    'Funded': 'var(--gain)',
   };
 
   return (
     <section className="mp-section" id="faq" style={{ position: 'relative' }}>
-      <div style={{ position: 'absolute', bottom: '0', left: '50%', transform: 'translateX(-50%)', width: '600px', height: '400px', background: 'radial-gradient(circle, rgba(41, 98, 255, 0.03), transparent 70%)', pointerEvents: 'none' }} />
-
       <div className="mp-container" style={{ maxWidth: '800px' }}>
         <div style={{ textAlign: 'center', marginBottom: '60px' }}>
           <div className="mp-badge mp-reveal" style={{ marginBottom: '20px' }}>
@@ -121,25 +116,21 @@ export default function LandingFAQ() {
         <div className="mp-reveal mp-delay-300" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '48px' }}>
           {categories.map(c => {
             const isActive = activeCat === c;
-            const color = catColors[c] || '#2962ff';
+            const color = catColors[c] || 'var(--muted)';
             return (
               <button 
                 key={c}
                 onClick={() => { setActiveCat(c); setOpenIndex(null); }}
                 style={{
                   padding: '10px 24px',
-                  borderRadius: '100px',
-                  background: isActive
-                    ? `linear-gradient(135deg, ${color}22, ${color}11)`
-                    : 'rgba(255,255,255,0.03)',
-                  color: isActive ? color : 'rgba(255,255,255,0.45)',
+                  background: 'transparent',
+                  color: isActive ? color : 'var(--muted)',
                   border: isActive
-                    ? `1px solid ${color}44`
-                    : '1px solid rgba(255,255,255,0.06)',
+                    ? `1px solid ${color}`
+                    : '1px solid var(--rule)',
                   cursor: 'pointer',
               fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '14px',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: isActive ? `0 4px 16px ${color}15` : 'none',
+                  transition: 'border-color 0.2s ease, color 0.2s ease',
                 }}
               >
                 {c}
@@ -150,9 +141,8 @@ export default function LandingFAQ() {
 
         {/* FAQ List */}
         <div className="mp-reveal mp-delay-400" style={{
-          background: 'rgba(17, 24, 39, 0.4)',
-          border: '1px solid rgba(255,255,255,0.04)',
-          borderRadius: '24px',
+          background: 'var(--paper-2)',
+          border: '1px solid var(--rule)',
           padding: '8px 32px',
         }}>
           {faqs.filter(f => f.category === activeCat).map((faq, i) => (
@@ -166,7 +156,7 @@ export default function LandingFAQ() {
                 </div>
               </button>
               <div className="mp-faq-content">
-                <p className="mp-p-body" style={{ color: 'rgba(255,255,255,0.45)', lineHeight: 1.8, fontSize: '15px' }}>{faq.a}</p>
+                <p className="mp-p-body" style={{ color: 'var(--muted)', lineHeight: 1.8, fontSize: '15px' }}>{faq.a}</p>
               </div>
             </div>
           ))}

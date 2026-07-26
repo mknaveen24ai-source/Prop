@@ -18,6 +18,9 @@ const {
   recordEnforcementEvent,
   recordViolation
 } = require('./services/violationEngine')
+const drawdownService = require('./services/drawdownService')
+const tradingDaysService = require('./services/tradingDaysService')
+const { fetchStepModelBySlug } = require('./utils/stepModels')
 
 let reviewFlagColumnsReady = false
 
@@ -25,6 +28,7 @@ let reviewFlagColumnsReady = false
 // socket with duplicate drawdown_warning events on every engine cycle.
 // Key: accountId (string), Value: last emitted warningLevel (number)
 const _lastDrawdownWarningLevel = new Map()
+const _lastConsistencyWarningLevel = new Map()
 
 async function safeRecordViolation(payload) {
   try {
@@ -42,8 +46,8 @@ async function safeRecordEnforcement(payload) {
   }
 }
 
-async function fetchChallengeAutomationSettings(tenantId = null) {
-  const settings = await getTenantSettings(tenantId, ['inactivity_auto_fail_enabled', 'inactivity_fail_days'])
+async function fetchChallengeAutomationSettings() {
+  const settings = await getTenantSettings(['inactivity_auto_fail_enabled', 'inactivity_fail_days'])
   return {
     inactivity_auto_fail_enabled: settings.inactivity_auto_fail_enabled !== 'false',
     inactivity_fail_days: parseInt(settings.inactivity_fail_days || '30', 10)
@@ -69,7 +73,7 @@ async function getLivePrice(instrument) {
   return result.rows[0]
 }
 
-async function incrementBbookMetric(client, tenantId, column) {
+async function incrementBbookMetric(client, column) {
   const safeColumn = ['accounts_expired', 'accounts_failed', 'accounts_passed', 'new_funded'].includes(column)
     ? column
     : null
@@ -78,11 +82,10 @@ async function incrementBbookMetric(client, tenantId, column) {
   }
 
   await client.query(
-    `INSERT INTO bbook_pnl (tenant_id, date, ${safeColumn})
-     VALUES ($1, CURRENT_DATE, 1)
-     ON CONFLICT (tenant_id, date) DO UPDATE
-     SET ${safeColumn} = bbook_pnl.${safeColumn} + 1`,
-    [tenantId || 1]
+    `INSERT INTO bbook_pnl (date, ${safeColumn})
+     VALUES (CURRENT_DATE, 1)
+     ON CONFLICT (date) DO UPDATE
+     SET ${safeColumn} = bbook_pnl.${safeColumn} + 1`
   )
 }
 
@@ -120,7 +123,7 @@ async function expireAccount(acc, io) {
       [acc.id]
     )
 
-    const priceMap = await getCurrentPricesForTenant(acc.tenant_id || 1)
+    const priceMap = await getCurrentPricesForTenant()
 
     // FIX (AUDIT): Use Decimal accumulator — native float += on many trades
     // causes sub-penny rounding drift in the final balance update.
@@ -173,7 +176,7 @@ async function expireAccount(acc, io) {
       [acc.id]
     )
 
-    await incrementBbookMetric(client, acc.tenant_id, 'accounts_expired')
+    await incrementBbookMetric(client, 'accounts_expired')
 
     await client.query('COMMIT')
 
@@ -186,11 +189,10 @@ async function expireAccount(acc, io) {
     }
 
     try {
-      const userResult = await pool.query('SELECT email, full_name, tenant_id FROM users WHERE id = $1', [acc.user_id])
+      const userResult = await pool.query('SELECT email, full_name FROM users WHERE id = $1', [acc.user_id])
       if (userResult.rows.length > 0) {
-        const { email, full_name, tenant_id } = userResult.rows[0]
+        const { email, full_name } = userResult.rows[0]
         enqueueAccountExpiredEmail(email, full_name, acc.account_type, acc.account_size, {
-          tenantId: tenant_id,
           userId: acc.user_id
         }).catch(() => {})
       }
@@ -236,22 +238,32 @@ async function failAccount(acc, reason, io, platformSettings = null, options = {
 
 
     acc = lockResult.rows[0]
-    const drawdownBase = new Decimal(acc.starting_balance)
     const currentBalance = new Decimal(acc.current_balance)
-    const maxDrawdownPct = acc.account_type === 'funded' && platformSettings
-      ? new Decimal(platformSettings.funded_max_drawdown_pct)
-      : new Decimal(acc.max_drawdown_pct)
+    let maxDrawdownPct = new Decimal(acc.max_drawdown_pct || 0)
+    let drawdownLocksAtPct = null
+    if (acc.account_type === 'funded' && acc.challenge_model_slug) {
+      const model = await fetchStepModelBySlug(acc.challenge_model_slug)
+      if (model) {
+        maxDrawdownPct = new Decimal(model.funded_max_drawdown_pct)
+        drawdownLocksAtPct = model.funded_drawdown_locks_at_pct != null ? parseFloat(model.funded_drawdown_locks_at_pct) : null
+      }
+    }
     let realisedDrawdownPct = new Decimal(0)
     if (!skipDrawdownCheck) {
-      if (drawdownBase.lte(0)) {
+      if (maxDrawdownPct.lte(0)) {
         await client.query('ROLLBACK')
         return
       }
-      realisedDrawdownPct = drawdownBase.minus(currentBalance).div(drawdownBase).times(100)
-      if (realisedDrawdownPct.lt(maxDrawdownPct)) {
+      const floor = await drawdownService.getEffectiveDrawdownFloor(client, acc, {
+        equity: currentBalance.toNumber(),
+        maxDrawdownPct: maxDrawdownPct.toNumber(),
+        drawdownLocksAtPct
+      })
+      if (currentBalance.gte(floor)) {
         await client.query('ROLLBACK')
         return
       }
+      realisedDrawdownPct = new Decimal(acc.starting_balance).minus(currentBalance).div(acc.starting_balance).times(100)
     }
 
     const openTrades = await client.query(
@@ -259,7 +271,7 @@ async function failAccount(acc, reason, io, platformSettings = null, options = {
       [acc.id]
     )
 
-    const priceMap = await getCurrentPricesForTenant(acc.tenant_id || 1)
+    const priceMap = await getCurrentPricesForTenant()
 
     // FIX (AUDIT): Use Decimal accumulator — native float += on many trades
     // causes sub-penny rounding drift in the final balance update.
@@ -334,12 +346,11 @@ async function failAccount(acc, reason, io, platformSettings = null, options = {
 
     await client.query(`UPDATE accounts SET status = 'failed' WHERE id = $1`, [acc.id])
 
-    await incrementBbookMetric(client, acc.tenant_id, 'accounts_failed')
+    await incrementBbookMetric(client, 'accounts_failed')
 
     await client.query('COMMIT')
 
     await safeRecordViolation({
-      tenantId: acc.tenant_id,
       violationType,
       severity: 'critical',
       accountId: acc.id,
@@ -356,7 +367,6 @@ async function failAccount(acc, reason, io, platformSettings = null, options = {
     })
 
     await safeRecordEnforcement({
-      tenantId: acc.tenant_id,
       accountId: acc.id,
       userId: acc.user_id,
       action: enforcementAction,
@@ -379,11 +389,10 @@ async function failAccount(acc, reason, io, platformSettings = null, options = {
     }
 
     try {
-      const userResult = await pool.query('SELECT email, full_name, tenant_id FROM users WHERE id = $1', [acc.user_id])
+      const userResult = await pool.query('SELECT email, full_name FROM users WHERE id = $1', [acc.user_id])
       if (userResult.rows.length > 0) {
-        const { email, full_name, tenant_id } = userResult.rows[0]
+        const { email, full_name } = userResult.rows[0]
         enqueueAccountFailedEmail(email, full_name, acc.account_type, reason, acc.account_size, {
-          tenantId: tenant_id,
           userId: acc.user_id
         }).catch(() => {})
       }
@@ -453,26 +462,21 @@ async function passAccount(acc, platformSettings, io) {
     await client.query('COMMIT')
 
     if (io && promoted) {
-      const passMsg = acc.account_type === 'phase1'
-        ? `🏆 Phase 1 PASSED! Profit target reached. Phase 2 is now active.`
-        : `🎉 Phase 2 PASSED! You are now a Funded Trader. Welcome to the team!`
-
       io.to(String(acc.user_id)).emit('account_update', {
         event:          promoted.event,
         account_id:     acc.id,
         new_account_id: promoted.new_account_id,
-        message:        passMsg
+        message:        promoted.message || `Your ${acc.account_type} challenge passed!`
       })
     }
 
     logger.info(`Challenge engine: account ${acc.id} PASSED (${acc.account_type})`)
 
     try {
-      const userResult = await pool.query('SELECT email, full_name, tenant_id FROM users WHERE id = $1', [acc.user_id])
+      const userResult = await pool.query('SELECT email, full_name FROM users WHERE id = $1', [acc.user_id])
       if (userResult.rows.length > 0) {
-        const { email, full_name, tenant_id } = userResult.rows[0]
+        const { email, full_name } = userResult.rows[0]
         enqueuePhasePassedEmail(email, full_name, acc.account_type, acc.account_size, {
-          tenantId: tenant_id,
           userId: acc.user_id
         }).catch(() => {})
       }
@@ -484,6 +488,60 @@ async function passAccount(acc, platformSettings, io) {
     logger.error(`passAccount error for ${acc.id}:`, { error: err.message })
   } finally {
     client.release()
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// evaluateScalingPlan — funded accounts only. Every `scaling_target_pct` net
+// profit milestone bumps the account's risk-capacity multiplier by
+// `scaling_increase_per_milestone_pct`, capped at the model's `scaling_multiplier`.
+// The multiplier is consumed by the lot/exposure caps in routes/trades.js — it
+// does not change the account's literal balance.
+// ─────────────────────────────────────────────────────────────────────────────
+async function evaluateScalingPlan(acc, io) {
+  if (!acc.challenge_model_slug) return
+  try {
+    const model = await fetchStepModelBySlug(acc.challenge_model_slug)
+    if (!model || !model.scaling_enabled) return
+
+    const startingBalance = parseFloat(acc.starting_balance)
+    const currentBalance = parseFloat(acc.current_balance)
+    if (!(startingBalance > 0)) return
+
+    const milestonePct = parseFloat(model.scaling_target_pct)
+    const increasePerMilestonePct = parseFloat(model.scaling_increase_per_milestone_pct || 0)
+    const maxMultiplier = parseFloat(model.scaling_multiplier || 1)
+    if (!(milestonePct > 0) || !(increasePerMilestonePct > 0)) return
+
+    const netProfitPct = ((currentBalance - startingBalance) / startingBalance) * 100
+    if (netProfitPct <= 0) return
+
+    const milestonesEarned = Math.floor(netProfitPct / milestonePct)
+    const prevMilestones = parseInt(acc.scaling_milestones_claimed || 0, 10)
+    if (milestonesEarned <= prevMilestones) return
+
+    const nextMultiplier = Math.min(maxMultiplier, 1 + (milestonesEarned * increasePerMilestonePct / 100))
+
+    const result = await pool.query(
+      `UPDATE accounts
+          SET scaling_multiplier = $2, scaling_milestones_claimed = $3
+        WHERE id = $1 AND scaling_milestones_claimed < $3
+        RETURNING scaling_multiplier`,
+      [acc.id, nextMultiplier, milestonesEarned]
+    )
+    if (result.rows.length === 0) return
+
+    logger.info(`Challenge engine: account ${acc.id} scaling upgraded to ${nextMultiplier}x (milestone ${milestonesEarned})`)
+
+    if (io) {
+      io.to(String(acc.user_id)).emit('account_update', {
+        event: 'scaling_upgrade',
+        account_id: acc.id,
+        message: `🚀 Scaling milestone reached! Your risk allocation just increased to ${nextMultiplier.toFixed(2)}x.`
+      })
+    }
+  } catch (err) {
+    logger.error(`evaluateScalingPlan error for account ${acc.id}:`, { error: err.message })
   }
 }
 
@@ -538,9 +596,19 @@ async function processAccount(acc, platformSettings, io) {
   const current_balance  = new Decimal(acc.current_balance)
   const starting_balance = new Decimal(acc.starting_balance)
 
-  const max_drawdown_pct = new Decimal(acc.account_type === 'funded'
+  let max_drawdown_pct = new Decimal(acc.account_type === 'funded'
     ? platformSettings.funded_max_drawdown_pct
     : acc.max_drawdown_pct)
+  let daily_drawdown_pct = acc.daily_drawdown_pct != null ? parseFloat(acc.daily_drawdown_pct) : null
+  let drawdownLocksAtPct = null
+  if (acc.account_type === 'funded' && acc.challenge_model_slug) {
+    const model = await fetchStepModelBySlug(acc.challenge_model_slug)
+    if (model) {
+      max_drawdown_pct = new Decimal(model.funded_max_drawdown_pct)
+      daily_drawdown_pct = parseFloat(model.funded_daily_drawdown_pct)
+      drawdownLocksAtPct = model.funded_drawdown_locks_at_pct != null ? parseFloat(model.funded_drawdown_locks_at_pct) : null
+    }
+  }
 
   const drawdownBase = starting_balance
 
@@ -578,16 +646,43 @@ async function processAccount(acc, platformSettings, io) {
       }
     }
 
-    if (realised_drawdown_pct.gte(max_drawdown_pct)) {
-      const reason = `max drawdown ${realised_drawdown_pct.toFixed(2)}% reached ${max_drawdown_pct.toFixed(2)}% limit`
+    const floor = await drawdownService.getEffectiveDrawdownFloor(pool, acc, {
+      equity: current_balance.toNumber(),
+      maxDrawdownPct: max_drawdown_pct.toNumber(),
+      drawdownLocksAtPct
+    })
+    if (current_balance.lt(floor)) {
+      const reason = `trailing drawdown breach — balance $${current_balance.toFixed(2)} fell below the $${floor.toFixed(2)} floor`
       logger.info(`Challenge engine: account ${acc.id} FAILED — ${reason}`)
       await failAccount(acc, reason, io, platformSettings)
       return
     }
   }
 
-  // Funded accounts have no profit target to pass — only drawdown to fail on
-  if (acc.account_type === 'funded') return
+  if (daily_drawdown_pct != null && daily_drawdown_pct > 0 && starting_balance.gt(0)) {
+    const todayRealizedMap = await tradingDaysService.getTodayRealizedPnl(pool, [acc.id])
+    const todayRealized = new Decimal(todayRealizedMap.get(acc.id) || 0)
+    if (todayRealized.isNegative()) {
+      const todayLossPct = todayRealized.abs().div(starting_balance).times(100)
+      if (todayLossPct.gte(daily_drawdown_pct)) {
+        const reason = `daily loss limit breach — today's loss ${todayLossPct.toFixed(2)}% reached the ${daily_drawdown_pct}% daily limit`
+        logger.info(`Challenge engine: account ${acc.id} FAILED — ${reason}`)
+        await failAccount(acc, reason, io, platformSettings, {
+          closeReason: 'Daily Loss Limit Breach',
+          violationType: 'daily_loss_limit_breach',
+          enforcementAction: 'auto_fail_daily_loss_limit'
+        })
+        return
+      }
+    }
+  }
+
+  // Funded accounts have no profit target to pass — only drawdown/daily-loss to fail on,
+  // plus the scaling plan (risk-capacity increases on profit milestones).
+  if (acc.account_type === 'funded') {
+    await evaluateScalingPlan(acc, io)
+    return
+  }
 
   let profit_target = new Decimal(acc.profit_target || 0)
   if (profit_target.lte(0)) {
@@ -601,11 +696,36 @@ async function processAccount(acc, platformSettings, io) {
       [acc.id]
     )
     const openCount = parseInt(openTradesResult.rows[0].count)
+    if (openCount > 0) return
 
-    if (openCount === 0) {
-      logger.info(`Challenge engine: account ${acc.id} hit profit target (${realised_profit.toFixed(2)}) — passing`)
-      await passAccount(acc, platformSettings, io)
+    const minTradingDays = acc.min_trading_days != null ? parseInt(acc.min_trading_days, 10) : 0
+    if (minTradingDays > 0) {
+      const tradingDays = await tradingDaysService.countTradingDays(pool, acc.id)
+      if (tradingDays < minTradingDays) {
+        return // profit target met, but hasn't traded enough distinct days yet
+      }
     }
+
+    const consistencyPct = acc.consistency_max_day_pct != null ? parseFloat(acc.consistency_max_day_pct) : null
+    if (consistencyPct != null && consistencyPct > 0) {
+      const consistency = await tradingDaysService.checkConsistencyRule(pool, acc.id, realised_profit.toNumber(), consistencyPct)
+      if (!consistency.ok) {
+        const prevLevel = _lastConsistencyWarningLevel.get(String(acc.id))
+        if (io && prevLevel !== true) {
+          _lastConsistencyWarningLevel.set(String(acc.id), true)
+          io.to(String(acc.user_id)).emit('account_update', {
+            event: 'consistency_rule_hold',
+            account_id: acc.id,
+            message: `📊 Almost there — your best single day is ${consistency.bestDayPct.toFixed(1)}% of total profit, which exceeds this model's ${consistencyPct}% consistency limit. Keep trading to bring that ratio down and you'll pass automatically.`
+          })
+        }
+        return // profit target met, but concentrated in too few days — soft hold, not a fail
+      }
+      _lastConsistencyWarningLevel.delete(String(acc.id))
+    }
+
+    logger.info(`Challenge engine: account ${acc.id} hit profit target (${realised_profit.toFixed(2)}) — passing`)
+    await passAccount(acc, platformSettings, io)
   }
 }
 
@@ -614,24 +734,19 @@ async function runChallengeEngine(io) {
     const activeAccounts = await pool.query(
       `SELECT * FROM accounts
        WHERE status = 'active'
-       AND account_type IN ('phase1', 'phase2', 'funded')`
+       AND account_type IN ('phase1', 'phase2', 'phase3', 'funded')`
     )
 
     if (activeAccounts.rows.length === 0) return
 
-    const settingsCache = new Map()
+    const [progressionSettings, automationSettings] = await Promise.all([
+      fetchProgressionSettings(pool),
+      fetchChallengeAutomationSettings()
+    ])
+    const platformSettings = { ...progressionSettings, ...automationSettings }
 
     for (const acc of activeAccounts.rows) {
       try {
-        const tenantKey = String(acc.tenant_id || 1)
-        if (!settingsCache.has(tenantKey)) {
-          const [progressionSettings, automationSettings] = await Promise.all([
-            fetchProgressionSettings(pool, acc.tenant_id),
-            fetchChallengeAutomationSettings(acc.tenant_id)
-          ])
-          settingsCache.set(tenantKey, { ...progressionSettings, ...automationSettings })
-        }
-        const platformSettings = settingsCache.get(tenantKey)
         await processAccount(acc, platformSettings, io)
       } catch (accErr) {
         logger.error(`Challenge engine error for account ${acc.id}:`, { error: accErr.message })
@@ -735,7 +850,7 @@ async function detectRapidOpposingTrades(userId, instrument, accountIds, io) {
               reason,
               payload: { instrument, rapid_count: rapidCount }
             })
-          } catch (_) {}
+          } catch (silentErr) { logger.warn("[challenge_engine] Non-critical operation failed silently:", { error: silentErr.message }) }
         }
       }
     }
@@ -785,7 +900,6 @@ async function detectOpposingTrades(io) {
   const result = await pool.query(`
     SELECT
       a.user_id,
-      MIN(a.tenant_id)                                                     AS tenant_id,
       t.instrument,
       COUNT(DISTINCT t.account_id)                                          AS account_count,
       COUNT(t.id) FILTER (WHERE t.direction = 'buy')                       AS buy_count,
@@ -807,7 +921,7 @@ async function detectOpposingTrades(io) {
   if (result.rows.length === 0) return
 
   for (const row of result.rows) {
-    const { user_id, instrument, account_ids, tenant_id } = row
+    const { user_id, instrument, account_ids } = row
 
     let alreadyFlagged = false
     try {
@@ -819,14 +933,13 @@ async function detectOpposingTrades(io) {
         [account_ids]
       )
       alreadyFlagged = existing.rows.length > 0
-    } catch (_) {}
+    } catch (silentErr) { logger.warn("[challenge_engine] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     if (alreadyFlagged) continue
 
     const flagReason = `Cross-account opposing trade detected on ${instrument} — BUY and SELL open simultaneously across ${account_ids.length} accounts`
     for (const accountId of account_ids) {
       await safeRecordViolation({
-        tenantId: tenant_id,
         violationType: 'cross_account_opposing_trades',
         severity: 'critical',
         accountId,
@@ -853,7 +966,7 @@ async function detectOpposingTrades(io) {
             sell_lots: parseFloat(row.total_sell_lots || 0)
           }
         })
-      } catch (_) {}
+      } catch (silentErr) { logger.warn("[challenge_engine] Non-critical operation failed silently:", { error: silentErr.message }) }
     }
 
     logger.warn(
@@ -873,16 +986,6 @@ async function detectOpposingTrades(io) {
         action: 'auto_locked',
         detected_at: new Date().toISOString()
       })
-      if (tenant_id) {
-        io.to(`admin:tenant:${tenant_id}`).emit('opposing_trade_detected', {
-          user_id, instrument,
-          account_ids,
-          buy_lots: parseFloat(row.total_buy_lots || 0),
-          sell_lots: parseFloat(row.total_sell_lots || 0),
-          action: 'auto_locked',
-          detected_at: new Date().toISOString()
-        })
-      }
 
       io.to(String(user_id)).emit('account_update', {
         event: 'account_locked',
@@ -899,31 +1002,29 @@ async function detectIPMultiAccounts() {
   try {
     // Find IPs that have been used by multiple users for trading within last 24h
     const result = await pool.query(`
-      SELECT tenant_id,
-             ip_address,
+      SELECT ip_address,
              array_agg(DISTINCT user_id) AS user_ids,
              COUNT(DISTINCT user_id) AS user_count
       FROM trade_logs
       WHERE logged_at > NOW() - INTERVAL '24 hours'
         AND ip_address IS NOT NULL
         AND ip_address <> 'unknown'
-      GROUP BY tenant_id, ip_address
+      GROUP BY ip_address
       HAVING COUNT(DISTINCT user_id) > 1
     `)
 
     if (result.rows.length === 0) return
 
     for (const row of result.rows) {
-      const { ip_address, user_ids, tenant_id } = row
+      const { ip_address, user_ids } = row
 
       // Flag all accounts belonging to these users
       const accountsResult = await pool.query(
         `SELECT id, user_id FROM accounts
          WHERE user_id = ANY($1::uuid[])
-           AND tenant_id = $2
            AND status = 'active'
            AND review_flagged = false`,
-        [user_ids, tenant_id || 1]
+        [user_ids]
       )
 
       if (accountsResult.rows.length === 0) continue
@@ -932,7 +1033,6 @@ async function detectIPMultiAccounts() {
       const reason = `IP-based multi-account detected: users ${user_ids.join(', ')} trading from same IP ${ip_address} within 24h`
       for (const account of accountsResult.rows) {
         await safeRecordViolation({
-          tenantId: tenant_id,
           violationType: 'ip_multi_account_detection',
           severity: 'high',
           accountId: account.id,
@@ -950,7 +1050,7 @@ async function detectIPMultiAccounts() {
             reason,
             payload: { ip_address, user_ids }
           })
-        } catch (_) {}
+        } catch (silentErr) { logger.warn("[challenge_engine] Non-critical operation failed silently:", { error: silentErr.message }) }
       }
 
       logger.warn(`[ip_detection] Multiple users (${user_ids.join(', ')}) detected trading from IP ${ip_address}`)

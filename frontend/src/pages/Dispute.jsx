@@ -64,7 +64,7 @@ export default function Dispute({ user, accounts }) {
 
   const statusColors = {
     open:       'var(--accent)',
-    under_review: '#858585',
+    under_review: 'var(--muted)',
     resolved:   'var(--green)',
     rejected:   'var(--red)',
   }

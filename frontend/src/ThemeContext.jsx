@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import axios from 'axios'
-import { getTenantHeaders } from './utils/tenant'
 
 const ThemeContext = createContext()
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
@@ -35,7 +34,7 @@ export function ThemeProvider({ children, initialTheme }) {
     setTheme(newTheme)
 
     // Persist to DB; the current page already applied the theme locally.
-    axios.patch(`${API_URL}/api/auth/theme`, { theme: newTheme }, { headers: getTenantHeaders() }).catch(() => {})
+    axios.patch(`${API_URL}/api/auth/theme`, { theme: newTheme }).catch(() => {})
   }
 
   return (

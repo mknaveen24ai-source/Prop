@@ -13,7 +13,6 @@
 
 const logger = require('../utils/logger')
 const { withAdvisoryLock } = require('../utils/advisoryLock')
-const { runWithSystemDbContext } = require('../utils/dbContext')
 
 // ─── Timer registry ───────────────────────────────────────────────────────────
 const trackedIntervals = new Set()
@@ -48,7 +47,7 @@ function clearTrackedTimers() {
 
 // ─── Locked job runner ────────────────────────────────────────────────────────
 function runLockedSchedulerJob(lockName, label, fn) {
-  return withAdvisoryLock(lockName, () => runWithSystemDbContext(fn)).catch((error) => {
+  return withAdvisoryLock(lockName, fn).catch((error) => {
     logger.error(`[scheduler:${label}] execution error:`, { error: error.message })
   })
 }
@@ -66,7 +65,6 @@ function runLockedSchedulerJob(lockName, label, fn) {
  *   pruneOldPriceHistory: Function,
  *   syncHourlyPriceHistory: Function,
  *   syncDedicatedPriceFeedWatchers: Function,
- *   emitTenantPriceUpdates: Function,
  * }} deps
  */
 function startAllSchedulers(io, deps) {
@@ -77,10 +75,10 @@ function startAllSchedulers(io, deps) {
     runChallengeEngine,
     checkNewsForceClose,
     weekendForceCloseByTenant,
+    flatByCloseForAccounts,
     pruneOldPriceHistory,
     syncHourlyPriceHistory,
-    syncDedicatedPriceFeedWatchers,
-    emitTenantPriceUpdates
+    syncDedicatedPriceFeedWatchers
   } = deps
 
   // ── Trading engine ──────────────────────────────────────────────────────────
@@ -115,15 +113,18 @@ function startAllSchedulers(io, deps) {
     runLockedSchedulerJob('jobs:weekend_force_close', 'weekend_force_close', weekendForceCloseByTenant)
   }, 60 * 1000)
 
+  // ── Daily flat-by-close (futures-style daily settlement) ───────────────────
+  if (flatByCloseForAccounts) {
+    registerTrackedInterval(() => {
+      runLockedSchedulerJob('jobs:flat_by_close', 'flat_by_close', flatByCloseForAccounts)
+    }, 60 * 1000)
+  }
+
   // ── Price feed maintenance ──────────────────────────────────────────────────
   registerTrackedInterval(pruneOldPriceHistory, 24 * 60 * 60 * 1000)
   registerTrackedInterval(syncHourlyPriceHistory, 30 * 60 * 1000)
   registerTrackedInterval(() => {
-    syncDedicatedPriceFeedWatchers(() => {
-      emitTenantPriceUpdates().catch((error) => {
-        logger.error('Tenant price broadcast error:', { error: error.message })
-      })
-    }).catch((error) => {
+    syncDedicatedPriceFeedWatchers().catch((error) => {
       logger.error('Dedicated price feed sync error:', { error: error.message })
     })
   }, 30 * 1000)

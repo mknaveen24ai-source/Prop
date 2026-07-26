@@ -61,7 +61,7 @@ export default function Leaderboard() {
                   alignItems: 'center',
                   gap: '20px',
                   padding: '20px 24px',
-                  borderLeft: `3px solid ${idx === 0 ? '#9d9d9d' : idx === 1 ? '#c0c0c0' : idx === 2 ? '#7f7f7f' : 'var(--navy-border)'}`,
+                  borderLeft: `3px solid ${idx === 0 ? 'var(--rule)' : idx === 1 ? 'var(--rule)' : idx === 2 ? 'var(--rule)' : 'var(--navy-border)'}`,
                   background: idx === 0 ? 'rgba(157, 157, 157, 0.04)' : 'var(--navy-card)',
                   cursor: 'pointer',
                   transition: 'background 0.15s'

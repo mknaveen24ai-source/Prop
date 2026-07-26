@@ -60,7 +60,6 @@ async function upsertCopierRuntimeStatus(pool, status = {}) {
     socket_ready: Boolean(status.socket_ready),
     ws_connected: Boolean(status.ws_connected),
     runtime_scope: status.runtime_scope || 'shared_worker',
-    tenant_id: status.tenant_id ?? null,
     follower_id: status.follower_id ?? null,
     last_heartbeat_at: status.last_heartbeat_at || null,
     last_db_poll_at: status.last_db_poll_at || null,
@@ -87,7 +86,6 @@ async function upsertCopierRuntimeStatus(pool, status = {}) {
        socket_ready,
        ws_connected,
        runtime_scope,
-       tenant_id,
        follower_id,
        last_heartbeat_at,
        last_db_poll_at,
@@ -108,15 +106,14 @@ async function upsertCopierRuntimeStatus(pool, status = {}) {
        updated_at
      ) VALUES (
        $1,
-       $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-       $16, $17, $18, $19, $20, $21, $22, $23, NOW()
+       $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+       $15, $16, $17, $18, $19, $20, $21, $22, NOW()
      )
      ON CONFLICT (status_key) DO UPDATE SET
        running = EXCLUDED.running,
        socket_ready = EXCLUDED.socket_ready,
        ws_connected = EXCLUDED.ws_connected,
        runtime_scope = EXCLUDED.runtime_scope,
-       tenant_id = EXCLUDED.tenant_id,
        follower_id = EXCLUDED.follower_id,
        last_heartbeat_at = EXCLUDED.last_heartbeat_at,
        last_db_poll_at = COALESCE(EXCLUDED.last_db_poll_at, copier_runtime_status.last_db_poll_at),
@@ -141,7 +138,6 @@ async function upsertCopierRuntimeStatus(pool, status = {}) {
       runtime.socket_ready,
       runtime.ws_connected,
       runtime.runtime_scope,
-      runtime.tenant_id,
       runtime.follower_id,
       runtime.last_heartbeat_at,
       runtime.last_db_poll_at,

@@ -24,39 +24,36 @@ async function runEnsureInfrastructure(db = pool) {
   await db.query(`
     CREATE TABLE IF NOT EXISTS tenant_monthly_quotas (
       id BIGSERIAL PRIMARY KEY,
-      tenant_id BIGINT NOT NULL,
       quota_month DATE NOT NULL,
       account_limit INT,
       is_unlimited BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (tenant_id, quota_month)
+      UNIQUE (quota_month)
     )
   `)
-  await db.query(`CREATE INDEX IF NOT EXISTS tenant_monthly_quotas_tenant_month_idx ON tenant_monthly_quotas(tenant_id, quota_month DESC)`)
+  await db.query(`CREATE INDEX IF NOT EXISTS tenant_monthly_quotas_month_idx ON tenant_monthly_quotas(quota_month DESC)`)
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS tenant_monthly_size_quotas (
       id BIGSERIAL PRIMARY KEY,
-      tenant_id BIGINT NOT NULL,
       quota_month DATE NOT NULL,
       account_size INT NOT NULL,
       account_limit INT,
       is_unlimited BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (tenant_id, quota_month, account_size)
+      UNIQUE (quota_month, account_size)
     )
   `)
   await db.query(`
     CREATE INDEX IF NOT EXISTS tenant_monthly_size_quotas_lookup_idx
-      ON tenant_monthly_size_quotas(tenant_id, quota_month DESC, account_size)
+      ON tenant_monthly_size_quotas(quota_month DESC, account_size)
   `)
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS account_promotion_reviews (
       id BIGSERIAL PRIMARY KEY,
-      tenant_id BIGINT NOT NULL DEFAULT 1,
       source_account_id TEXT NOT NULL,
       user_id TEXT NOT NULL,
       from_account_type TEXT NOT NULL,
@@ -75,7 +72,6 @@ async function runEnsureInfrastructure(db = pool) {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `)
-  await db.query(`ALTER TABLE account_promotion_reviews ADD COLUMN IF NOT EXISTS tenant_id BIGINT NOT NULL DEFAULT 1`)
   await db.query(`ALTER TABLE account_promotion_reviews ADD COLUMN IF NOT EXISTS source_account_id TEXT`)
   await db.query(`ALTER TABLE account_promotion_reviews ADD COLUMN IF NOT EXISTS user_id TEXT`)
   await db.query(`ALTER TABLE account_promotion_reviews ADD COLUMN IF NOT EXISTS from_account_type TEXT`)
@@ -92,7 +88,7 @@ async function runEnsureInfrastructure(db = pool) {
   await db.query(`ALTER TABLE account_promotion_reviews ADD COLUMN IF NOT EXISTS decided_at TIMESTAMPTZ`)
   await db.query(`ALTER TABLE account_promotion_reviews ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`)
   await db.query(`ALTER TABLE account_promotion_reviews ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`)
-  await db.query(`CREATE INDEX IF NOT EXISTS account_promotion_reviews_tenant_status_idx ON account_promotion_reviews(tenant_id, status, created_at DESC)`)
+  await db.query(`CREATE INDEX IF NOT EXISTS account_promotion_reviews_status_idx ON account_promotion_reviews(status, created_at DESC)`)
   await db.query(`CREATE INDEX IF NOT EXISTS account_promotion_reviews_source_idx ON account_promotion_reviews(source_account_id)`)
   await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS account_promotion_reviews_pending_source_uq ON account_promotion_reviews(source_account_id) WHERE status = 'pending'`)
 
@@ -110,20 +106,17 @@ async function ensureTenantMonthlyQuotaInfrastructure(db = pool) {
   await infrastructurePromise
 }
 
-async function lockTenantQuotaMonth(db, tenantId, quotaMonth = getQuotaMonth(), accountSize = null) {
-  const normalizedTenantId = parseInt(tenantId, 10) || 1
+async function lockTenantQuotaMonth(db, quotaMonth = getQuotaMonth(), accountSize = null) {
   const normalizedSize = normalizeAccountSize(accountSize)
-  await db.query(`SELECT pg_advisory_xact_lock(hashtext($1), $2)`, [
+  await db.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
     normalizedSize
       ? `tenant_monthly_size_quota:${getQuotaMonth(quotaMonth)}:${normalizedSize}`
-      : `tenant_monthly_quota:${getQuotaMonth(quotaMonth)}`,
-    normalizedTenantId
+      : `tenant_monthly_quota:${getQuotaMonth(quotaMonth)}`
   ])
 }
 
-async function upsertTenantMonthlyQuota(db, { tenantId, quotaMonth = getQuotaMonth(), accountLimit = null, isUnlimited = true }) {
+async function upsertTenantMonthlyQuota(db, { quotaMonth = getQuotaMonth(), accountLimit = null, isUnlimited = true }) {
   await ensureTenantMonthlyQuotaInfrastructure(db)
-  const normalizedTenantId = parseInt(tenantId, 10) || 1
   const normalizedMonth = getQuotaMonth(quotaMonth)
   const unlimited = !!isUnlimited
   const limit = unlimited ? null : parseNonNegativeLimit(accountLimit)
@@ -134,22 +127,21 @@ async function upsertTenantMonthlyQuota(db, { tenantId, quotaMonth = getQuotaMon
   }
 
   const result = await db.query(
-    `INSERT INTO tenant_monthly_quotas (tenant_id, quota_month, account_limit, is_unlimited, updated_at)
-     VALUES ($1, $2::date, $3, $4, NOW())
-     ON CONFLICT (tenant_id, quota_month)
+    `INSERT INTO tenant_monthly_quotas (quota_month, account_limit, is_unlimited, updated_at)
+     VALUES ($1::date, $2, $3, NOW())
+     ON CONFLICT (quota_month)
      DO UPDATE SET
        account_limit = EXCLUDED.account_limit,
        is_unlimited = EXCLUDED.is_unlimited,
        updated_at = NOW()
      RETURNING *`,
-    [normalizedTenantId, normalizedMonth, limit, unlimited]
+    [normalizedMonth, limit, unlimited]
   )
   return result.rows[0]
 }
 
-async function upsertTenantMonthlySizeQuota(db, { tenantId, quotaMonth = getQuotaMonth(), accountSize, accountLimit = null, isUnlimited = true }) {
+async function upsertTenantMonthlySizeQuota(db, { quotaMonth = getQuotaMonth(), accountSize, accountLimit = null, isUnlimited = true }) {
   await ensureTenantMonthlyQuotaInfrastructure(db)
-  const normalizedTenantId = parseInt(tenantId, 10) || 1
   const normalizedMonth = getQuotaMonth(quotaMonth)
   const normalizedSize = normalizeAccountSize(accountSize)
   if (!normalizedSize) {
@@ -167,42 +159,38 @@ async function upsertTenantMonthlySizeQuota(db, { tenantId, quotaMonth = getQuot
   }
 
   const result = await db.query(
-    `INSERT INTO tenant_monthly_size_quotas (tenant_id, quota_month, account_size, account_limit, is_unlimited, updated_at)
-     VALUES ($1, $2::date, $3, $4, $5, NOW())
-     ON CONFLICT (tenant_id, quota_month, account_size)
+    `INSERT INTO tenant_monthly_size_quotas (quota_month, account_size, account_limit, is_unlimited, updated_at)
+     VALUES ($1::date, $2, $3, $4, NOW())
+     ON CONFLICT (quota_month, account_size)
      DO UPDATE SET
        account_limit = EXCLUDED.account_limit,
        is_unlimited = EXCLUDED.is_unlimited,
        updated_at = NOW()
      RETURNING *`,
-    [normalizedTenantId, normalizedMonth, normalizedSize, limit, unlimited]
+    [normalizedMonth, normalizedSize, limit, unlimited]
   )
   return result.rows[0]
 }
 
-async function getTenantMonthlyQuota(db, tenantId, quotaMonth = getQuotaMonth()) {
+async function getTenantMonthlyQuota(db, quotaMonth = getQuotaMonth()) {
   await ensureTenantMonthlyQuotaInfrastructure(db)
-  const normalizedTenantId = parseInt(tenantId, 10) || 1
   const normalizedMonth = getQuotaMonth(quotaMonth)
   const result = await db.query(
     `SELECT *
        FROM tenant_monthly_quotas
-      WHERE tenant_id = $1
-        AND quota_month = $2::date
+      WHERE quota_month = $1::date
       LIMIT 1`,
-    [normalizedTenantId, normalizedMonth]
+    [normalizedMonth]
   )
   return result.rows[0] || {
-    tenant_id: normalizedTenantId,
     quota_month: normalizedMonth,
     account_limit: null,
     is_unlimited: true
   }
 }
 
-async function getTenantMonthlySizeQuota(db, tenantId, accountSize, quotaMonth = getQuotaMonth()) {
+async function getTenantMonthlySizeQuota(db, accountSize, quotaMonth = getQuotaMonth()) {
   await ensureTenantMonthlyQuotaInfrastructure(db)
-  const normalizedTenantId = parseInt(tenantId, 10) || 1
   const normalizedMonth = getQuotaMonth(quotaMonth)
   const normalizedSize = normalizeAccountSize(accountSize)
   if (!normalizedSize) {
@@ -214,16 +202,14 @@ async function getTenantMonthlySizeQuota(db, tenantId, accountSize, quotaMonth =
   const result = await db.query(
     `SELECT *
        FROM tenant_monthly_size_quotas
-      WHERE tenant_id = $1
-        AND quota_month = $2::date
-        AND account_size = $3
+      WHERE quota_month = $1::date
+        AND account_size = $2
       LIMIT 1`,
-    [normalizedTenantId, normalizedMonth, normalizedSize]
+    [normalizedMonth, normalizedSize]
   )
   if (result.rows[0]) return result.rows[0]
 
   return {
-    tenant_id: normalizedTenantId,
     quota_month: normalizedMonth,
     account_size: normalizedSize,
     account_limit: null,
@@ -231,30 +217,28 @@ async function getTenantMonthlySizeQuota(db, tenantId, accountSize, quotaMonth =
   }
 }
 
-async function countTenantMonthlyAccounts(db, tenantId, quotaMonth = getQuotaMonth(), accountSize = null) {
-  const normalizedTenantId = parseInt(tenantId, 10) || 1
+async function countTenantMonthlyAccounts(db, quotaMonth = getQuotaMonth(), accountSize = null) {
   const normalizedMonth = getQuotaMonth(quotaMonth)
   const normalizedSize = normalizeAccountSize(accountSize)
   const result = await db.query(
     `SELECT COUNT(*)::int AS used
        FROM accounts
-      WHERE COALESCE(tenant_id, $1) = $1
-        AND created_at >= $2::date
-        AND created_at < ($2::date + INTERVAL '1 month')
-        AND ($3::int IS NULL OR account_size::int = $3::int)`,
-    [normalizedTenantId, normalizedMonth, normalizedSize]
+      WHERE created_at >= $1::date
+        AND created_at < ($1::date + INTERVAL '1 month')
+        AND ($2::int IS NULL OR account_size::int = $2::int)`,
+    [normalizedMonth, normalizedSize]
   )
   return parseInt(result.rows[0]?.used || 0, 10) || 0
 }
 
-async function getTenantMonthlyQuotaStatus(db, tenantId, quotaMonth = getQuotaMonth(), accountSize = null) {
+async function getTenantMonthlyQuotaStatus(db, quotaMonth = getQuotaMonth(), accountSize = null) {
   await ensureTenantMonthlyQuotaInfrastructure(db)
   const normalizedSize = normalizeAccountSize(accountSize)
   const quota = normalizedSize
-    ? await getTenantMonthlySizeQuota(db, tenantId, normalizedSize, quotaMonth)
-    : await getTenantMonthlyQuota(db, tenantId, quotaMonth)
+    ? await getTenantMonthlySizeQuota(db, normalizedSize, quotaMonth)
+    : await getTenantMonthlyQuota(db, quotaMonth)
   const normalizedMonth = getQuotaMonth(quotaMonth)
-  const used = await countTenantMonthlyAccounts(db, tenantId, normalizedMonth, normalizedSize)
+  const used = await countTenantMonthlyAccounts(db, normalizedMonth, normalizedSize)
   const isUnlimited = !!quota.is_unlimited
   const accountLimit = parseNonNegativeLimit(quota.account_limit)
   const remaining = isUnlimited ? null : Math.max(0, (accountLimit || 0) - used)
@@ -267,7 +251,6 @@ async function getTenantMonthlyQuotaStatus(db, tenantId, quotaMonth = getQuotaMo
         : 'available'
 
   return {
-    tenant_id: parseInt(tenantId, 10) || 1,
     quota_month: normalizedMonth,
     account_size: normalizedSize,
     account_limit: isUnlimited ? null : accountLimit,
@@ -278,10 +261,10 @@ async function getTenantMonthlyQuotaStatus(db, tenantId, quotaMonth = getQuotaMo
   }
 }
 
-async function assertTenantMonthlyQuotaAvailable(db, tenantId, quotaMonth = getQuotaMonth(), accountSize = null) {
+async function assertTenantMonthlyQuotaAvailable(db, quotaMonth = getQuotaMonth(), accountSize = null) {
   await ensureTenantMonthlyQuotaInfrastructure(db)
-  await lockTenantQuotaMonth(db, tenantId, quotaMonth, accountSize)
-  const status = await getTenantMonthlyQuotaStatus(db, tenantId, quotaMonth, accountSize)
+  await lockTenantQuotaMonth(db, quotaMonth, accountSize)
+  const status = await getTenantMonthlyQuotaStatus(db, quotaMonth, accountSize)
   if (!status.is_unlimited && status.remaining <= 0) {
     const sizeLabel = status.account_size ? ` $${Number(status.account_size).toLocaleString('en-US')} account` : ''
     const error = new Error(`Monthly quota is full for${sizeLabel} allocations in ${status.quota_month}.`)
@@ -305,10 +288,10 @@ async function createPromotionReview(db, acc, { triggeredBy = 'auto_pass', reaso
 
   const result = await db.query(
     `INSERT INTO account_promotion_reviews (
-       tenant_id, source_account_id, user_id, from_account_type, target_account_type,
+       source_account_id, user_id, from_account_type, target_account_type,
        account_size, status, triggered_by, reason, requested_by_admin_id, payload_json, updated_at
      )
-     VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $8, $9, $10::jsonb, NOW())
+     VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9::jsonb, NOW())
      ON CONFLICT (source_account_id) WHERE status = 'pending'
      DO UPDATE SET
        triggered_by = EXCLUDED.triggered_by,
@@ -317,7 +300,6 @@ async function createPromotionReview(db, acc, { triggeredBy = 'auto_pass', reaso
        updated_at = NOW()
      RETURNING *`,
     [
-      acc.tenant_id || 1,
       String(acc.id),
       String(acc.user_id),
       String(acc.account_type),
@@ -332,15 +314,11 @@ async function createPromotionReview(db, acc, { triggeredBy = 'auto_pass', reaso
   return result.rows[0]
 }
 
-async function listPromotionReviews(db, { tenantId = null, status = 'pending', month = null } = {}) {
+async function listPromotionReviews(db, { status = 'pending', month = null } = {}) {
   await ensureTenantMonthlyQuotaInfrastructure(db)
   const params = []
   const where = []
   let index = 1
-  if (tenantId) {
-    params.push(tenantId)
-    where.push(`r.tenant_id = $${index++}`)
-  }
   if (status && status !== 'all') {
     params.push(String(status).toLowerCase())
     where.push(`LOWER(r.status) = $${index++}`)
@@ -362,13 +340,11 @@ async function listPromotionReviews(db, { tenantId = null, status = 'pending', m
        a.peak_balance,
        a.profit_target,
        a.status AS source_account_status,
-       t.name AS tenant_name,
        COALESCE(open_counts.open_trade_count, 0)::int AS open_trade_count,
        COALESCE(pending_counts.pending_trade_count, 0)::int AS pending_trade_count
      FROM account_promotion_reviews r
      JOIN accounts a ON a.id::text = r.source_account_id
      LEFT JOIN users u ON u.id::text = r.user_id
-     LEFT JOIN tenants t ON t.id = r.tenant_id
      LEFT JOIN LATERAL (
        SELECT COUNT(*)::int AS open_trade_count FROM trades tr WHERE tr.account_id::text = r.source_account_id AND tr.status = 'open'
      ) open_counts ON TRUE
@@ -382,19 +358,16 @@ async function listPromotionReviews(db, { tenantId = null, status = 'pending', m
   return result.rows
 }
 
-async function getPromotionReviewForUpdate(db, reviewId, tenantId = null) {
+async function getPromotionReviewForUpdate(db, reviewId) {
   await ensureTenantMonthlyQuotaInfrastructure(db)
-  const params = [reviewId]
-  const tenantClause = tenantId ? 'AND r.tenant_id = $2' : ''
-  if (tenantId) params.push(tenantId)
   const result = await db.query(
     `SELECT r.*, a.status AS source_account_status, a.account_type AS source_account_type,
-            a.user_id AS source_user_id, a.tenant_id AS source_tenant_id, a.account_size AS source_account_size
+            a.user_id AS source_user_id, a.account_size AS source_account_size
        FROM account_promotion_reviews r
        JOIN accounts a ON a.id::text = r.source_account_id
-      WHERE r.id = $1 ${tenantClause}
+      WHERE r.id = $1
       FOR UPDATE OF r, a`,
-    params
+    [reviewId]
   )
   return result.rows[0] || null
 }

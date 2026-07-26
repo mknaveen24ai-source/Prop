@@ -69,7 +69,7 @@ function formatPercent(value, digits = 1) {
 function getScoreColor(score) {
   if (score >= 85) return 'var(--green)'
   if (score >= 70) return 'var(--accent)'
-  if (score >= 55) return '#f59e0b'
+  if (score >= 55) return 'var(--warn)'
   return 'var(--red)'
 }
 
@@ -247,7 +247,19 @@ export default function Analytics({ selectedAccount }) {
 
     const ctx = canvas.getContext('2d')
     const curve = activeCurve.slice(0, Math.max(1, Math.floor(activeCurve.length * (replayIndex / 100))))
-    const isDark = document.documentElement.getAttribute('data-theme') !== 'light'
+
+    // Resolve Ledger Desk tokens at draw time (canvas can't read CSS vars directly).
+    const readToken = (name, fallback) => {
+      const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+      return value || fallback
+    }
+    const tokens = {
+      rule: readToken('--rule', '#3a3a3a'),
+      muted: readToken('--muted', '#8a8a82'),
+      ink: readToken('--ink', '#e8e4d8'),
+      gain: readToken('--gain', '#4ade80'),
+      loss: readToken('--loss', '#f87171')
+    }
 
     const width = canvas.width = canvas.offsetWidth
     const height = canvas.height = 240
@@ -262,7 +274,7 @@ export default function Analytics({ selectedAccount }) {
     const chartWidth = width - pad.left - pad.right
     const chartHeight = height - pad.top - pad.bottom
 
-    ctx.strokeStyle = isDark ? '#383838' : '#efefef'
+    ctx.strokeStyle = tokens.rule
     ctx.lineWidth = 1
     for (let index = 0; index <= 4; index += 1) {
       const y = pad.top + (chartHeight / 4) * index
@@ -272,7 +284,7 @@ export default function Analytics({ selectedAccount }) {
       ctx.stroke()
     }
 
-    ctx.fillStyle = isDark ? '#8f8f8f' : '#6f6f6f'
+    ctx.fillStyle = tokens.muted
     ctx.font = '11px "Public Sans", sans-serif'
     ctx.textAlign = 'right'
     for (let index = 0; index <= 4; index += 1) {
@@ -297,19 +309,8 @@ export default function Analytics({ selectedAccount }) {
       y: pad.top + chartHeight - ((Number(point.balance || 0) - minBalance) / range) * chartHeight
     }))
 
-    const gradient = ctx.createLinearGradient(0, pad.top, 0, pad.top + chartHeight)
-    gradient.addColorStop(0, 'rgba(37, 99, 235, 0.35)')
-    gradient.addColorStop(1, 'rgba(37, 99, 235, 0.02)')
     ctx.beginPath()
-    ctx.moveTo(points[0].x, pad.top + chartHeight)
-    points.forEach((point) => ctx.lineTo(point.x, point.y))
-    ctx.lineTo(points[points.length - 1].x, pad.top + chartHeight)
-    ctx.closePath()
-    ctx.fillStyle = gradient
-    ctx.fill()
-
-    ctx.beginPath()
-    ctx.strokeStyle = '#3b82f6'
+    ctx.strokeStyle = tokens.ink
     ctx.lineWidth = 2
     ctx.lineJoin = 'round'
     points.forEach((point, index) => {
@@ -325,7 +326,7 @@ export default function Analytics({ selectedAccount }) {
       const pnl = Number(curve[index].balance || 0) - previousBalance
       ctx.beginPath()
       ctx.arc(point.x, point.y, 3, 0, Math.PI * 2)
-      ctx.fillStyle = pnl >= 0 ? '#2ecc71' : '#e74c3c'
+      ctx.fillStyle = pnl >= 0 ? tokens.gain : tokens.loss
       ctx.fill()
     })
   }, [curveRange, getActiveCurve, replayIndex])
@@ -503,7 +504,7 @@ export default function Analytics({ selectedAccount }) {
                       padding: '7px 12px',
                       borderRadius: '999px',
                       border: curveRange === range.id ? '1px solid var(--accent)' : '1px solid var(--navy-border)',
-                      background: curveRange === range.id ? 'rgba(37,99,235,0.16)' : 'transparent',
+                      background: curveRange === range.id ? 'rgba(var(--brand-primary-rgb),0.16)' : 'transparent',
                       color: curveRange === range.id ? 'var(--accent)' : 'var(--text-muted)',
                       cursor: 'pointer',
                       fontSize: '11px',
@@ -912,7 +913,7 @@ export default function Analytics({ selectedAccount }) {
                     background: suggestion.priority === 'high'
                       ? 'rgba(239,68,68,0.1)'
                       : suggestion.priority === 'medium'
-                        ? 'rgba(37,99,235,0.12)'
+                        ? 'rgba(var(--brand-primary-rgb),0.12)'
                         : 'rgba(255,255,255,0.02)',
                     color: suggestion.priority === 'high' ? 'var(--red)' : suggestion.priority === 'medium' ? 'var(--accent)' : 'var(--text-muted)',
                     fontSize: '10px',

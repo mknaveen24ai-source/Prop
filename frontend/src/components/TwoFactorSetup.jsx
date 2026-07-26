@@ -36,11 +36,11 @@ function Card({ children, style }) {
 
 function Btn({ children, variant = 'default', disabled, onClick, style: s, ...rest }) {
   const colors = {
-    default: { bg: 'var(--navy-hover)', border: 'var(--navy-border)', color: 'var(--text)' },
-    accent:  { bg: '#2962ff', border: '#2962ff', color: '#fff' },
-    red:     { bg: 'rgba(255,71,87,0.12)', border: 'rgba(255,71,87,0.3)', color: '#ff4757' },
-    green:   { bg: 'rgba(0,200,150,0.12)', border: 'rgba(0,200,150,0.3)', color: '#00c896' },
-    ghost:   { bg: 'transparent', border: 'var(--navy-border)', color: 'var(--text-muted)' },
+    default: { bg: 'var(--ink)', border: 'var(--ink)', color: 'var(--paper)' },
+    accent:  { bg: 'var(--ink)', border: 'var(--ink)', color: 'var(--paper)' },
+    red:     { bg: 'transparent', border: 'var(--loss)', color: 'var(--loss)' },
+    green:   { bg: 'transparent', border: 'var(--gain)', color: 'var(--gain)' },
+    ghost:   { bg: 'transparent', border: 'var(--rule)', color: 'var(--muted)' },
   }
   const c = colors[variant] || colors.default
   return (
@@ -69,16 +69,16 @@ function Btn({ children, variant = 'default', disabled, onClick, style: s, ...re
 
 function Alert({ type = 'info', children }) {
   const styles = {
-    error:   { bg: 'rgba(255,71,87,0.08)',   border: 'rgba(255,71,87,0.2)',  color: '#ff6b7a' },
-    success: { bg: 'rgba(0,200,150,0.08)',   border: 'rgba(0,200,150,0.2)', color: '#00c896' },
-    warning: { bg: 'rgba(255,165,0,0.08)',   border: 'rgba(255,165,0,0.25)', color: '#ffa500' },
-    info:    { bg: 'rgba(41,98,255,0.08)',   border: 'rgba(41,98,255,0.2)', color: '#5c87ff' },
+    error:   { border: 'var(--loss)', color: 'var(--loss)' },
+    success: { border: 'var(--gain)', color: 'var(--gain)' },
+    warning: { border: 'var(--warn)', color: 'var(--warn)' },
+    info:    { border: 'var(--rule)', color: 'var(--ink)' },
   }
   const s = styles[type] || styles.info
   return (
     <div style={{
-      background: s.bg, border: `1px solid ${s.border}`, color: s.color,
-      borderRadius: '8px', padding: '12px 16px', fontSize: '13px',
+      background: 'transparent', border: `1px solid ${s.border}`, color: s.color,
+      padding: '12px 16px', fontSize: '13px',
       lineHeight: 1.6, marginBottom: '16px'
     }}>
       {children}
@@ -418,7 +418,7 @@ function TwoFactorSetup({ apiBase = '' }) {
             <span style={{
               padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600,
               background: is2faEnabled ? 'rgba(0,200,150,0.12)' : 'rgba(255,71,87,0.08)',
-              color: is2faEnabled ? '#00c896' : '#ff4757',
+              color: is2faEnabled ? 'var(--gain)' : 'var(--loss)',
               border: `1px solid ${is2faEnabled ? 'rgba(0,200,150,0.25)' : 'rgba(255,71,87,0.2)'}`
             }}>
               {is2faEnabled ? 'ENABLED' : 'DISABLED'}

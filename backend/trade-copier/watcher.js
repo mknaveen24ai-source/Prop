@@ -38,6 +38,21 @@ const RETRY_ACK_STATUSES = new Set(['retry', 'queued', 'timeout', 'bridge_busy',
 
 const pool = new Pool({ connectionString: DATABASE_URL })
 
+// FIX (SECURITY AUDIT): This process had no top-level crash handler — unlike
+// server.js and workers/emailWorker.js, an error outside the per-job try/catch
+// (e.g. inside one of the setInterval callbacks) would crash the process with
+// no logging and no cleanup, relying entirely on an external supervisor to
+// notice and restart it. Mirrors server.js's handling: log + exit on an
+// uncaught exception (process state is unknown, safest to let a supervisor
+// restart cleanly); log-only on unhandled rejections.
+process.on('unhandledRejection', (reason) => {
+  logger.error('[trade-copier] Unhandled promise rejection:', { error: reason?.message || String(reason), stack: reason?.stack })
+})
+process.on('uncaughtException', (err) => {
+  logger.error('[trade-copier] Uncaught exception:', { error: err.message, stack: err.stack })
+  process.exit(1)
+})
+
 let socket = null
 let socketReady = false
 let bridgeHeartbeatAt = null
@@ -213,15 +228,13 @@ function shouldUseIdentitySymbol(symbolCatalog, symbol) {
   return symbolCatalog.some((item) => String(item || '').toUpperCase() === String(symbol || '').toUpperCase())
 }
 
-async function sendFailureWebhook(tenantId, eventType, payload) {
+async function sendFailureWebhook(eventType, payload) {
   try {
     const endpointsResult = await pool.query(
       `SELECT target_url, secret, event_allowlist_json
          FROM copier_alert_endpoints
-        WHERE tenant_id = $1
-          AND is_enabled = TRUE
-          AND endpoint_type = 'webhook'`,
-      [tenantId]
+        WHERE is_enabled = TRUE
+          AND endpoint_type = 'webhook'`
     )
 
     for (const row of endpointsResult.rows) {
@@ -297,12 +310,7 @@ async function persistRuntimeStatus() {
 
     if (Number(metrics.dead_letter_count || 0) >= DEAD_LETTER_ALERT_THRESHOLD && Number(metrics.dead_letter_count || 0) !== deadLetterAlertedCount) {
       deadLetterAlertedCount = Number(metrics.dead_letter_count || 0)
-      const tenantIds = await pool.query(`SELECT DISTINCT tenant_id FROM copier_jobs WHERE state = 'dead'`)
-      for (const row of tenantIds.rows) {
-        if (row.tenant_id) {
-          sendFailureWebhook(row.tenant_id, 'dead_letter_burst', { dead_letter_count: deadLetterAlertedCount })
-        }
-      }
+      sendFailureWebhook('dead_letter_burst', { dead_letter_count: deadLetterAlertedCount })
     }
   } catch (error) {
     lastError = `[runtime] ${error.message}`
@@ -466,7 +474,6 @@ async function upsertPositionLinkFromAck(job, command, ack) {
 
   await pool.query(
     `INSERT INTO copier_position_links (
-       tenant_id,
        master_id,
        follower_id,
        master_trade_id,
@@ -478,7 +485,7 @@ async function upsertPositionLinkFromAck(job, command, ack) {
        last_synced_at,
        metadata_json,
        updated_at
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10::jsonb, NOW())
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9::jsonb, NOW())
      ON CONFLICT (follower_id, master_trade_id) DO UPDATE SET
        follower_external_ticket = COALESCE(EXCLUDED.follower_external_ticket, copier_position_links.follower_external_ticket),
        follower_external_order_id = COALESCE(EXCLUDED.follower_external_order_id, copier_position_links.follower_external_order_id),
@@ -489,7 +496,6 @@ async function upsertPositionLinkFromAck(job, command, ack) {
        metadata_json = EXCLUDED.metadata_json,
        updated_at = NOW()`,
     [
-      job.tenant_id,
       job.master_id,
       job.follower_id,
       job.master_trade_id,
@@ -509,7 +515,6 @@ async function upsertPositionLinkFromAck(job, command, ack) {
 async function recordJobAttempt(db, jobId, attemptNo, stage, deliveryStatus, message, bridgePayload = {}, responsePayload = {}, latencyMs = null) {
   await db.query(
     `INSERT INTO copier_job_attempts (
-       tenant_id,
        job_id,
        attempt_no,
        stage,
@@ -518,19 +523,7 @@ async function recordJobAttempt(db, jobId, attemptNo, stage, deliveryStatus, mes
        bridge_payload_json,
        response_payload_json,
        message
-     )
-     SELECT
-       tenant_id,
-       id,
-       $2,
-       $3,
-       $4,
-       $5,
-       $6::jsonb,
-       $7::jsonb,
-       $8
-     FROM copier_jobs
-     WHERE id = $1`,
+     ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8)`,
     [
       jobId,
       attemptNo,
@@ -599,7 +592,7 @@ async function scheduleRetry(job, message) {
       [job.id, message || 'Retry budget exhausted']
     )
     await recordJobAttempt(pool, job.id, attemptsCount || 1, 'ack_timeout', 'failed', message)
-    sendFailureWebhook(job.tenant_id, 'copier_job_dead', {
+    sendFailureWebhook('copier_job_dead', {
       follower_id: job.follower_id,
       master_trade_id: job.master_trade_id,
       correlation_id: job.correlation_id,
@@ -670,7 +663,6 @@ async function handleBridgeAck(message) {
       })
     } else {
       requestFollowerSnapshot({
-        tenant_id: job.tenant_id,
         follower_id: job.follower_id,
         bridge_target_key: command.bridge_target_key
       })
@@ -694,7 +686,7 @@ async function handleBridgeAck(message) {
     [job.id, errorMessage]
   )
   await recordJobAttempt(pool, job.id, Math.max(1, Number(job.attempts_count || 0)), 'ack', 'failed', errorMessage, command, message, inflight?.sentAt ? Math.max(0, Date.now() - inflight.sentAt.getTime()) : null)
-  sendFailureWebhook(job.tenant_id, 'copier_job_dead', {
+  sendFailureWebhook('copier_job_dead', {
     follower_id: job.follower_id,
     master_trade_id: job.master_trade_id,
     correlation_id: job.correlation_id,
@@ -783,7 +775,7 @@ async function buildJobForMapping(client, event, masterMeta, mapping) {
   const mappingAllowlist = safeJsonParse(mapping.mapping_symbol_allowlist_json, [])
   const sessionFilter = safeJsonParse(mapping.session_filter_json, {})
   const newsFilter = safeJsonParse(mapping.news_filter_json, {})
-  const allowedAccountTypes = safeJsonParse(mapping.allowed_master_account_types_json, ['phase1', 'phase2', 'funded'])
+  const allowedAccountTypes = safeJsonParse(mapping.allowed_master_account_types_json, ['phase1', 'phase2', 'phase3', 'funded'])
 
   if (!Array.isArray(allowedAccountTypes) || !allowedAccountTypes.includes(String(masterMeta.account_type || '').toLowerCase())) {
     return buildDeadOrSkipped('skipped', 'Master account type is not allowed for this follower mapping')
@@ -831,7 +823,6 @@ async function buildJobForMapping(client, event, masterMeta, mapping) {
   const correlationId = uuidv4()
   const baseCommand = {
     correlation_id: correlationId,
-    tenant_id: event.tenant_id,
     follower_id: mapping.follower_id,
     bridge_target_key: mapping.bridge_target_key,
     master_id: event.master_id,
@@ -956,7 +947,6 @@ async function createJobsFromPendingEvents() {
         const correlationId = plan.command?.correlation_id || uuidv4()
         const insertResult = await client.query(
           `INSERT INTO copier_jobs (
-             tenant_id,
              event_id,
              follower_id,
              mapping_id,
@@ -968,12 +958,11 @@ async function createJobsFromPendingEvents() {
              dead_reason,
              last_error
            ) VALUES (
-             $1, $2, $3, $4, $5, $6, NOW(), $7, $8::jsonb, $9, $9
+             $1, $2, $3, $4, $5, NOW(), $6, $7::jsonb, $8, $8
            )
            ON CONFLICT DO NOTHING
            RETURNING id, attempts_count`,
           [
-            event.tenant_id,
             event.id,
             mapping.follower_id,
             mapping.mapping_id,
@@ -1002,7 +991,7 @@ async function createJobsFromPendingEvents() {
             {}
           )
           if (plan.state === 'dead') {
-            sendFailureWebhook(event.tenant_id, 'copier_job_dead', {
+            sendFailureWebhook('copier_job_dead', {
               follower_id: mapping.follower_id,
               master_trade_id: event.master_trade_id,
               reason: plan.reason
@@ -1194,7 +1183,7 @@ async function pollFollowerProtections() {
             WHERE id = $1`,
           [follower.id, reason]
         )
-        sendFailureWebhook(follower.tenant_id, 'follower_auto_paused', {
+        sendFailureWebhook('follower_auto_paused', {
           follower_id: follower.id,
           reason
         })
@@ -1219,7 +1208,6 @@ function requestFollowerSnapshot(follower) {
   if (!socketReady || !follower?.follower_id) return false
   return sendBridgeCommand({
     correlation_id: uuidv4(),
-    tenant_id: follower.tenant_id,
     follower_id: follower.follower_id,
     bridge_target_key: follower.bridge_target_key || null,
     event_type: 'SNAPSHOT_REQUEST',
@@ -1231,13 +1219,12 @@ async function requestFollowerSnapshots() {
   if (!socketReady) return
   try {
     const followersResult = await pool.query(
-      `SELECT id, tenant_id, bridge_target_key
+      `SELECT id, bridge_target_key
          FROM copier_followers
         WHERE status IN ('active', 'paused')`
     )
     for (const follower of followersResult.rows) {
       requestFollowerSnapshot({
-        tenant_id: follower.tenant_id,
         follower_id: follower.id,
         bridge_target_key: follower.bridge_target_key
       })

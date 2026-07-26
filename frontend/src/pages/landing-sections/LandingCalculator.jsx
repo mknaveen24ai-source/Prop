@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useBranding } from '../../BrandingContext';
 import { accountsAPI } from '../../services/api';
 import { buildUnavailableAvailabilityRows, normalizeAvailabilityRows, UNLIMITED_QUOTA } from '../../utils/accountAvailability';
 import { getTenantLandingCopy, isPaidTenant } from '../../utils/tenantMarketing';
-import { buildTenantPath } from '../../utils/tenant';
 
 /* Animated number counter */
 function CountUp({ value, duration = 800 }) {
@@ -42,9 +40,8 @@ function sizeLabel(size) {
 
 export default function LandingCalculator({ onStartAssessment }) {
   const navigate = useNavigate();
-  const { tenant } = useBranding();
-  const landingCopy = getTenantLandingCopy(tenant);
-  const paidTenant = isPaidTenant(tenant);
+  const landingCopy = getTenantLandingCopy();
+  const paidTenant = isPaidTenant();
   const [accounts, setAccounts] = useState(() => buildUnavailableAvailabilityRows());
   const [selected, setSelected] = useState(0);
   const [loadingAPI, setLoadingAPI] = useState(true);
@@ -85,17 +82,14 @@ export default function LandingCalculator({ onStartAssessment }) {
 
   return (
     <section id="mp-accounts" className="mp-section" style={{
-      background: 'linear-gradient(180deg, rgba(10,14,23,0.95), rgba(10,14,23,0.8))',
-      borderTop: '1px solid rgba(255,255,255,0.04)',
-      borderBottom: '1px solid rgba(255,255,255,0.04)',
+      background: 'var(--paper-2)',
+      borderTop: '1px solid var(--rule)',
+      borderBottom: '1px solid var(--rule)',
       position: 'relative',
     }}>
-      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '800px', height: '800px', background: 'radial-gradient(circle, rgba(41,98,255,0.03), transparent 60%)', pointerEvents: 'none' }} />
-
       <div className="mp-container">
         <div style={{ textAlign: 'center', marginBottom: '60px' }}>
           <div className="mp-badge mp-reveal" style={{ marginBottom: '20px' }}>
-            <span className="mp-badge-dot"></span>
             Account Sizes
           </div>
           <h2 className="mp-h2 mp-reveal mp-delay-100">Choose Your Account Size</h2>
@@ -103,7 +97,7 @@ export default function LandingCalculator({ onStartAssessment }) {
             {landingCopy.calculatorLead}
           </p>
           {availabilitySource !== 'live' && (
-            <p className="mp-reveal mp-delay-250" style={{ margin: '14px auto 0', color: 'rgba(255,255,255,0.48)', maxWidth: '740px', fontSize: '13px' }}>
+            <p className="mp-reveal mp-delay-250" style={{ margin: '14px auto 0', color: 'var(--muted)', maxWidth: '740px', fontSize: '13px' }}>
               {availabilitySource === 'config'
                 ? 'Tier availability on this page follows admin-configured quotas and refreshes automatically.'
                 : 'Live availability is temporarily unavailable. You can still register and claim the next open tier.'}
@@ -111,13 +105,13 @@ export default function LandingCalculator({ onStartAssessment }) {
           )}
 
           {/* Summary pill */}
-          <div className="mp-availability-pill mp-reveal mp-delay-300" style={{ marginTop: '24px', display: 'inline-flex', gap: '24px', padding: '12px 28px', background: 'rgba(255,255,255,0.03)', borderRadius: '100px', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)' }}>
-              Sizes Available: <span style={{ color: '#fff', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{totalEnabled}</span>
+          <div className="mp-availability-pill mp-reveal mp-delay-300" style={{ marginTop: '24px', display: 'inline-flex', gap: '24px', padding: '12px 28px', background: 'transparent', border: '1px solid var(--rule)' }}>
+            <span style={{ fontSize: '13px', color: 'var(--muted)' }}>
+              Sizes Available: <span style={{ color: 'var(--ink)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{totalEnabled}</span>
             </span>
-            <span style={{ width: '1px', background: 'rgba(255,255,255,0.08)' }} />
-            <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)' }}>
-              Remaining Slots: <span style={{ color: hasUnlimitedAvailability || totalRemaining > 0 ? '#00c896' : '#f0b90b', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{loadingAPI ? '...' : hasUnlimitedAvailability ? 'Unlimited' : totalRemaining}</span>
+            <span style={{ width: '1px', background: 'var(--rule)' }} />
+            <span style={{ fontSize: '13px', color: 'var(--muted)' }}>
+              Remaining Slots: <span style={{ color: hasUnlimitedAvailability || totalRemaining > 0 ? 'var(--gain)' : 'var(--warn)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{loadingAPI ? '...' : hasUnlimitedAvailability ? 'Unlimited' : totalRemaining}</span>
             </span>
           </div>
         </div>
@@ -146,64 +140,46 @@ export default function LandingCalculator({ onStartAssessment }) {
                 onClick={() => setSelected(i)}
                 className={`mp-account-size-card ${isSelected && !isSoldOut ? 'mp-active-selection' : ''}`}
                 style={{
-                  background: isSoldOut
-                    ? 'rgba(17,24,39,0.25)'
-                    : isSelected
-                      ? 'linear-gradient(135deg, rgba(41,98,255,0.18), rgba(123,97,255,0.12))'
-                      : 'rgba(17,24,39,0.6)',
+                  background: isSoldOut ? 'var(--paper-2)' : 'var(--paper)',
                   border: isSoldOut
-                    ? '1px solid rgba(255,71,87,0.12)'
+                    ? '1px solid var(--rule)'
                     : isSelected
-                      ? '1px solid rgba(41,98,255,0.5)'
-                      : '1px solid rgba(255,255,255,0.07)',
-                  borderRadius: '20px',
+                      ? '2px solid var(--ink)'
+                      : '1px solid var(--rule)',
                   padding: '24px 18px',
                   cursor: 'pointer',
-                  transition: 'all 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+                  transition: 'border-color 0.2s ease',
                   textAlign: 'center',
-                  transform: isSelected && !isSoldOut ? 'translateY(-6px) scale(1.02)' : 'translateY(0)',
-                  boxShadow: isSelected && !isSoldOut ? '0 20px 48px rgba(41,98,255,0.25)' : 'none',
                   position: 'relative',
                   overflow: 'hidden',
-                  opacity: isSoldOut ? 0.45 : 1,
+                  opacity: isSoldOut ? 0.5 : 1,
                 }}
               >
-                {/* Reactive Border Pulse for Selection */}
-                {isSelected && !isSoldOut && (
-                  <div style={{ 
-                    position: 'absolute', inset: 0, 
-                    border: '2px solid var(--mp-accent)', 
-                    borderRadius: '20px',
-                    animation: 'mp-count-glow 2s infinite alternate',
-                    pointerEvents: 'none'
-                  }} />
-                )}
-
                 {/* Sold-out badge */}
                 {isSoldOut && (
                   <div style={{
                     position: 'absolute', top: '12px', right: '12px',
-                    padding: '3px 10px', borderRadius: '100px',
-                    background: 'rgba(255,71,87,0.15)', border: '1px solid rgba(255,71,87,0.3)',
-                    color: '#ff4757', fontSize: '9px', fontWeight: 800,
+                    padding: '3px 10px',
+                    background: 'transparent', border: '1px solid var(--loss)',
+                    color: 'var(--loss)', fontSize: '9px', fontWeight: 800,
                     textTransform: 'uppercase', letterSpacing: '0.1em',
-              fontFamily: 'var(--font-mono)',
+                    fontFamily: 'var(--font-mono)',
                   }}>Full</div>
                 )}
 
-          <div style={{ fontSize: '10px', color: isSelected && !isSoldOut ? '#2962ff' : 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '10px', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+          <div style={{ fontSize: '10px', color: isSelected && !isSoldOut ? 'var(--muted)' : 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '10px', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
                   {sizeLabel(a.size)}
                 </div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(20px,2vw,28px)', fontWeight: 800, color: isSoldOut ? 'rgba(255,255,255,0.25)' : '#fff', marginBottom: '14px' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(20px,2vw,28px)', fontWeight: 800, color: isSoldOut ? 'var(--muted)' : 'var(--ink)', marginBottom: '14px' }}>
                   ${a.size.toLocaleString('en-US')}
                 </div>
 
-                {/* FREE / FULL badge */}
+                {/* OPEN / FULL badge */}
                 <div style={{
                   display: 'inline-block', padding: '6px 16px',
-                  background: isSoldOut ? 'rgba(255,71,87,0.1)' : 'rgba(0,200,150,0.1)',
-                  border: `1px solid ${isSoldOut ? 'rgba(255,71,87,0.2)' : 'rgba(0,200,150,0.3)'}`,
-                  borderRadius: '100px', color: isSoldOut ? '#ff4757' : '#00c896',
+                  background: 'transparent',
+                  border: `1px solid ${isSoldOut ? 'var(--loss)' : 'var(--gain)'}`,
+                  color: isSoldOut ? 'var(--loss)' : 'var(--gain)',
                   fontSize: '13px', fontWeight: 700, marginBottom: '16px',
                 }}>
                   {isSoldOut ? landingCopy.calculatorLocked : landingCopy.calculatorBadgeOpen}
@@ -212,18 +188,17 @@ export default function LandingCalculator({ onStartAssessment }) {
                 {/* Availability bar */}
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>AVAILABLE</span>
-                <span style={{ fontSize: '10px', color: isSoldOut ? '#ff4757' : pct > 50 ? '#00c896' : '#f0b90b', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                    <span style={{ fontSize: '10px', color: 'var(--muted)', fontWeight: 600 }}>AVAILABLE</span>
+                <span style={{ fontSize: '10px', color: isSoldOut ? 'var(--loss)' : pct > 50 ? 'var(--gain)' : 'var(--warn)', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
                       {isSoldOut ? '0/0' : isUnlimited ? 'OPEN' : `${a.remaining ?? 0}/${a.quota}`}
                     </span>
                   </div>
-                  <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ height: '4px', background: 'var(--rule)', overflow: 'hidden' }}>
                     <div style={{
                       height: '100%',
                       width: `${pct}%`,
-                      background: isSoldOut ? '#ff4757' : pct > 50 ? '#00c896' : pct > 20 ? '#f0b90b' : '#ff4757',
-                      borderRadius: '4px', transition: 'width 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
-                      boxShadow: isSelected ? `0 0 10px ${isSoldOut ? '#ff4757' : pct > 50 ? '#00c896' : '#f0b90b'}` : 'none'
+                      background: isSoldOut ? 'var(--loss)' : pct > 50 ? 'var(--gain)' : pct > 20 ? 'var(--warn)' : 'var(--loss)',
+                      transition: 'width 0.6s ease',
                     }} />
                   </div>
                 </div>
@@ -234,25 +209,25 @@ export default function LandingCalculator({ onStartAssessment }) {
 
         {/* Detail Panel */}
         {acc && (
-          <div className="mp-account-detail-card mp-glass-card mp-reveal mp-delay-400" style={{ maxWidth: '900px', margin: '0 auto', padding: '56px', background: 'rgba(17,24,39,0.7)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="mp-account-detail-card mp-glass-card mp-reveal mp-delay-400" style={{ maxWidth: '900px', margin: '0 auto', padding: '56px', background: 'var(--paper)', border: '1px solid var(--rule)', borderTop: '3px double var(--ink)' }}>
             <div className="mp-account-detail-layout" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '48px' }}>
 
               <div className="mp-account-detail-main" style={{ flex: 1, minWidth: '300px' }}>
-          <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '12px', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>Active Tier Assessment</div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: '56px', fontWeight: 800, color: isLocked ? 'rgba(255,255,255,0.25)' : '#fff', marginBottom: '32px', letterSpacing: '-0.02em' }}>
+          <div style={{ fontSize: '12px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '12px', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>Active Tier Assessment</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '56px', fontWeight: 800, color: isLocked ? 'var(--muted)' : 'var(--ink)', marginBottom: '32px', letterSpacing: '-0.01em' }}>
                   $<CountUp value={acc.size} />
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '20px' }}>
                   {[
-                    { label: paidTenant ? 'Challenge Access' : 'Evaluation Fee', value: isLocked ? 'Locked' : landingCopy.calculatorFeeLabel,     color: isLocked ? '#ff4757' : '#00c896', isShimmer: !isLocked },
-                    { label: 'Evaluation Mode', value: 'Phase 1 + 2',                      color: '#2962ff' },
-                    { label: 'Standard Leverage',value: '1:30 (Max)',                      color: '#fff' },
-                    { label: 'Availability',   value: isLocked ? 'Closed' : acc.quota >= 999999 ? 'Institutional' : 'Limited Spots', color: isLocked ? '#ff4757' : '#f0b90b' },
+                    { label: paidTenant ? 'Challenge Access' : 'Evaluation Fee', value: isLocked ? 'Locked' : landingCopy.calculatorFeeLabel,     color: isLocked ? 'var(--loss)' : 'var(--gain)' },
+                    { label: 'Evaluation Mode', value: 'Phase 1 + 2',                      color: 'var(--muted)' },
+                    { label: 'Standard Leverage',value: '1:30 (Max)',                      color: 'var(--ink)' },
+                    { label: 'Availability',   value: isLocked ? 'Closed' : acc.quota >= 999999 ? 'Institutional' : 'Limited Spots', color: isLocked ? 'var(--loss)' : 'var(--warn)' },
                   ].map((item, i) => (
-                    <div key={i} style={{ padding: '16px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                      <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginBottom: '6px', fontWeight: 600 }}>{item.label}</div>
-                      <div className={item.isShimmer ? 'mp-shimmer' : ''} style={{ fontSize: '17px', fontWeight: 700, color: item.color }}>{item.value}</div>
+                    <div key={i} style={{ padding: '16px 0', borderBottom: '1px solid var(--rule)' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '6px', fontWeight: 600 }}>{item.label}</div>
+                      <div style={{ fontSize: '17px', fontWeight: 700, color: item.color, fontFamily: 'var(--font-mono)' }}>{item.value}</div>
                     </div>
                   ))}
                 </div>
@@ -263,32 +238,29 @@ export default function LandingCalculator({ onStartAssessment }) {
                 {(() => {
                   const isUnlim = acc.quota >= UNLIMITED_QUOTA;
                   const availPct = isUnlim ? 100 : acc.quota > 0 ? Math.max(0, Math.min(100, ((acc.remaining ?? 0) / acc.quota) * 100)) : 0;
-                  const ringColor = isLocked ? '#ff4757' : availPct > 50 ? '#00c896' : availPct > 20 ? '#f0b90b' : '#ff4757';
-                  const glowColor = isLocked ? 'rgba(255,71,87,0.2)' : availPct > 50 ? 'rgba(0,200,150,0.2)' : 'rgba(240,185,11,0.2)';
-                  
+                  const ringColor = isLocked ? 'var(--loss)' : availPct > 50 ? 'var(--gain)' : availPct > 20 ? 'var(--warn)' : 'var(--loss)';
+
                   return (
-                    <div style={{ 
-                      width: '180px', height: '180px', 
-                      borderRadius: '50%', 
-                      border: '4px solid rgba(255,255,255,0.04)', 
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', 
+                    <div style={{
+                      width: '180px', height: '180px',
+                      borderRadius: '50%',
+                      border: '1px solid var(--rule)',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center',
                       justifyContent: 'center', position: 'relative',
-                      boxShadow: `0 0 40px ${glowColor}`,
-                      transition: 'all 0.5s ease'
                     }}>
                       <svg width="180" height="180" viewBox="0 0 180 180" style={{ position: 'absolute', top: 0, left: 0, transform: 'rotate(-90deg)' }}>
-                        <circle cx="90" cy="90" r="84" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="6" />
+                        <circle cx="90" cy="90" r="84" fill="none" stroke="var(--rule)" strokeWidth="6" />
                         <circle cx="90" cy="90" r="84" fill="none"
                           stroke={ringColor} strokeWidth="6"
                           strokeDasharray={`${(availPct / 100) * 527.8} 527.8`}
                           strokeLinecap="round"
-                          style={{ transition: 'stroke-dasharray 1s cubic-bezier(0.16, 1, 0.3, 1)' }}
+                          style={{ transition: 'stroke-dasharray 0.8s ease' }}
                         />
                       </svg>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '38px', fontWeight: 800, color: '#fff', zIndex: 1, letterSpacing: '-0.02em' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '38px', fontWeight: 800, color: 'var(--ink)', zIndex: 1, letterSpacing: '-0.01em' }}>
                         {isLocked ? '0' : isUnlim ? '∞' : (acc.remaining ?? 0)}
                       </div>
-                      <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', zIndex: 1, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--muted)', zIndex: 1, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
                         {isLocked ? 'Sold Out' : 'Active Slots'}
                       </div>
                     </div>
@@ -296,9 +268,9 @@ export default function LandingCalculator({ onStartAssessment }) {
                 })()}
 
                 {isLocked ? (
-                  <div style={{ padding: '20px 40px', borderRadius: '16px', background: 'rgba(255,71,87,0.08)', border: '1px solid rgba(255,71,87,0.2)', color: '#ff4757', fontWeight: 700, fontSize: '15px', textAlign: 'center' }}>
+                  <div style={{ padding: '20px 40px', background: 'transparent', border: '1px solid var(--loss)', color: 'var(--loss)', fontWeight: 700, fontSize: '15px', textAlign: 'center' }}>
                     QUOTA EXCEEDED
-                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '8px', fontWeight: 400 }}>Next release in 14 days</div>
+                    <div style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '8px', fontWeight: 400 }}>Next release in 14 days</div>
                   </div>
                 ) : (
                   <>
@@ -307,12 +279,12 @@ export default function LandingCalculator({ onStartAssessment }) {
                       style={{ padding: '22px 48px', minWidth: '240px' }}
                       onClick={() => {
                         if (onStartAssessment) onStartAssessment(acc.size);
-                        navigate(buildTenantPath('/register'));
+                        navigate('/register');
                       }}
                     >
                       Start Challenge
                     </button>
-                    <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', textAlign: 'center', fontWeight: 500 }}>{landingCopy.calculatorFooter}</p>
+                    <p style={{ fontSize: '12px', color: 'var(--muted)', textAlign: 'center', fontWeight: 500 }}>{landingCopy.calculatorFooter}</p>
                   </>
                 )}
               </div>

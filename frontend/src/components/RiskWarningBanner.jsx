@@ -66,14 +66,14 @@ export default function RiskWarningBanner({ floating = false }) {
     }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1 }}>
-        <span style={{ fontSize: '12px', fontWeight: 700, flexShrink: 0, marginTop: '2px', color: '#7a7a7a' }}>WARNING</span>
+        <span style={{ fontSize: '12px', fontWeight: 700, flexShrink: 0, marginTop: '2px', color: 'var(--muted)' }}>WARNING</span>
         <p style={{
           color: 'var(--text-muted)',
           fontSize: '12px',
           lineHeight: '1.6',
           margin: 0
         }}>
-          <span style={{ color: '#7a7a7a', fontWeight: '600' }}>RISK WARNING: </span>
+          <span style={{ color: 'var(--muted)', fontWeight: '600' }}>RISK WARNING: </span>
           This is a simulated trader evaluation platform. All trading accounts are demo accounts -
           no real market orders are placed. Payouts to successful traders are funded from company
           capital, not from user deposits. Past performance in the evaluation environment does not

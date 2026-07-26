@@ -51,7 +51,7 @@ export default function Pagination({ page, totalPages, onPageChange, pageSize, t
       ? 'var(--accent)'
       : 'var(--bg-surface)',
     color: isActive
-      ? '#fff'
+      ? 'var(--paper)'
       : isDisabled
         ? 'var(--text-muted)'
         : 'var(--text-secondary)',

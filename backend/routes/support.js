@@ -35,7 +35,6 @@ function optionalUserAuth(req, _res, next) {
 router.post('/ticket', supportLimiter, optionalUserAuth, async function(req, res) {
   try {
     const userId = req.user?.userId
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
     const normalized = normalizeSupportTicketPayload(req.body, {
       email: req.user?.email,
       name: req.user?.full_name
@@ -46,9 +45,9 @@ router.post('/ticket', supportLimiter, optionalUserAuth, async function(req, res
     const { category, subject, message, email, name } = normalized.value
 
     await pool.query(
-      `INSERT INTO support_tickets (tenant_id, user_id, email, name, category, subject, message)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [tenantId, userId || null, email, name, category, subject, message]
+      `INSERT INTO support_tickets (user_id, email, name, category, subject, message)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [userId || null, email, name, category, subject, message]
     )
     res.status(201).json({ message: 'Support ticket submitted successfully' })
   } catch (error) {
@@ -59,14 +58,12 @@ router.post('/ticket', supportLimiter, optionalUserAuth, async function(req, res
 
 async function loadUserSupportTickets(req, res) {
   try {
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
     const result = await pool.query(
       `SELECT id, category, subject, message, status, created_at
        FROM support_tickets
        WHERE user_id = $1
-         AND tenant_id = $2
        ORDER BY created_at DESC`,
-      [req.user.userId, tenantId]
+      [req.user.userId]
     )
     res.json(result.rows)
   } catch (error) {
@@ -80,7 +77,6 @@ router.get('/my-tickets', authenticateToken, loadUserSupportTickets)
 
 router.get('/ticket/:id', authenticateToken, async function(req, res) {
   try {
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
     const ticketId = parseInt(req.params.id, 10)
     if (!Number.isFinite(ticketId)) {
       return res.status(400).json({ error: 'Invalid ticket id' })
@@ -89,8 +85,8 @@ router.get('/ticket/:id', authenticateToken, async function(req, res) {
     const ticketResult = await pool.query(
       `SELECT id, user_id, category, subject, message, status, created_at
        FROM support_tickets
-       WHERE id = $1 AND user_id = $2 AND tenant_id = $3`,
-      [ticketId, req.user.userId, tenantId]
+       WHERE id = $1 AND user_id = $2`,
+      [ticketId, req.user.userId]
     )
     if (ticketResult.rows.length === 0) {
       return res.status(404).json({ error: 'Ticket not found' })
@@ -99,9 +95,9 @@ router.get('/ticket/:id', authenticateToken, async function(req, res) {
     const messagesResult = await pool.query(
       `SELECT id, sender_type, sender_name, message, created_at
        FROM support_ticket_messages
-       WHERE ticket_id = $1 AND tenant_id = $2
+       WHERE ticket_id = $1
        ORDER BY created_at ASC, id ASC`,
-      [ticketId, tenantId]
+      [ticketId]
     )
 
     res.json({
@@ -116,7 +112,6 @@ router.get('/ticket/:id', authenticateToken, async function(req, res) {
 
 router.post('/ticket/:id/reply', authenticateToken, async function(req, res) {
   try {
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
     const ticketId = parseInt(req.params.id, 10)
     if (!Number.isFinite(ticketId)) {
       return res.status(400).json({ error: 'Invalid ticket id' })
@@ -131,8 +126,8 @@ router.post('/ticket/:id/reply', authenticateToken, async function(req, res) {
     const ticketResult = await pool.query(
       `SELECT id, status
        FROM support_tickets
-       WHERE id = $1 AND user_id = $2 AND tenant_id = $3`,
-      [ticketId, req.user.userId, tenantId]
+       WHERE id = $1 AND user_id = $2`,
+      [ticketId, req.user.userId]
     )
     if (ticketResult.rows.length === 0) {
       return res.status(404).json({ error: 'Ticket not found' })
@@ -142,10 +137,10 @@ router.post('/ticket/:id/reply', authenticateToken, async function(req, res) {
     }
 
     const replyResult = await pool.query(
-      `INSERT INTO support_ticket_messages (tenant_id, ticket_id, sender_type, sender_name, message)
-       VALUES ($1, $2, 'user', $3, $4)
+      `INSERT INTO support_ticket_messages (ticket_id, sender_type, sender_name, message)
+       VALUES ($1, 'user', $2, $3)
        RETURNING id, sender_type, sender_name, message, created_at`,
-      [tenantId, ticketId, 'You', message]
+      [ticketId, 'You', message]
     )
 
     res.status(201).json({
@@ -160,12 +155,9 @@ router.post('/ticket/:id/reply', authenticateToken, async function(req, res) {
 
 adminRouter.get('/support-tickets', authenticateAdmin, async function(req, res) {
   try {
-    const tenantId = req.admin?.tenantId || null
     const result = await pool.query(
       `SELECT * FROM support_tickets
-       WHERE ($1::bigint IS NULL OR tenant_id = $1)
-       ORDER BY created_at DESC`,
-      [tenantId]
+       ORDER BY created_at DESC`
     )
     res.json(result.rows)
   } catch (error) {
@@ -176,7 +168,6 @@ adminRouter.get('/support-tickets', authenticateAdmin, async function(req, res) 
 
 adminRouter.patch('/support-tickets/:id', authenticateAdmin, async function(req, res) {
   try {
-    const tenantId = req.admin?.tenantId || null
     const { status } = req.body
     if (!['open', 'resolved', 'closed'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' })
@@ -185,9 +176,8 @@ adminRouter.patch('/support-tickets/:id', authenticateAdmin, async function(req,
       `UPDATE support_tickets
           SET status = $1
         WHERE id = $2
-          AND ($3::bigint IS NULL OR tenant_id = $3)
         RETURNING *`,
-      [status, req.params.id, tenantId]
+      [status, req.params.id]
     )
     if (result.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' })
     res.json({ message: 'Ticket updated', ticket: result.rows[0] })

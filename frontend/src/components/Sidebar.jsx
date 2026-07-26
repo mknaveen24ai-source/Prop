@@ -6,6 +6,7 @@ import { renderIcon } from '../utils/iconMap'
 
 const NAV_ITEMS = [
   { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
+  { id: 'get-challenge', icon: 'target', label: 'New Challenge' },
   { id: 'rules', icon: 'journal', label: 'Rules' },
   { id: 'trade', icon: 'trade', label: 'Trade' },
   { id: 'analytics', icon: 'analytics', label: 'Analytics' },
@@ -68,7 +69,7 @@ export default function Sidebar({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#fff',
+              color: 'var(--paper)',
               fontSize: '18px',
               boxShadow: '0 4px 12px var(--accent-glow)',
             }}
@@ -116,7 +117,7 @@ export default function Sidebar({
               boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
               transition: 'background 0.15s, color 0.15s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = '#fff' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--paper)' }}
             onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-surface)'; e.currentTarget.style.color = 'var(--text-secondary)' }}
           >
             {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
@@ -268,7 +269,7 @@ export default function Sidebar({
               width: '32px', height: '32px', flexShrink: 0,
               borderRadius: '50%', background: 'var(--accent)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#fff', fontSize: '12px', fontWeight: 600,
+              color: 'var(--paper)', fontSize: '12px', fontWeight: 600,
             }}>
               TR
             </div>

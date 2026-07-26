@@ -29,17 +29,13 @@ export default function AdminTopBar({ onMobileMenuClick, onLogout, session }) {
 
   const roleLabel = session?.role === 'super_admin'
     ? 'Platform Owner'
-    : session?.role === 'tenant_admin'
-      ? 'Tenant Admin'
-      : 'Administrator'
-  const scopeLabel = session?.tenantId ? `Tenant #${session.tenantId}` : 'Global Scope'
+    : 'Administrator'
+  const scopeLabel = 'Global Scope'
   const authSourceLabel = session?.auth_source === 'platform_admin'
     ? 'DB Admin'
-    : session?.auth_source === 'tenant_admin'
-      ? 'Tenant Login'
-      : session?.auth_source === 'env_fallback'
-        ? 'Bootstrap'
-        : 'Unknown'
+    : session?.auth_source === 'env_fallback'
+      ? 'Bootstrap'
+      : 'Unknown'
   const initials = String(session?.full_name || session?.email || 'AD')
     .split(/\s+/)
     .filter(Boolean)
@@ -125,7 +121,7 @@ export default function AdminTopBar({ onMobileMenuClick, onLogout, session }) {
         </div>
 
         <div style={{ position: 'relative' }} ref={profileRef}>
-          <button className="admin-icon-btn" style={{ background: 'var(--admin-accent)', color: '#fff', border: 'none' }} onClick={() => setShowProfile((visible) => !visible)}>
+          <button className="admin-icon-btn" style={{ background: 'var(--admin-accent)', color: 'var(--paper)', border: 'none' }} onClick={() => setShowProfile((visible) => !visible)}>
             {initials}
           </button>
 

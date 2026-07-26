@@ -35,12 +35,22 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          adminCharts: ['recharts'],
-          tradingCharts: ['lightweight-charts'],
-          motion: ['framer-motion'],
-          store: ['zustand'],
+        manualChunks(id) {
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router-dom')) {
+            return 'vendor';
+          }
+          if (id.includes('node_modules/recharts')) {
+            return 'adminCharts';
+          }
+          if (id.includes('node_modules/lightweight-charts')) {
+            return 'tradingCharts';
+          }
+          if (id.includes('node_modules/framer-motion')) {
+            return 'motion';
+          }
+          if (id.includes('node_modules/zustand')) {
+            return 'store';
+          }
         }
       }
     }

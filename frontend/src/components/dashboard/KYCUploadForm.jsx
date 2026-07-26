@@ -129,7 +129,7 @@ function WebcamCapture({ onCapture, onCancel }) {
         </div>
 
         {error ? (
-          <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '8px', padding: '16px', color: '#ef4444', fontSize: '14px', lineHeight: 1.6 }}>
+          <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '8px', padding: '16px', color: 'var(--loss)', fontSize: '14px', lineHeight: 1.6 }}>
             {error}
           </div>
         ) : (
@@ -147,8 +147,8 @@ function WebcamCapture({ onCapture, onCancel }) {
                 <img src={captured} alt="Captured live selfie" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               )}
               {!ready && !captured && (
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#888', gap: '12px' }}>
-                  <div style={{ width: '32px', height: '32px', border: '3px solid rgba(41,98,255,0.4)', borderTopColor: '#2962ff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', gap: '12px' }}>
+                  <div style={{ width: '32px', height: '32px', border: '3px solid var(--rule)', borderTopColor: 'var(--ink)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                   <span style={{ fontSize: '13px' }}>Starting camera...</span>
                 </div>
               )}
@@ -161,7 +161,7 @@ function WebcamCapture({ onCapture, onCancel }) {
             <div style={{ display: 'flex', gap: '12px' }}>
               {!captured ? (
                 <>
-                  <button type="button" onClick={takeSnapshot} disabled={!ready} style={{ flex: 1, padding: '14px', borderRadius: '10px', fontSize: '15px', fontWeight: 700, cursor: ready ? 'pointer' : 'not-allowed', background: ready ? 'linear-gradient(135deg, #2962ff, #1e4bd8)' : '#333', border: 'none', color: '#fff', opacity: ready ? 1 : 0.5 }}>
+                  <button type="button" onClick={takeSnapshot} disabled={!ready} style={{ flex: 1, padding: '14px', fontSize: '15px', fontWeight: 700, cursor: ready ? 'pointer' : 'not-allowed', background: ready ? 'var(--ink)' : 'var(--rule)', border: 'none', color: 'var(--paper)', opacity: ready ? 1 : 0.5 }}>
                     Capture Photo
                   </button>
                   <button type="button" onClick={handleCancel} style={{ padding: '14px 20px', borderRadius: '10px', background: 'transparent', border: '1px solid var(--navy-border, rgba(255,255,255,0.1))', color: 'var(--text-muted, #888)', cursor: 'pointer', fontSize: '14px' }}>
@@ -170,7 +170,7 @@ function WebcamCapture({ onCapture, onCancel }) {
                 </>
               ) : (
                 <>
-                  <button type="button" onClick={usePhoto} style={{ flex: 1, padding: '14px', borderRadius: '10px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', background: 'linear-gradient(135deg, #00c896, #00a07a)', border: 'none', color: '#fff' }}>
+                  <button type="button" onClick={usePhoto} style={{ flex: 1, padding: '14px', borderRadius: '10px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', background: 'linear-gradient(135deg, var(--gain), var(--gain))', border: 'none', color: 'var(--paper)' }}>
                     Use This Photo
                   </button>
                   <button type="button" onClick={() => setCaptured(null)} style={{ padding: '14px 20px', borderRadius: '10px', background: 'transparent', border: '1px solid var(--navy-border, rgba(255,255,255,0.1))', color: 'var(--text-muted, #888)', cursor: 'pointer', fontSize: '14px' }}>
@@ -460,7 +460,7 @@ export default function KYCUploadForm({
               <button
                 type="button"
                 onClick={() => setShowCamera(true)}
-                style={{ marginTop: '8px', width: '100%', padding: '10px', borderRadius: '8px', background: 'rgba(41,98,255,0.08)', border: '1px solid rgba(41,98,255,0.3)', color: 'var(--accent)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'background 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                style={{ marginTop: '8px', width: '100%', padding: '10px', background: 'transparent', border: '1px solid var(--rule)', color: 'var(--accent)', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'border-color 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
               >
                 Use Live Camera Instead
               </button>

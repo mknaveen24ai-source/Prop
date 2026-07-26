@@ -80,13 +80,15 @@ export default function AdminEmailJobs() {
     }
   };
 
-  const fetchJobs = async ({ silent = false } = {}) => {
+  // FIX (AUDIT): stale-closure race — see AdminUsers.jsx for full explanation.
+  const fetchJobs = async ({ silent = false, pageOverride } = {}) => {
+    const effectivePage = pageOverride ?? page;
     if (!silent) setLoading(true);
     try {
       const res = await adminAxios.get('/api/admin/email-jobs', {
         params: {
           format: 'list',
-          page,
+          page: effectivePage,
           page_size: 25,
           search,
           sort: sort.key,
@@ -113,7 +115,7 @@ export default function AdminEmailJobs() {
   useEffect(() => {
     const timeout = setTimeout(() => {
       setPage(1);
-      fetchJobs({ silent: true });
+      fetchJobs({ silent: true, pageOverride: 1 });
     }, 150);
     return () => clearTimeout(timeout);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -247,9 +249,6 @@ export default function AdminEmailJobs() {
         <div>
           <div style={{ color: 'var(--admin-text)' }}>{job.full_name_hint || job.to_email}</div>
           <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>{job.to_email}</div>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>
-            Tenant {job.tenant_id || 'global'}
-          </div>
         </div>
       )
     },
@@ -450,7 +449,6 @@ export default function AdminEmailJobs() {
                 <div><span>Scheduled</span><strong>{formatDateTime(drawerRow.scheduled_for)}</strong></div>
                 <div><span>Last Attempt</span><strong>{formatDateTime(drawerRow.last_attempt_at)}</strong></div>
                 <div><span>Sent</span><strong>{formatDateTime(drawerRow.sent_at)}</strong></div>
-                <div><span>Tenant Scope</span><strong>{drawerRow.tenant_id || 'global'}</strong></div>
               </div>
 
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '18px' }}>

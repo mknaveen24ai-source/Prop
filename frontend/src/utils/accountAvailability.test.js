@@ -10,19 +10,19 @@ describe('account availability helpers', () => {
 
   it('normalizes sparse API data into a canonical row shape', () => {
     const rows = normalizeAvailabilityRows([
-      { size: 1000, quota: 50, used: 12, remaining: 38, locked: false }
+      { size: 5000, quota: 50, used: 12, remaining: 38, locked: false }
     ])
 
-    const oneK = rows.find((row) => row.size === 1000)
-    const twoK = rows.find((row) => row.size === 2000)
+    const fiveK = rows.find((row) => row.size === 5000)
+    const tenK = rows.find((row) => row.size === 10000)
 
-    expect(oneK).toMatchObject({
-      size: 1000,
+    expect(fiveK).toMatchObject({
+      size: 5000,
       quota: 50,
       used: 12,
       remaining: 38,
       locked: false
     })
-    expect(twoK.locked).toBe(true)
+    expect(tenK.locked).toBe(true)
   })
 })

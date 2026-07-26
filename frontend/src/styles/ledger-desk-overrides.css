@@ -1,0 +1,138 @@
+/* ── The Ledger Desk: global structural enforcement ───────────────────────────
+   The spec is explicit and total: flat corners, no shadows, no glass blur,
+   no gradients, ANYWHERE. Rather than hand-edit every legacy gradient/shadow
+   declaration across App.css and the mode stylesheets, this file wins the
+   cascade (loaded last) and enforces the rule universally. Verified safe:
+   no component in this codebase uses background-image for real image
+   content (only decorative gradients), so resetting it globally has no
+   functional side effects.
+──────────────────────────────────────────────────────────────────────────── */
+
+*, *::before, *::after {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  text-shadow: none !important;
+  background-image: none !important;
+}
+
+/* ── Masthead: heavy double rule, like a printed statement header ── */
+.navbar, .mp-nav, nav {
+  border-bottom: 3px double var(--ink) !important;
+}
+
+/* ── Section labels: tracked uppercase + a hairline rule filling the row ── */
+.mp-badge {
+  border: none !important;
+  background: transparent !important;
+  color: var(--muted) !important;
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.1em;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.mp-badge::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--rule);
+  min-width: 24px;
+}
+
+/* ── Roman numerals for ordered list entries, not bullets ── */
+.ledger-list {
+  list-style: none;
+  counter-reset: ledger-item;
+  padding: 0;
+}
+.ledger-list > li {
+  counter-increment: ledger-item;
+  position: relative;
+  padding-left: 2.2em;
+  margin-bottom: 0.6em;
+}
+.ledger-list > li::before {
+  content: counter(ledger-item, upper-roman) '.';
+  position: absolute;
+  left: 0;
+  font-family: var(--font-mono);
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* ── Broadsheet column divider ── */
+.ledger-columns {
+  display: grid;
+  gap: 0;
+}
+.ledger-columns > * + * {
+  border-left: 1px solid var(--rule);
+  padding-left: 24px;
+  margin-left: 24px;
+}
+.mp-badge-dot { display: none !important; }
+
+/* ── Stat rows: hairline top/bottom, hairline dividers between siblings, no fill ── */
+.card-stat, .admin-stat-card, .stat-tile {
+  background: transparent !important;
+  border: 1px solid var(--rule) !important;
+}
+
+/* ── Tables: heavy header rule, thin row rule, no striping ── */
+table { border-collapse: collapse; width: 100%; }
+th {
+  border-bottom: 2px solid var(--ink) !important;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 11px;
+  color: var(--muted);
+  padding: 10px 12px;
+}
+td {
+  border-bottom: 1px solid var(--rule) !important;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+}
+tr:nth-child(even) td { background: transparent !important; }
+
+/* ── Buttons: flat ink-filled blocks, inverted per theme, no gradient/glow ── */
+.btn-primary, .btn-accent, .btn-admin {
+  background: var(--accent) !important;
+  color: var(--paper) !important;
+  border: 1px solid var(--accent) !important;
+}
+.btn-primary:hover:not(:disabled),
+.btn-accent:hover:not(:disabled),
+.btn-admin:hover:not(:disabled) {
+  background: var(--accent-hover) !important;
+  border-color: var(--accent-hover) !important;
+  transform: none !important;
+  filter: none !important;
+}
+.btn-secondary, .btn-ghost {
+  background: transparent !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--rule) !important;
+}
+.btn-danger { background: var(--loss) !important; color: var(--paper) !important; }
+
+/* ── Numeric alignment wherever digits line up in columns ── */
+.mono, [class*="stat-value"], [class*="card-value"], .card-stat-value {
+  font-family: var(--font-mono) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

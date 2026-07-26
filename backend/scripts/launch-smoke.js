@@ -3,11 +3,9 @@ require('../loadEnv')
 const axios = require('axios')
 
 const BASE_URL = String(process.env.SMOKE_BASE_URL || 'http://127.0.0.1:5000').replace(/\/+$/, '')
-const TENANT_SLUG = String(process.env.SMOKE_TENANT_SLUG || '').trim()
 
 function buildHeaders(extra = {}, cookie = '') {
   const headers = { ...extra }
-  if (TENANT_SLUG) headers['X-Tenant-Slug'] = TENANT_SLUG
   if (cookie) headers.Cookie = cookie
   return headers
 }
@@ -76,22 +74,6 @@ async function loginTrader() {
   return cookie
 }
 
-async function loginAdmin() {
-  const email = String(process.env.SMOKE_TENANT_ADMIN_EMAIL || '').trim()
-  const password = String(process.env.SMOKE_TENANT_ADMIN_PASSWORD || '').trim()
-  if (!email || !password) {
-    throw new Error('SMOKE_TENANT_ADMIN_EMAIL and SMOKE_TENANT_ADMIN_PASSWORD are not configured')
-  }
-
-  const response = await postJson('/api/admin/login', { email, password }, {
-    headers: buildHeaders({ 'Content-Type': 'application/json' })
-  })
-  assertStatus(response, [200], 'Tenant admin login')
-  const cookie = extractCookie(response, 'admin_token') || `admin_token=${response.data?.token || ''}`
-  if (!cookie.includes('admin_token=')) throw new Error('Tenant admin login did not return admin auth token')
-  return cookie
-}
-
 async function loginSuperAdmin() {
   const email = String(process.env.SMOKE_SUPER_ADMIN_EMAIL || '').trim()
   const password = String(process.env.SMOKE_SUPER_ADMIN_PASSWORD || '').trim()
@@ -128,15 +110,6 @@ async function main() {
     return `status=${response.data.status || (response.data.healthy ? 'healthy' : 'unhealthy')}`
   })
 
-  await step('GET /api/tenant/config', async () => {
-    const response = await getJson('/api/tenant/config', { headers: buildHeaders() })
-    assertStatus(response, [200], 'Tenant config')
-    if (!response.data?.tenant) {
-      throw new Error('Tenant config did not include tenant payload')
-    }
-    return `tenant=${response.data.tenant.slug || 'default'}`
-  })
-
   let traderCookie = ''
   await step('Trader login + /api/auth/me', async () => {
     traderCookie = await loginTrader()
@@ -147,16 +120,17 @@ async function main() {
     return `user=${response.data?.email || 'ok'}`
   }, { optional: true })
 
-  await step('Trader free/paid challenge order creation', async () => {
+  await step('Trader paid challenge order creation', async () => {
     if (!traderCookie) {
       throw new Error('Trader login step did not run')
     }
     const accountSize = parseInt(process.env.SMOKE_ACCOUNT_SIZE || '10000', 10)
-    const response = await postJson('/api/accounts/orders', { account_size: accountSize }, {
+    const stepModel = process.env.SMOKE_STEP_MODEL || '2-step'
+    const response = await postJson('/api/accounts/orders', { account_size: accountSize, step_model: stepModel }, {
       headers: buildHeaders({ 'Content-Type': 'application/json' }, traderCookie)
     })
     assertStatus(response, [201], 'Challenge order creation')
-    return `checkout_mode=${response.data?.checkout_mode || 'unknown'}`
+    return `requires_payment=${response.data?.requires_payment ?? 'unknown'}`
   }, { optional: true })
 
   await step('Trader trade open/close', async () => {
@@ -208,26 +182,13 @@ async function main() {
     return 'payout_requested'
   }, { optional: true })
 
-  let tenantAdminCookie = ''
-  await step('Tenant admin login + subscription view', async () => {
-    tenantAdminCookie = await loginAdmin()
-    const response = await getJson('/api/billing/tenant/subscription', {
-      headers: buildHeaders({}, tenantAdminCookie)
-    })
-    assertStatus(response, [200], 'Tenant subscription view')
-    return `status=${response.data?.status || 'none'}`
-  }, { optional: true })
-
-  await step('Super admin login + tenant list', async () => {
+  await step('Super admin login + /api/admin/session', async () => {
     const superAdminCookie = await loginSuperAdmin()
-    const response = await getJson('/api/admin/tenants', {
+    const response = await getJson('/api/admin/session', {
       headers: buildHeaders({}, superAdminCookie)
     })
-    assertStatus(response, [200], 'Super admin tenant list')
-    if (!Array.isArray(response.data)) {
-      throw new Error('Tenant list payload is not an array')
-    }
-    return `tenants=${response.data.length}`
+    assertStatus(response, [200], 'Super admin session')
+    return `authenticated=${response.data?.authenticated ?? 'unknown'}`
   }, { optional: true })
 
   const failures = results.filter((entry) => entry.ok === false)

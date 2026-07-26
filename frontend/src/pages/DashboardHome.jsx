@@ -1,12 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import CountUp from 'react-countup'
-import { useBranding } from '../BrandingContext'
 import { PageWrapper } from '../App'
 import useStore from '../store/useStore'
 import { renderIcon } from '../utils/iconMap'
-import { accountsAPI } from '../services/api'
-import { buildUnavailableAvailabilityRows, normalizeAvailabilityRows } from '../utils/accountAvailability'
 import { filterVisibleTraderAccounts, isTraderAccountVisible } from '../utils/accountVisibility'
 import {
   calculateEquity,
@@ -104,14 +101,13 @@ export default function DashboardHome({
   accounts: propAccounts,
   selectedAccount: propSelectedAccount,
   setSelectedAccount: propSetSelectedAccount,
-  onCreateAccount,
   getStatusColor,
   profitSharePct = 80,
   quotaFull = false,
   quotaNextOpen = null,
-  onOpenRulesPage
+  onOpenRulesPage,
+  onStartChallenge
 }) {
-  const { tenant } = useBranding()
   const {
     prices,
     openPositions,
@@ -120,12 +116,8 @@ export default function DashboardHome({
     allAccounts,
     setActiveAccount,
   } = useStore()
-  const [availableSizes, setAvailableSizes] = useState([])
-  const [sizesLoading, setSizesLoading] = useState(true)
-  const [creatingSize, setCreatingSize] = useState(null)
   const [quotaTimeLeft, setQuotaTimeLeft] = useState(null)
   const [nowTick, setNowTick] = useState(Date.now())
-  const [kycNotice, setKycNotice] = useState('')
 
   const rawAccounts = allAccounts.length > 0 ? allAccounts : (propAccounts || [])
   const accounts = useMemo(() => filterVisibleTraderAccounts(rawAccounts, nowTick), [rawAccounts, nowTick])
@@ -147,10 +139,8 @@ export default function DashboardHome({
     setSelectedAccount(accounts[0] || null)
   }, [accounts, nowTick, selectedAccountCandidate, setSelectedAccount])
 
-  const requiresPayment = tenant?.settings?.requires_payment === 'true'
-  const kycBlocked = String(user?.kyc_status || '').toLowerCase() !== 'approved'
   const activeChallengeCount = accounts.filter(
-    account => account.status === 'active' && ['phase1', 'phase2', 'funded'].includes(account.account_type)
+    account => account.status === 'active' && ['phase1', 'phase2', 'phase3', 'funded'].includes(account.account_type)
   ).length
   const hasFailedOrExpired = accounts.some(account => ['failed', 'expired'].includes(account.status))
   const isFunded = selectedAccount?.account_type === 'funded'
@@ -158,30 +148,10 @@ export default function DashboardHome({
     ? 'Start a New Challenge'
     : activeChallengeCount > 0
       ? 'Start Another Challenge'
-      : requiresPayment
-        ? 'Start Your Challenge'
-        : 'Start Your Free Challenge'
+      : 'Start Your Challenge'
   const challengeAvailabilityMessage = activeChallengeCount > 0
     ? `You currently have ${activeChallengeCount} active account${activeChallengeCount === 1 ? '' : 's'}. New accounts are controlled by the monthly allocation for each account size.`
-    : (requiresPayment
-        ? 'Select an account size to begin a fresh challenge. Checkout will appear automatically if this tenant requires payment.'
-        : 'Select an account size to begin a fresh Phase 1 challenge. Each size resets its allocation at the start of each month.')
-
-  const fetchSizes = useCallback(async () => {
-    setSizesLoading(true)
-    try {
-      const response = await accountsAPI.getAvailableSizes()
-      setAvailableSizes(normalizeAvailabilityRows(response.data))
-    } catch {
-      setAvailableSizes(buildUnavailableAvailabilityRows())
-    } finally {
-      setSizesLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchSizes()
-  }, [fetchSizes])
+    : 'Pick a 1-step, 2-step, or 3-step challenge and an account size to get started.'
 
   useEffect(() => {
     if (!quotaFull || !quotaNextOpen) {
@@ -213,22 +183,6 @@ export default function DashboardHome({
     const iv = setInterval(() => setNowTick(Date.now()), 1000)
     return () => clearInterval(iv)
   }, [])
-
-  async function handleCreateAccount(size) {
-    if (creatingSize) return
-    if (kycBlocked) {
-      setKycNotice('Complete KYC verification first before starting a challenge.')
-      return
-    }
-    setKycNotice('')
-    setCreatingSize(size)
-    try {
-      await onCreateAccount(size)
-      fetchSizes()
-    } finally {
-      setCreatingSize(null)
-    }
-  }
 
   const daysRemainingDisplay = isFunded
     ? '∞'
@@ -339,7 +293,7 @@ export default function DashboardHome({
                 onClick={() => setSelectedAccount(account)}
                 style={{
                   background: isSelected ? 'var(--accent)' : 'var(--bg-elevated)',
-                  color: isSelected ? '#fff' : 'var(--text-primary)',
+                  color: isSelected ? 'var(--paper)' : 'var(--text-primary)',
                   border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
                   padding: '16px 20px',
                   borderRadius: '16px',
@@ -364,7 +318,7 @@ export default function DashboardHome({
                   fontSize: '10px',
                   fontWeight: 800,
                   letterSpacing: '0.1em',
-                  color: isSelected ? '#fff' : getStatusColor(account.status),
+                  color: isSelected ? 'var(--paper)' : getStatusColor(account.status),
                   background: isSelected ? 'rgba(255,255,255,0.18)' : 'var(--bg-hover)',
                   padding: '4px 8px',
                   borderRadius: '6px'
@@ -382,7 +336,7 @@ export default function DashboardHome({
           <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
             <h3 style={{ color: 'var(--red)', marginBottom: '8px' }}>Account Creation Closed</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '18px' }}>
-              The monthly tenant account allocation has been reached. New account creation reopens when the month resets.
+              The monthly account allocation has been reached. New account creation reopens when the month resets.
             </p>
             {quotaTimeLeft && !quotaTimeLeft.expired && (
               <>
@@ -414,55 +368,17 @@ export default function DashboardHome({
           <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>
             {challengeAvailabilityMessage}
           </p>
-          {kycNotice && (
-            <div style={{ padding: '12px 14px', borderRadius: '12px', marginBottom: '16px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.35)', color: '#f59e0b', fontSize: '13px', fontWeight: 700 }}>
-              {kycNotice}
-            </div>
-          )}
-
-          {sizesLoading ? (
-            <div style={{ color: 'var(--text-muted)', fontSize: '14px', padding: '20px 0' }}>Loading available sizes...</div>
-          ) : (
-            <div className="grid-6">
-              {availableSizes.map(({ size, locked, remaining, quota, reason, is_unlimited: isUnlimited }) => {
-                const isCreating = creatingSize === size
-                const usedPct = quota && remaining != null ? Math.min(((quota - remaining) / quota) * 100, 100) : 0
-                return (
-                  <div
-                    key={size}
-                    className="card-stat card-hover"
-                    onClick={() => !locked && !isCreating && handleCreateAccount(size)}
-                    style={{
-                      cursor: locked ? 'not-allowed' : isCreating ? 'wait' : 'pointer',
-                      opacity: locked ? 0.45 : 1,
-                      border: locked ? '1px solid #8a8a8a' : undefined
-                    }}
-                  >
-                    {locked && (
-                      <div className="badge badge-neutral" style={{ position: 'absolute', top: '6px', right: '6px' }}>
-                        FULL
-                      </div>
-                    )}
-                    <div className="card-stat-value" style={{ color: 'var(--accent)' }}>${size.toLocaleString('en-US')}</div>
-                    <div className="card-stat-title" style={{ marginTop: '4px', color: locked ? '#8a8a8a' : 'var(--text-muted)' }}>
-                      {locked
-                        ? (reason || 'No slots left')
-                        : isCreating
-                          ? 'Creating...'
-                          : isUnlimited || remaining === null
-                            ? 'Unlimited slots'
-                            : `${remaining} slot${remaining !== 1 ? 's' : ''} left`}
-                    </div>
-                    {!locked && !isUnlimited && quota !== null && remaining !== null && (
-                      <div className="progress-bar" style={{ marginTop: '8px' }}>
-                        <div className="progress-fill" style={{ width: `${usedPct}%` }} />
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
+          <button
+            className="btn btn-primary"
+            onClick={() => (typeof onStartChallenge === 'function') && onStartChallenge()}
+            style={{ padding: '12px 28px' }}
+          >
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              {renderIcon('target', { size: 16, color: 'currentColor' })}
+              <span>Choose a Challenge</span>
+              {renderIcon('arrow', { size: 14, color: 'currentColor' })}
+            </span>
+          </button>
         </div>
       )}
 
@@ -488,7 +404,7 @@ export default function DashboardHome({
                   style={{
                     marginBottom: '24px',
                     border: `1px solid ${warningTone}`,
-                    background: 'rgba(17, 24, 39, 0.72)'
+                    background: 'var(--paper-2)'
                   }}
                 >
                   <h3 style={{ color: warningTone, marginBottom: '8px' }}>Drawdown Warning</h3>
@@ -611,8 +527,8 @@ export default function DashboardHome({
       )}
 
       {selectedAccount?.status === 'locked' && (
-        <div className="card" style={{ textAlign: 'center', padding: '32px', border: '1px solid #8a8a8a', marginTop: '20px' }}>
-          <h3 style={{ color: '#8a8a8a', marginBottom: '8px' }}>Account Locked</h3>
+        <div className="card" style={{ textAlign: 'center', padding: '32px', border: '1px solid var(--rule)', marginTop: '20px' }}>
+          <h3 style={{ color: 'var(--muted)', marginBottom: '8px' }}>Account Locked</h3>
           <p style={{ color: 'var(--text-muted)' }}>This account has been locked by admin. Contact support for assistance.</p>
         </div>
       )}

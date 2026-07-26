@@ -1,12 +1,10 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
-import RiskWarningBanner from '../components/RiskWarningBanner';
 import { useTheme } from '../ThemeContext';
 import { trackEvent } from '../utils/analytics';
 import { useBranding } from '../BrandingContext';
-import { buildTenantPath } from '../utils/tenant';
-import { getChallengeFeeDisplay, isPaidTenant } from '../utils/tenantMarketing';
+import { getChallengeFeeDisplay } from '../utils/tenantMarketing';
 
 // Import Masterpiece sections
 import { MASTERPIECE_CSS } from './landing-sections/LandingStyles';
@@ -50,14 +48,9 @@ function upsertMetaTag({ name, property, content, id }) {
 export default function Landing() {
   const { tenant } = useBranding();
   const { theme } = useTheme();
-  const requiresPayment = isPaidTenant(tenant);
-  const challengeFeeDisplay = getChallengeFeeDisplay(tenant);
-  const defaultTitle = requiresPayment
-    ? `${tenant?.name || 'PropFirm'} | Prop Trading Challenges`
-    : `${tenant?.name || 'PropFirm'} | Free Funded Trading Accounts`;
-  const defaultDescription = requiresPayment
-    ? 'Start a prop trading challenge with transparent rules, clear progression, and white-label infrastructure.'
-    : 'Get a free funded trading account. Pass a transparent 2-phase evaluation and trade institutional capital.';
+  const challengeFeeDisplay = getChallengeFeeDisplay();
+  const defaultTitle = `${tenant?.name || 'PropFirm'} | Prop Trading Challenges`;
+  const defaultDescription = 'Start a prop trading challenge with transparent rules, clear progression, and white-label infrastructure.';
   const [scrolled, setScrolled] = useState(false);
   const [showStickyCta, setShowStickyCta] = useState(false);
 
@@ -215,7 +208,7 @@ export default function Landing() {
   }, [defaultDescription, defaultTitle, tenant]);
 
   const sectionFallback = (
-    <div className="mp-container ui-surface ui-empty-state" style={{ padding: '48px 24px', color: 'rgba(255,255,255,0.45)' }}>
+    <div className="mp-container ui-surface ui-empty-state" style={{ padding: '48px 24px', color: 'var(--muted)' }}>
       Loading section...
     </div>
   );
@@ -223,40 +216,11 @@ export default function Landing() {
   return (
     <>
       <div className={`mode-public ui-shell masterpiece-landing${showStickyCta ? ' has-sticky-cta' : ''}`} data-theme={theme}>
-        {/* Liquid / Noise Filter Definitions */}
-        <svg style={{ position: 'absolute', width: 0, height: 0, pointerEvents: 'none' }}>
-          <defs>
-            <filter id="mp-liquid">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="40" result="blur" />
-              <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -11" result="mp-liquid" />
-              <feComposite in="SourceGraphic" in2="mp-liquid" operator="atop" />
-            </filter>
-            <filter id="mp-noise">
-              <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch" />
-              <feColorMatrix type="saturate" values="0" />
-              <feComponentTransfer>
-                <feFuncR type="linear" slope="0.05" />
-                <feFuncG type="linear" slope="0.05" />
-                <feFuncB type="linear" slope="0.05" />
-              </feComponentTransfer>
-            </filter>
-          </defs>
-        </svg>
 
-        {/* Background System */}
-        <div className="mp-bg-system">
-          <div className="mp-bg-noise"></div>
-          <div className="mp-bg-orb-1"></div>
-          <div className="mp-bg-orb-2"></div>
-          <div className="mp-bg-grid"></div>
-        </div>
-
-      <RiskWarningBanner floating />
-      
       {/* Glass Navbar */}
       <nav className={`nav-transparent ${scrolled ? 'scrolled' : ''}`}>
         <div className="mp-nav-brand" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-          <span style={{ fontFamily: 'var(--font-ui)', fontSize: '20px', fontWeight: 800, letterSpacing: '0.08em', color: '#fff' }}>
+          <span style={{ fontFamily: 'var(--font-ui)', fontSize: '20px', fontWeight: 800, letterSpacing: '0.08em', color: 'var(--ink)' }}>
             {String(tenant?.logo_text || tenant?.brand?.short_name || tenant?.name || 'PROPFIRM').toUpperCase()}
           </span>
         </div>
@@ -293,10 +257,10 @@ export default function Landing() {
             {/* Right Actions */}
             <div className="mp-nav-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <ThemeToggle />
-              <Link to={buildTenantPath('/login')} className="btn btn-ghost mp-nav-login" style={{ textDecoration: 'none' }}>
+              <Link to={'/login'} className="btn btn-ghost mp-nav-login" style={{ textDecoration: 'none' }}>
                 Log In
               </Link>
-              <Link to={buildTenantPath('/register')} className="btn btn-primary mp-nav-primary" style={{ textDecoration: 'none' }}
+              <Link to={'/register'} className="btn btn-primary mp-nav-primary" style={{ textDecoration: 'none' }}
                 onClick={() => trackEvent('landing_cta_click', { placement: 'nav', action: 'register' })}>
                 Get Funded
               </Link>
@@ -347,11 +311,11 @@ export default function Landing() {
         <div className="mp-sticky-cta">
           <div className="mp-sticky-cta-inner">
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '14px', color: '#fff' }}>
-                {requiresPayment ? 'Start Your Trading Challenge Today' : 'Start Your Free Evaluation Today'}
+              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '14px', color: 'var(--ink)' }}>
+                Start Your Trading Challenge Today
               </span>
-              <span style={{ color: 'rgba(255,255,255,0.58)', fontSize: '12px' }}>
-                {requiresPayment ? `Live quota-controlled access from ${challengeFeeDisplay}.` : 'Limited monthly spots. No card required.'}
+              <span style={{ color: 'var(--muted)', fontSize: '12px' }}>
+                {`Live quota-controlled access from ${challengeFeeDisplay}.`}
               </span>
             </div>
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
@@ -367,7 +331,7 @@ export default function Landing() {
                 View Rules
               </button>
               <Link
-                to={buildTenantPath('/register')}
+                to={'/register'}
                 className="mp-btn-primary"
                 style={{ padding: '10px 18px', fontSize: '13px', textDecoration: 'none' }}
                 onClick={() => trackEvent('landing_cta_click', { placement: 'sticky', action: 'register' })}

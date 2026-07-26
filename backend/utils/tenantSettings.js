@@ -1,6 +1,5 @@
 const pool = require('../db')
 const logger = require('./logger')
-const { runWithSystemDbContext } = require('./dbContext')
 
 const DEFAULT_TENANT_SETTINGS = {
   phase1_profit_target_pct: '10',
@@ -21,11 +20,6 @@ const DEFAULT_TENANT_SETTINGS = {
   inactivity_auto_fail_enabled: 'true',
   inactivity_fail_days: '30',
   weekend_holding_enabled: 'true',
-  requires_payment: 'false',
-  challenge_checkout_mode: 'free',
-  challenge_fee_amount: '0',
-  challenge_fee_currency: 'USD',
-  challenge_fee_label: 'FREE',
   shared_price_feed_enabled: 'true',
   use_shared_feed_only: 'true',
   spread_markup_points_json: '{}',
@@ -36,24 +30,14 @@ const DEFAULT_TENANT_SETTINGS = {
   payment_provider_webhook_secret: '',
   payment_provider_account_id: '',
   billing_email: '',
-  subscription_plan_code: 'starter',
-  subscription_seats: '1',
-  revenue_share_enabled: 'false',
-  revenue_share_pct: '0',
-  support_mode: 'tenant',
-  marketing_mode: 'free',
-  quota_1000: '999999',
-  quota_2000: '999999',
-  quota_2500: '999999',
   quota_5000: '999999',
   quota_10000: '999999',
   quota_25000: '999999',
   quota_50000: '999999',
-  quota_100000: '999999',
-  quota_200000: '999999'
+  quota_100000: '999999'
 }
 
-let tenantSettingsInfrastructurePromise = null
+let challengeCommerceInfrastructurePromise = null
 
 function normalizeSettingValue(value) {
   if (value === undefined || value === null) return ''
@@ -61,69 +45,36 @@ function normalizeSettingValue(value) {
   return String(value)
 }
 
+// Creates the challenge purchase tables (checkout/orders/payments). These are
+// part of the trader-facing challenge product, not the removed multi-tenant
+// SaaS billing layer.
 async function ensureTenantSettingsInfrastructure() {
-  if (tenantSettingsInfrastructurePromise) return tenantSettingsInfrastructurePromise
+  if (challengeCommerceInfrastructurePromise) return challengeCommerceInfrastructurePromise
 
-  tenantSettingsInfrastructurePromise = runWithSystemDbContext(async () => {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS tenant_settings (
-        id BIGSERIAL PRIMARY KEY,
-        tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-        key TEXT NOT NULL,
-        value TEXT NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        UNIQUE (tenant_id, key)
-      )
-    `)
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tenant_settings_tenant_key ON tenant_settings(tenant_id, key)`)
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS tenant_admins (
-        id BIGSERIAL PRIMARY KEY,
-        tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-        email TEXT NOT NULL,
-        password_hash TEXT NOT NULL,
-        full_name TEXT,
-        role TEXT NOT NULL DEFAULT 'tenant_admin',
-        status TEXT NOT NULL DEFAULT 'active',
-        token_version INTEGER NOT NULL DEFAULT 1,
-        totp_secret TEXT,
-        totp_enabled BOOLEAN NOT NULL DEFAULT FALSE,
-        last_login_at TIMESTAMPTZ,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        UNIQUE (tenant_id, email)
-      )
-    `)
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tenant_admins_tenant_status ON tenant_admins(tenant_id, status)`)
-
+  challengeCommerceInfrastructurePromise = (async () => {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS challenge_products (
         id BIGSERIAL PRIMARY KEY,
-        tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-        account_size NUMERIC(12,2) NOT NULL,
+        account_size NUMERIC(12,2) NOT NULL UNIQUE,
         display_name TEXT,
         challenge_fee_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
         currency TEXT NOT NULL DEFAULT 'USD',
         is_active BOOLEAN NOT NULL DEFAULT TRUE,
         metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        UNIQUE (tenant_id, account_size)
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `)
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS challenge_orders (
         id BIGSERIAL PRIMARY KEY,
-        tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
         user_id TEXT NOT NULL,
         account_size NUMERIC(12,2) NOT NULL,
         amount NUMERIC(12,2) NOT NULL DEFAULT 0,
         currency TEXT NOT NULL DEFAULT 'USD',
         status TEXT NOT NULL DEFAULT 'pending',
-        checkout_mode TEXT NOT NULL DEFAULT 'free',
+        checkout_mode TEXT NOT NULL DEFAULT 'paid',
         payment_provider TEXT,
         paid_via TEXT,
         provider_reference TEXT,
@@ -164,18 +115,15 @@ async function ensureTenantSettingsInfrastructure() {
       END$$;
     `).catch(() => {})
 
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_challenge_orders_tenant_user_status ON challenge_orders(tenant_id, user_id, status, created_at DESC)`)
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_challenge_orders_user_status ON challenge_orders(user_id, status, created_at DESC)`)
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS challenge_payments (
         id BIGSERIAL PRIMARY KEY,
-        tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
         order_id BIGINT NOT NULL REFERENCES challenge_orders(id) ON DELETE CASCADE,
         provider TEXT NOT NULL,
         provider_payment_id TEXT,
         amount NUMERIC(12,2) NOT NULL DEFAULT 0,
-        platform_fee_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
-        tenant_net_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
         currency TEXT NOT NULL DEFAULT 'USD',
         status TEXT NOT NULL DEFAULT 'pending',
         payload_json JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -183,103 +131,61 @@ async function ensureTenantSettingsInfrastructure() {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `)
-    await pool.query(`ALTER TABLE challenge_payments ADD COLUMN IF NOT EXISTS platform_fee_amount NUMERIC(12,2) NOT NULL DEFAULT 0`)
-    await pool.query(`ALTER TABLE challenge_payments ADD COLUMN IF NOT EXISTS tenant_net_amount NUMERIC(12,2) NOT NULL DEFAULT 0`)
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_challenge_payments_tenant_order ON challenge_payments(tenant_id, order_id, status)`)
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS tenant_price_feeds (
-        id BIGSERIAL PRIMARY KEY,
-        tenant_id BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-        feed_name TEXT NOT NULL DEFAULT 'shared',
-        feed_mode TEXT NOT NULL DEFAULT 'shared',
-        dwx_path TEXT,
-        mt5_host TEXT,
-        mt5_port INTEGER,
-        spread_markup_points_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-        is_active BOOLEAN NOT NULL DEFAULT TRUE,
-        metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        UNIQUE (tenant_id, feed_name)
-      )
-    `)
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tenant_price_feeds_tenant_mode ON tenant_price_feeds(tenant_id, feed_mode, is_active)`)
-  }).catch((error) => {
-    tenantSettingsInfrastructurePromise = null
-    logger.error('[tenant-settings] Failed to ensure infrastructure:', { error: error.message })
+    // FIX (SECURITY AUDIT): ON CONFLICT DO NOTHING on the INSERT in
+    // markChallengeOrderPaid was a no-op with no matching constraint to
+    // trigger on — Stripe's documented at-least-once webhook delivery could
+    // double-insert a payment row for the same order on redelivery.
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_challenge_payments_order ON challenge_payments(order_id)`)
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_challenge_payments_order ON challenge_payments(order_id, status)`)
+  })().catch((error) => {
+    challengeCommerceInfrastructurePromise = null
+    logger.error('[settings] Failed to ensure challenge commerce infrastructure:', { error: error.message })
     throw error
   })
 
-  return tenantSettingsInfrastructurePromise
+  return challengeCommerceInfrastructurePromise
 }
 
-async function getTenantSettingsMap(tenantId, keys = []) {
-  await ensureTenantSettingsInfrastructure()
-
-  const normalizedTenantId = parseInt(tenantId, 10)
+async function getTenantSettingsMap(keys = []) {
   const useKeyFilter = Array.isArray(keys) && keys.length > 0
-
-  const [platformResult, tenantResult] = await Promise.all([
-    useKeyFilter
-      ? pool.query(`SELECT key, value FROM platform_settings WHERE key = ANY($1::text[])`, [keys])
-      : pool.query(`SELECT key, value FROM platform_settings`),
-    Number.isFinite(normalizedTenantId) && normalizedTenantId > 0
-      ? (useKeyFilter
-          ? pool.query(`SELECT key, value FROM tenant_settings WHERE tenant_id = $1 AND key = ANY($2::text[])`, [normalizedTenantId, keys])
-          : pool.query(`SELECT key, value FROM tenant_settings WHERE tenant_id = $1`, [normalizedTenantId]))
-      : Promise.resolve({ rows: [] })
-  ])
+  const result = useKeyFilter
+    ? await pool.query(`SELECT key, value FROM platform_settings WHERE key = ANY($1::text[])`, [keys])
+    : await pool.query(`SELECT key, value FROM platform_settings`)
 
   const settings = { ...DEFAULT_TENANT_SETTINGS }
-  for (const row of platformResult.rows) settings[row.key] = row.value
-  for (const row of tenantResult.rows) settings[row.key] = row.value
+  for (const row of result.rows) settings[row.key] = row.value
   return settings
 }
 
-async function getTenantSettingValue(tenantId, key, fallback = null) {
-  const settings = await getTenantSettingsMap(tenantId, [key])
+async function getTenantSettingValue(key, fallback = null) {
+  const settings = await getTenantSettingsMap([key])
   return settings[key] !== undefined ? settings[key] : fallback
 }
 
-async function upsertTenantSettings(clientOrPool, tenantId, settings = {}) {
-  await ensureTenantSettingsInfrastructure()
-
+async function upsertTenantSettings(clientOrPool, settings = {}) {
   const db = clientOrPool && typeof clientOrPool.query === 'function' ? clientOrPool : pool
-  const normalizedTenantId = parseInt(tenantId, 10)
-  if (!Number.isFinite(normalizedTenantId) || normalizedTenantId <= 0) {
-    throw new Error('Valid tenant_id is required for tenant settings')
-  }
-
   const entries = Object.entries(settings).filter(([key]) => !!key)
   for (const [key, value] of entries) {
     await db.query(
-      `INSERT INTO tenant_settings (tenant_id, key, value, updated_at)
-       VALUES ($1, $2, $3, NOW())
-       ON CONFLICT (tenant_id, key)
+      `INSERT INTO platform_settings (key, value, updated_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (key)
        DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-      [normalizedTenantId, key, normalizeSettingValue(value)]
+      [key, normalizeSettingValue(value)]
     )
   }
 }
 
-async function ensureTenantSettingDefaults(clientOrPool, tenantId, defaults = DEFAULT_TENANT_SETTINGS) {
-  await ensureTenantSettingsInfrastructure()
-
+async function ensureTenantSettingDefaults(clientOrPool, defaults = DEFAULT_TENANT_SETTINGS) {
   const db = clientOrPool && typeof clientOrPool.query === 'function' ? clientOrPool : pool
-  const normalizedTenantId = parseInt(tenantId, 10)
-  if (!Number.isFinite(normalizedTenantId) || normalizedTenantId <= 0) {
-    throw new Error('Valid tenant_id is required for tenant settings')
-  }
-
   const entries = Object.entries(defaults).filter(([key]) => !!key)
   for (const [key, value] of entries) {
     await db.query(
-      `INSERT INTO tenant_settings (tenant_id, key, value, updated_at)
-       VALUES ($1, $2, $3, NOW())
-       ON CONFLICT (tenant_id, key)
+      `INSERT INTO platform_settings (key, value, updated_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (key)
        DO NOTHING`,
-      [normalizedTenantId, key, normalizeSettingValue(value)]
+      [key, normalizeSettingValue(value)]
     )
   }
 }

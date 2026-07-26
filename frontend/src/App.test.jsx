@@ -64,7 +64,6 @@ vi.mock('./pages/admin/AdminLeaderboard', () => ({ default: () => <div>admin-lea
 vi.mock('./pages/admin/AdminTradeCopier', () => ({ default: () => <div>admin-copier</div> }))
 vi.mock('./pages/admin/AdminAccountDetail', () => ({ default: () => <div>admin-account-detail</div> }))
 vi.mock('./pages/admin/AdminViolations', () => ({ default: () => <div>admin-violations</div> }))
-vi.mock('./pages/admin/AdminTenants', () => ({ default: () => <div>admin-tenants</div> }))
 vi.mock('./pages/admin/AdminCommandCenter', () => ({ default: () => <div>admin-command-center</div> }))
 
 describe('App routing', () => {

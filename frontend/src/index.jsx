@@ -4,7 +4,7 @@ import './index.css';
 import App from './App';
 import ErrorBoundary from './ErrorBoundary';
 import { ApiStateProvider } from './providers/ApiStateProvider';
-import { TenantConfigProvider } from './providers/TenantConfigProvider';
+import { BrandingProvider } from './BrandingContext';
 import { AuthProvider } from './providers/AuthProvider';
 import { AdminSessionProvider } from './providers/AdminSessionProvider';
 import reportWebVitals from './reportWebVitals';
@@ -15,13 +15,13 @@ root.render(
   <React.StrictMode>
     <ErrorBoundary>
       <ApiStateProvider>
-        <TenantConfigProvider>
+        <BrandingProvider>
           <AuthProvider>
             <AdminSessionProvider>
               <App />
             </AdminSessionProvider>
           </AuthProvider>
-        </TenantConfigProvider>
+        </BrandingProvider>
       </ApiStateProvider>
     </ErrorBoundary>
   </React.StrictMode>

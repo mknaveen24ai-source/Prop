@@ -511,7 +511,7 @@ function Chat() {
 
         .unread-badge {
           background: var(--danger);
-          color: #fff;
+          color: var(--paper);
           border-radius: 50%;
           padding: 2px 6px;
           font-size: 11px;
@@ -553,7 +553,7 @@ function Chat() {
 
         .btn-new-chat {
           background: var(--accent);
-          color: #fff;
+          color: var(--paper);
           border: none;
           padding: 8px 16px;
           border-radius: 6px;
@@ -585,7 +585,7 @@ function Chat() {
 
         .new-chat-form button {
           background: var(--accent);
-          color: #fff;
+          color: var(--paper);
           border: none;
           padding: 10px;
           border-radius: 6px;
@@ -627,7 +627,7 @@ function Chat() {
         }
 
         .conversation-item.active {
-          background: rgba(37, 99, 235, 0.14);
+          background: rgba(var(--brand-primary-rgb), 0.14);
           border-left: 3px solid var(--accent);
         }
 
@@ -655,7 +655,7 @@ function Chat() {
           text-transform: uppercase;
         }
 
-        .status-open { background: rgba(37, 99, 235, 0.14); color: var(--accent-hover); }
+        .status-open { background: rgba(var(--brand-primary-rgb), 0.14); color: var(--accent-hover); }
         .status-pending { background: var(--warning-bg); color: var(--warning); }
         .status-resolved { background: var(--success-bg); color: var(--success); }
         .status-closed { background: rgba(148, 163, 184, 0.14); color: var(--text-secondary); }
@@ -681,7 +681,7 @@ function Chat() {
 
         .unread-count {
           background: var(--danger);
-          color: #fff;
+          color: var(--paper);
           border-radius: 50%;
           padding: 2px 8px;
           font-size: 11px;
@@ -795,13 +795,13 @@ function Chat() {
         }
 
         .message.admin .message-body {
-          background: rgba(14, 165, 233, 0.12);
-          border-color: rgba(14, 165, 233, 0.22);
+          background: var(--paper-2);
+          border-color: var(--rule);
         }
 
         .message.user .message-body {
           background: var(--accent);
-          color: #fff;
+          color: var(--paper);
           border-color: var(--accent);
         }
 
@@ -824,7 +824,7 @@ function Chat() {
 
         .message-input-form button {
           background: var(--accent);
-          color: #fff;
+          color: var(--paper);
           border: none;
           padding: 12px 24px;
           border-radius: 8px;
@@ -874,7 +874,7 @@ function Chat() {
         .welcome-chat button {
           margin-top: 20px;
           background: var(--accent);
-          color: #fff;
+          color: var(--paper);
           border: none;
           padding: 12px 30px;
           border-radius: 8px;

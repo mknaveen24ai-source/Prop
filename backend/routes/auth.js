@@ -34,17 +34,13 @@ function clearAuthCookie(res) {
   res.clearCookie('token', COOKIE_BASE)
 }
 
-function buildTenantAwareResetLink(req) {
-  const tenantSlug = req.tenant?.slug
+function buildResetLink() {
   const base = process.env.FRONTEND_URL || 'http://localhost:3000'
   try {
     const url = new URL('/reset-password', base)
-    if (tenantSlug && tenantSlug !== 'default') {
-      url.searchParams.set('tenant', tenantSlug)
-    }
     return url.toString()
   } catch {
-    return `${base}/reset-password${tenantSlug && tenantSlug !== 'default' ? `?tenant=${tenantSlug}` : ''}`
+    return `${base}/reset-password`
   }
 }
 
@@ -93,10 +89,6 @@ function checkPasswordStrength(password) {
 
 router.post('/register', registerLimiter, async function(req, res) {
   try {
-    const tenantId = req.tenant?.id || 1
-    if (req.tenant?.status && !['active', 'trialing', 'past_due', 'default'].includes(String(req.tenant.status).toLowerCase())) {
-      return res.status(403).json({ error: 'This tenant portal is currently unavailable' })
-    }
     const { email, password, full_name, country, phone, referred_by, device_fingerprint } = req.body
 
     if (!email || !password || !full_name || !country || !phone) {
@@ -150,8 +142,8 @@ router.post('/register', registerLimiter, async function(req, res) {
     }
 
     const existingUser = await pool.query(
-      'SELECT id FROM users WHERE email = $1 AND COALESCE(tenant_id, $2) = $2',
-      [email.toLowerCase(), tenantId]
+      'SELECT id FROM users WHERE email = $1',
+      [email.toLowerCase()]
     )
     if (existingUser.rows.length > 0) {
       return res.status(400).json({ error: 'Email already registered' })
@@ -159,8 +151,8 @@ router.post('/register', registerLimiter, async function(req, res) {
 
     if (device_fingerprint) {
       const existingDevice = await pool.query(
-        'SELECT id FROM users WHERE device_fingerprint = $1 AND COALESCE(tenant_id, $2) = $2',
-        [device_fingerprint, tenantId]
+        'SELECT id FROM users WHERE device_fingerprint = $1',
+        [device_fingerprint]
       )
       if (existingDevice.rows.length > 0) {
         return res.status(403).json({ error: 'An account already exists from this device' })
@@ -174,9 +166,9 @@ router.post('/register', registerLimiter, async function(req, res) {
     // FIX: DDL moved to server.js startup (ensureUniqueIds). No inline ALTER TABLE.
     const newUser = await pool.query(
       `INSERT INTO users
-       (email, password_hash, full_name, country, phone, referred_by, device_fingerprint, affiliate_code, trader_uid, tenant_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       RETURNING id, email, full_name, country, kyc_status, affiliate_code, trader_uid, token_version, tenant_id`,
+       (email, password_hash, full_name, country, phone, referred_by, device_fingerprint, affiliate_code, trader_uid)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING id, email, full_name, country, kyc_status, affiliate_code, trader_uid, token_version`,
       [
         email.toLowerCase(),
         password_hash,
@@ -186,15 +178,14 @@ router.post('/register', registerLimiter, async function(req, res) {
         referred_by || null,
         device_fingerprint || null,
         affiliate_code,
-        trader_uid,
-        tenantId
+        trader_uid
       ]
     )
 
     const user = newUser.rows[0]
     const tokenVersion = user.token_version || 1
     const token = jwt.sign(
-      { userId: user.id, email: user.email, tv: tokenVersion, tid: tenantId, ts: req.tenant?.slug || 'default' },
+      { userId: user.id, email: user.email, tv: tokenVersion },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     )
@@ -206,7 +197,6 @@ router.post('/register', registerLimiter, async function(req, res) {
         user.trader_uid,
         user.affiliate_code,
         {
-          tenantId,
           userId: user.id
         }
       )
@@ -228,8 +218,7 @@ router.post('/register', registerLimiter, async function(req, res) {
         full_name: user.full_name,
         country: user.country,
         kyc_status: user.kyc_status,
-        affiliate_code: user.affiliate_code,
-        tenant: req.tenant || null
+        affiliate_code: user.affiliate_code
       }
     })
 
@@ -241,10 +230,6 @@ router.post('/register', registerLimiter, async function(req, res) {
 
 router.post('/login', loginLimiter, async function(req, res) {
   try {
-    const tenantId = req.tenant?.id || 1
-    if (req.tenant?.status && !['active', 'trialing', 'past_due', 'default'].includes(String(req.tenant.status).toLowerCase())) {
-      return res.status(403).json({ error: 'This tenant portal is currently unavailable' })
-    }
     const { email, password } = req.body
 
     if (!email || !password) {
@@ -257,9 +242,9 @@ router.post('/login', loginLimiter, async function(req, res) {
 
     const result = await pool.query(
       'SELECT id, email, password_hash, full_name, country, kyc_status, is_banned,' +
-      ' affiliate_code, trader_uid, token_version, totp_enabled, tenant_id FROM users' +
-      ' WHERE email = $1 AND COALESCE(tenant_id, $2) = $2',
-      [email.toLowerCase(), tenantId]
+      ' affiliate_code, trader_uid, token_version, totp_enabled FROM users' +
+      ' WHERE email = $1',
+      [email.toLowerCase()]
     )
 
     if (result.rows.length === 0) {
@@ -283,7 +268,7 @@ router.post('/login', loginLimiter, async function(req, res) {
       // Issue a short-lived pre_2fa token — NOT a full session token.
       // This token only works with POST /api/auth/2fa/validate.
       const pre2faToken = jwt.sign(
-        { userId: user.id, email: user.email, type: 'pre_2fa', tid: tenantId, ts: req.tenant?.slug || 'default' },
+        { userId: user.id, email: user.email, type: 'pre_2fa' },
         process.env.JWT_SECRET,
         { expiresIn: '5m' }
       )
@@ -293,7 +278,7 @@ router.post('/login', loginLimiter, async function(req, res) {
     // ── Normal login (no 2FA) ─────────────────────────────────────────────────
     const tokenVersion = user.token_version || 1
     const token = jwt.sign(
-      { userId: user.id, email: user.email, tv: tokenVersion, tid: tenantId, ts: req.tenant?.slug || 'default' },
+      { userId: user.id, email: user.email, tv: tokenVersion },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     )
@@ -321,8 +306,7 @@ router.post('/login', loginLimiter, async function(req, res) {
         full_name: user.full_name,
         country: user.country,
         kyc_status: user.kyc_status,
-        affiliate_code: user.affiliate_code,
-        tenant: req.tenant || null
+        affiliate_code: user.affiliate_code
       }
     })
 
@@ -336,9 +320,9 @@ router.get('/me', authenticateToken, async function(req, res) {
   try {
     const result = await pool.query(
       `SELECT id, email, full_name, country, kyc_status, kyc_rejection_reason,
-              affiliate_code, is_banned, theme_preference, trader_uid, tenant_id
-       FROM users WHERE id = $1 AND COALESCE(tenant_id, $2) = $2`,
-      [req.user.userId, req.user.tenantId || req.tenant?.id || 1]
+              affiliate_code, is_banned, theme_preference, trader_uid
+       FROM users WHERE id = $1`,
+      [req.user.userId]
     )
 
     if (result.rows.length === 0) {
@@ -361,8 +345,7 @@ router.get('/me', authenticateToken, async function(req, res) {
       kyc_status: user.kyc_status,
       kyc_rejection_reason: user.kyc_rejection_reason || null,
       affiliate_code: user.affiliate_code,
-      theme_preference: user.theme_preference || 'dark',
-      tenant: req.tenant || null
+      theme_preference: user.theme_preference || 'dark'
     })
   } catch (error) {
     logger.error('Get me error:', { error: error.message })
@@ -372,7 +355,6 @@ router.get('/me', authenticateToken, async function(req, res) {
 
 router.post('/forgot-password', passwordResetLimiter, async function(req, res) {
   try {
-    const tenantId = req.tenant?.id || 1
     const { email } = req.body
 
     if (!email) {
@@ -384,8 +366,8 @@ router.post('/forgot-password', passwordResetLimiter, async function(req, res) {
     }
 
     const result = await pool.query(
-      'SELECT id, email FROM users WHERE email = $1 AND COALESCE(tenant_id, $2) = $2',
-      [email.toLowerCase(), tenantId]
+      'SELECT id, email FROM users WHERE email = $1',
+      [email.toLowerCase()]
     )
 
     const safeResponse = { message: 'If that email is registered, a reset link has been sent.' }
@@ -409,10 +391,9 @@ router.post('/forgot-password', passwordResetLimiter, async function(req, res) {
     // Send a link to the reset-password page WITHOUT the token in the URL.
     // The user will enter the token manually on that page, preventing token
     // leakage via browser history, server logs, referrer headers, etc.
-    const resetLink = buildTenantAwareResetLink(req)
+    const resetLink = buildResetLink()
 
     await enqueuePasswordResetEmail(user.email, resetLink, rawToken, {
-      tenant: req.tenant || null,
       userId: user.id
     })
 
@@ -431,7 +412,6 @@ router.post('/forgot-password', passwordResetLimiter, async function(req, res) {
 
 router.post('/reset-password', forgotLimiter, async function(req, res) {
   try {
-    const tenantId = req.tenant?.id || 1
     const { email, token, new_password } = req.body
 
     if (!email || !token || !new_password) {
@@ -446,8 +426,8 @@ router.post('/reset-password', forgotLimiter, async function(req, res) {
     }
 
     const result = await pool.query(
-      'SELECT id, reset_token, reset_token_expires FROM users WHERE email = $1 AND COALESCE(tenant_id, $2) = $2',
-      [email.toLowerCase(), tenantId]
+      'SELECT id, reset_token, reset_token_expires FROM users WHERE email = $1',
+      [email.toLowerCase()]
     )
 
     if (result.rows.length === 0) {
@@ -526,7 +506,6 @@ router.post('/logout-all', authenticateToken, async function(req, res) {
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get('/profile/:userId', async function(req, res) {
   try {
-    const tenantId = req.tenant?.id || 1
     const { userId } = req.params
     if (!userId || isNaN(parseInt(userId))) {
       return res.status(400).json({ error: 'Invalid user ID' })
@@ -541,11 +520,10 @@ router.get('/profile/:userId', async function(req, res) {
        FROM users u
        LEFT JOIN accounts a ON a.user_id = u.id
        WHERE u.id = $1
-         AND COALESCE(u.tenant_id, $2) = $2
          AND COALESCE(u.leaderboard_visible, TRUE) = TRUE
          AND COALESCE(u.is_banned, FALSE) = FALSE
        GROUP BY u.id`,
-      [parseInt(userId), tenantId]
+      [parseInt(userId)]
     )
 
     if (userResult.rows.length === 0) {
@@ -566,8 +544,8 @@ router.get('/profile/:userId', async function(req, res) {
          MODE() WITHIN GROUP (ORDER BY t.instrument)             AS favourite_instrument
        FROM trades t
        JOIN accounts a ON t.account_id = a.id
-       WHERE a.user_id = $1 AND COALESCE(a.tenant_id, $2) = $2 AND t.status = 'closed'`,
-      [parseInt(userId), tenantId]
+       WHERE a.user_id = $1 AND t.status = 'closed'`,
+      [parseInt(userId)]
     )
 
     const s = statsResult.rows[0]

@@ -7,7 +7,6 @@
  * Cache keys:
  *   token_version:{userId} → token version (TTL: 5 min)
  *   banned_status:{userId} → is_banned boolean (TTL: 5 min)
- *   tenant_id:{userId} → tenant id (TTL: 5 min)
  */
 
 const redis = require('redis')
@@ -75,17 +74,15 @@ async function getCachedTokenData(userId) {
   if (!redisClient) return null
 
   try {
-    const [version, banned, tenantId] = await Promise.all([
+    const [version, banned] = await Promise.all([
       redisClient.get(`token_version:${userId}`),
-      redisClient.get(`banned_status:${userId}`),
-      redisClient.get(`tenant_id:${userId}`)
+      redisClient.get(`banned_status:${userId}`)
     ])
 
     if (version !== null) {
       return {
         token_version: parseInt(version, 10),
-        is_banned: banned === 'true',
-        tenant_id: tenantId !== null && tenantId !== '' ? parseInt(tenantId, 10) : null
+        is_banned: banned === 'true'
       }
     }
     return null
@@ -99,14 +96,13 @@ async function getCachedTokenData(userId) {
  * Set cached token data
  * Called after database lookup to populate cache
  */
-async function cacheTokenData(userId, tokenVersion, isBanned, tenantId = null) {
+async function cacheTokenData(userId, tokenVersion, isBanned) {
   if (!redisClient) return
 
   try {
     await Promise.all([
       redisClient.setEx(`token_version:${userId}`, CACHE_TTL, tokenVersion.toString()),
-      redisClient.setEx(`banned_status:${userId}`, CACHE_TTL, isBanned ? 'true' : 'false'),
-      redisClient.setEx(`tenant_id:${userId}`, CACHE_TTL, tenantId == null ? '' : String(tenantId))
+      redisClient.setEx(`banned_status:${userId}`, CACHE_TTL, isBanned ? 'true' : 'false')
     ])
   } catch (err) {
     // Fail silently - cache miss is not critical, just hit DB again
@@ -124,8 +120,7 @@ async function invalidateTokenCache(userId) {
   try {
     await Promise.all([
       redisClient.del(`token_version:${userId}`),
-      redisClient.del(`banned_status:${userId}`),
-      redisClient.del(`tenant_id:${userId}`)
+      redisClient.del(`banned_status:${userId}`)
     ])
   } catch (err) {
     logger.warn('Failed to invalidate token cache:', { error: err.message })

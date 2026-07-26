@@ -10,12 +10,6 @@ router.get('/violations', authenticateAdmin, requireAdminCapability('violation:r
 
     const conditions = []
     const values = []
-    const scopedTenantId = req.admin?.tenantId || null
-
-    if (scopedTenantId) {
-      values.push(scopedTenantId)
-      conditions.push(`COALESCE(tenant_id, $${values.length}) = $${values.length}`)
-    }
 
     if (req.query.status) {
       values.push(String(req.query.status))
@@ -59,7 +53,6 @@ router.get('/violations', authenticateAdmin, requireAdminCapability('violation:r
 router.get('/violations/summary', authenticateAdmin, requireAdminCapability('violation:read:scoped'), async (req, res) => {
   try {
     await ensureViolationTables()
-    const scopedTenantId = req.admin?.tenantId || null
 
     const [openCounts, recentCounts] = await Promise.all([
       pool.query(`
@@ -69,17 +62,15 @@ router.get('/violations/summary', authenticateAdmin, requireAdminCapability('vio
           COUNT(*) FILTER (WHERE severity = 'high')::int AS high_open
         FROM admin_rule_violations
         WHERE status = 'open'
-          AND ($1::bigint IS NULL OR COALESCE(tenant_id, $1) = $1)
-      `, [scopedTenantId]),
+      `),
       pool.query(`
         SELECT violation_type, COUNT(*)::int AS total
         FROM admin_rule_violations
         WHERE last_detected_at >= NOW() - INTERVAL '24 hours'
-          AND ($1::bigint IS NULL OR COALESCE(tenant_id, $1) = $1)
         GROUP BY violation_type
         ORDER BY total DESC, violation_type ASC
         LIMIT 10
-      `, [scopedTenantId])
+      `)
     ])
 
     res.json({
@@ -94,7 +85,6 @@ router.get('/violations/summary', authenticateAdmin, requireAdminCapability('vio
 router.post('/violations/:id/resolve', authenticateAdmin, requireAdminCapability('violation:resolve:scoped'), async (req, res) => {
   try {
     await ensureViolationTables()
-    const scopedTenantId = req.admin?.tenantId || null
     const id = parseInt(req.params.id, 10)
     if (!Number.isFinite(id)) {
       return res.status(400).json({ error: 'Invalid violation id' })
@@ -113,13 +103,11 @@ router.post('/violations/:id/resolve', authenticateAdmin, requireAdminCapability
               resolution_type = $3,
               payload_json = COALESCE(payload_json, '{}'::jsonb) || jsonb_build_object(
                 'resolution_type', $3,
-                'resolved_by_role', $4,
-                'resolved_tenant_scope', $5
+                'resolved_by_role', $4
               )
         WHERE id = $1
-          AND ($6::bigint IS NULL OR COALESCE(tenant_id, $6) = $6)
         RETURNING *`,
-      [id, note, resolutionType, req.admin?.role || 'admin', scopedTenantId, scopedTenantId]
+      [id, note, resolutionType, req.admin?.role || 'admin']
     )
 
     if (result.rows.length === 0) {

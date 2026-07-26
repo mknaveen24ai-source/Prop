@@ -37,6 +37,9 @@ const {
   getIdempotencyKey
 } = require('../utils/idempotency')
 const { writeCopierEvent } = require('../utils/copierV2')
+const drawdownService = require('../services/drawdownService')
+const tradingDaysService = require('../services/tradingDaysService')
+const { fetchStepModelBySlug } = require('../utils/stepModels')
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Leverage: 1:30 on forex (EURUSD, GBPUSD), 1:10 on commodities (XAUUSD, XAGUSD)
@@ -58,7 +61,7 @@ const COMMODITY_LOTS_PER_1K = 0.02
 // â”€â”€ Load admin-configurable trading rules from platform_settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Falls back to hardcoded defaults if a setting hasn't been configured yet.
 // Cached for 30s to avoid a DB hit on every single trade open.
-const _tradingRulesCache = new Map()
+let _tradingRulesCache = null
 const TRADING_RULES_TTL  = 30 * 1000 // 30 seconds
 const candleCache = new Map()
 const CANDLE_CACHE_TTL_MS = 15000
@@ -88,11 +91,6 @@ const DEFAULT_TRADING_RULES = {
   slippageSimulatorEnabled: false,
   slippageMaxPipsAdverse: 0,
   weekendHoldingEnabled: true,
-}
-
-function normalizeTenantId(value) {
-  const parsed = parseInt(value, 10)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
 }
 
 function getCachedCandles(cacheKey) {
@@ -211,7 +209,7 @@ function isValidImageDataUrl(dataUrl) {
     && /^data:image\/(png|jpeg|jpg);base64,[A-Za-z0-9+/=]+$/i.test(dataUrl.trim())
 }
 
-async function persistTradeScreenshot({ tradeId, tenantId, userId, kind, dataUrl }) {
+async function persistTradeScreenshot({ tradeId, userId, kind, dataUrl }) {
   if (!isValidImageDataUrl(dataUrl)) {
     return null
   }
@@ -226,10 +224,9 @@ async function persistTradeScreenshot({ tradeId, tenantId, userId, kind, dataUrl
     return null
   }
 
-  const tenantPart = String(normalizeTenantId(tenantId) || 1)
   const userPart = sanitizeString(String(userId || 'user'), 64) || 'user'
   const tradePart = sanitizeString(String(tradeId || 'trade'), 64) || 'trade'
-  const relativeDir = path.join(tenantPart, userPart)
+  const relativeDir = path.join(userPart)
   const absoluteDir = path.join(TRADE_JOURNAL_UPLOAD_ROOT, relativeDir)
   await fs.promises.mkdir(absoluteDir, { recursive: true })
 
@@ -276,8 +273,7 @@ async function emitCopierEventSafe(payload) {
       error: error.message,
       eventType: payload?.eventType,
       masterTradeId: payload?.masterTradeId,
-      masterAccountId: payload?.masterAccountId,
-      tenantId: payload?.tenantId
+      masterAccountId: payload?.masterAccountId
     })
   }
 }
@@ -303,15 +299,12 @@ function buildCopierTradePayload(trade = {}, overrides = {}) {
   }
 }
 
-async function getTradingRules(tenantId = null) {
-  const normalizedTenantId = normalizeTenantId(tenantId)
-  const cacheKey = String(normalizedTenantId || 'default')
-  const cached = _tradingRulesCache.get(cacheKey)
-  if (cached && (Date.now() - cached.cachedAt) < TRADING_RULES_TTL) {
-    return cached.value
+async function getTradingRules() {
+  if (_tradingRulesCache && (Date.now() - _tradingRulesCache.cachedAt) < TRADING_RULES_TTL) {
+    return _tradingRulesCache.value
   }
   try {
-    const settings = await getTenantSettings(normalizedTenantId, TRADING_RULE_KEYS)
+    const settings = await getTenantSettings(TRADING_RULE_KEYS)
     // FIX (BUG-2): parseFloat('true') === NaN, so every boolean flag was always falsy.
     // Parse each value with the correct type: booleans use strict string comparison,
     // numerics continue to use parseFloat.
@@ -336,7 +329,7 @@ async function getTradingRules(tenantId = null) {
         : DEFAULT_TRADING_RULES.slippageMaxPipsAdverse,
       weekendHoldingEnabled: parsed.weekend_holding_enabled ?? DEFAULT_TRADING_RULES.weekendHoldingEnabled,
     }
-    _tradingRulesCache.set(cacheKey, { value: resolved, cachedAt: Date.now() })
+    _tradingRulesCache = { value: resolved, cachedAt: Date.now() }
     return resolved
   } catch {
     // If DB read fails, return safe defaults
@@ -361,25 +354,17 @@ const tradeOpenLimiter = rateLimit({
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Helpers
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-async function getLivePrice(instrument, tenantId = null, basePrices = null) {
-  return getPriceForTenant(tenantId, instrument, basePrices)
+async function getLivePrice(instrument, basePrices = null) {
+  return getPriceForTenant(instrument, basePrices)
 }
 
-async function getPlatformSettingsForProgression(client, tenantId = null) {
-  return fetchProgressionSettings(client, tenantId)
+async function getPlatformSettingsForProgression(client) {
+  return fetchProgressionSettings(client)
 }
 
-async function buildTenantPriceMap(tenantIds) {
+async function getLivePriceMap() {
   const basePrices = await getCurrentPrices()
-  const uniqueTenantIds = [...new Set(
-    tenantIds
-      .map((tenantId) => normalizeTenantId(tenantId) || 1)
-      .filter(Boolean)
-  )]
-  const entries = await Promise.all(
-    uniqueTenantIds.map(async (tenantId) => [String(tenantId), await getCurrentPricesForTenant(tenantId, basePrices)])
-  )
-  return new Map(entries)
+  return getCurrentPricesForTenant(basePrices)
 }
 
 function calculatePnL(direction, open_price, current_price, lots, instrument, commission = 0) {
@@ -489,7 +474,7 @@ async function checkSLTP(io) {
               t.stop_loss, t.take_profit, t.status, t.open_time, t.demo_trade_id,
               t.commission, t.trailing_step_pips, t.trailing_activation_price,
               t.breakeven_trigger_pips,
-              a.user_id, a.tenant_id
+              a.user_id
        FROM trades t
        JOIN accounts a ON t.account_id = a.id
        WHERE t.status = 'open'
@@ -501,18 +486,11 @@ async function checkSLTP(io) {
        )`
     )
 
-    const tenantPriceMap = await buildTenantPriceMap(openTrades.rows.map((trade) => trade.tenant_id))
-    const tenantRulesCache = new Map()
+    const priceMap = await getLivePriceMap()
+    const rules = await getTradingRules()
 
     for (const trade of openTrades.rows) {
-      const tenantKey = String(normalizeTenantId(trade.tenant_id) || 1)
-      let rules = tenantRulesCache.get(tenantKey)
-      if (!rules) {
-        rules = await getTradingRules(trade.tenant_id)
-        tenantRulesCache.set(tenantKey, rules)
-      }
-
-      const price = tenantPriceMap.get(tenantKey)?.[trade.instrument]
+      const price = priceMap[trade.instrument]
       if (!price) continue
 
       // BUY trades close at BID. SELL trades close at ASK.
@@ -545,7 +523,6 @@ async function checkSLTP(io) {
             trade.stop_loss = roundedBreakeven
             trade.breakeven_trigger_pips = null
             await emitCopierEventSafe({
-              tenantId: trade.tenant_id || 1,
               masterAccountId: trade.account_id,
               masterTradeId: trade.id,
               eventType: 'MODIFY_POSITION',
@@ -585,7 +562,6 @@ async function checkSLTP(io) {
               await pool.query('UPDATE trades SET stop_loss = $1 WHERE id = $2', [roundedStopLoss, trade.id])
               trade.stop_loss = roundedStopLoss
               await emitCopierEventSafe({
-                tenantId: trade.tenant_id || 1,
                 masterAccountId: trade.account_id,
                 masterTradeId: trade.id,
                 eventType: 'MODIFY_POSITION',
@@ -669,7 +645,6 @@ async function checkSLTP(io) {
         await client.query('COMMIT')
 
         await emitCopierEventSafe({
-          tenantId: trade.tenant_id || 1,
           masterAccountId: trade.account_id,
           masterTradeId: trade.id,
           eventType: 'CLOSE_POSITION',
@@ -780,7 +755,7 @@ async function validatePendingTrigger(client, order, rules) {
 
   const margin = calculateMargin(order.instrument, lotsNum)
   let floatingPnl = new Decimal(0)
-  const tenantPrices = await getCurrentPricesForTenant(order.tenant_id || 1)
+  const livePrices = await getCurrentPricesForTenant()
   const openTradesResult = await client.query(
     `SELECT t.direction, t.open_price, t.lot_size, t.instrument, t.commission
      FROM trades t
@@ -788,7 +763,7 @@ async function validatePendingTrigger(client, order, rules) {
     [order.account_id, order.id]
   )
   for (const t of openTradesResult.rows) {
-    const livePrice = tenantPrices[t.instrument]
+    const livePrice = livePrices[t.instrument]
     if (!livePrice) continue
     const currentPrice = t.direction === 'buy' ? parseFloat(livePrice.bid) : parseFloat(livePrice.ask)
     floatingPnl = floatingPnl.plus(calculatePnL(t.direction, parseFloat(t.open_price), currentPrice, parseFloat(t.lot_size), t.instrument, parseFloat(t.commission || 0)))
@@ -810,21 +785,20 @@ async function checkPendingOrders(io) {
     const pendingOrders = await pool.query(
       `SELECT t.id, t.account_id, t.instrument, t.direction, t.lot_size, t.order_type,
               t.pending_price, t.status, a.user_id, a.current_balance, a.peak_balance,
-              a.status as account_status, a.account_size, a.tenant_id, t.oco_group_id
+              a.status as account_status, a.account_size, t.oco_group_id
        FROM trades t
        JOIN accounts a ON t.account_id = a.id
        WHERE t.status = 'pending'`
     )
 
-    const tenantPriceMap = await buildTenantPriceMap(pendingOrders.rows.map((order) => order.tenant_id))
-    const tenantRulesCache = new Map()
+    const priceMap = await getLivePriceMap()
+    const rules = await getTradingRules()
 
     const copierEvents = []
     for (const order of pendingOrders.rows) {
       if (order.account_status !== 'active') {
         await cancelPendingOrder(order.id, 'Account inactive')
         await emitCopierEventSafe({
-          tenantId: order.tenant_id || 1,
           masterAccountId: order.account_id,
           masterTradeId: order.id,
           eventType: 'CANCEL_PENDING',
@@ -838,14 +812,7 @@ async function checkPendingOrders(io) {
         continue
       }
 
-      const tenantKey = String(normalizeTenantId(order.tenant_id) || 1)
-      let rules = tenantRulesCache.get(tenantKey)
-      if (!rules) {
-        rules = await getTradingRules(order.tenant_id)
-        tenantRulesCache.set(tenantKey, rules)
-      }
-
-      const price = tenantPriceMap.get(tenantKey)?.[order.instrument]
+      const price = priceMap[order.instrument]
       if (!price) continue
 
       const bid           = parseFloat(price.bid)
@@ -885,7 +852,6 @@ async function checkPendingOrders(io) {
             )
             await client.query('COMMIT')
             await emitCopierEventSafe({
-              tenantId: order.tenant_id || 1,
               masterAccountId: order.account_id,
               masterTradeId: order.id,
               eventType: 'CANCEL_PENDING',
@@ -924,7 +890,6 @@ async function checkPendingOrders(io) {
           await client.query('COMMIT')
 
           await emitCopierEventSafe({
-            tenantId: order.tenant_id || 1,
             masterAccountId: order.account_id,
             masterTradeId: order.id,
             eventType: 'OPEN_MARKET',
@@ -938,7 +903,6 @@ async function checkPendingOrders(io) {
           })
           for (const sibling of cancelledSiblingRows) {
             await emitCopierEventSafe({
-              tenantId: order.tenant_id || 1,
               masterAccountId: order.account_id,
               masterTradeId: sibling.id,
               eventType: 'CANCEL_PENDING',
@@ -998,7 +962,7 @@ async function autoCloseAndFail(acc, reason, io) {
        FROM trades WHERE account_id = $1 AND status = 'open' FOR UPDATE`,
       [acc.id]
     )
-    const priceMap = await getCurrentPricesForTenant(acc.tenant_id || 1)
+    const priceMap = await getCurrentPricesForTenant()
     const copierEvents = []
 
     // FIX (AUDIT): Use Decimal accumulator — native float += on many trades
@@ -1020,7 +984,6 @@ async function autoCloseAndFail(acc, reason, io) {
             [trade.id]
           )
           copierEvents.push({
-            tenantId: acc.tenant_id || 1,
             masterAccountId: acc.id,
             masterTradeId: trade.id,
             eventType: 'CLOSE_POSITION',
@@ -1063,7 +1026,6 @@ async function autoCloseAndFail(acc, reason, io) {
            [close_price, demo_pnl, trade.id]
         )
         copierEvents.push({
-          tenantId: acc.tenant_id || 1,
           masterAccountId: acc.id,
           masterTradeId: trade.id,
           eventType: 'CLOSE_POSITION',
@@ -1110,18 +1072,16 @@ async function autoCloseAndFail(acc, reason, io) {
     await client.query(`UPDATE accounts SET status = 'failed' WHERE id = $1`, [acc.id])
 
     await client.query(
-      `INSERT INTO bbook_pnl (tenant_id, date, accounts_failed)
-       VALUES ($1, CURRENT_DATE, 1)
-       ON CONFLICT (tenant_id, date) DO UPDATE
-       SET accounts_failed = bbook_pnl.accounts_failed + 1`,
-      [acc.tenant_id || 1]
+      `INSERT INTO bbook_pnl (date, accounts_failed)
+       VALUES (CURRENT_DATE, 1)
+       ON CONFLICT (date) DO UPDATE
+       SET accounts_failed = bbook_pnl.accounts_failed + 1`
     )
 
     await client.query('COMMIT')
 
     for (const pendingTrade of cancelledPendingResult.rows) {
       copierEvents.push({
-        tenantId: acc.tenant_id || 1,
         masterAccountId: acc.id,
         masterTradeId: pendingTrade.id,
         eventType: 'CANCEL_PENDING',
@@ -1139,7 +1099,6 @@ async function autoCloseAndFail(acc, reason, io) {
     }
 
     await safeRecordViolation({
-      tenantId: acc.tenant_id,
       violationType: 'floating_drawdown_breach',
       severity: 'critical',
       accountId: acc.id,
@@ -1153,7 +1112,6 @@ async function autoCloseAndFail(acc, reason, io) {
     })
 
     await safeRecordEnforcement({
-      tenantId: acc.tenant_id,
       accountId: acc.id,
       userId: acc.user_id,
       action: 'auto_fail_account',
@@ -1210,7 +1168,7 @@ async function autoCloseAndPass(acc, io) {
        FROM trades WHERE account_id = $1 AND status = 'open' FOR UPDATE`,
       [acc.id]
     )
-    const priceMap = await getCurrentPricesForTenant(acc.tenant_id || 1)
+    const priceMap = await getCurrentPricesForTenant()
     const copierEvents = []
 
     const closeReason = acc.account_type === 'phase1' ? 'Phase 1 Passed' : 'Phase 2 Passed'
@@ -1249,7 +1207,6 @@ async function autoCloseAndPass(acc, io) {
            [close_price, demo_pnl, closeReason, trade.id]
         )
         copierEvents.push({
-          tenantId: acc.tenant_id || 1,
           masterAccountId: acc.id,
           masterTradeId: trade.id,
           eventType: 'CLOSE_POSITION',
@@ -1291,7 +1248,7 @@ async function autoCloseAndPass(acc, io) {
       [closeReason, acc.id]
     )
 
-    const settings    = await fetchProgressionSettings(client, acc.tenant_id)
+    const settings    = await fetchProgressionSettings(client)
     const promoted    = await promotePassedAccount(client, acc, settings)
     const newAccountId = promoted ? promoted.new_account_id : null
 
@@ -1299,7 +1256,6 @@ async function autoCloseAndPass(acc, io) {
 
     for (const pendingTrade of cancelledPendingResult.rows) {
       copierEvents.push({
-        tenantId: acc.tenant_id || 1,
         masterAccountId: acc.id,
         masterTradeId: pendingTrade.id,
         eventType: 'CANCEL_PENDING',
@@ -1362,7 +1318,8 @@ async function checkFloatingDrawdown(io) {
               t.stop_loss, t.take_profit, t.status, t.open_time, t.demo_trade_id,
               a.user_id, a.current_balance, a.starting_balance, a.peak_balance,
               a.max_drawdown_pct, a.account_type, a.profit_target, a.account_size,
-              a.starting_balance as acc_starting, a.tenant_id
+              a.starting_balance as acc_starting,
+              a.eod_peak_equity, a.eod_trailing_floor, a.challenge_model_slug, a.daily_drawdown_pct
        FROM trades t
        JOIN accounts a ON t.account_id = a.id
        WHERE t.status = 'open'
@@ -1371,8 +1328,8 @@ async function checkFloatingDrawdown(io) {
 
     if (tradesResult.rows.length === 0) return
 
-    const tenantPriceMap = await buildTenantPriceMap(tradesResult.rows.map((trade) => trade.tenant_id))
-    const fundedDrawdownCache = new Map()
+    const priceMap = await getLivePriceMap()
+    const fundedModelSettingsCache = new Map()
 
     // Group trades by account_id in JS â€” no extra queries
     const accountTrades = {}
@@ -1383,25 +1340,28 @@ async function checkFloatingDrawdown(io) {
       if (!accountTrades[aid]) {
         accountTrades[aid] = []
         accountMeta[aid] = {
-          id:               aid,
-          user_id:          row.user_id,
-          current_balance:  parseFloat(row.current_balance),
-          starting_balance: parseFloat(row.acc_starting),
-          peak_balance:     parseFloat(row.peak_balance),
-          max_drawdown_pct: parseFloat(row.max_drawdown_pct),
-          account_type:     row.account_type,
-          account_size:     parseFloat(row.account_size),
-          profit_target:    parseFloat(row.profit_target || 0),
-          tenant_id:        row.tenant_id || 1,
+          id:                    aid,
+          user_id:               row.user_id,
+          current_balance:       parseFloat(row.current_balance),
+          starting_balance:      parseFloat(row.acc_starting),
+          peak_balance:          parseFloat(row.peak_balance),
+          max_drawdown_pct:      parseFloat(row.max_drawdown_pct),
+          account_type:          row.account_type,
+          account_size:          parseFloat(row.account_size),
+          profit_target:         parseFloat(row.profit_target || 0),
+          eod_peak_equity:       row.eod_peak_equity,
+          eod_trailing_floor:    row.eod_trailing_floor,
+          challenge_model_slug:  row.challenge_model_slug,
+          daily_drawdown_pct:    row.daily_drawdown_pct != null ? parseFloat(row.daily_drawdown_pct) : null,
         }
       }
       accountTrades[aid].push(row)
     }
 
+    const todayRealizedMap = await tradingDaysService.getTodayRealizedPnl(pool, Object.keys(accountTrades))
+
     for (const [aid, trades] of Object.entries(accountTrades)) {
       const acc = accountMeta[aid]
-      const tenantKey = String(normalizeTenantId(acc.tenant_id) || 1)
-      const priceMap = tenantPriceMap.get(tenantKey) || {}
 
       let floatingPnl = new Decimal(0)
       for (const trade of trades) {
@@ -1423,26 +1383,58 @@ async function checkFloatingDrawdown(io) {
       }
 
       const equity = new Decimal(acc.current_balance).plus(floatingPnl)
-      // FIX: funded accounts use live platform setting, not the stored column
       let max_drawdown_pct = acc.max_drawdown_pct
-      if (acc.account_type === 'funded') {
-        let fundedMaxDrawdownPct = fundedDrawdownCache.get(tenantKey)
-        if (!Number.isFinite(fundedMaxDrawdownPct)) {
-          const tenantSettings = await getTenantSettings(acc.tenant_id, ['funded_max_drawdown_pct'])
-          fundedMaxDrawdownPct = parseFloat(tenantSettings.funded_max_drawdown_pct || '5')
-          fundedDrawdownCache.set(tenantKey, fundedMaxDrawdownPct)
+      let daily_drawdown_pct = acc.daily_drawdown_pct
+      let drawdownLocksAtPct = null
+
+      if (acc.account_type === 'funded' && acc.challenge_model_slug) {
+        let modelSettings = fundedModelSettingsCache.get(acc.challenge_model_slug)
+        if (!modelSettings) {
+          const model = await fetchStepModelBySlug(acc.challenge_model_slug)
+          modelSettings = model
+            ? {
+                funded_max_drawdown_pct: parseFloat(model.funded_max_drawdown_pct),
+                funded_daily_drawdown_pct: parseFloat(model.funded_daily_drawdown_pct),
+                funded_drawdown_locks_at_pct: model.funded_drawdown_locks_at_pct != null ? parseFloat(model.funded_drawdown_locks_at_pct) : null
+              }
+            : null
+          fundedModelSettingsCache.set(acc.challenge_model_slug, modelSettings || {})
         }
-        max_drawdown_pct = fundedMaxDrawdownPct
+        if (modelSettings && Number.isFinite(modelSettings.funded_max_drawdown_pct)) {
+          max_drawdown_pct = modelSettings.funded_max_drawdown_pct
+          daily_drawdown_pct = modelSettings.funded_daily_drawdown_pct
+          drawdownLocksAtPct = modelSettings.funded_drawdown_locks_at_pct
+        }
       }
 
-      const drawdownBase = new Decimal(acc.starting_balance)
-      if (drawdownBase.lte(0)) continue
-      const floating_drawdown_pct = drawdownBase.minus(equity).div(drawdownBase).times(100)
-      if (floating_drawdown_pct.gte(max_drawdown_pct)) {
-        const reason = `Max drawdown ${floating_drawdown_pct.toFixed(2)}% reached ${max_drawdown_pct}% limit`
+      if (!(max_drawdown_pct > 0)) continue
+
+      const floor = await drawdownService.getEffectiveDrawdownFloor(pool, acc, {
+        equity: equity.toNumber(),
+        maxDrawdownPct: max_drawdown_pct,
+        drawdownLocksAtPct
+      })
+
+      if (equity.lt(floor)) {
+        const drawdownPctUsed = new Decimal(acc.starting_balance).minus(equity).div(acc.starting_balance).times(100)
+        const reason = `Trailing drawdown breach — equity $${equity.toFixed(2)} fell below the $${floor.toFixed(2)} floor (${drawdownPctUsed.toFixed(2)}% of a ${max_drawdown_pct}% limit)`
         logger.info(`Account ${aid} DRAWDOWN BREACH: ${reason}`)
         await autoCloseAndFail(acc, reason, io)
         continue
+      }
+
+      if (Number.isFinite(daily_drawdown_pct) && daily_drawdown_pct > 0 && acc.starting_balance > 0) {
+        const todayRealized = todayRealizedMap.get(aid) || 0
+        const todayTotalPnl = new Decimal(todayRealized).plus(floatingPnl)
+        const todayLossPct = todayTotalPnl.isNegative()
+          ? todayTotalPnl.abs().div(acc.starting_balance).times(100)
+          : new Decimal(0)
+        if (todayLossPct.gte(daily_drawdown_pct)) {
+          const reason = `Daily loss limit breach — today's loss ${todayLossPct.toFixed(2)}% reached the ${daily_drawdown_pct}% daily limit`
+          logger.info(`Account ${aid} DAILY LOSS BREACH: ${reason}`)
+          await autoCloseAndFail(acc, reason, io)
+          continue
+        }
       }
 
       if (acc.account_type === 'funded') continue
@@ -1478,7 +1470,6 @@ async function checkFloatingDrawdown(io) {
 router.get('/candles', authenticateToken, async function(req, res) {
   try {
     const { instrument, timeframe } = req.query
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
     const normalizedInstrument = String(instrument || '').trim().toUpperCase()
 
     if (!instrument || !timeframe) {
@@ -1495,9 +1486,9 @@ router.get('/candles', authenticateToken, async function(req, res) {
     }
 
     const tfSeconds = tfMinutes * 60
-    const feedConfig = await getTenantFeedConfig(tenantId)
+    const feedConfig = await getTenantFeedConfig()
     const effectiveSourceKey = String(feedConfig?.effective_source_key || 'shared').trim().toLowerCase()
-    const cacheKey = `${tenantId}:${effectiveSourceKey}:${normalizedInstrument}:${String(timeframe).toUpperCase()}`
+    const cacheKey = `${effectiveSourceKey}:${normalizedInstrument}:${String(timeframe).toUpperCase()}`
     const cachedCandles = getCachedCandles(cacheKey)
     if (cachedCandles) {
       res.set('Cache-Control', 'private, max-age=15')
@@ -1719,8 +1710,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
     const normalizedTags = normalizeTradeTags(tags)
 
     // â”€â”€ Minimum lot size (admin-configurable) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    const requestTenantId = req.user?.tenantId || req.tenant?.id || null
-    let rules = await getTradingRules(requestTenantId)
+    let rules = await getTradingRules()
     const MIN_LOT_SIZE = rules.minLotSize
     if (lotsNum < MIN_LOT_SIZE) {
       return res.status(400).json({ error: `Minimum lot size is ${MIN_LOT_SIZE}. You entered ${lotsNum}.` })
@@ -1784,7 +1774,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       // Lock the account row for this transaction
       const lockedAccount = await client.query(
         `SELECT id, user_id, account_size, current_balance, starting_balance, peak_balance,
-                status, account_type, phase_end_date, tenant_id
+                status, account_type, phase_end_date, scaling_multiplier
          FROM accounts WHERE id = $1 AND user_id = $2 AND status = 'active' FOR UPDATE`,
         [accountIdStr, req.user.userId]
       )
@@ -1797,7 +1787,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       // The challenge engine checks every 30s, so there's a window where traders
       // could still open trades on an expired account.
       const account = lockedAccount.rows[0]
-      rules = await getTradingRules(account.tenant_id)
+      rules = await getTradingRules()
       if (lotsNum < rules.minLotSize) {
         await client.query('ROLLBACK')
         return res.status(400).json({ error: `Minimum lot size is ${rules.minLotSize}. You entered ${lotsNum}.` })
@@ -1826,7 +1816,12 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       }
 
       // â”€â”€ Combined exposure check (inside transaction) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      const accountSizeK = parseFloat(account.account_size) / 1000
+      // Funded accounts' scaling-plan multiplier raises risk capacity (lot caps)
+      // proportionally — it does not change the account's literal balance.
+      const scalingMultiplier = account.account_type === 'funded' && account.scaling_multiplier != null
+        ? parseFloat(account.scaling_multiplier)
+        : 1
+      const accountSizeK = (parseFloat(account.account_size) / 1000) * (Number.isFinite(scalingMultiplier) ? scalingMultiplier : 1)
 
       if (COMMODITY_INSTRUMENTS.includes(instrumentFinal)) {
         const maxCommodityLots = parseFloat((accountSizeK * rules.commodityLotsPer1k).toFixed(4))
@@ -1865,7 +1860,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       }
 
       // â”€â”€ Max simultaneous open trades cap (inside transaction) â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      const maxOpenTrades = Math.min(50, Math.max(5, Math.floor(parseFloat(account.account_size) / 1000) * rules.maxTradesPer1k))
+      const maxOpenTrades = Math.min(50, Math.max(5, Math.floor(accountSizeK) * rules.maxTradesPer1k))
       const openTradeCountResult = await client.query(
         `SELECT COUNT(*) FROM trades WHERE account_id = $1 AND status IN ('open', 'pending')`,
         [accountIdStr]
@@ -1882,7 +1877,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       const margin = calculateMargin(instrumentFinal, lotsNum)
       
       let floatingPnl = new Decimal(0)
-      const tenantPrices = await getCurrentPricesForTenant(account.tenant_id || 1)
+      const livePrices = await getCurrentPricesForTenant()
       const openTradesResult = await client.query(
         `SELECT t.direction, t.open_price, t.lot_size, t.instrument, t.commission
          FROM trades t
@@ -1890,7 +1885,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
         [accountIdStr]
       )
       for (const t of openTradesResult.rows) {
-        const livePrice = tenantPrices[t.instrument]
+        const livePrice = livePrices[t.instrument]
         if (!livePrice) continue
         const currentPrice = t.direction === 'buy' ? parseFloat(livePrice.bid) : parseFloat(livePrice.ask)
         floatingPnl = floatingPnl.plus(calculatePnL(t.direction, parseFloat(t.open_price), currentPrice, parseFloat(t.lot_size), t.instrument, parseFloat(t.commission || 0)))
@@ -1906,14 +1901,12 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
 
       const demo_trade_id = uuidv4()
       const tradeCommission = parseFloat((lotsNum * rules.dynamicCommissionPerLot).toFixed(2))
-      const tenantIdForWrite = account.tenant_id || requestTenantId || 1
 
       async function ensureTradeOpenIdempotencyClaim() {
         if (idempotencyClaim) return null
 
         const idempotencyResult = await beginIdempotentRequest(pool, {
           scope: 'trades:open',
-          tenantId: tenantIdForWrite,
           actorId: req.user.userId,
           idempotencyKey: getIdempotencyKey(req)
         })
@@ -1938,7 +1931,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       // â”€â”€ Pending order â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       if (isPending) {
         const p = parseFloat(pending_price)
-        const price = await getLivePrice(instrumentFinal, account.tenant_id).catch(() => null)
+        const price = await getLivePrice(instrumentFinal).catch(() => null)
         const bid = price ? parseFloat(price.bid) : NaN
         const ask = price ? parseFloat(price.ask) : NaN
 
@@ -1990,7 +1983,6 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
         if (screenshot_data_url) {
           const openScreenshotPath = await persistTradeScreenshot({
             tradeId: newTrade.rows[0].id,
-            tenantId: account.tenant_id || 1,
             userId: req.user.userId,
             kind: 'open',
             dataUrl: screenshot_data_url
@@ -2027,7 +2019,6 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
           siblingTradeId = siblingTrade.rows[0]?.id || null
           if (siblingTrade.rows[0]) {
             copierEvents.push({
-              tenantId: account.tenant_id || 1,
               masterAccountId: accountIdStr,
               masterTradeId: siblingTrade.rows[0].id,
               eventType: 'PLACE_PENDING',
@@ -2038,15 +2029,14 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
           }
         }
         await client.query(
-          `INSERT INTO trade_logs (trade_id, user_id, account_id, tenant_id, ip_address, logged_at)
-           VALUES ($1, $2, $3, $4, $5, NOW())`,
-          [newTrade.rows[0].id, req.user.userId, accountIdStr, account.tenant_id || 1, tradeIp]
+          `INSERT INTO trade_logs (trade_id, user_id, account_id, ip_address, logged_at)
+           VALUES ($1, $2, $3, $4, NOW())`,
+          [newTrade.rows[0].id, req.user.userId, accountIdStr, tradeIp]
         )
         await client.query('COMMIT')
 
         const tradeRow = newTrade.rows[0]
         copierEvents.push({
-          tenantId: account.tenant_id || 1,
           masterAccountId: accountIdStr,
           masterTradeId: tradeRow.id,
           eventType: 'PLACE_PENDING',
@@ -2073,7 +2063,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       }
 
       // â”€â”€ Market order â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      const price = await getLivePrice(instrumentFinal, account.tenant_id)
+      const price = await getLivePrice(instrumentFinal)
       const priceAgeMs = Date.now() - new Date(price.updated_at).getTime()
       // Allow up to 10 seconds for price age (more lenient for slower MT5 setups)
       if (priceAgeMs > 10000) {
@@ -2155,7 +2145,6 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       if (screenshot_data_url) {
         const openScreenshotPath = await persistTradeScreenshot({
           tradeId: newTrade.rows[0].id,
-          tenantId: account.tenant_id || 1,
           userId: req.user.userId,
           kind: 'open',
           dataUrl: screenshot_data_url
@@ -2167,15 +2156,14 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       }
 
       await client.query(
-        `INSERT INTO trade_logs (trade_id, user_id, account_id, tenant_id, ip_address, logged_at)
-         VALUES ($1, $2, $3, $4, $5, NOW())`,
-        [newTrade.rows[0].id, req.user.userId, accountIdStr, account.tenant_id || 1, tradeIp]
+        `INSERT INTO trade_logs (trade_id, user_id, account_id, ip_address, logged_at)
+         VALUES ($1, $2, $3, $4, NOW())`,
+        [newTrade.rows[0].id, req.user.userId, accountIdStr, tradeIp]
       )
 
       await client.query('COMMIT')
 
       copierEvents.push({
-        tenantId: account.tenant_id || 1,
         masterAccountId: accountIdStr,
         masterTradeId: newTrade.rows[0].id,
         eventType: 'OPEN_MARKET',
@@ -2252,7 +2240,7 @@ router.post('/close', authenticateToken, tradeCloseLimiter, async function(req, 
 
     // Pre-flight check (outside transaction) for quick rejection
     const tradeResult = await pool.query(
-      `SELECT t.*, t.original_commission, a.user_id, a.tenant_id FROM trades t
+      `SELECT t.*, t.original_commission, a.user_id FROM trades t
        JOIN accounts a ON t.account_id = a.id
        WHERE t.id = $1 AND t.status = 'open'`,
       [trade_id]
@@ -2269,7 +2257,7 @@ router.post('/close', authenticateToken, tradeCloseLimiter, async function(req, 
     }
 
     const secondsOpen = (new Date() - new Date(trade.open_time)) / 1000
-    const rules = await getTradingRules(trade.tenant_id)
+    const rules = await getTradingRules()
     const { minHoldSeconds } = rules
     if (secondsOpen < minHoldSeconds) {
       return res.status(400).json({
@@ -2283,7 +2271,7 @@ router.post('/close', authenticateToken, tradeCloseLimiter, async function(req, 
       return res.status(400).json({ error: `Cannot close trade: ${closeMarketStatus.reason}` })
     }
 
-    const price = await getLivePrice(trade.instrument, trade.tenant_id)
+    const price = await getLivePrice(trade.instrument)
     const priceAgeMs = Date.now() - new Date(price.updated_at).getTime()
     // Allow up to 10 seconds for price age (more lenient for slower MT5 setups)
     if (priceAgeMs > 10000) {
@@ -2447,7 +2435,6 @@ router.post('/close', authenticateToken, tradeCloseLimiter, async function(req, 
       if (screenshot_data_url && closedTradeId) {
         const screenshotPath = await persistTradeScreenshot({
           tradeId: closedTradeId,
-          tenantId: trade.tenant_id || 1,
           userId: req.user.userId,
           kind: 'close',
           dataUrl: screenshot_data_url
@@ -2483,7 +2470,6 @@ router.post('/close', authenticateToken, tradeCloseLimiter, async function(req, 
       })
 
       await emitCopierEventSafe({
-        tenantId: trade.tenant_id || 1,
         masterAccountId: lockedTrade.account_id,
         masterTradeId: trade_id,
         eventType: isPartial ? 'PARTIAL_CLOSE' : 'CLOSE_POSITION',
@@ -2523,16 +2509,14 @@ router.post('/close', authenticateToken, tradeCloseLimiter, async function(req, 
 router.post('/cancel', authenticateToken, tradeCloseLimiter, async function(req, res) {
   try {
     const { trade_id } = req.body
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
 
     if (!trade_id) return res.status(400).json({ error: 'Trade ID required' })
 
-    // FIX (BUG-M003): Added tenant_id filter to prevent cross-tenant cancellation
     const tradeResult = await pool.query(
       `SELECT t.*, a.user_id FROM trades t
        JOIN accounts a ON t.account_id = a.id
-       WHERE t.id = $1 AND t.status = 'pending' AND COALESCE(a.tenant_id, $2) = $2`,
-      [trade_id, tenantId]
+       WHERE t.id = $1 AND t.status = 'pending'`,
+      [trade_id]
     )
 
     if (tradeResult.rows.length === 0) {
@@ -2556,7 +2540,6 @@ router.post('/cancel', authenticateToken, tradeCloseLimiter, async function(req,
     }
 
     await emitCopierEventSafe({
-      tenantId,
       masterAccountId: tradeResult.rows[0].account_id,
       masterTradeId: trade_id,
       eventType: 'CANCEL_PENDING',
@@ -2596,17 +2579,15 @@ const tradeModifyLimiter = rateLimit({
 router.patch('/modify-pending', authenticateToken, tradeModifyLimiter, async function(req, res) {
   try {
     await ensureTradeExperienceInfrastructure()
-    const tenantId = req.user?.tenantId || req.tenant?.id || 1
     const { trade_id, pending_price, stop_loss, take_profit } = req.body
 
     if (!trade_id) return res.status(400).json({ error: 'Trade ID required' })
 
     const tradeResult = await pool.query(
-      `SELECT t.*, a.user_id, a.tenant_id FROM trades t
+      `SELECT t.*, a.user_id FROM trades t
          JOIN accounts a ON t.account_id = a.id
-        WHERE t.id = $1 AND t.status = 'pending'
-          AND COALESCE(a.tenant_id, $2) = $2`,
-      [trade_id, tenantId]
+        WHERE t.id = $1 AND t.status = 'pending'`,
+      [trade_id]
     )
 
     if (tradeResult.rows.length === 0) {
@@ -2619,9 +2600,8 @@ router.patch('/modify-pending', authenticateToken, tradeModifyLimiter, async fun
       return res.status(403).json({ error: 'Unauthorized' })
     }
 
-    const prices = await buildTenantPriceMap([trade.tenant_id])
-    const tenantKey = String(normalizeTenantId(trade.tenant_id) || 1)
-    const price = prices.get(tenantKey)?.[trade.instrument]
+    const prices = await getLivePriceMap()
+    const price = prices[trade.instrument]
     const bid = price ? parseFloat(price.bid) : 0
     const ask = price ? parseFloat(price.ask) : 0
 
@@ -2647,7 +2627,6 @@ router.patch('/modify-pending', authenticateToken, tradeModifyLimiter, async fun
     const row = updated.rows[0]
 
     await emitCopierEventSafe({
-      tenantId: trade.tenant_id || tenantId,
       masterAccountId: trade.account_id,
       masterTradeId: trade_id,
       eventType: 'MODIFY_PENDING',
@@ -2692,7 +2671,7 @@ router.patch('/modify', authenticateToken, tradeModifyLimiter, async function(re
     }
 
     const tradeResult = await pool.query(
-      `SELECT t.*, a.user_id, a.tenant_id FROM trades t
+      `SELECT t.*, a.user_id FROM trades t
        JOIN accounts a ON t.account_id = a.id
        WHERE t.id = $1 AND t.status = 'open'`,
       [trade_id]
@@ -2811,7 +2790,6 @@ router.patch('/modify', authenticateToken, tradeModifyLimiter, async function(re
     }
 
     await emitCopierEventSafe({
-      tenantId: trade.tenant_id || 1,
       masterAccountId: trade.account_id,
       masterTradeId: trade.id,
       eventType: 'MODIFY_POSITION',
@@ -3720,21 +3698,20 @@ router.get('/analytics', authenticateToken, async function(req, res) {
     const accountResult = await pool.query(
       `SELECT id, user_id, account_type, account_size, current_balance, starting_balance,
               peak_balance, status, profit_target, max_drawdown_pct,
-              tenant_id, phase_start_date, phase_end_date, created_at, review_flag_reason
+              phase_start_date, phase_end_date, created_at, review_flag_reason
        FROM accounts WHERE id = $1 AND user_id = $2`,
       [account_id, req.user.userId]
     )
     if (accountResult.rows.length === 0) return res.status(404).json({ error: 'Account not found' })
 
     const account = accountResult.rows[0]
-    const tenantId = account.tenant_id || req.user?.tenantId || req.tenant?.id || 1
 
     const [userResult, openTradeSummaryResult, payoutRowsResult, violationsResult, tenantSettings] = await Promise.all([
       pool.query(
         `SELECT id, email, kyc_status
            FROM users
-          WHERE id = $1 AND COALESCE(tenant_id, $2) = $2`,
-        [req.user.userId, tenantId]
+          WHERE id = $1`,
+        [req.user.userId]
       ),
       pool.query(
         `SELECT
@@ -3748,21 +3725,19 @@ router.get('/analytics', authenticateToken, async function(req, res) {
         `SELECT status, amount_requested, amount_payable, requested_at, paid_at
            FROM payouts
           WHERE account_id = $1
-            AND COALESCE(tenant_id, $2) = $2
           ORDER BY requested_at DESC
           LIMIT 10`,
-        [account_id, tenantId]
+        [account_id]
       ),
       pool.query(
         `SELECT violation_type, severity, status, message, hit_count, last_detected_at
            FROM admin_rule_violations
           WHERE account_id = $1
-            AND ($2::bigint IS NULL OR COALESCE(tenant_id, $2) = $2)
           ORDER BY last_detected_at DESC
           LIMIT 25`,
-        [String(account_id), tenantId]
+        [String(account_id)]
       ),
-      getTenantSettings(tenantId, [
+      getTenantSettings([
         'profit_share_pct',
         'min_payout_amount',
         'payout_processing_days',
@@ -3965,7 +3940,7 @@ router.post('/batch-action', authenticateToken, tradingLimiter, async function(r
     }
 
     const openTradesResult = await pool.query(
-      `SELECT t.*, a.tenant_id FROM trades t
+      `SELECT t.* FROM trades t
        JOIN accounts a ON t.account_id = a.id
        WHERE a.user_id = $1 AND t.account_id = $2 AND t.status = 'open'`,
       [req.user.userId, account_id]
@@ -3989,8 +3964,7 @@ router.post('/batch-action', authenticateToken, tradingLimiter, async function(r
       }
     }
 
-    const tenantId = openTradesResult.rows[0]?.tenant_id || req.user?.tenantId || req.tenant?.id || null
-    const rules = await getTradingRules(tenantId)
+    const rules = await getTradingRules()
     let affectedCount = 0
     const copierEvents = []
     const skipped = {
@@ -4015,7 +3989,7 @@ router.post('/batch-action', authenticateToken, tradingLimiter, async function(r
 
         let currentPrice
         try {
-          const priceObj = await getLivePrice(trade.instrument, trade.tenant_id || tenantId)
+          const priceObj = await getLivePrice(trade.instrument)
           currentPrice = trade.direction === 'buy' ? parseFloat(priceObj.bid) : parseFloat(priceObj.ask)
         } catch {
           skipped.price_unavailable++
@@ -4061,7 +4035,6 @@ router.post('/batch-action', authenticateToken, tradingLimiter, async function(r
           await client.query('COMMIT')
           affectedCount++
           copierEvents.push({
-            tenantId: trade.tenant_id || tenantId,
             masterAccountId: trade.account_id,
             masterTradeId: trade.id,
             eventType: 'MODIFY_POSITION',
@@ -4080,7 +4053,6 @@ router.post('/batch-action', authenticateToken, tradingLimiter, async function(r
           await client.query('COMMIT')
           affectedCount++
           copierEvents.push({
-            tenantId: trade.tenant_id || tenantId,
             masterAccountId: trade.account_id,
             masterTradeId: trade.id,
             eventType: 'CLOSE_POSITION',
