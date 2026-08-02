@@ -122,19 +122,19 @@ function WebcamCapture({ onCapture, onCancel }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: 'var(--bg-base, #0f1117)', borderRadius: '16px', padding: '28px', width: '600px', maxWidth: '95vw', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: '0 24px 80px rgba(0,0,0,0.8)' }}>
+      <div style={{ background: 'var(--glass-2)', border: '1px solid var(--rule-soft)', borderTop: '3px double var(--ink)', padding: '28px', width: '600px', maxWidth: '95vw', display: 'flex', flexDirection: 'column', gap: '16px', backdropFilter: 'blur(20px) saturate(140%)', WebkitBackdropFilter: 'blur(20px) saturate(140%)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ margin: 0, color: 'var(--text, #fff)', fontSize: '17px', fontWeight: 700 }}>Live Photo Capture</h3>
           <button type="button" onClick={handleCancel} style={{ background: 'none', border: 'none', color: 'var(--text-muted, #888)', fontSize: '22px', cursor: 'pointer', lineHeight: 1 }}>x</button>
         </div>
 
         {error ? (
-          <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '8px', padding: '16px', color: 'var(--loss)', fontSize: '14px', lineHeight: 1.6 }}>
+          <div style={{ background: 'color-mix(in srgb, var(--loss) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--loss) 40%, transparent)', padding: '16px', color: 'var(--loss)', fontSize: '14px', lineHeight: 1.6 }}>
             {error}
           </div>
         ) : (
           <>
-            <div style={{ position: 'relative', borderRadius: '10px', overflow: 'hidden', background: '#000', aspectRatio: '16/9' }}>
+            <div style={{ position: 'relative', overflow: 'hidden', background: '#000', aspectRatio: '16/9' }}>
               {!captured ? (
                 <video
                   ref={videoRef}
@@ -164,16 +164,16 @@ function WebcamCapture({ onCapture, onCancel }) {
                   <button type="button" onClick={takeSnapshot} disabled={!ready} style={{ flex: 1, padding: '14px', fontSize: '15px', fontWeight: 700, cursor: ready ? 'pointer' : 'not-allowed', background: ready ? 'var(--ink)' : 'var(--rule)', border: 'none', color: 'var(--paper)', opacity: ready ? 1 : 0.5 }}>
                     Capture Photo
                   </button>
-                  <button type="button" onClick={handleCancel} style={{ padding: '14px 20px', borderRadius: '10px', background: 'transparent', border: '1px solid var(--navy-border, rgba(255,255,255,0.1))', color: 'var(--text-muted, #888)', cursor: 'pointer', fontSize: '14px' }}>
+                  <button type="button" onClick={handleCancel} style={{ padding: '14px 20px', background: 'transparent', border: '1px solid var(--navy-border, rgba(255,255,255,0.1))', color: 'var(--text-muted, #888)', cursor: 'pointer', fontSize: '14px' }}>
                     Cancel
                   </button>
                 </>
               ) : (
                 <>
-                  <button type="button" onClick={usePhoto} style={{ flex: 1, padding: '14px', borderRadius: '10px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', background: 'linear-gradient(135deg, var(--gain), var(--gain))', border: 'none', color: 'var(--paper)' }}>
+                  <button type="button" onClick={usePhoto} style={{ flex: 1, padding: '14px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', background: 'var(--gain)', border: 'none', color: 'var(--paper)' }}>
                     Use This Photo
                   </button>
-                  <button type="button" onClick={() => setCaptured(null)} style={{ padding: '14px 20px', borderRadius: '10px', background: 'transparent', border: '1px solid var(--navy-border, rgba(255,255,255,0.1))', color: 'var(--text-muted, #888)', cursor: 'pointer', fontSize: '14px' }}>
+                  <button type="button" onClick={() => setCaptured(null)} style={{ padding: '14px 20px', background: 'transparent', border: '1px solid var(--navy-border, rgba(255,255,255,0.1))', color: 'var(--text-muted, #888)', cursor: 'pointer', fontSize: '14px' }}>
                     Retake
                   </button>
                 </>
@@ -276,7 +276,7 @@ export default function KYCUploadForm({
   function renderUploadBox({ inputId, label, helper, file, error, accept, onChange }) {
     return (
       <div>
-        <label>{label}</label>
+        <label htmlFor={inputId}>{label}</label>
         <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: 1.5 }}>
           {helper}
         </p>
@@ -284,7 +284,6 @@ export default function KYCUploadForm({
           className="kyc-upload-box"
           style={{
             border: `1.5px dashed ${error ? 'var(--red)' : 'var(--border)'}`,
-            borderRadius: '16px',
             minHeight: '150px',
             padding: '20px',
             display: 'flex',
@@ -292,7 +291,7 @@ export default function KYCUploadForm({
             justifyContent: 'center',
             textAlign: 'center',
             cursor: 'pointer',
-            background: file ? 'rgba(0, 200, 150, 0.08)' : 'rgba(255,255,255,0.025)',
+            background: file ? 'color-mix(in srgb, var(--gain) 8%, transparent)' : 'var(--glass)',
             transition: 'border-color 0.2s ease, background 0.2s ease, transform 0.2s ease'
           }}
           onClick={() => document.getElementById(inputId)?.click()}
@@ -335,8 +334,9 @@ export default function KYCUploadForm({
         <form onSubmit={onSubmit}>
           <div style={{ display: 'grid', gap: '14px', marginBottom: '22px' }}>
             <div>
-              <label>Country of Residence</label>
+              <label htmlFor="kyc_country">Country of Residence</label>
               <select
+                id="kyc_country"
                 className="select-field"
                 value={country || ''}
                 onChange={(event) => setCountry(event.target.value)}
@@ -351,8 +351,9 @@ export default function KYCUploadForm({
 
             <div className="grid-2 kyc-upload-grid">
               <div>
-                <label>Document Type</label>
+                <label htmlFor="kyc_document_type">Document Type</label>
                 <select
+                  id="kyc_document_type"
                   className="select-field"
                   value={documentType || 'passport'}
                   onChange={(event) => setDocumentType(event.target.value)}
@@ -366,8 +367,9 @@ export default function KYCUploadForm({
                 </select>
               </div>
               <div>
-                <label>Document Number</label>
+                <label htmlFor="kyc_document_number">Document Number</label>
                 <input
+                  id="kyc_document_number"
                   className="input-field"
                   value={documentNumber || ''}
                   onChange={(event) => setDocumentNumber(event.target.value)}
@@ -404,7 +406,7 @@ export default function KYCUploadForm({
 
           <div className="grid-2 kyc-upload-grid" style={{ marginTop: '16px' }}>
             <div>
-              <label>Live Photo / Selfie</label>
+              <label htmlFor="selfie_input">Live Photo / Selfie</label>
               <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
                 Use camera or upload a clear selfie with your ID.
               </p>
@@ -412,11 +414,10 @@ export default function KYCUploadForm({
               <div
                 style={{
                   border: `2px dashed ${selfieError ? 'var(--red)' : 'var(--navy-border)'}`,
-                  borderRadius: '16px',
                   overflow: 'hidden',
                   textAlign: 'center',
                   cursor: 'pointer',
-                  background: selfie ? 'rgba(74, 74, 74, 0.12)' : 'transparent',
+                  background: selfie ? 'color-mix(in srgb, var(--gain) 10%, transparent)' : 'var(--glass)',
                   transition: 'all 0.2s',
                   position: 'relative'
                 }}
@@ -469,7 +470,7 @@ export default function KYCUploadForm({
             </div>
           </div>
 
-          <div style={{ marginTop: '20px', padding: '16px', background: 'var(--navy-card)', border: '1px solid var(--navy-border)', borderRadius: '8px', marginBottom: '20px' }}>
+          <div style={{ marginTop: '20px', padding: '16px', background: 'var(--glass)', border: '1px solid var(--rule-soft)', marginBottom: '20px' }}>
             <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-muted)' }}>
               Your documents are stored securely and only used for identity verification. Admin can review the submitted details, ID document, and live photo.
             </p>

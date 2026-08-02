@@ -40,6 +40,8 @@ const {
 const { sanitizeString } = require('../utils/validation')
 const { fetchProgressionSettings, promotePassedAccount } = require('../services/progressionService')
 const { fetchStepModels, fetchStepModelBySlug, toggleStepModel } = require('../utils/stepModels')
+const { CURRENT_TOS_VERSION } = require('../utils/tosVersion')
+const { readKycFileBuffer, getKycContentType, getOriginalKycExtension } = require('../utils/secureKycStorage')
 const { ensureViolationTables } = require('../services/violationEngine')
 const { getTenantSettings } = require('../services/tenantPolicyService')
 const { getPriceForTenant } = require('../priceFeed')
@@ -64,7 +66,7 @@ const adminLoginLimiter = rateLimit({
   skipSuccessfulRequests: true // don't count successful logins against the limit
 })
 
-const ADMIN_VALID_ACCOUNT_SIZES = [5000, 10000, 25000, 50000, 100000]
+const ADMIN_VALID_ACCOUNT_SIZES = [5000, 10000, 25000, 50000, 100000, 200000, 400000]
 
 let _featureTablesReady = false
 let _featureTablesPromise = null
@@ -1654,53 +1656,9 @@ function calcTradePnl(direction, openPrice, currentPrice, lots, instrument) {
   return priceDiff.times(lots).times(contractSize).toDecimalPlaces(2).toNumber()
 }
 
-// -- Copier event helpers (shared by force-close functions) -------------------
-function buildCopierTradePayload(trade, overrides) {
-  if (!overrides) overrides = {}
-  return {
-    instrument: trade.instrument || null,
-    direction: trade.direction || null,
-    status: trade.status || null,
-    order_type: trade.order_type || null,
-    open_price: trade.open_price != null ? trade.open_price : null,
-    close_price: trade.close_price != null ? trade.close_price : null,
-    stop_loss: trade.stop_loss != null ? trade.stop_loss : null,
-    take_profit: trade.take_profit != null ? trade.take_profit : null,
-    lot_size: trade.lot_size != null ? trade.lot_size : null,
-    close_reason: trade.close_reason || null,
-    source: overrides.source || 'admin',
-  }
-}
-
-function queueAdminCopierEvent(target, event) {
-  if (Array.isArray(target)) target.push(event)
-}
-
-async function emitCopierEventSafe(payload) {
-  try {
-    const { writeCopierEvent } = require('../utils/copierV2')
-    await writeCopierEvent(pool, payload)
-  } catch (error) {
-    logger.warn('[copier] Failed to write admin copier event:', {
-      error: error.message,
-      eventType: payload && payload.eventType,
-      masterTradeId: payload && payload.masterTradeId
-    })
-  }
-}
-
-async function emitCopierEventsAfterCommit(events) {
-  if (!Array.isArray(events)) return
-  for (const event of events) {
-    await emitCopierEventSafe(event)
-  }
-}
-
 // -- Force-close helpers ------------------------------------------------------
 async function forceCloseOpenTradesForAccount(client, accountId, options) {
   if (!options) options = {}
-  const localCopierEvents = []
-  const copierEventsTarget = Array.isArray(options.copierEvents) ? options.copierEvents : localCopierEvents
   const openTrades = await client.query(
     `SELECT t.*, a.user_id
        FROM trades t
@@ -1711,7 +1669,7 @@ async function forceCloseOpenTradesForAccount(client, accountId, options) {
   )
 
   if (openTrades.rows.length === 0) {
-    return { closedCount: 0, totalPnl: 0, copierEvents: [] }
+    return { closedCount: 0, totalPnl: 0 }
   }
 
   let totalPnl = 0
@@ -1742,18 +1700,6 @@ async function forceCloseOpenTradesForAccount(client, accountId, options) {
     if (closeResult.rowCount !== 1) {
       throw new Error('Failed to force-close trade ' + t.id)
     }
-    queueAdminCopierEvent(copierEventsTarget, {
-      masterAccountId: accountId,
-      masterTradeId: t.id,
-      eventType: 'CLOSE_POSITION',
-      payload: buildCopierTradePayload(t, {
-        status: 'closed',
-        close_price: currentPrice,
-        close_reason: options.closeReason || 'Admin Auto Enforcement',
-        demo_pnl: pnl,
-        source: options.source || 'admin_force_close_open_trades'
-      })
-    })
   }
 
   await client.query(
@@ -1767,8 +1713,7 @@ async function forceCloseOpenTradesForAccount(client, accountId, options) {
 
   return {
     closedCount: openTrades.rows.length,
-    totalPnl: parseFloat(totalPnl.toFixed(2)),
-    copierEvents: localCopierEvents
+    totalPnl: parseFloat(totalPnl.toFixed(2))
   }
 }
 
@@ -1795,19 +1740,6 @@ async function cancelPendingTradesForAccount(client, accountId, closeReason, opt
   )
   if (cancelled.rows.length !== pendingTrades.rows.length) {
     throw new Error('Failed to cancel all pending trades for account ' + accountId)
-  }
-  for (var ti = 0; ti < pendingTrades.rows.length; ti++) {
-    var trade = pendingTrades.rows[ti]
-    queueAdminCopierEvent(options.copierEvents, {
-      masterAccountId: accountId,
-      masterTradeId: trade.id,
-      eventType: 'CANCEL_PENDING',
-      payload: buildCopierTradePayload(trade, {
-        status: 'cancelled',
-        close_reason: String(closeReason || 'Cancelled by admin'),
-        source: options.source || 'admin_cancel_pending'
-      })
-    })
   }
   return cancelled.rows.length
 }
@@ -1866,19 +1798,6 @@ async function forceCloseTradeById(client, tradeId, closeReason, options) {
       WHERE id = $2`,
     [pnl, trade.account_id]
   )
-
-  queueAdminCopierEvent(options.copierEvents, {
-    masterAccountId: trade.account_id,
-    masterTradeId: trade.id,
-    eventType: 'CLOSE_POSITION',
-    payload: buildCopierTradePayload(trade, {
-      status: 'closed',
-      close_price: closePrice,
-      close_reason: String(closeReason || 'Admin Force Close'),
-      demo_pnl: pnl,
-      source: options.source || 'admin_force_close_trade'
-    })
-  })
 
   return {
     trade_id: trade.id,
@@ -4630,9 +4549,6 @@ router.post('/users/:userId/manual-account', authenticateAdmin, requireAdminCapa
 
     await client.query('COMMIT')
 
-    // Emit copier events after commit
-    await emitCopierEventsAfterCommit(copierEvents)
-
     if (req.app.get('io')) {
       req.app.get('io').to(String(userId)).emit('account_update', {
         message: `Support issued a new ${accountType.toUpperCase()} account for you.`,
@@ -4758,9 +4674,6 @@ router.post('/accounts/:accountId/adjust-balance', authenticateAdmin, requireAdm
 
     await client.query('COMMIT')
 
-    // Emit copier events after commit
-    await emitCopierEventsAfterCommit(copierEvents)
-
     if (req.app.get('io')) {
       req.app.get('io').to(String(account.user_id)).emit('account_update', {
         message: `Admin balance adjustment applied: ${amount >= 0 ? '+' : ''}$${amount.toFixed(2)}`,
@@ -4828,7 +4741,6 @@ router.post('/accounts/:accountId/override', authenticateAdmin, requireAdminCapa
     let updatedAccount = null
     let closeResult = { closedCount: 0, totalPnl: 0 }
     let cancelledCount = 0
-    const copierEvents = []
 
     if (action === 'pass' || action === 'promote') {
       if (!['phase1', 'phase2'].includes(account.account_type)) {
@@ -4910,7 +4822,7 @@ router.post('/accounts/:accountId/override', authenticateAdmin, requireAdminCapa
       )
       message = `Funded account revoked. Closed ${closeResult.closedCount} open trades and cancelled ${cancelledCount} pending orders.`
     } else if (action === 'force_close_open_trades') {
-      closeResult = await forceCloseOpenTradesForAccount(client, account.id, { copierEvents, source: 'admin_enforcement_force_close_open_trades' })
+      closeResult = await forceCloseOpenTradesForAccount(client, account.id, { source: 'admin_enforcement_force_close_open_trades' })
       message = `Force-closed ${closeResult.closedCount} open trades; total P&L ${closeResult.totalPnl >= 0 ? '+' : ''}$${closeResult.totalPnl.toFixed(2)}`
     } else if (action === 'restore_active') {
       if (!['failed', 'locked'].includes(String(account.status || '').toLowerCase())) {
@@ -5026,9 +4938,6 @@ router.post('/accounts/:accountId/override', authenticateAdmin, requireAdminCapa
 
     await client.query('COMMIT')
 
-    // Emit copier events after commit
-    await emitCopierEventsAfterCommit(copierEvents)
-
     if (req.app.get('io')) {
       req.app.get('io').to(String(account.user_id)).emit('account_update', {
         message,
@@ -5084,6 +4993,67 @@ router.post('/accounts/:accountId/override', authenticateAdmin, requireAdminCapa
 
 router.get('/trades', authenticateAdmin, requireAdminCapability('trader:read'), async function(req, res) {
   try {
+    const paging = parseListPaging(req)
+    const direction = String(req.query?.direction || 'all').toLowerCase()
+    const status = String(req.query?.status || 'all').toLowerCase()
+    const search = String(req.query?.search || req.query?.q || '').trim()
+
+    // Built separately from `statusCondition` so the Open/Pending/Closed stat-card
+    // breakdown (below) can reflect the full picture under the active search+
+    // direction filter, independent of which status tab happens to be selected.
+    const searchDirectionConditions = []
+    const searchDirectionValues = []
+    let sdParamIndex = 1
+
+    if (['buy', 'sell'].includes(direction)) {
+      searchDirectionConditions.push(`t.direction = $${sdParamIndex}`)
+      searchDirectionValues.push(direction)
+      sdParamIndex++
+    }
+    if (search) {
+      searchDirectionConditions.push(`(
+        t.id::text ILIKE $${sdParamIndex} OR
+        t.account_id::text ILIKE $${sdParamIndex} OR
+        a.user_id::text ILIKE $${sdParamIndex} OR
+        t.instrument ILIKE $${sdParamIndex}
+      )`)
+      searchDirectionValues.push(`%${search}%`)
+      sdParamIndex++
+    }
+
+    const conditions = [...searchDirectionConditions]
+    const values = [...searchDirectionValues]
+    let paramIndex = sdParamIndex
+
+    if (['open', 'pending', 'closed'].includes(status)) {
+      conditions.push(`t.status = $${paramIndex}`)
+      values.push(status)
+      paramIndex++
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+    const searchDirectionWhereClause = searchDirectionConditions.length > 0 ? `WHERE ${searchDirectionConditions.join(' AND ')}` : ''
+
+    const [countResult, breakdownResult] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*) FROM trades t JOIN accounts a ON a.id = t.account_id ${whereClause}`,
+        values
+      ),
+      pool.query(
+        `SELECT t.status, COUNT(*) FROM trades t JOIN accounts a ON a.id = t.account_id ${searchDirectionWhereClause} GROUP BY t.status`,
+        searchDirectionValues
+      )
+    ])
+    const totalItems = parseInt(countResult.rows[0]?.count || 0, 10)
+    const summary = { total: totalItems, open: 0, pending: 0, closed: 0 }
+    for (const row of breakdownResult.rows) {
+      if (row.status === 'open') summary.open = parseInt(row.count, 10)
+      else if (row.status === 'pending') summary.pending = parseInt(row.count, 10)
+      else summary.closed += parseInt(row.count, 10)
+    }
+
+    const limitParam = paramIndex
+    const offsetParam = paramIndex + 1
     const result = await pool.query(
       `SELECT t.id,
               t.account_id,
@@ -5105,9 +5075,12 @@ router.get('/trades', authenticateAdmin, requireAdminCapability('trader:read'), 
        FROM trades t
        JOIN accounts a ON a.id = t.account_id
        LEFT JOIN price_feed p ON p.instrument = t.instrument
+       ${whereClause}
        ORDER BY
          CASE WHEN t.status = 'open' THEN 0 WHEN t.status = 'pending' THEN 1 ELSE 2 END,
-         COALESCE(t.close_time, t.open_time) DESC`
+         COALESCE(t.close_time, t.open_time) DESC
+       LIMIT $${limitParam} OFFSET $${offsetParam}`,
+      [...values, paging.pageSize, (paging.page - 1) * paging.pageSize]
     )
 
     const rows = result.rows.map(row => {
@@ -5132,7 +5105,11 @@ router.get('/trades', authenticateAdmin, requireAdminCapability('trader:read'), 
       }
     })
 
-    res.json(rows)
+    res.json({
+      rows,
+      summary,
+      pagination: buildPagination({ page: paging.page, pageSize: paging.pageSize, total: totalItems })
+    })
   } catch (error) {
     logger.error('Admin trades fetch error:', { error: error.message })
     res.status(500).json({ error: 'Could not fetch trades' })
@@ -5166,9 +5143,6 @@ router.post('/trades/:tradeId/close', authenticateAdmin, requireAdminCapability(
     } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     await client.query('COMMIT')
-
-    // Emit copier events after commit
-    await emitCopierEventsAfterCommit(copierEvents)
 
     if (req.app.get('io')) {
       req.app.get('io').to(String(closed.user_id)).emit('account_update', {
@@ -6002,7 +5976,6 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
           ])
           let closeResult = { closedCount: 0, totalPnl: 0 }
           let cancelledCount = 0
-    const copierEvents = []
           let linkedAccountId = null
           let message = ''
 
@@ -6101,6 +6074,22 @@ router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapabi
           } else if (action === 'force_close_open_trades') {
             closeResult = await forceCloseOpenTradesForAccount(client, account.id)
             message = `Force-closed ${closeResult.closedCount} open trades`
+          } else if (action === 'revoke_funded') {
+            if (account.account_type !== 'funded') {
+              throw createHttpError('Only funded accounts can be revoked', 400)
+            }
+            closeResult = await forceCloseOpenTradesForAccount(client, account.id)
+            cancelledCount = await cancelPendingTradesForAccount(client, account.id, 'Funding Revoked by Admin (Bulk)')
+            await client.query(
+              `UPDATE accounts
+                  SET status = 'locked',
+                      review_flagged = TRUE,
+                      review_flag_reason = $2,
+                      updated_at = NOW()
+                WHERE id = $1`,
+              [account.id, reason || 'Funding revoked by admin']
+            )
+            message = `Funded account revoked. Closed ${closeResult.closedCount} open trades and cancelled ${cancelledCount} pending orders.`
           } else {
             throw createHttpError(`Unsupported bulk account action: ${action}`, 400)
           }
@@ -6500,13 +6489,36 @@ router.get('/audit-log', authenticateAdmin, requireSuperAdmin, async (req, res) 
     await ensureFeatureTables()
     const limit  = Math.min(parseInt(req.query.limit  || '200', 10), 1000)
     const offset = parseInt(req.query.offset || '0', 10)
+
+    const conditions = []
+    const values = []
+    if (req.query.entity_id) {
+      values.push(`%${String(req.query.entity_id)}%`)
+      conditions.push(`entity_id ILIKE $${values.length}`)
+    }
+    if (req.query.event_type) {
+      values.push(String(req.query.event_type))
+      conditions.push(`event_type = $${values.length}`)
+    }
+    if (req.query.created_from) {
+      values.push(String(req.query.created_from))
+      conditions.push(`created_at >= $${values.length}::timestamptz`)
+    }
+    if (req.query.created_to) {
+      values.push(String(req.query.created_to))
+      conditions.push(`created_at < ($${values.length}::timestamptz + INTERVAL '1 day')`)
+    }
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+
+    values.push(limit, offset)
     const result = await pool.query(
       `SELECT id, event_type, entity_type, entity_id, actor, payload_json,
               prev_hash, entry_hash, created_at
        FROM admin_immutable_audit
+       ${where}
        ORDER BY created_at DESC
-       LIMIT $1 OFFSET $2`,
-      [limit, offset]
+       LIMIT $${values.length - 1} OFFSET $${values.length}`,
+      values
     );
     res.json({ entries: result.rows });
   } catch (err) {
@@ -6514,6 +6526,33 @@ router.get('/audit-log', authenticateAdmin, requireSuperAdmin, async (req, res) 
     res.status(500).json({ error: 'Failed to load audit log' });
   }
 });
+
+router.get('/tos-acceptance', authenticateAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT u.id AS user_id, u.email, u.full_name, uaa.tos_version, uaa.accepted_at
+         FROM users u
+         LEFT JOIN LATERAL (
+           SELECT tos_version, accepted_at
+             FROM user_agreement_acceptances
+            WHERE user_id = u.id
+            ORDER BY accepted_at DESC
+            LIMIT 1
+         ) uaa ON true
+        ORDER BY u.created_at DESC
+        LIMIT 500`
+    )
+    const rows = result.rows.map((row) => ({
+      ...row,
+      current_version: CURRENT_TOS_VERSION,
+      outdated: row.tos_version !== CURRENT_TOS_VERSION
+    }))
+    res.json({ current_version: CURRENT_TOS_VERSION, rows })
+  } catch (err) {
+    logger.error('ToS acceptance error:', { error: err.message })
+    res.status(500).json({ error: 'Failed to load ToS acceptance records' })
+  }
+})
 
 router.get('/settings-log', authenticateAdmin, requireSuperAdmin, async (req, res) => {
   try {
@@ -6660,11 +6699,31 @@ router.get('/settings/account-availability', authenticateAdmin, async (req, res)
   }
 });
 
-router.post('/settings', authenticateAdmin, async (req, res) => {
+const WRITABLE_SETTINGS_KEYS = new Set([
+  'challenge_start_requires_kyc', 'hide_unavailable_sizes_on_landing', 'sold_out_message',
+  'promotion_requires_admin_review', 'promotion_review_sla_hours', 'failed_account_visibility_days',
+  'passed_account_visibility_days', 'expired_account_visibility_days',
+  'funded_max_drawdown_pct', 'profit_share_pct', 'payouts_enabled', 'min_payout_amount',
+  'payout_request_cooldown_hours', 'payout_requires_kyc_approved', 'payout_requires_no_open_positions',
+  'min_hold_seconds', 'min_lot_size', 'forex_lots_per_1k', 'commodity_lots_per_1k',
+  'max_trades_per_1k', 'max_daily_trades', 'weekend_holding_enabled',
+  'dynamic_commission_per_lot', 'commission_per_lot_json',
+  'slippage_simulator_enabled', 'slippage_max_pips_adverse', 'slippage_max_pips_adverse_json',
+  'news_protection_enabled', 'news_protection_block_new_orders', 'news_protection_lookahead_minutes',
+  'rollover_guard_enabled', 'rollover_guard_block_new_orders',
+  'support_response_sla_hours', 'dispute_submission_window_days', 'support_ticket_categories',
+  'support_escalation_label', 'inactivity_auto_fail_enabled', 'inactivity_fail_days',
+  'payment_provider', 'payment_provider_public_key', 'payment_provider_secret_key',
+  'payment_provider_webhook_secret', 'payment_provider_account_id',
+  'affiliate_program_enabled', 'affiliate_referred_discount_pct',
+  'affiliate_min_payout_amount', 'affiliate_default_commission_pct'
+]);
+
+router.post('/settings', authenticateAdmin, requireSuperAdmin, async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const keys = Object.keys(req.body);
+    const keys = Object.keys(req.body).filter(key => WRITABLE_SETTINGS_KEYS.has(key));
     for (const key of keys) {
       await client.query(
         `INSERT INTO platform_settings (key, value, updated_at)
@@ -7993,19 +8052,22 @@ router.get('/kyc-quality-flags', authenticateAdmin, requireAdminCapability('kyc:
     )
 
     function inspectRelativeFile(relPath) {
+      // getOriginalKycExtension strips a `.enc` at-rest-encryption suffix (if present)
+      // before reading the extension, so encrypted and legacy plaintext files report
+      // the same logical extension for the quality heuristics below.
       if (!relPath) return { exists: false, size_bytes: 0, ext: '' }
       const raw = String(relPath).replace(/^[/\\]+/, '')
       const safe = raw.replace(/\.\./g, '')
       const abs = path.resolve(uploadsRoot, safe)
       if (!abs.startsWith(uploadsRoot + path.sep) && abs !== uploadsRoot) {
-        return { exists: false, size_bytes: 0, ext: path.extname(raw).toLowerCase() }
+        return { exists: false, size_bytes: 0, ext: getOriginalKycExtension(raw) }
       }
       try {
-        if (!fs.existsSync(abs)) return { exists: false, size_bytes: 0, ext: path.extname(raw).toLowerCase() }
+        if (!fs.existsSync(abs)) return { exists: false, size_bytes: 0, ext: getOriginalKycExtension(raw) }
         const st = fs.statSync(abs)
-        return { exists: true, size_bytes: st.size, ext: path.extname(raw).toLowerCase() }
+        return { exists: true, size_bytes: st.size, ext: getOriginalKycExtension(raw) }
       } catch {
-        return { exists: false, size_bytes: 0, ext: path.extname(raw).toLowerCase() }
+        return { exists: false, size_bytes: 0, ext: getOriginalKycExtension(raw) }
       }
     }
 
@@ -9066,15 +9128,13 @@ router.get('/emergency-kill/status', authenticateAdmin, async (req, res) => {
     const settings = await getSettingsMap([
       'emergency_kill_enabled',
       'emergency_kill_last_triggered_at',
-      'emergency_kill_last_reset_at',
-      'copier_enabled'
+      'emergency_kill_last_reset_at'
     ])
     const openTrades = await pool.query(`SELECT COUNT(*)::int AS c FROM trades WHERE status = 'open'`)
     res.json({
       enabled: toBool(settings.emergency_kill_enabled, false),
       last_triggered_at: settings.emergency_kill_last_triggered_at || null,
       last_reset_at: settings.emergency_kill_last_reset_at || null,
-      copier_enabled: toBool(settings.copier_enabled, true),
       open_trades: parseInt(openTrades.rows[0]?.c || 0, 10)
     })
   } catch (err) {
@@ -9082,7 +9142,7 @@ router.get('/emergency-kill/status', authenticateAdmin, async (req, res) => {
   }
 })
 
-router.post('/emergency-kill/execute', authenticateAdmin, async (req, res) => {
+router.post('/emergency-kill/execute', authenticateAdmin, requireSuperAdmin, async (req, res) => {
   const client = await pool.connect()
   try {
     await ensureFeatureTables()
@@ -9124,7 +9184,6 @@ router.post('/emergency-kill/execute', authenticateAdmin, async (req, res) => {
 
     await upsertSetting(client, 'emergency_kill_enabled', 'true')
     await upsertSetting(client, 'emergency_kill_last_triggered_at', new Date().toISOString())
-    await upsertSetting(client, 'copier_enabled', 'false')
 
     try {
       await appendImmutableAudit(client, {
@@ -9145,7 +9204,6 @@ router.post('/emergency-kill/execute', authenticateAdmin, async (req, res) => {
       closed_trades: closedTrades,
       affected_accounts: accountIdsResult.rows.length,
       total_pnl: parseFloat(totalPnl.toFixed(2)),
-      copier_enabled: false,
       emergency_kill_enabled: true
     })
   } catch (err) {
@@ -9156,32 +9214,27 @@ router.post('/emergency-kill/execute', authenticateAdmin, async (req, res) => {
   }
 })
 
-router.post('/emergency-kill/reset', authenticateAdmin, async (req, res) => {
+router.post('/emergency-kill/reset', authenticateAdmin, requireSuperAdmin, async (req, res) => {
   const client = await pool.connect()
   try {
     await ensureFeatureTables()
-    const reEnableCopier = toBool(req.body?.reenable_copier, false)
 
     await client.query('BEGIN')
     await upsertSetting(client, 'emergency_kill_enabled', 'false')
     await upsertSetting(client, 'emergency_kill_last_reset_at', new Date().toISOString())
-    if (reEnableCopier) {
-      await upsertSetting(client, 'copier_enabled', 'true')
-    }
 
     try {
       await appendImmutableAudit(client, {
         eventType: 'emergency_kill_reset',
         entityType: 'system',
         entityId: 'global',
-        payload: { reenable_copier: reEnableCopier }
+        payload: {}
       })
     } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     await client.query('COMMIT')
     res.json({
       emergency_kill_enabled: false,
-      copier_enabled: reEnableCopier ? true : undefined,
       last_reset_at: new Date().toISOString()
     })
   } catch (err) {
@@ -9243,7 +9296,18 @@ router.get('/kyc/document/:userId/:type', authenticateAdmin, requireAdminCapabil
       })
     } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
-    res.sendFile(absoluteFilePath);
+    // readKycFileBuffer transparently decrypts `.enc` files (AES-256-GCM at rest)
+    // and passes legacy plaintext files straight through, so both eras of upload
+    // are served the same way.
+    let buffer
+    try {
+      buffer = readKycFileBuffer(absoluteFilePath).buffer
+    } catch (decryptErr) {
+      logger.error('[kyc-doc] Failed to decrypt document:', { error: decryptErr.message, userId, type });
+      return res.status(500).json({ error: 'Failed to retrieve KYC document' });
+    }
+    res.setHeader('Content-Type', getKycContentType(absoluteFilePath));
+    res.send(buffer);
   } catch (err) {
     logger.error('[kyc-doc] Error serving document:', { error: err.message });
     res.status(500).json({ error: 'Failed to retrieve KYC document' });
@@ -9296,10 +9360,6 @@ router._internals = {
   cancelPendingTradesForAccount,
   forceCloseTradeById,
   calcTradePnl,
-  emitCopierEventSafe,
-  emitCopierEventsAfterCommit,
-  buildCopierTradePayload,
-  queueAdminCopierEvent,
   upsertAdminEntityMeta,
   computePhaseEndDateForAccountType,
   appendImmutableAudit,

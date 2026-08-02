@@ -2,83 +2,89 @@ const pool = require('../db')
 const logger = require('./logger')
 
 // Authoritative rule/pricing data for the paid 1-step / 2-step / 3-step challenge system.
-// Source: business-supplied rules file (prop-firm-challenge-rules.json), reviewed 2026-07-25.
+// Source: business-supplied "Challenge Models — Updated" rules sheet, reviewed 2026-07-26.
 const STEP_MODEL_SEED = [
   {
     slug: '1-step',
     name: '1-Step',
-    description: 'Single-phase evaluation: hit a 10% profit target within 45 days while staying inside a 4% trailing drawdown.',
+    description: 'Single-phase evaluation: hit a 16% profit target within 45 days while staying inside a 4% trailing drawdown.',
     steps: 1,
     display_order: 1,
-    profit_targets_pct: [10],
+    profit_targets_pct: [16],
     daily_drawdown_pct: 2,
     max_drawdown_pct: 4,
     time_limits_days: [45],
-    consistency_max_day_pct_by_phase: [12],
-    consistency_max_day_pct: 12,
-    min_trading_days: 8,
+    consistency_max_day_pct_by_phase: [15],
+    consistency_max_day_pct: 15,
+    min_trading_days: 5,
+    min_daily_profit_pct: 0.75,
     news_restriction_minutes: 2,
-    scaling_target_pct: 5,
+    scaling_target_pct: 6,
     scaling_multiplier: 2,
+    scaling_max_account_size: 30000000,
     scaling_increase_per_milestone_pct: 25
   },
   {
     slug: '2-step',
     name: '2-Step',
-    description: 'Two-phase evaluation: 8% then 5% profit targets, 40 days per phase, 4.5% trailing drawdown.',
+    description: 'Two-phase evaluation: 10% then 8% profit targets, 45 days per phase, 4% trailing drawdown.',
     steps: 2,
     display_order: 2,
-    profit_targets_pct: [8, 5],
-    daily_drawdown_pct: 2.5,
-    max_drawdown_pct: 4.5,
-    time_limits_days: [40, 40],
-    consistency_max_day_pct_by_phase: [14, 18],
-    consistency_max_day_pct: 18,
-    min_trading_days: 6,
+    profit_targets_pct: [10, 8],
+    daily_drawdown_pct: 2,
+    max_drawdown_pct: 4,
+    time_limits_days: [45, 45],
+    consistency_max_day_pct_by_phase: [15, 15],
+    consistency_max_day_pct: 15,
+    min_trading_days: 5,
+    min_daily_profit_pct: 0.75,
     news_restriction_minutes: 2,
-    scaling_target_pct: 5,
+    scaling_target_pct: 6,
     scaling_multiplier: 2,
+    scaling_max_account_size: 30000000,
     scaling_increase_per_milestone_pct: 25
   },
   {
     slug: '3-step',
     name: '3-Step',
-    description: 'Three-phase evaluation: 6%/5%/4% profit targets, 35 days per phase, 5% trailing drawdown.',
+    description: 'Three-phase evaluation: 8%/6%/6% profit targets, 45 days per phase, 4% trailing drawdown.',
     steps: 3,
     display_order: 3,
-    profit_targets_pct: [6, 5, 4],
-    daily_drawdown_pct: 2.5,
-    max_drawdown_pct: 5,
-    time_limits_days: [35, 35, 35],
-    consistency_max_day_pct_by_phase: [18, 18, 20],
-    consistency_max_day_pct: 20,
+    profit_targets_pct: [8, 6, 6],
+    daily_drawdown_pct: 2,
+    max_drawdown_pct: 4,
+    time_limits_days: [45, 45, 45],
+    consistency_max_day_pct_by_phase: [15, 15, 15],
+    consistency_max_day_pct: 15,
     min_trading_days: 5,
+    min_daily_profit_pct: 0.75,
     news_restriction_minutes: 2,
-    scaling_target_pct: 5,
+    scaling_target_pct: 6,
     scaling_multiplier: 2,
+    scaling_max_account_size: 30000000,
     scaling_increase_per_milestone_pct: 25
   }
 ]
 
 // funded_stage rules apply the same way to every model
 const FUNDED_STAGE = {
-  funded_max_drawdown_pct: 5,
-  funded_daily_drawdown_pct: 3,
+  funded_max_drawdown_pct: 4,
+  funded_daily_drawdown_pct: 2,
   funded_drawdown_locks_at_pct: 2,
   funded_min_trading_days_for_payout: 10,
-  funded_payout_min_net_profit_pct: 5,
-  funded_consistency_max_day_pct: 20,
-  payout_frequency: 'biweekly',
-  profit_split_pct: 80
+  funded_payout_min_net_profit_pct: 6,
+  funded_consistency_max_day_pct: 15,
+  payout_frequency: 'weekly',
+  profit_split_pct: 75
 }
 
 const PRICING_SEED = {
-  '1-step': { 5000: 7, 10000: 12, 25000: 22, 50000: 34, 100000: 49 },
-  '2-step': { 5000: 5, 10000: 9, 25000: 17, 50000: 27, 100000: 39 },
-  '3-step': { 5000: 4, 10000: 7, 25000: 13, 50000: 20, 100000: 29 }
+  '1-step': { 5000: 7, 10000: 12, 25000: 22, 50000: 34, 100000: 49, 200000: 79, 400000: 99 },
+  '2-step': { 5000: 5, 10000: 9, 25000: 17, 50000: 27, 100000: 39, 200000: 64, 400000: 79 },
+  '3-step': { 5000: 4, 10000: 7, 25000: 13, 50000: 20, 100000: 29, 200000: 48, 400000: 59 }
 }
 
-const ACCOUNT_SIZES = [5000, 10000, 25000, 50000, 100000]
+const ACCOUNT_SIZES = [5000, 10000, 25000, 50000, 100000, 200000, 400000]
 
 let stepModelInfrastructurePromise = null
 
@@ -189,20 +195,22 @@ async function ensureStepModelInfrastructure() {
            slug, name, description, steps, is_active, display_order,
            profit_targets_pct, daily_drawdown_pct, max_drawdown_pct, drawdown_type,
            time_limits_days, consistency_max_day_pct_by_phase, consistency_max_day_pct,
-           min_trading_days, news_restriction_minutes, allow_overnight, allow_weekend_holding,
-           profit_split_pct, scaling_target_pct, scaling_multiplier, scaling_increase_per_milestone_pct,
+           min_trading_days, min_daily_profit_pct, news_restriction_minutes, allow_overnight, allow_weekend_holding,
+           profit_split_pct, scaling_target_pct, scaling_multiplier, scaling_increase_per_milestone_pct, scaling_max_account_size,
            funded_max_drawdown_pct, funded_daily_drawdown_pct, funded_drawdown_locks_at_pct,
            funded_min_trading_days_for_payout, funded_payout_min_net_profit_pct,
-           funded_consistency_max_day_pct, payout_frequency
+           funded_consistency_max_day_pct, payout_frequency,
+           no_martingale, no_grid_trading, no_ea_bots, no_hedging
          ) VALUES (
            $1, $2, $3, $4, TRUE, $5,
            $6::jsonb, $7, $8, 'trailing',
            $9::jsonb, $10::jsonb, $11,
-           $12, $13, FALSE, FALSE,
-           $14, $15, $16, $17,
-           $18, $19, $20,
-           $21, $22,
-           $23, $24
+           $12, $13, $14, FALSE, FALSE,
+           $15, $16, $17, $18, $19,
+           $20, $21, $22,
+           $23, $24,
+           $25, $26,
+           TRUE, TRUE, TRUE, TRUE
          )
          ON CONFLICT (slug) DO UPDATE SET
            name = EXCLUDED.name,
@@ -217,6 +225,7 @@ async function ensureStepModelInfrastructure() {
            consistency_max_day_pct_by_phase = EXCLUDED.consistency_max_day_pct_by_phase,
            consistency_max_day_pct = EXCLUDED.consistency_max_day_pct,
            min_trading_days = EXCLUDED.min_trading_days,
+           min_daily_profit_pct = EXCLUDED.min_daily_profit_pct,
            news_restriction_minutes = EXCLUDED.news_restriction_minutes,
            allow_overnight = EXCLUDED.allow_overnight,
            allow_weekend_holding = EXCLUDED.allow_weekend_holding,
@@ -224,6 +233,7 @@ async function ensureStepModelInfrastructure() {
            scaling_target_pct = EXCLUDED.scaling_target_pct,
            scaling_multiplier = EXCLUDED.scaling_multiplier,
            scaling_increase_per_milestone_pct = EXCLUDED.scaling_increase_per_milestone_pct,
+           scaling_max_account_size = EXCLUDED.scaling_max_account_size,
            funded_max_drawdown_pct = EXCLUDED.funded_max_drawdown_pct,
            funded_daily_drawdown_pct = EXCLUDED.funded_daily_drawdown_pct,
            funded_drawdown_locks_at_pct = EXCLUDED.funded_drawdown_locks_at_pct,
@@ -231,14 +241,18 @@ async function ensureStepModelInfrastructure() {
            funded_payout_min_net_profit_pct = EXCLUDED.funded_payout_min_net_profit_pct,
            funded_consistency_max_day_pct = EXCLUDED.funded_consistency_max_day_pct,
            payout_frequency = EXCLUDED.payout_frequency,
+           no_martingale = EXCLUDED.no_martingale,
+           no_grid_trading = EXCLUDED.no_grid_trading,
+           no_ea_bots = EXCLUDED.no_ea_bots,
+           no_hedging = EXCLUDED.no_hedging,
            updated_at = NOW()
          RETURNING id`,
         [
           model.slug, model.name, model.description, model.steps, model.display_order,
           JSON.stringify(model.profit_targets_pct), model.daily_drawdown_pct, model.max_drawdown_pct,
           JSON.stringify(model.time_limits_days), JSON.stringify(model.consistency_max_day_pct_by_phase), model.consistency_max_day_pct,
-          model.min_trading_days, model.news_restriction_minutes,
-          FUNDED_STAGE.profit_split_pct, model.scaling_target_pct, model.scaling_multiplier, model.scaling_increase_per_milestone_pct,
+          model.min_trading_days, model.min_daily_profit_pct, model.news_restriction_minutes,
+          FUNDED_STAGE.profit_split_pct, model.scaling_target_pct, model.scaling_multiplier, model.scaling_increase_per_milestone_pct, model.scaling_max_account_size,
           FUNDED_STAGE.funded_max_drawdown_pct, FUNDED_STAGE.funded_daily_drawdown_pct, FUNDED_STAGE.funded_drawdown_locks_at_pct,
           FUNDED_STAGE.funded_min_trading_days_for_payout, FUNDED_STAGE.funded_payout_min_net_profit_pct,
           FUNDED_STAGE.funded_consistency_max_day_pct, FUNDED_STAGE.payout_frequency

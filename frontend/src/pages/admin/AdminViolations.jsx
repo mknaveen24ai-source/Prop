@@ -615,7 +615,6 @@ export default function AdminViolations() {
                   alignItems: 'center',
                   padding: '12px 14px',
                   border: '1px solid var(--admin-border)',
-                  borderRadius: '8px',
                   background: 'var(--admin-surface)'
                 }}
               >
@@ -690,7 +689,6 @@ export default function AdminViolations() {
               <div style={{
                 background: 'var(--admin-bg)',
                 border: '1px solid var(--admin-border)',
-                borderRadius: '8px',
                 padding: '14px',
                 color: 'var(--admin-text)',
                 lineHeight: '1.6'
@@ -723,7 +721,6 @@ export default function AdminViolations() {
               <div style={{
                 background: 'var(--admin-bg)',
                 border: '1px solid var(--admin-border)',
-                borderRadius: '8px',
                 padding: '14px',
                 color: 'var(--admin-text)',
                 fontSize: '12px',

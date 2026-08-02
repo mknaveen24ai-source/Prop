@@ -118,10 +118,10 @@ export function getStatusColor(status) {
     approved: 'var(--green)',
     paid: 'var(--green)',
     rejected: 'var(--red)',
-    locked: '#8a8a8a',
-    expired: '#8a8a8a'
+    locked: 'var(--muted)',
+    expired: 'var(--muted)'
   }
-  return colors[status] || '#8a8a8a'
+  return colors[status] || 'var(--muted)'
 }
 
 /**

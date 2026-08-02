@@ -2,15 +2,17 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, ReferenceLine
+  Tooltip, ResponsiveContainer, ReferenceLine,
+  PieChart, Pie, Cell, Legend
 } from 'recharts';
 import AdminBadge from '../../components/admin/AdminBadge';
-import { chartThemeProps } from '../../components/admin/AdminChart';
+import AdminChart, { chartThemeProps } from '../../components/admin/AdminChart';
 import AdminDataTable from '../../components/admin/AdminDataTable';
 import AdminEntityDrawer from '../../components/admin/AdminEntityDrawer';
 import AdminFilterBar from '../../components/admin/AdminFilterBar';
 import AdminListToolbar from '../../components/admin/AdminListToolbar';
 import AdminStatCard from '../../components/admin/AdminStatCard';
+import AdminStatGrid from '../../components/admin/AdminStatGrid';
 import { useToast } from '../../components/admin/AdminToast';
 import { exportAdminResource } from '../../utils/adminList';
 
@@ -118,6 +120,17 @@ export default function AdminPlatformPnL() {
   const winRate = filteredTrades.length > 0 ? `${((winningTrades / filteredTrades.length) * 100).toFixed(1)}%` : '-';
   const fundedAccounts = overview?.accounts?.funded || 0;
   const totalTraders = overview?.users?.total || 0;
+
+  // Passed = accounts that cleared evaluation (passed + already-funded); Failed
+  // = accounts that didn't make it (failed + expired); Active = still evaluating.
+  const passFailData = useMemo(() => {
+    const accounts = overview?.accounts || {};
+    return [
+      { name: 'Active', value: (accounts.phase1 || 0) + (accounts.phase2 || 0), color: 'var(--admin-info)' },
+      { name: 'Passed', value: (accounts.passed || 0) + (accounts.funded || 0), color: 'var(--admin-success)' },
+      { name: 'Failed', value: (accounts.failed || 0) + (accounts.expired || 0), color: 'var(--admin-danger)' }
+    ].filter((item) => item.value > 0);
+  }, [overview]);
 
   const saveView = async () => {
     const name = window.prompt('Name this platform PnL view', 'Positive Edge');
@@ -289,14 +302,14 @@ export default function AdminPlatformPnL() {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '20px', marginBottom: '24px' }}>
-        <AdminStatCard icon="EDGE" label="Filtered Edge" value={formatMoney(totalEdge)} trendDirection={totalEdge >= 0 ? 'up' : 'down'} />
-        <AdminStatCard icon="FEE" label="Filtered Fees" value={formatMoney(totalFees)} trendDirection="up" />
-        <AdminStatCard icon="WR" label="Trader Win Rate" value={winRate} />
-        <AdminStatCard icon="ROWS" label="Closed Trades" value={filteredTrades.length.toLocaleString()} />
-        <AdminStatCard icon="USR" label="Total Traders" value={totalTraders.toLocaleString()} />
-        <AdminStatCard icon="ACC" label="Funded Accounts" value={fundedAccounts.toLocaleString()} />
-      </div>
+      <AdminStatGrid minColumnWidth={190}>
+        <AdminStatCard icon="pnl" label="Filtered Edge" value={formatMoney(totalEdge)} trendDirection={totalEdge >= 0 ? 'up' : 'down'} />
+        <AdminStatCard icon="payouts" label="Filtered Fees" value={formatMoney(totalFees)} trendDirection="up" />
+        <AdminStatCard icon="trades" label="Trader Win Rate" value={winRate} />
+        <AdminStatCard icon="history" label="Closed Trades" value={filteredTrades.length.toLocaleString()} />
+        <AdminStatCard icon="users" label="Total Traders" value={totalTraders.toLocaleString()} />
+        <AdminStatCard icon="funded" label="Funded Accounts" value={fundedAccounts.toLocaleString()} />
+      </AdminStatGrid>
 
       <div className="admin-card" style={{ marginBottom: '24px' }}>
         <h2 className="admin-h2" style={{ marginBottom: '24px' }}>Recent Platform Edge</h2>
@@ -317,6 +330,39 @@ export default function AdminPlatformPnL() {
             <Area type="monotone" dataKey="fees" stroke="var(--admin-gold)" fill="none" strokeWidth={2} name="Fee Revenue" strokeDasharray="5 3" />
           </AreaChart>
         </ResponsiveContainer>
+      </div>
+
+      <div style={{ marginBottom: '24px' }}>
+        {passFailData.length > 0 ? (
+          <AdminChart title="Pass / Fail Breakdown">
+            <PieChart>
+              <Tooltip {...chartThemeProps.tooltip} />
+              <Legend wrapperStyle={{ fontSize: '12px' }} />
+              <Pie
+                data={passFailData}
+                cx="50%"
+                cy="50%"
+                innerRadius={55}
+                outerRadius={78}
+                paddingAngle={4}
+                dataKey="value"
+                stroke="var(--admin-surface)"
+                strokeWidth={2}
+              >
+                {passFailData.map((entry, index) => (
+                  <Cell key={entry.name || index} fill={entry.color} />
+                ))}
+              </Pie>
+            </PieChart>
+          </AdminChart>
+        ) : (
+          <div className="admin-card">
+            <h3 className="admin-h2" style={{ marginBottom: '24px' }}>Pass / Fail Breakdown</h3>
+            <div style={{ height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--admin-text-faint)' }}>
+              No account data yet
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="admin-card" style={{ marginBottom: '20px' }}>

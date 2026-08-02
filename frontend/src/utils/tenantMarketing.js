@@ -15,21 +15,16 @@ export function getChallengeFeeDisplay() {
 
 export function getTenantLandingCopy() {
   return {
-    heroBadge: 'prop trading challenges - firm-backed capital access',
-    heroTitleLead: 'Get Funded with',
-    heroTitleHighlight: 'Firm-Backed Capital.',
-    heroSubtitle: 'Choose a 1-step, 2-step, or 3-step challenge, trade under transparent rules, and progress into funded deployment.',
-    heroPrimaryCta: 'Start Challenge',
+    heroBadge: 'live funding · real payouts · no hidden rules',
+    heroTitleLead: 'Stop Risking',
+    heroTitleHighlight: 'Your Own Capital.',
+    heroSubtitle: 'Pass one evaluation — 1, 2, or 3 steps, your choice — and trade up to $400,000 of our capital. Keep 75% of every payout, paid weekly.',
+    heroPrimaryCta: 'Start From $4',
     heroStatsLead: '3',
     heroStatsLeadSuffix: 'Challenge Models',
-    calculatorLead: 'Choose a 1, 2, or 3-step evaluation. Pricing scales with account size — fewer phases costs more, more phases costs less.',
-    calculatorBadgeOpen: 'OPEN',
-    calculatorLocked: 'FULL',
-    calculatorFeeLabel: 'From $4',
-    calculatorFooter: 'Complete checkout to activate this challenge.',
     featuresHeadline: 'Institutional Grade. Challenge Ready.',
     featuresSubtitle: 'Run a transparent prop challenge with live quota controls, clear progression, and funded scaling once you pass.',
-    faqLead: 'Everything you need to know about this prop trading challenge program.',
+    faqLead: 'Every real objection, answered up front — not buried in a support queue.',
     faqItems: [
       {
         category: 'General',
@@ -42,8 +37,8 @@ export function getTenantLandingCopy() {
         a: 'Each account size has its own monthly allocation. Once that size is filled, it reopens automatically at the start of the next month.'
       }
     ],
-    footerHeadline: 'Start Your Challenge',
-    footerSubtitle: 'Per-size monthly availability updates in real time. Pick the model that fits your trading style.',
+    footerHeadline: 'The Capital Is Ready. Are You?',
+    footerSubtitle: 'Every account size updates in real time. Pick the model that fits your trading style before this month\'s batch fills.',
     footerButton: 'Get Started',
     footerBrand: 'Prop trading challenges with transparent rules, per-size monthly quota enforcement, and funded progression once you pass.'
   }

@@ -28,6 +28,7 @@ const {
   parseBooleanSetting: parseTenantBoolean
 } = require('../utils/tenantSettings')
 const { createChallengePaymentSession } = require('./billing')
+const tradingDaysService = require('../services/tradingDaysService')
 const {
   ACCOUNT_SIZES: STEP_MODEL_ACCOUNT_SIZES,
   ensureStepModelInfrastructure,
@@ -315,6 +316,43 @@ router.get('/step-models', authenticateToken, async function(req, res) {
   }
 })
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/accounts/step-models-public
+// Public (no auth) mirror of /step-models for the landing page's challenge
+// selector. Same shape, same "only enabled models" filter — no order/checkout
+// action is exposed here, this is read-only marketing data.
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/step-models-public', async function(req, res) {
+  try {
+    const models = await fetchStepModels({ onlyEnabled: true })
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    res.set('Pragma', 'no-cache')
+    res.set('Expires', '0')
+    res.json({
+      account_sizes: STEP_MODEL_ACCOUNT_SIZES,
+      models: models.map((m) => ({
+        slug: m.slug,
+        name: m.name,
+        description: m.description,
+        steps: m.steps,
+        profit_targets_pct: m.profit_targets_pct,
+        daily_drawdown_pct: parseFloat(m.daily_drawdown_pct),
+        max_drawdown_pct: parseFloat(m.max_drawdown_pct),
+        time_limits_days: m.time_limits_days,
+        min_trading_days: m.min_trading_days,
+        consistency_max_day_pct_by_phase: m.consistency_max_day_pct_by_phase,
+        profit_split_pct: parseFloat(m.profit_split_pct),
+        funded_max_drawdown_pct: parseFloat(m.funded_max_drawdown_pct),
+        funded_daily_drawdown_pct: parseFloat(m.funded_daily_drawdown_pct),
+        pricing: m.pricing
+      }))
+    })
+  } catch (error) {
+    logger.error('Public step models error:', { error: error.message })
+    res.status(500).json({ error: 'Could not fetch challenge models' })
+  }
+})
+
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // POST /api/accounts/create
 //
@@ -552,10 +590,15 @@ router.post('/create', authenticateToken, createAccountLimiter, async function(r
 router.get('/my-accounts', authenticateToken, async function(req, res) {
   try {
     const result = await pool.query(
-      `SELECT id, user_id, account_type, account_size, current_balance, starting_balance,
-              peak_balance, status, profit_target, max_drawdown_pct, created_at,
-              phase_start_date, phase_end_date, account_uid, updated_at
-       FROM accounts WHERE user_id = $1 ORDER BY created_at DESC`,
+      `SELECT a.id, a.user_id, a.account_type, a.account_size, a.current_balance, a.starting_balance,
+              a.peak_balance, a.status, a.profit_target, a.max_drawdown_pct, a.created_at,
+              a.phase_start_date, a.phase_end_date, a.account_uid, a.updated_at,
+              c.title AS competition_title
+         FROM accounts a
+         LEFT JOIN competition_entries ce ON ce.account_id = a.id
+         LEFT JOIN competitions c ON c.id = ce.competition_id
+        WHERE a.user_id = $1
+        ORDER BY a.created_at DESC`,
       [req.user.userId]
     )
     res.json(result.rows)
@@ -603,7 +646,8 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
 
     const result = await pool.query(
       `SELECT id, user_id, account_type, account_size, current_balance, starting_balance,
-              peak_balance, status, profit_target, max_drawdown_pct, phase_end_date
+              peak_balance, status, profit_target, max_drawdown_pct, phase_end_date,
+              consistency_max_day_pct
        FROM accounts WHERE id = $1 AND user_id = $2`,
       [accountIdStr, req.user.userId]
     )
@@ -677,6 +721,32 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
     const trades_today = parseInt(tradesTodayResult.rows[0].count || 0, 10)
     const last_trade_at = lastTradeResult.rows[0].last_trade_at || null
 
+    // Consistency score — same real "no single day's profit may exceed X% of
+    // total profit" rule already enforced at payout time (payouts.js /
+    // tradingDaysService.checkConsistencyRule), expressed here as a live 0-100
+    // gauge instead of a pass/fail gate.
+    const consistencyThresholdPct = parseFloat(account.consistency_max_day_pct || 0)
+    const realizedProfit = Math.max(0, parseFloat((current - starting).toFixed(2)))
+    let consistency = null
+    if (consistencyThresholdPct > 0) {
+      const bestDayProfit = realizedProfit > 0
+        ? await tradingDaysService.getBestDayProfit(pool, accountIdStr)
+        : 0
+      const bestDayPct = realizedProfit > 0
+        ? parseFloat(((bestDayProfit / realizedProfit) * 100).toFixed(2))
+        : 0
+      const score = realizedProfit > 0
+        ? Math.max(0, Math.min(100, parseFloat((100 - (bestDayPct / consistencyThresholdPct) * 100).toFixed(1))))
+        : null
+      consistency = {
+        score,
+        best_day_pct: bestDayPct,
+        best_day_profit: parseFloat(bestDayProfit.toFixed(2)),
+        threshold_pct: consistencyThresholdPct,
+        realized_profit: realizedProfit
+      }
+    }
+
     res.json({
       account,
       rules,
@@ -691,7 +761,8 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
         equity,
         days_remaining,
         trades_today,
-        last_trade_at
+        last_trade_at,
+        consistency
       }
     })
 
@@ -706,6 +777,88 @@ router.post('/orders', authenticateToken, async function(req, res) {
   try {
     await ensureChallengeOrderInfrastructure()
     await ensureStepModelInfrastructure()
+
+    // ── Competition prize voucher redemption ──────────────────────────────────
+    // Bypasses pricing/Stripe entirely: turns the voucher directly into a
+    // pre-paid challenge_orders row so the existing POST /accounts/create gate
+    // (which only checks for a challenge_orders row belonging to this user with
+    // matching account_size and status='paid') needs zero changes.
+    const voucherCode = String(req.body?.voucher_code || '').trim()
+    if (voucherCode) {
+      try {
+        await client.query('BEGIN')
+        await client.query(`SELECT pg_advisory_xact_lock(hashtext('competition_voucher'), hashtext($1))`, [voucherCode])
+
+        const voucherResult = await client.query(
+          `SELECT * FROM competition_prize_vouchers WHERE code = $1 AND user_id = $2 FOR UPDATE`,
+          [voucherCode, req.user.userId]
+        )
+        const voucher = voucherResult.rows[0]
+        if (!voucher) {
+          await client.query('ROLLBACK')
+          return res.status(404).json({ error: 'Voucher not found' })
+        }
+
+        if (voucher.status === 'issued' && voucher.expires_at && new Date(voucher.expires_at) < new Date()) {
+          await client.query(
+            `UPDATE competition_prize_vouchers SET status = 'expired', updated_at = NOW() WHERE id = $1`,
+            [voucher.id]
+          )
+          await client.query('COMMIT')
+          return res.status(410).json({ error: 'This voucher has expired' })
+        }
+
+        if (voucher.status !== 'issued') {
+          await client.query('ROLLBACK')
+          return res.status(409).json({ error: 'This voucher has already been used or is no longer valid' })
+        }
+
+        const stepModel = await fetchStepModelBySlug(voucher.challenge_model_slug)
+        if (!stepModel) {
+          await client.query('ROLLBACK')
+          return res.status(400).json({ error: 'The challenge model for this voucher is no longer available. Please contact support.' })
+        }
+
+        const orderInsert = await client.query(
+          `INSERT INTO challenge_orders (
+             user_id, account_size, amount, currency, status, checkout_mode, payment_provider, paid_via, paid_at,
+             challenge_model_id, challenge_model_slug, metadata_json
+           ) VALUES (
+             $1, $2, 0, 'USD', 'paid', 'voucher', NULL, 'competition_voucher', NOW(), $3, $4, $5::jsonb
+           )
+           RETURNING *`,
+          [
+            req.user.userId,
+            voucher.account_size,
+            stepModel.id,
+            voucher.challenge_model_slug,
+            JSON.stringify({ voucher_code: voucher.code, competition_id: voucher.competition_id })
+          ]
+        )
+
+        await client.query(
+          `UPDATE competition_prize_vouchers
+              SET status = 'redeemed', redeemed_at = NOW(), redeemed_order_id = $1, updated_at = NOW()
+            WHERE id = $2`,
+          [orderInsert.rows[0].id, voucher.id]
+        )
+
+        await client.query('COMMIT')
+        return res.status(201).json({
+          order: orderInsert.rows[0],
+          requires_payment: false,
+          payment_configured: true,
+          checkout_url: null,
+          checkout_session_id: null,
+          voucher_redeemed: true
+        })
+      } catch (voucherErr) {
+        await client.query('ROLLBACK').catch(() => {})
+        logger.error('Redeem competition voucher error:', { error: voucherErr.message })
+        return res.status(500).json({ error: 'Could not redeem voucher' })
+      }
+    }
+
     const accountSize = parseInt(req.body.account_size, 10)
     const stepModelSlug = String(req.body.step_model || '').trim().toLowerCase()
 
@@ -723,10 +876,45 @@ router.post('/orders', authenticateToken, async function(req, res) {
       return res.status(400).json({ error: 'This account size is not available for the selected challenge model.' })
     }
 
-    const settings = await loadTenantSettings(['payment_provider'])
+    const settings = await loadTenantSettings([
+      'payment_provider',
+      'affiliate_program_enabled',
+      'affiliate_referred_discount_pct'
+    ])
     const paymentProvider = String(settings.payment_provider || '').trim()
-    const amount = parseFloat(priceRow.price)
+    let amount = parseFloat(priceRow.price)
     const currency = 'USD'
+
+    // Referred-user discount — first paid challenge purchase only. The affiliate's
+    // own commission is a separate, lifetime concern handled in billing.js's
+    // markChallengeOrderPaid (fires on every paid order, not just this one).
+    let discountApplied = null
+    if (parseBooleanSetting(settings.affiliate_program_enabled, true)) {
+      const referralResult = await client.query(
+        `SELECT 1 FROM affiliate_referrals WHERE referred_user_id = $1`,
+        [req.user.userId]
+      )
+      if (referralResult.rows.length > 0) {
+        const priorPaidOrder = await client.query(
+          `SELECT 1 FROM challenge_orders WHERE user_id = $1 AND status = 'paid' LIMIT 1`,
+          [req.user.userId]
+        )
+        const discountPct = parseFloat(settings.affiliate_referred_discount_pct || 0)
+        if (priorPaidOrder.rows.length === 0 && discountPct > 0) {
+          const originalAmount = amount
+          const discountedAmount = Math.round(originalAmount * (1 - discountPct / 100) * 100) / 100
+          discountApplied = { pct: discountPct, original_amount: originalAmount, discounted_amount: discountedAmount }
+          amount = discountedAmount
+        }
+      }
+    }
+    const metadataJson = discountApplied
+      ? JSON.stringify({
+          affiliate_discount_applied: true,
+          affiliate_discount_pct: discountApplied.pct,
+          original_amount: discountApplied.original_amount
+        })
+      : '{}'
 
     await client.query('BEGIN')
 
@@ -737,7 +925,7 @@ router.post('/orders', authenticateToken, async function(req, res) {
          user_id, account_size, amount, currency, status, checkout_mode, payment_provider, paid_via, paid_at,
          challenge_model_id, challenge_model_slug, metadata_json
        ) VALUES (
-         $1, $2, $3, $4, 'pending', 'paid', $5, NULL, NULL, $6, $7, '{}'::jsonb
+         $1, $2, $3, $4, 'pending', 'paid', $5, NULL, NULL, $6, $7, $8::jsonb
        )
        RETURNING *`,
       [
@@ -747,7 +935,8 @@ router.post('/orders', authenticateToken, async function(req, res) {
         currency,
         paymentProvider || null,
         stepModel.id,
-        stepModelSlug
+        stepModelSlug,
+        metadataJson
       ]
     )
 
@@ -767,7 +956,8 @@ router.post('/orders', authenticateToken, async function(req, res) {
       requires_payment: true,
       payment_configured: !!paymentProvider,
       checkout_url: checkout?.checkout_url || null,
-      checkout_session_id: checkout?.checkout_session_id || null
+      checkout_session_id: checkout?.checkout_session_id || null,
+      discount_applied: discountApplied
     })
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {})

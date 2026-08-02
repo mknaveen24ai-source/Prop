@@ -54,8 +54,24 @@ test('production env safety accepts strong-looking runtime values', () => {
     SMTP_USER: 'a68d12001@smtp-brevo.com',
     SMTP_FROM: 'support@example.com',
     TRUST_PROXY: 'true',
-    ADMIN_PASSWORD: undefined
+    ADMIN_PASSWORD: 'Str0ngAdminPass!Str0ngAdminPass!'
   }, () => {
     assert.deepEqual(getUnsafeProductionEnvVars(), [])
+  })
+})
+
+test('production env safety still flags a weak ADMIN_PASSWORD even when everything else is strong', () => {
+  withEnv({
+    JWT_SECRET: 'a'.repeat(64),
+    ADMIN_JWT_SECRET: 'b'.repeat(64),
+    TOTP_ENCRYPTION_KEY: 'c'.repeat(64),
+    KYC_FILE_ENCRYPTION_KEY: 'd'.repeat(64),
+    DATABASE_URL: 'postgresql://app_user:safe-password@db.internal:5432/propfirm',
+    SMTP_USER: 'a68d12001@smtp-brevo.com',
+    SMTP_FROM: 'support@example.com',
+    TRUST_PROXY: 'true',
+    ADMIN_PASSWORD: 'changeme'
+  }, () => {
+    assert.deepEqual(getUnsafeProductionEnvVars(), ['ADMIN_PASSWORD'])
   })
 })

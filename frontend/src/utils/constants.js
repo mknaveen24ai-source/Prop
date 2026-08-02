@@ -28,8 +28,8 @@ export const ACCOUNT_STATUSES = {
   approved: { label: 'Approved', color: 'var(--green)' },
   paid: { label: 'Paid', color: 'var(--green)' },
   rejected: { label: 'Rejected', color: 'var(--red)' },
-  locked: { label: 'Locked', color: '#8a8a8a' },
-  expired: { label: 'Expired', color: '#8a8a8a' }
+  locked: { label: 'Locked', color: 'var(--muted)' },
+  expired: { label: 'Expired', color: 'var(--muted)' }
 }
 
 export const DRAWDOWN_THRESHOLDS = {
@@ -75,7 +75,7 @@ export const RISK_LEVELS = {
   CRITICAL: { threshold: 90, color: '#F44336', label: 'Critical' }
 }
 
-export const VALID_ACCOUNT_SIZES = [1000, 2000, 5000, 10000, 25000, 50000, 100000, 200000]
+export const VALID_ACCOUNT_SIZES = [5000, 10000, 25000, 50000, 100000, 200000, 400000]
 
 export const DEFAULT_PLATFORM_SETTINGS = {
   phase1_profit_target_pct: 10,
@@ -89,7 +89,7 @@ export const DEFAULT_PLATFORM_SETTINGS = {
 }
 
 export function getStatusColor(status) {
-  return ACCOUNT_STATUSES[status]?.color || '#8a8a8a'
+  return ACCOUNT_STATUSES[status]?.color || 'var(--muted)'
 }
 
 export function getStatusLabel(status) {

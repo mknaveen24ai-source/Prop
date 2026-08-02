@@ -143,11 +143,11 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
       <div style={{
         textAlign: 'center', padding: '64px 24px 48px',
         borderBottom: '1px solid var(--navy-border)',
-        background: 'radial-gradient(ellipse at 50% 0%, rgba(148, 148, 148, 0.06) 0%, transparent 60%)'
+        background: 'radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--muted) 6%, transparent) 0%, transparent 60%)'
       }}>
         <div style={{
-          display: 'inline-block', background: 'rgba(148, 148, 148, 0.1)',
-          border: '1px solid rgba(148, 148, 148, 0.3)', borderRadius: '99px',
+          display: 'inline-block', background: 'color-mix(in srgb, var(--muted) 10%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)', borderRadius: 'var(--radius-pill)',
           padding: '5px 14px', fontSize: '11px', color: 'var(--accent)',
           letterSpacing: '0.1em', marginBottom: '20px'
         }}>
@@ -168,8 +168,8 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
 
         {/* Intro box */}
         <div style={{
-          background: 'rgba(148, 148, 148, 0.06)', border: '1px solid rgba(148, 148, 148, 0.2)',
-          borderRadius: '12px', padding: '24px 28px', marginBottom: '40px'
+          background: 'color-mix(in srgb, var(--muted) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--muted) 20%, transparent)',
+            padding: '24px 28px', marginBottom: '40px'
         }}>
           <p style={{ color: 'var(--text)', lineHeight: '1.8', fontSize: '14px', margin: 0 }}>
             Please read these Terms of Service carefully before using our platform. By registering an account or using any part of this service, you agree to be bound by these Terms. If you do not agree, do not use this platform.
@@ -183,7 +183,7 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
             style={{
               background: 'var(--navy-card)',
               border: `1px solid ${activeSection === section.id ? 'var(--accent-dim)' : 'var(--navy-border)'}`,
-              borderRadius: '12px', marginBottom: '12px',
+                marginBottom: '12px',
               overflow: 'hidden', transition: 'border-color 0.2s ease'
             }}
           >
@@ -221,7 +221,7 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
         {/* Footer note */}
         <div style={{
           marginTop: '40px', padding: '24px', background: 'var(--navy-mid)',
-          border: '1px solid var(--navy-border)', borderRadius: '12px', textAlign: 'center'
+          border: '1px solid var(--navy-border)',   textAlign: 'center'
         }}>
           <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0, lineHeight: '1.7' }}>
             By using this platform you confirm you have read, understood, and agreed to these Terms of Service.<br />

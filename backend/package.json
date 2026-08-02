@@ -13,8 +13,6 @@
         "email:verify": "node scripts/verify-email-config.js",
         "email:worker": "node workers/emailWorker.js",
         "launch:smoke": "node scripts/launch-smoke.js",
-        "copier:mock-bridge": "node scripts/mock-copier-bridge.js",
-        "copier:smoke": "node scripts/copier-smoke.js",
         "migrate": "knex migrate:latest",
         "migrate:make": "knex migrate:make",
         "migrate:rollback": "knex migrate:rollback",

@@ -77,8 +77,8 @@ router.get('/status', async function(req, res) {
 //   "phase1_max_drawdown_pct": 10,
 //   "phase2_profit_target_pct": 5,
 //   "phase2_max_drawdown_pct": 5,
-//   "funded_max_drawdown_pct": 5,
-//   "profit_share_pct": 80,
+//   "funded_max_drawdown_pct": 4,
+//   "profit_share_pct": 75,
 //   "min_payout_amount": 50
 // }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -110,15 +110,16 @@ router.post('/init', setupLimiter, async function(req, res) {
       phase2_profit_target_pct  = 5,
       phase2_max_drawdown_pct   = 5,
       phase2_day_limit          = 30,
-      funded_max_drawdown_pct   = 5,
-      profit_share_pct          = 80,
+      funded_max_drawdown_pct   = 4,
+      profit_share_pct          = 75,
       max_accounts_per_user     = 5,
       min_payout_amount         = 50,
       min_hold_seconds          = 60,
-      forex_lots_per_1k         = 0.20,
+      forex_lots_per_1k         = 0.10,
       commodity_lots_per_1k     = 0.02,
       min_lot_size              = 0.01,
       max_trades_per_1k         = 5,
+      max_open_positions        = 10,
       max_daily_trades          = 20,
       weekend_holding_enabled   = true,
       inactivity_auto_fail_enabled = true,
@@ -168,6 +169,7 @@ router.post('/init', setupLimiter, async function(req, res) {
       ['commodity_lots_per_1k',        String(commodity_lots_per_1k)],
       ['min_lot_size',                 String(min_lot_size)],
       ['max_trades_per_1k',            String(max_trades_per_1k)],
+      ['max_open_positions',           String(max_open_positions)],
       ['max_daily_trades',             String(max_daily_trades)],
       ['weekend_holding_enabled',      String(weekend_holding_enabled)],
       ['inactivity_auto_fail_enabled', String(inactivity_auto_fail_enabled)],
@@ -177,7 +179,6 @@ router.post('/init', setupLimiter, async function(req, res) {
       ['announcement_enabled',         'false'],
       ['announcement_message',         ''],
       ['leaderboard_enabled',          'true'],
-      ['copier_enabled',               'false'],
     ]
 
     for (const [key, value] of settings) {

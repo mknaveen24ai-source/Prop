@@ -159,8 +159,11 @@ export const authAPI = {
   getProfile: () => 
     api.get('/api/auth/me', { skipAuthRedirect: true }),
   
-  updateTheme: (theme) => 
-    api.patch('/api/auth/theme', { theme })
+  updateTheme: (theme) =>
+    api.patch('/api/auth/theme', { theme }),
+
+  updateProfile: (data) =>
+    api.patch('/api/auth/profile', data)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -175,6 +178,13 @@ export const accountsAPI = {
 
   getPublicAvailableSizes: () =>
     api.get('/api/accounts/available-sizes-public', {
+      timeout: 5000,
+      params: { _t: Date.now() },
+      headers: { 'Cache-Control': 'no-cache' }
+    }),
+
+  getPublicStepModels: () =>
+    api.get('/api/accounts/step-models-public', {
       timeout: 5000,
       params: { _t: Date.now() },
       headers: { 'Cache-Control': 'no-cache' }
@@ -247,6 +257,35 @@ export const payoutsAPI = {
   
   getSettings: () => 
     api.get('/api/payouts/settings')
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Affiliate API
+// ─────────────────────────────────────────────────────────────────────────────
+export const affiliateAPI = {
+  getMe: () =>
+    api.get('/api/affiliates/me'),
+
+  getMyDiscountEligibility: () =>
+    api.get('/api/affiliates/my-discount-eligibility'),
+
+  getReferrals: (params) =>
+    api.get('/api/affiliates/referrals', { params }),
+
+  getCommissions: (params) =>
+    api.get('/api/affiliates/commissions', { params }),
+
+  getPayouts: (params) =>
+    api.get('/api/affiliates/payouts', { params }),
+
+  requestPayout: (data) =>
+    api.post('/api/affiliates/payouts/request', data, { headers: createIdempotencyHeaders('affiliate-payouts:request') }),
+
+  validateCode: (code) =>
+    api.get(`/api/affiliates/validate-code/${encodeURIComponent(code)}`),
+
+  getPublicSettings: () =>
+    api.get('/api/affiliates/settings-public')
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

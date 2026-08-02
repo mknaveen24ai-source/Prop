@@ -20,7 +20,7 @@ export default function LandingFeatures() {
     {
       colSpan: 'span 6',
       title: 'Institutional Evaluation',
-      desc: 'Clear, documented rules for both phases. Reach the profit target without breaching the maximum drawdown limit. Pure skill-based selection.',
+      desc: 'The same documented rules apply to every phase, whichever model you pick. Hit the profit target without breaching the drawdown limit. Pure skill-based selection — no surprise conditions revealed later.',
       iconColor: 'var(--muted)',
       icon: (
         <svg viewBox="0 0 24 24" width="44" height="44" stroke="var(--muted)" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -30,8 +30,8 @@ export default function LandingFeatures() {
     },
     {
       colSpan: 'span 6',
-      title: 'Precise Time Horizons',
-      desc: 'Each phase provides 30 calendar days of execution time. High-performance trading environments with zero artificial latency or slippage.',
+      title: 'No Artificial Rush',
+      desc: 'Each phase gives you 45 calendar days — enough room to trade your edge, not the clock. High-performance execution with zero artificial latency or slippage.',
       iconColor: 'var(--muted)',
       icon: (
         <svg viewBox="0 0 24 24" width="44" height="44" stroke="var(--muted)" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -67,7 +67,7 @@ export default function LandingFeatures() {
     {
       colSpan: 'span 4',
       title: 'Curated Batch Releases',
-      desc: 'Accounts are released in exclusive monthly cycles to maintain liquidity integrity. Professional grade funding for a selected number of traders.',
+      desc: 'Each account size has a limited monthly allocation to protect liquidity integrity. Once a tier fills, it reopens automatically the following month — check the live counter above before it does.',
       iconColor: 'var(--loss)',
       icon: (
         <svg viewBox="0 0 24 24" width="44" height="44" stroke="var(--loss)" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round">

@@ -161,7 +161,6 @@ function KycDocViewer({ userId, zoom, adminAxios }) {
             style={{
               width: `${Math.min(100, 90 * zoom)}%`,
               height: `${Math.min(100, 90 * zoom)}%`,
-              borderRadius: '12px',
               background: 'var(--paper)'
             }}
           >

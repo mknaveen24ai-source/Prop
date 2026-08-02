@@ -6,7 +6,7 @@ function currentMonth() {
   return new Date().toISOString().slice(0, 7)
 }
 
-const ACCOUNT_SIZES = [5000, 10000, 25000, 50000, 100000]
+const ACCOUNT_SIZES = [5000, 10000, 25000, 50000, 100000, 200000, 400000]
 
 function formatMoney(value) {
   const parsed = Number(value)
@@ -78,16 +78,12 @@ const SETTINGS_GROUPS = [
     ]
   },
   {
-    title: 'Trade Copier',
+    title: 'Affiliate Program',
     fields: [
-      { key: 'copier_enabled', label: 'Copier Enabled', type: 'select', options: ['true', 'false'] },
-      { key: 'phase1_copy_mode', label: 'Phase 1 Copy Mode', type: 'select', options: ['reverse', 'mirror'], hint: 'Default reverse: master BUY becomes follower SELL' },
-      { key: 'phase2_copy_mode', label: 'Phase 2 Copy Mode', type: 'select', options: ['reverse', 'mirror'], hint: 'Default reverse' },
-      { key: 'funded_copy_mode', label: 'Funded Copy Mode', type: 'select', options: ['mirror', 'reverse'], hint: 'Default mirror: master BUY stays follower BUY' },
-      { key: 'copier_lot_mode', label: 'Copier Lot Mode', type: 'select', options: ['master_lots_1_1'], hint: '1 lot master = 1 lot follower in this pass' },
-      { key: 'copier_sync_sl_tp', label: 'Sync SL/TP Changes', type: 'select', options: ['true', 'false'] },
-      { key: 'copier_sync_pending_orders', label: 'Sync Pending Orders', type: 'select', options: ['true', 'false'] },
-      { key: 'copier_sync_partial_closes', label: 'Sync Partial Closes', type: 'select', options: ['true', 'false'] },
+      { key: 'affiliate_program_enabled', label: 'Affiliate Program Enabled', type: 'select', options: ['true', 'false'] },
+      { key: 'affiliate_referred_discount_pct', label: 'Referred User Discount (%)', type: 'number', hint: "Applied to a referred user's first challenge purchase only" },
+      { key: 'affiliate_min_payout_amount', label: 'Minimum Affiliate Payout ($)', type: 'number', hint: 'e.g. 50' },
+      { key: 'affiliate_default_commission_pct', label: 'Default Commission (%)', type: 'number', hint: 'Used when a referrer has not yet reached any tier' },
     ]
   },
   {
@@ -114,6 +110,12 @@ export default function AdminSettings() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
+
+  const [tiers, setTiers] = useState([])
+  const [tierDrafts, setTierDrafts] = useState({})
+  const [tierSavingId, setTierSavingId] = useState(null)
+  const [newTier, setNewTier] = useState({ tier_rank: '', label: '', min_referrals: '', commission_pct: '' })
+  const [creatingTier, setCreatingTier] = useState(false)
 
   const getQuotaParams = useCallback(() => {
     return { month: `${quotaMonth || currentMonth()}-01` }
@@ -166,6 +168,73 @@ export default function AdminSettings() {
     if (loading) return
     loadMonthlyQuota({ silent: true })
   }, [loading, loadMonthlyQuota])
+
+  const loadTiers = useCallback(async () => {
+    try {
+      const res = await adminAxios.get('/api/admin/affiliates/tiers')
+      const rows = Array.isArray(res.data?.tiers) ? res.data.tiers : []
+      setTiers(rows)
+      setTierDrafts(rows.reduce((acc, t) => {
+        acc[t.id] = { label: t.label || '', min_referrals: String(t.min_referrals), commission_pct: String(t.commission_pct), is_active: t.is_active }
+        return acc
+      }, {}))
+    } catch (error) {
+      toast.error(error?.response?.data?.error || 'Could not load commission tiers')
+    }
+  }, [adminAxios, toast])
+
+  useEffect(() => {
+    if (loading) return
+    loadTiers()
+  }, [loading, loadTiers])
+
+  const updateTierDraft = (id, patch) => {
+    setTierDrafts(current => ({ ...current, [id]: { ...current[id], ...patch } }))
+  }
+
+  const handleSaveTier = async (id) => {
+    const draft = tierDrafts[id]
+    if (!draft) return
+    setTierSavingId(id)
+    try {
+      const res = await adminAxios.patch(`/api/admin/affiliates/tiers/${id}`, {
+        label: draft.label,
+        min_referrals: Number(draft.min_referrals),
+        commission_pct: Number(draft.commission_pct),
+        is_active: draft.is_active
+      })
+      setTiers(current => current.map(t => (t.id === id ? res.data : t)).sort((a, b) => a.tier_rank - b.tier_rank))
+      toast.success('Tier updated')
+    } catch (error) {
+      toast.error(error?.response?.data?.error || 'Could not update tier')
+    } finally {
+      setTierSavingId(null)
+    }
+  }
+
+  const handleCreateTier = async () => {
+    setCreatingTier(true)
+    try {
+      const res = await adminAxios.post('/api/admin/affiliates/tiers', {
+        tier_rank: Number(newTier.tier_rank),
+        label: newTier.label,
+        min_referrals: Number(newTier.min_referrals),
+        commission_pct: Number(newTier.commission_pct)
+      })
+      const created = res.data
+      setTiers(current => [...current, created].sort((a, b) => a.tier_rank - b.tier_rank))
+      setTierDrafts(current => ({
+        ...current,
+        [created.id]: { label: created.label || '', min_referrals: String(created.min_referrals), commission_pct: String(created.commission_pct), is_active: created.is_active }
+      }))
+      setNewTier({ tier_rank: '', label: '', min_referrals: '', commission_pct: '' })
+      toast.success('Tier created')
+    } catch (error) {
+      toast.error(error?.response?.data?.error || 'Could not create tier')
+    } finally {
+      setCreatingTier(false)
+    }
+  }
 
   const updateQuotaDraft = (size, patch) => {
     setQuotaDrafts(current => ({
@@ -228,7 +297,7 @@ export default function AdminSettings() {
     return (
       <div style={{ padding: '40px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '24px' }}>
         {Array(6).fill(0).map((_, index) => (
-          <div key={index} className="admin-skeleton" style={{ height: '240px', borderRadius: '12px' }} />
+          <div key={index} className="admin-skeleton" style={{ height: '240px' }} />
         ))}
       </div>
     )
@@ -347,6 +416,78 @@ export default function AdminSettings() {
               </div>
             )
           })}
+        </div>
+      </div>
+
+      <div className="admin-card" style={{ marginBottom: 24 }}>
+        <h2 className="admin-h2" style={{ marginBottom: 6 }}>Affiliate Commission Tiers</h2>
+        <p style={{ color: 'var(--admin-text-muted)', fontSize: 13, marginBottom: 18 }}>
+          Rate applied to a referrer's commission is chosen by their current count of paying (ever-purchased) referrals —
+          the highest tier whose "Min Paying Referrals" is at or below that count wins.
+        </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14, marginBottom: 18 }}>
+          {tiers.map((tier) => {
+            const draft = tierDrafts[tier.id] || { label: '', min_referrals: '', commission_pct: '', is_active: true }
+            const savingThis = tierSavingId === tier.id
+            return (
+              <div key={tier.id} style={{ border: '1px solid var(--admin-border)', borderRadius: 14, padding: 14, background: 'var(--admin-bg-elevated)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <span style={{ color: 'var(--admin-text-faint)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Tier {tier.tier_rank}</span>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--admin-text-muted)' }}>
+                    <input type="checkbox" checked={!!draft.is_active} onChange={(e) => updateTierDraft(tier.id, { is_active: e.target.checked })} />
+                    Active
+                  </label>
+                </div>
+                <div className="admin-form-group" style={{ marginBottom: 10 }}>
+                  <label className="admin-label">Label</label>
+                  <input className="admin-input" value={draft.label} onChange={(e) => updateTierDraft(tier.id, { label: e.target.value })} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                  <div className="admin-form-group" style={{ marginBottom: 0 }}>
+                    <label className="admin-label">Min Paying Referrals</label>
+                    <input className="admin-input" type="number" min="0" value={draft.min_referrals} onChange={(e) => updateTierDraft(tier.id, { min_referrals: e.target.value })} />
+                  </div>
+                  <div className="admin-form-group" style={{ marginBottom: 0 }}>
+                    <label className="admin-label">Commission %</label>
+                    <input className="admin-input" type="number" min="0" max="100" step="0.1" value={draft.commission_pct} onChange={(e) => updateTierDraft(tier.id, { commission_pct: e.target.value })} />
+                  </div>
+                </div>
+                <button className="admin-btn admin-btn-primary" style={{ width: '100%' }} onClick={() => handleSaveTier(tier.id)} disabled={savingThis}>
+                  {savingThis ? 'Saving...' : 'Save Tier'}
+                </button>
+              </div>
+            )
+          })}
+        </div>
+
+        <div style={{ borderTop: '1px solid var(--admin-border)', paddingTop: 16 }}>
+          <h3 className="admin-h3" style={{ marginBottom: 12 }}>Add New Tier</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, alignItems: 'end' }}>
+            <div className="admin-form-group" style={{ marginBottom: 0 }}>
+              <label className="admin-label">Tier Rank</label>
+              <input className="admin-input" type="number" min="1" value={newTier.tier_rank} onChange={(e) => setNewTier(cur => ({ ...cur, tier_rank: e.target.value }))} />
+            </div>
+            <div className="admin-form-group" style={{ marginBottom: 0 }}>
+              <label className="admin-label">Label</label>
+              <input className="admin-input" value={newTier.label} onChange={(e) => setNewTier(cur => ({ ...cur, label: e.target.value }))} placeholder="e.g. Diamond" />
+            </div>
+            <div className="admin-form-group" style={{ marginBottom: 0 }}>
+              <label className="admin-label">Min Paying Referrals</label>
+              <input className="admin-input" type="number" min="0" value={newTier.min_referrals} onChange={(e) => setNewTier(cur => ({ ...cur, min_referrals: e.target.value }))} />
+            </div>
+            <div className="admin-form-group" style={{ marginBottom: 0 }}>
+              <label className="admin-label">Commission %</label>
+              <input className="admin-input" type="number" min="0" max="100" step="0.1" value={newTier.commission_pct} onChange={(e) => setNewTier(cur => ({ ...cur, commission_pct: e.target.value }))} />
+            </div>
+            <button
+              className="admin-btn admin-btn-primary"
+              onClick={handleCreateTier}
+              disabled={creatingTier || !newTier.tier_rank || !newTier.min_referrals || !newTier.commission_pct}
+            >
+              {creatingTier ? 'Adding...' : 'Add Tier'}
+            </button>
+          </div>
         </div>
       </div>
 

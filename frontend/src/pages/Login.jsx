@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { useBranding } from '../BrandingContext'
 import { authAPI } from '../services/api'
 
@@ -24,7 +25,7 @@ function getPasswordStrength(password) {
   ]
   const score  = checks.filter(c => c.pass).length
   const label  = score <= 2 ? 'Weak' : score <= 3 ? 'Fair' : score === 4 ? 'Good' : 'Strong'
-  const color  = score <= 2 ? 'var(--muted)' : score <= 3 ? 'var(--muted)' : score === 4 ? 'var(--muted)' : 'var(--muted)'
+  const color  = score <= 2 ? 'var(--loss)' : score <= 3 ? 'var(--warn)' : score === 4 ? 'var(--warn)' : 'var(--gain)'
   return { score, label, color, checks }
 }
 
@@ -114,7 +115,6 @@ function TotpInput({ onSubmit, onBack, loading, error }) {
               fontWeight: 700,
               background: 'var(--navy-hover)',
               border: `2px solid ${d ? 'var(--accent)' : 'var(--navy-border)'}`,
-              borderRadius: '10px',
               color: 'var(--text)',
               outline: 'none',
               transition: 'border-color 0.2s',
@@ -139,7 +139,7 @@ function TotpInput({ onSubmit, onBack, loading, error }) {
         style={{
           width: '100%', background: 'transparent',
           border: '1px solid var(--navy-border)', color: 'var(--text-muted)',
-          padding: '10px', borderRadius: '6px', cursor: 'pointer',
+          padding: '10px', cursor: 'pointer',
           fontSize: '13px', fontFamily: 'var(--font-ui)'
         }}
       >
@@ -271,6 +271,14 @@ function Login({ onLogin, initialMode = 'login' }) {
       position: 'relative',
       overflow: 'hidden'
     }}>
+      <Link
+        to="/"
+        className="auth-secondary-button"
+        style={{ position: 'absolute', top: '24px', left: '24px', width: 'auto', display: 'inline-block', textDecoration: 'none', zIndex: 20 }}
+      >
+        ← Back to Home
+      </Link>
+
       {/* Ambient background glows */}
       <div className="auth-ambient auth-ambient-primary" />
       <div className="auth-ambient auth-ambient-secondary" />
@@ -467,7 +475,7 @@ function Login({ onLogin, initialMode = 'login' }) {
                 <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
                   {[1,2,3,4,5].map(i => (
                     <div key={i} style={{
-                      flex: 1, height: '3px', borderRadius: '2px',
+                      flex: 1, height: '3px', 
                       background: i <= resetStrength.score ? resetStrength.color : 'var(--navy-border)',
                       transition: 'background 0.2s'
                     }} />
@@ -508,7 +516,7 @@ function Login({ onLogin, initialMode = 'login' }) {
         {mode === 'login' && (
           <p style={{ textAlign: 'center', marginTop: '24px', color: 'var(--text-muted)', fontSize: '14px' }}>
             No account?{' '}
-            <a href="/register" style={{ color: 'var(--accent)' }}>Register here</a>
+            <Link to="/register" style={{ color: 'var(--accent)' }}>Register here</Link>
           </p>
         )}
       </div>

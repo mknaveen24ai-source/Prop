@@ -16,9 +16,10 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  font-family: var(--font-ui);
+  font-family: var(--font-mono);
   font-weight: 700;
-  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
@@ -109,6 +110,43 @@
 }
 .lx-card__actions { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
 
+/* ── Glass surface ────────────────────────────────────────────────────────── */
+/* Frosted variant of the flat Ledger Desk surface — opt-in via modifier
+   classes so the base .lx-card/.lx-btn/etc. stay untouched for anything not
+   part of the redesign. Depth still comes from a rule (--rule-soft), not a
+   blurred box-shadow, matching the system's "hairline over elevation" rule
+   from tokens.css; the only new device here is transparency + blur. */
+.lx-glass-panel {
+  position: relative;
+  background: var(--glass);
+  border: 1px solid var(--rule-soft);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+}
+.lx-glass-panel--strong { background: var(--glass-2); }
+.lx-glass-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: var(--glass-hi);
+  pointer-events: none;
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lx-glass-panel { background: var(--paper-2); }
+}
+
+.lx-card--glass {
+  background: var(--glass);
+  border-color: var(--rule-soft);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+}
+.lx-card--glass.lx-card--strong { background: var(--glass-2); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lx-card--glass { background: var(--paper-2); }
+}
+
 /* ── StatCell ─────────────────────────────────────────────────────────────── */
 .lx-stat {
   display: flex;
@@ -142,6 +180,7 @@
 /* ── Field ────────────────────────────────────────────────────────────────── */
 .lx-field { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-5); }
 .lx-field__label {
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;

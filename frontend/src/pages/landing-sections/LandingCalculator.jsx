@@ -1,31 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { accountsAPI } from '../../services/api';
-import { buildUnavailableAvailabilityRows, normalizeAvailabilityRows, UNLIMITED_QUOTA } from '../../utils/accountAvailability';
-import { getTenantLandingCopy, isPaidTenant } from '../../utils/tenantMarketing';
+import { buildUnavailableAvailabilityRows, normalizeAvailabilityRows, UNLIMITED_QUOTA, ALL_ACCOUNT_SIZES } from '../../utils/accountAvailability';
+import { setMemoryItem } from '../../utils/memoryStore';
+import { renderIcon } from '../../utils/iconMap';
 
-/* Animated number counter */
-function CountUp({ value, duration = 800 }) {
-  const [display, setDisplay] = useState('0');
-  const prevValue = useRef(0);
-
-  useEffect(() => {
-    const start = prevValue.current;
-    const end = value;
-    const startTime = performance.now();
-    const animate = (now) => {
-      const prog = Math.min((now - startTime) / duration, 1);
-      const ease = 1 - Math.pow(1 - prog, 3);
-      const current = start + (end - start) * ease;
-      setDisplay(Math.round(current).toLocaleString('en-US'));
-      if (prog < 1) requestAnimationFrame(animate);
-      else prevValue.current = end;
-    };
-    requestAnimationFrame(animate);
-  }, [value, duration]);
-
-  return <>{display}</>;
-}
+const RECOMMENDED_SIZE = 25000;
 
 function sizeLabel(size) {
   if (size >= 200000) return 'Institutional';
@@ -38,47 +18,103 @@ function sizeLabel(size) {
   return 'Micro';
 }
 
+// Good/better/best framing — ordered fastest-and-priciest to slowest-and-cheapest
+// so the price spread does the anchoring work on its own (real prices, no invented claims).
+const MODEL_HOOKS = {
+  1: { badge: 'FASTEST TO FUNDED', color: 'var(--warn)' },
+  2: { badge: 'MOST BALANCED', color: 'var(--ink)' },
+  3: { badge: 'LOWEST COST TO START', color: 'var(--gain)' },
+};
+
+function priceForSize(model, size) {
+  const row = (model?.pricing || []).find(p => p.account_size === size);
+  return row && row.is_active ? row.price : null;
+}
+
+function reopenMessage(acc) {
+  if (acc?.period_end) {
+    const d = new Date(acc.period_end);
+    if (!Number.isNaN(d.getTime())) {
+      return `Reopens ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+    }
+  }
+  return 'New slots release periodically — check back soon';
+}
+
+function InfoDot({ title }) {
+  return (
+    <span title={title} style={{ display: 'inline-flex', verticalAlign: 'middle', marginLeft: '4px', cursor: 'help', opacity: 0.6 }}>
+      {renderIcon('info', { size: 11, color: 'currentColor' })}
+    </span>
+  );
+}
+
 export default function LandingCalculator({ onStartAssessment }) {
   const navigate = useNavigate();
-  const landingCopy = getTenantLandingCopy();
-  const paidTenant = isPaidTenant();
+  const [models, setModels] = useState([]);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
   const [accounts, setAccounts] = useState(() => buildUnavailableAvailabilityRows());
-  const [selected, setSelected] = useState(0);
-  const [loadingAPI, setLoadingAPI] = useState(true);
   const [availabilitySource, setAvailabilitySource] = useState('config');
+  const [selectedModelSlug, setSelectedModelSlug] = useState(null);
 
+  // Models + pricing + rules — fetched once, changes rarely relative to live quota.
+  useEffect(() => {
+    async function fetchModels() {
+      try {
+        const res = await accountsAPI.getPublicStepModels();
+        const list = Array.isArray(res.data?.models) ? res.data.models : [];
+        list.sort((a, b) => (a.steps || 0) - (b.steps || 0));
+        setModels(list);
+      } catch (_err) {
+        setModels([]);
+      } finally {
+        setModelsLoaded(true);
+      }
+    }
+    fetchModels();
+  }, []);
+
+  // Default to the first (fastest) model once models arrive, so the size
+  // cards are visible immediately — matches the always-an-active-tab reference layout.
+  useEffect(() => {
+    if (!selectedModelSlug && models.length > 0) {
+      setSelectedModelSlug(models[0].slug);
+    }
+  }, [models, selectedModelSlug]);
+
+  // Live quota / OPEN-LOW-FULL — polled, same cadence as before.
   useEffect(() => {
     async function fetchSizes() {
       try {
         const res = await accountsAPI.getPublicAvailableSizes();
-        const merged = normalizeAvailabilityRows(res.data);
-        setAccounts(merged);
+        setAccounts(normalizeAvailabilityRows(res.data));
         setAvailabilitySource('live');
-        // Auto-select the first unlocked size
-        const firstUnlocked = merged.findIndex(s => !s.locked);
-        if (firstUnlocked >= 0) setSelected(firstUnlocked);
       } catch (_err) {
         setAvailabilitySource('offline');
-        // Backend offline — show all sizes as locked until data loads
         setAccounts(buildUnavailableAvailabilityRows());
-      } finally {
-        setLoadingAPI(false);
       }
     }
     fetchSizes();
-    const iv = setInterval(() => {
-      fetchSizes();
-    }, 30000);
+    const iv = setInterval(fetchSizes, 30000);
     return () => clearInterval(iv);
   }, []);
 
-  const acc = accounts[selected];
-  const isLocked = !acc || acc.locked || acc.quota === 0;
+  const selectedModel = models.find(m => m.slug === selectedModelSlug) || null;
   const totalEnabled = accounts.filter(a => a.quota > 0).length;
   const hasUnlimitedAvailability = accounts.some(a => !a.locked && a.quota >= UNLIMITED_QUOTA);
   const totalRemaining = hasUnlimitedAvailability
     ? null
     : accounts.reduce((sum, account) => sum + (account.remaining || 0), 0);
+
+  function startChallenge(size) {
+    setMemoryItem('pendingChallenge', JSON.stringify({
+      accountSize: size,
+      stepModel: selectedModel?.slug || null,
+      accountType: 'phase1'
+    }));
+    if (onStartAssessment) onStartAssessment(size, selectedModel?.slug);
+    navigate('/checkout');
+  }
 
   return (
     <section id="mp-accounts" className="mp-section" style={{
@@ -88,14 +124,15 @@ export default function LandingCalculator({ onStartAssessment }) {
       position: 'relative',
     }}>
       <div className="mp-container">
-        <div style={{ textAlign: 'center', marginBottom: '60px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
           <div className="mp-badge mp-reveal" style={{ marginBottom: '20px' }}>
-            Account Sizes
+            Choose Your Challenge
           </div>
-          <h2 className="mp-h2 mp-reveal mp-delay-100">Choose Your Account Size</h2>
+          <h2 className="mp-h2 mp-reveal mp-delay-100">Pick Your Path to Funded</h2>
           <p className="mp-p-lead mp-reveal mp-delay-200" style={{ margin: '0 auto' }}>
-            {landingCopy.calculatorLead}
+            1 Step, 2 Step, or 3 Step. Every model trades under the exact same rules — no hidden catches either way.
           </p>
+
           {availabilitySource !== 'live' && (
             <p className="mp-reveal mp-delay-250" style={{ margin: '14px auto 0', color: 'var(--muted)', maxWidth: '740px', fontSize: '13px' }}>
               {availabilitySource === 'config'
@@ -103,192 +140,256 @@ export default function LandingCalculator({ onStartAssessment }) {
                 : 'Live availability is temporarily unavailable. You can still register and claim the next open tier.'}
             </p>
           )}
-
-          {/* Summary pill */}
-          <div className="mp-availability-pill mp-reveal mp-delay-300" style={{ marginTop: '24px', display: 'inline-flex', gap: '24px', padding: '12px 28px', background: 'transparent', border: '1px solid var(--rule)' }}>
-            <span style={{ fontSize: '13px', color: 'var(--muted)' }}>
-              Sizes Available: <span style={{ color: 'var(--ink)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{totalEnabled}</span>
-            </span>
-            <span style={{ width: '1px', background: 'var(--rule)' }} />
-            <span style={{ fontSize: '13px', color: 'var(--muted)' }}>
-              Remaining Slots: <span style={{ color: hasUnlimitedAvailability || totalRemaining > 0 ? 'var(--gain)' : 'var(--warn)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{loadingAPI ? '...' : hasUnlimitedAvailability ? 'Unlimited' : totalRemaining}</span>
-            </span>
-          </div>
         </div>
 
-        {/* Account Cards Grid */}
-        <div className="mp-account-size-grid mp-reveal mp-delay-300" style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-          gap: '14px',
-          maxWidth: '1200px',
-          margin: '0 auto 60px',
-        }}>
-          {accounts.map((a, i) => {
-            const isSelected = selected === i;
-            const isSoldOut = a.locked || a.quota === 0;
-            const isUnlimited = !isSoldOut && a.quota >= UNLIMITED_QUOTA;
-            const pct = isUnlimited
-              ? 100
-              : a.quota > 0
-                ? Math.max(0, Math.min(100, ((a.remaining ?? 0) / a.quota) * 100))
-                : 0;
-
-            return (
-              <div
-                key={i}
-                onClick={() => setSelected(i)}
-                className={`mp-account-size-card ${isSelected && !isSoldOut ? 'mp-active-selection' : ''}`}
-                style={{
-                  background: isSoldOut ? 'var(--paper-2)' : 'var(--paper)',
-                  border: isSoldOut
-                    ? '1px solid var(--rule)'
-                    : isSelected
-                      ? '2px solid var(--ink)'
-                      : '1px solid var(--rule)',
-                  padding: '24px 18px',
-                  cursor: 'pointer',
-                  transition: 'border-color 0.2s ease',
-                  textAlign: 'center',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  opacity: isSoldOut ? 0.5 : 1,
-                }}
-              >
-                {/* Sold-out badge */}
-                {isSoldOut && (
+        {/* ── Model tab bar ── */}
+        {modelsLoaded && models.length > 0 && (
+          <div className="mp-reveal mp-delay-300" style={{
+            display: 'flex',
+            justifyContent: 'center',
+            flexWrap: 'wrap',
+            gap: '10px',
+            marginBottom: '20px',
+          }}>
+            {models.map((m) => {
+              const hook = MODEL_HOOKS[m.steps] || { badge: `${m.steps} PHASES`, color: 'var(--muted)' };
+              const active = m.slug === selectedModelSlug;
+              return (
+                <button
+                  key={m.slug}
+                  type="button"
+                  onClick={() => setSelectedModelSlug(m.slug)}
+                  style={{
+                    cursor: 'pointer',
+                    textAlign: 'center',
+                    background: active ? 'var(--ink)' : 'var(--paper)',
+                    border: `1px solid ${active ? 'var(--ink)' : 'var(--rule)'}`,
+                    padding: '10px 22px',
+                    minWidth: '160px',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
                   <div style={{
-                    position: 'absolute', top: '12px', right: '12px',
-                    padding: '3px 10px',
-                    background: 'transparent', border: '1px solid var(--loss)',
-                    color: 'var(--loss)', fontSize: '9px', fontWeight: 800,
-                    textTransform: 'uppercase', letterSpacing: '0.1em',
-                    fontFamily: 'var(--font-mono)',
-                  }}>Full</div>
-                )}
+                    fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 800,
+                    color: active ? 'var(--paper)' : 'var(--ink)',
+                  }}>
+                    {m.name}
+                  </div>
+                  <div style={{
+                    marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: '9px', fontWeight: 700,
+                    textTransform: 'uppercase', letterSpacing: '0.08em',
+                    color: active ? hook.color : 'var(--muted)',
+                  }}>
+                    {hook.badge}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
-          <div style={{ fontSize: '10px', color: isSelected && !isSoldOut ? 'var(--muted)' : 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '10px', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
-                  {sizeLabel(a.size)}
-                </div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(20px,2vw,28px)', fontWeight: 800, color: isSoldOut ? 'var(--muted)' : 'var(--ink)', marginBottom: '14px' }}>
-                  ${a.size.toLocaleString('en-US')}
-                </div>
+        {modelsLoaded && models.length === 0 && (
+          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
+            Challenge models are temporarily unavailable. Please check back shortly.
+          </div>
+        )}
 
-                {/* OPEN / FULL badge */}
-                <div style={{
-                  display: 'inline-block', padding: '6px 16px',
-                  background: 'transparent',
-                  border: `1px solid ${isSoldOut ? 'var(--loss)' : 'var(--gain)'}`,
-                  color: isSoldOut ? 'var(--loss)' : 'var(--gain)',
-                  fontSize: '13px', fontWeight: 700, marginBottom: '16px',
-                }}>
-                  {isSoldOut ? landingCopy.calculatorLocked : landingCopy.calculatorBadgeOpen}
-                </div>
+        {selectedModel && (
+          <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+            <div className="mp-availability-pill mp-reveal mp-delay-300" style={{ display: 'inline-flex', gap: '24px', padding: '12px 28px', background: 'transparent', border: '1px solid var(--rule)' }}>
+              <span style={{ fontSize: '13px', color: 'var(--muted)' }}>
+                Sizes Available: <span style={{ color: 'var(--ink)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{totalEnabled}</span>
+              </span>
+              <span style={{ width: '1px', background: 'var(--rule)' }} />
+              <span style={{ fontSize: '13px', color: 'var(--muted)' }}>
+                Remaining Slots: <span style={{ color: hasUnlimitedAvailability || totalRemaining > 0 ? 'var(--gain)' : 'var(--warn)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{hasUnlimitedAvailability ? 'Unlimited' : totalRemaining}</span>
+              </span>
+            </div>
+          </div>
+        )}
 
-                {/* Availability bar */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '10px', color: 'var(--muted)', fontWeight: 600 }}>AVAILABLE</span>
-                <span style={{ fontSize: '10px', color: isSoldOut ? 'var(--loss)' : pct > 50 ? 'var(--gain)' : 'var(--warn)', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
-                      {isSoldOut ? '0/0' : isUnlimited ? 'OPEN' : `${a.remaining ?? 0}/${a.quota}`}
+        {/* ── Size + rules + price cards for the chosen model ── */}
+        {selectedModel && (
+          <div className="mp-account-size-grid mp-reveal mp-delay-300" style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+            gap: '16px',
+            maxWidth: '1300px',
+            margin: '0 auto 60px',
+            alignItems: 'stretch',
+          }}>
+            {ALL_ACCOUNT_SIZES.map((size) => {
+              const acc = accounts.find(a => a.size === size) || { size, locked: true, quota: 0, remaining: 0 };
+              const price = priceForSize(selectedModel, size);
+              const isSoldOut = acc.locked || acc.quota === 0 || price == null;
+              const isUnlimited = !isSoldOut && acc.quota >= UNLIMITED_QUOTA;
+              const pct = isUnlimited
+                ? 100
+                : acc.quota > 0
+                  ? Math.max(0, Math.min(100, ((acc.remaining ?? 0) / acc.quota) * 100))
+                  : 0;
+              const targets = Array.isArray(selectedModel.profit_targets_pct) ? selectedModel.profit_targets_pct : [];
+              const isRecommended = size === RECOMMENDED_SIZE && !isSoldOut;
+              const inverted = isRecommended;
+
+              const inkColor = inverted ? 'var(--paper)' : 'var(--ink)';
+              const mutedColor = inverted ? 'color-mix(in srgb, var(--paper) 65%, transparent)' : 'var(--muted)';
+              const ruleColor = inverted ? 'color-mix(in srgb, var(--paper) 25%, transparent)' : 'var(--rule)';
+
+              return (
+                <div
+                  key={size}
+                  className={`mp-account-size-card ${!isSoldOut ? 'mp-active-selection' : ''}`}
+                  style={{
+                    background: isSoldOut ? 'var(--paper-2)' : inverted ? 'var(--ink)' : 'var(--paper)',
+                    border: `1px solid ${inverted ? 'var(--ink)' : 'var(--rule)'}`,
+                    padding: '24px 20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    position: 'relative',
+                    opacity: isSoldOut ? 0.55 : 1,
+                  }}
+                >
+                  {isRecommended && (
+                    <div style={{
+                      position: 'absolute', top: '-11px', left: '50%', transform: 'translateX(-50%)',
+                      background: 'var(--warn)', color: 'var(--ink)', fontFamily: 'var(--font-mono)',
+                      fontSize: '9px', fontWeight: 800, letterSpacing: '0.1em', padding: '4px 12px',
+                      textTransform: 'uppercase', whiteSpace: 'nowrap',
+                    }}>
+                      Recommended
+                    </div>
+                  )}
+
+                  {/* Header row: ACCOUNT SIZE / PRICE */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                    <span style={{ fontSize: '10px', color: mutedColor, textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                      Account Size
+                    </span>
+                    <span style={{ fontSize: '10px', color: mutedColor, textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                      Price
                     </span>
                   </div>
-                  <div style={{ height: '4px', background: 'var(--rule)', overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%',
-                      width: `${pct}%`,
-                      background: isSoldOut ? 'var(--loss)' : pct > 50 ? 'var(--gain)' : pct > 20 ? 'var(--warn)' : 'var(--loss)',
-                      transition: 'width 0.6s ease',
-                    }} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
+                    <span style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(22px,2.4vw,28px)', fontWeight: 800, color: isSoldOut ? 'var(--muted)' : inkColor }}>
+                      ${size >= 1000 ? `${size / 1000}K` : size}
+                    </span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '20px', fontWeight: 800, color: isSoldOut ? 'var(--muted)' : inkColor }}>
+                      {price != null ? `$${price}` : '—'}
+                    </span>
                   </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Detail Panel */}
-        {acc && (
-          <div className="mp-account-detail-card mp-glass-card mp-reveal mp-delay-400" style={{ maxWidth: '900px', margin: '0 auto', padding: '56px', background: 'var(--paper)', border: '1px solid var(--rule)', borderTop: '3px double var(--ink)' }}>
-            <div className="mp-account-detail-layout" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '48px' }}>
-
-              <div className="mp-account-detail-main" style={{ flex: 1, minWidth: '300px' }}>
-          <div style={{ fontSize: '12px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '12px', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>Active Tier Assessment</div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: '56px', fontWeight: 800, color: isLocked ? 'var(--muted)' : 'var(--ink)', marginBottom: '32px', letterSpacing: '-0.01em' }}>
-                  $<CountUp value={acc.size} />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '20px' }}>
-                  {[
-                    { label: paidTenant ? 'Challenge Access' : 'Evaluation Fee', value: isLocked ? 'Locked' : landingCopy.calculatorFeeLabel,     color: isLocked ? 'var(--loss)' : 'var(--gain)' },
-                    { label: 'Evaluation Mode', value: 'Phase 1 + 2',                      color: 'var(--muted)' },
-                    { label: 'Standard Leverage',value: '1:30 (Max)',                      color: 'var(--ink)' },
-                    { label: 'Availability',   value: isLocked ? 'Closed' : acc.quota >= 999999 ? 'Institutional' : 'Limited Spots', color: isLocked ? 'var(--loss)' : 'var(--warn)' },
-                  ].map((item, i) => (
-                    <div key={i} style={{ padding: '16px 0', borderBottom: '1px solid var(--rule)' }}>
-                      <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '6px', fontWeight: 600 }}>{item.label}</div>
-                      <div style={{ fontSize: '17px', fontWeight: 700, color: item.color, fontFamily: 'var(--font-mono)' }}>{item.value}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Circular indicator */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '28px', flex: '0 0 auto' }}>
-                {(() => {
-                  const isUnlim = acc.quota >= UNLIMITED_QUOTA;
-                  const availPct = isUnlim ? 100 : acc.quota > 0 ? Math.max(0, Math.min(100, ((acc.remaining ?? 0) / acc.quota) * 100)) : 0;
-                  const ringColor = isLocked ? 'var(--loss)' : availPct > 50 ? 'var(--gain)' : availPct > 20 ? 'var(--warn)' : 'var(--loss)';
-
-                  return (
-                    <div style={{
-                      width: '180px', height: '180px',
-                      borderRadius: '50%',
-                      border: '1px solid var(--rule)',
-                      display: 'flex', flexDirection: 'column', alignItems: 'center',
-                      justifyContent: 'center', position: 'relative',
+                  <div style={{ marginBottom: '14px' }}>
+                    <span style={{
+                      display: 'inline-block', padding: '2px 8px', fontSize: '9px', fontWeight: 800, fontFamily: 'var(--font-mono)',
+                      textTransform: 'uppercase', letterSpacing: '0.08em',
+                      border: `1px solid ${isSoldOut ? 'var(--loss)' : pct > 50 ? 'var(--gain)' : 'var(--warn)'}`,
+                      color: isSoldOut ? 'var(--loss)' : pct > 50 ? 'var(--gain)' : 'var(--warn)',
                     }}>
-                      <svg width="180" height="180" viewBox="0 0 180 180" style={{ position: 'absolute', top: 0, left: 0, transform: 'rotate(-90deg)' }}>
-                        <circle cx="90" cy="90" r="84" fill="none" stroke="var(--rule)" strokeWidth="6" />
-                        <circle cx="90" cy="90" r="84" fill="none"
-                          stroke={ringColor} strokeWidth="6"
-                          strokeDasharray={`${(availPct / 100) * 527.8} 527.8`}
-                          strokeLinecap="round"
-                          style={{ transition: 'stroke-dasharray 0.8s ease' }}
-                        />
-                      </svg>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '38px', fontWeight: 800, color: 'var(--ink)', zIndex: 1, letterSpacing: '-0.01em' }}>
-                        {isLocked ? '0' : isUnlim ? '∞' : (acc.remaining ?? 0)}
+                      {isSoldOut ? 'FULL' : isUnlimited ? 'OPEN' : pct > 50 ? 'OPEN' : 'LOW'}
+                    </span>
+                    <span style={{ marginLeft: '8px', fontSize: '10px', color: mutedColor, fontFamily: 'var(--font-mono)' }}>
+                      {sizeLabel(size)}
+                    </span>
+                  </div>
+
+                  {/* Buy Challenge button */}
+                  <button
+                    type="button"
+                    disabled={isSoldOut}
+                    onClick={() => startChallenge(size)}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      marginBottom: '18px',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.08em',
+                      cursor: isSoldOut ? 'not-allowed' : 'pointer',
+                      background: isSoldOut ? 'transparent' : inverted ? 'var(--paper)' : 'var(--ink)',
+                      color: isSoldOut ? 'var(--muted)' : inverted ? 'var(--ink)' : 'var(--paper)',
+                      border: `1px solid ${isSoldOut ? 'var(--rule)' : inverted ? 'var(--paper)' : 'var(--ink)'}`,
+                    }}
+                  >
+                    {isSoldOut ? 'Full' : 'Buy Challenge'}
+                  </button>
+
+                  {/* Itemized rules */}
+                  <div style={{ borderTop: `1px solid ${ruleColor}`, paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: inkColor, marginBottom: '4px' }}>
+                        Profit Target
+                        <InfoDot title="The percentage gain required to pass this phase." />
                       </div>
-                      <div style={{ fontSize: '11px', color: 'var(--muted)', zIndex: 1, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                        {isLocked ? 'Sold Out' : 'Active Slots'}
+                      {targets.map((t, i) => {
+                        const phaseDays = Array.isArray(selectedModel.time_limits_days) ? selectedModel.time_limits_days[i] : null;
+                        return (
+                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: mutedColor }}>
+                            <span>Phase {i + 1}</span>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: inkColor }}>
+                              {t}%{phaseDays != null ? ` in ${phaseDays}d` : ''}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                      <span style={{ color: inkColor, fontWeight: 700 }}>
+                        Max Loss
+                        <InfoDot title="Maximum drawdown allowed from your starting balance before the account is closed." />
+                      </span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: inkColor }}>{selectedModel.max_drawdown_pct}%</span>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                      <span style={{ color: inkColor, fontWeight: 700 }}>
+                        Daily Loss
+                        <InfoDot title="Maximum drawdown allowed within a single day." />
+                      </span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: inkColor }}>{selectedModel.daily_drawdown_pct}%</span>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                      <span style={{ color: inkColor, fontWeight: 700 }}>
+                        Min Trading Days
+                        <InfoDot title="Minimum number of days you must trade before completing this phase." />
+                      </span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: inkColor }}>{selectedModel.min_trading_days}</span>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                      <span style={{ color: inkColor, fontWeight: 700 }}>
+                        Split
+                        <InfoDot title="Your share of profits once funded, paid on this cadence." />
+                      </span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: inkColor }}>
+                        {selectedModel.profit_split_pct}% Weekly
+                      </span>
+                    </div>
+                  </div>
+
+                  {!isSoldOut && (
+                    <div style={{ marginTop: '14px' }}>
+                      <div style={{ height: '3px', background: ruleColor, overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%', width: `${pct}%`,
+                          background: pct > 50 ? 'var(--gain)' : pct > 20 ? 'var(--warn)' : 'var(--loss)',
+                          transition: 'width 0.6s ease',
+                        }} />
                       </div>
                     </div>
-                  );
-                })()}
+                  )}
 
-                {isLocked ? (
-                  <div style={{ padding: '20px 40px', background: 'transparent', border: '1px solid var(--loss)', color: 'var(--loss)', fontWeight: 700, fontSize: '15px', textAlign: 'center' }}>
-                    QUOTA EXCEEDED
-                    <div style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '8px', fontWeight: 400 }}>Next release in 14 days</div>
-                  </div>
-                ) : (
-                  <>
-                    <button
-                      className="mp-btn-primary"
-                      style={{ padding: '22px 48px', minWidth: '240px' }}
-                      onClick={() => {
-                        if (onStartAssessment) onStartAssessment(acc.size);
-                        navigate('/register');
-                      }}
-                    >
-                      Start Challenge
-                    </button>
-                    <p style={{ fontSize: '12px', color: 'var(--muted)', textAlign: 'center', fontWeight: 500 }}>{landingCopy.calculatorFooter}</p>
-                  </>
-                )}
-              </div>
-            </div>
+                  {isSoldOut && (
+                    <div style={{ marginTop: '14px', fontSize: '11px', color: 'var(--muted)' }}>
+                      {price == null ? 'Not offered at this size' : reopenMessage(acc)}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

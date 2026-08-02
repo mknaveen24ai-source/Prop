@@ -14,10 +14,29 @@ const { isValidEmail, isValidPassword, sanitizeString } = require('../utils/vali
 const logger   = require('../utils/logger')
 const totp     = require('../utils/totp')
 const { invalidateTokenCache } = require('../utils/tokenCache')
+const { CURRENT_TOS_VERSION } = require('../utils/tosVersion')
+const { resolveAffiliateCode } = require('../utils/affiliates')
 require('../loadEnv')
 
 
 const BLOCKED_COUNTRIES = ['United States', 'Canada', 'Iran', 'North Korea', 'Cuba', 'Syria']
+
+// FIX (BUG-M3): isValidCountry() accepted ISO codes (US, GB) but the frontend
+// select sends full names (India, United Kingdom). Explicit allowed-list
+// validation using full names — shared between /register and /profile so a
+// user submitting "Narnia" or injecting a long string via API is rejected
+// consistently in both places.
+const ALLOWED_COUNTRIES = new Set([
+  'India', 'United Kingdom', 'Australia', 'UAE', 'South Africa', 'Nigeria',
+  'Malaysia', 'Singapore', 'Philippines', 'Kenya', 'Pakistan', 'Bangladesh',
+  'Germany', 'France', 'Netherlands', 'Italy', 'Spain', 'Sweden', 'Norway',
+  'Denmark', 'Finland', 'Belgium', 'Switzerland', 'Austria', 'Portugal',
+  'Poland', 'Czech Republic', 'Romania', 'Hungary', 'Greece', 'Turkey',
+  'Japan', 'South Korea', 'Hong Kong', 'New Zealand', 'Saudi Arabia',
+  'Israel', 'Brazil', 'Mexico', 'Argentina', 'Chile', 'Colombia', 'Peru',
+  'Indonesia', 'Thailand', 'Vietnam', 'Egypt', 'Morocco', 'Tunisia',
+  'Ghana', 'Tanzania', 'Uganda', 'Zimbabwe', 'Other'
+])
 
 const COOKIE_BASE = {
   httpOnly: true,
@@ -89,7 +108,7 @@ function checkPasswordStrength(password) {
 
 router.post('/register', registerLimiter, async function(req, res) {
   try {
-    const { email, password, full_name, country, phone, referred_by, device_fingerprint } = req.body
+    const { email, password, full_name, country, phone, referred_by, device_fingerprint, terms_accepted, signup_source } = req.body
 
     if (!email || !password || !full_name || !country || !phone) {
       return res.status(400).json({ error: 'All fields are required' })
@@ -99,21 +118,6 @@ router.post('/register', registerLimiter, async function(req, res) {
       return res.status(400).json({ error: 'Please enter a valid email address' })
     }
 
-    // FIX (BUG-M3): isValidCountry() accepted ISO codes (US, GB) but the frontend
-    // select sends full names (India, United Kingdom). Added explicit allowed-list
-    // validation here using full names. A user submitting "Narnia" or injecting a
-    // long string via API is now rejected cleanly.
-    const ALLOWED_COUNTRIES = new Set([
-      'India', 'United Kingdom', 'Australia', 'UAE', 'South Africa', 'Nigeria',
-      'Malaysia', 'Singapore', 'Philippines', 'Kenya', 'Pakistan', 'Bangladesh',
-      'Germany', 'France', 'Netherlands', 'Italy', 'Spain', 'Sweden', 'Norway',
-      'Denmark', 'Finland', 'Belgium', 'Switzerland', 'Austria', 'Portugal',
-      'Poland', 'Czech Republic', 'Romania', 'Hungary', 'Greece', 'Turkey',
-      'Japan', 'South Korea', 'Hong Kong', 'New Zealand', 'Saudi Arabia',
-      'Israel', 'Brazil', 'Mexico', 'Argentina', 'Chile', 'Colombia', 'Peru',
-      'Indonesia', 'Thailand', 'Vietnam', 'Egypt', 'Morocco', 'Tunisia',
-      'Ghana', 'Tanzania', 'Uganda', 'Zimbabwe', 'Other'
-    ])
     const countryTrimmed = String(country).trim()
     if (!countryTrimmed || countryTrimmed.length > 100) {
       return res.status(400).json({ error: 'Please select a valid country' })
@@ -163,11 +167,17 @@ router.post('/register', registerLimiter, async function(req, res) {
     const affiliate_code = uuidv4().substring(0, 8).toUpperCase()
     const trader_uid = uuidv4()
 
+    // Soft-validate the incoming referral code: an unrecognized code never blocks
+    // registration, it's just dropped. Store the resolved/uppercased code (not the
+    // raw user-typed value) so admin.js's existing referred_by-based cohort
+    // heuristic keeps working unchanged.
+    const referrer = referred_by ? await resolveAffiliateCode(referred_by) : null
+
     // FIX: DDL moved to server.js startup (ensureUniqueIds). No inline ALTER TABLE.
     const newUser = await pool.query(
       `INSERT INTO users
-       (email, password_hash, full_name, country, phone, referred_by, device_fingerprint, affiliate_code, trader_uid)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       (email, password_hash, full_name, country, phone, referred_by, device_fingerprint, affiliate_code, trader_uid, signup_source)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING id, email, full_name, country, kyc_status, affiliate_code, trader_uid, token_version`,
       [
         email.toLowerCase(),
@@ -175,14 +185,40 @@ router.post('/register', registerLimiter, async function(req, res) {
         full_name,
         countryTrimmed,
         phone,
-        referred_by || null,
+        referrer ? referrer.affiliate_code : null,
         device_fingerprint || null,
         affiliate_code,
-        trader_uid
+        trader_uid,
+        sanitizeString(String(signup_source || 'direct'), 100)
       ]
     )
 
     const user = newUser.rows[0]
+
+    if (referrer) {
+      try {
+        await pool.query(
+          `INSERT INTO affiliate_referrals (referrer_user_id, referred_user_id, affiliate_code_used)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (referred_user_id) DO NOTHING`,
+          [referrer.id, user.id, referrer.affiliate_code]
+        )
+      } catch (referralErr) {
+        logger.warn('Failed to record affiliate referral:', { error: referralErr.message, userId: user.id })
+      }
+    }
+
+    if (terms_accepted) {
+      try {
+        await pool.query(
+          `INSERT INTO user_agreement_acceptances (user_id, tos_version, ip_address) VALUES ($1, $2, $3)`,
+          [user.id, CURRENT_TOS_VERSION, req.ip || null]
+        )
+      } catch (tosErr) {
+        logger.warn('Failed to record ToS acceptance:', { error: tosErr.message })
+      }
+    }
+
     const tokenVersion = user.token_version || 1
     const token = jwt.sign(
       { userId: user.id, email: user.email, tv: tokenVersion },
@@ -241,7 +277,7 @@ router.post('/login', loginLimiter, async function(req, res) {
     }
 
     const result = await pool.query(
-      'SELECT id, email, password_hash, full_name, country, kyc_status, is_banned,' +
+      'SELECT id, email, password_hash, full_name, country, kyc_status, is_banned, is_bot,' +
       ' affiliate_code, trader_uid, token_version, totp_enabled FROM users' +
       ' WHERE email = $1',
       [email.toLowerCase()]
@@ -258,6 +294,13 @@ router.post('/login', loginLimiter, async function(req, res) {
       return res.status(403).json({ error: 'Account has been suspended' })
     }
 
+    // Bot users (synthetic competition participants, see migration 021) never
+    // learn their own randomly-generated password, but this closes the gap
+    // explicitly in case a bot's email ever leaked.
+    if (user.is_bot) {
+      return res.status(403).json({ error: 'This account cannot be used to log in.' })
+    }
+
     const validPassword = await bcrypt.compare(password, user.password_hash)
     if (!validPassword) {
       return res.status(401).json({ error: 'Invalid email or password' })
@@ -268,7 +311,7 @@ router.post('/login', loginLimiter, async function(req, res) {
       // Issue a short-lived pre_2fa token — NOT a full session token.
       // This token only works with POST /api/auth/2fa/validate.
       const pre2faToken = jwt.sign(
-        { userId: user.id, email: user.email, type: 'pre_2fa' },
+        { userId: user.id, email: user.email, type: 'pre_2fa', tv: user.token_version || 1 },
         process.env.JWT_SECRET,
         { expiresIn: '5m' }
       )
@@ -350,6 +393,112 @@ router.get('/me', authenticateToken, async function(req, res) {
   } catch (error) {
     logger.error('Get me error:', { error: error.message })
     res.status(500).json({ error: 'Could not fetch user' })
+  }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/auth/profile — trader self-service name/address edit.
+//
+// full_name/country are locked once kyc_status='approved': KYC verifies
+// identity against those exact declared values, so letting them change
+// silently post-approval would undermine the verification. Address detail
+// fields stay editable regardless of KYC status.
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch('/profile', authenticateToken, async function(req, res) {
+  try {
+    const userResult = await pool.query(
+      `SELECT id, kyc_status FROM users WHERE id = $1`,
+      [req.user.userId]
+    )
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+    const kycApproved = userResult.rows[0].kyc_status === 'approved'
+
+    const body = req.body || {}
+    const fields = []
+    const values = []
+    let i = 1
+
+    function set(column, value) {
+      fields.push(`${column} = $${i}`)
+      values.push(value)
+      i += 1
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, 'full_name')) {
+      if (kycApproved) {
+        return res.status(400).json({ error: 'Contact support to change your legal name after KYC verification.' })
+      }
+      const fullName = sanitizeString(String(body.full_name || '').trim(), 200)
+      if (!fullName) {
+        return res.status(400).json({ error: 'Full name cannot be empty' })
+      }
+      set('full_name', fullName)
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, 'country')) {
+      if (kycApproved) {
+        return res.status(400).json({ error: 'Contact support to change your country after KYC verification.' })
+      }
+      const countryTrimmed = String(body.country || '').trim()
+      if (!ALLOWED_COUNTRIES.has(countryTrimmed)) {
+        return res.status(400).json({ error: 'Please select a valid country from the list' })
+      }
+      set('country', countryTrimmed)
+    }
+
+    if (Object.prototype.hasOwnProperty.call(body, 'address_line1')) {
+      set('address_line1', sanitizeString(String(body.address_line1 || '').trim(), 200) || null)
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'address_line2')) {
+      set('address_line2', sanitizeString(String(body.address_line2 || '').trim(), 200) || null)
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'city')) {
+      set('city', sanitizeString(String(body.city || '').trim(), 100) || null)
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'state_province')) {
+      set('state_province', sanitizeString(String(body.state_province || '').trim(), 100) || null)
+    }
+    if (Object.prototype.hasOwnProperty.call(body, 'postal_code')) {
+      set('postal_code', sanitizeString(String(body.postal_code || '').trim(), 20) || null)
+    }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ error: 'No editable fields provided' })
+    }
+
+    values.push(req.user.userId)
+    const result = await pool.query(
+      `UPDATE users SET ${fields.join(', ')}, updated_at = NOW()
+       WHERE id = $${i}
+       RETURNING id, trader_uid, email, full_name, country, kyc_status, kyc_rejection_reason,
+                 affiliate_code, theme_preference, address_line1, address_line2, city,
+                 state_province, postal_code`,
+      values
+    )
+    const user = result.rows[0]
+
+    res.json({
+      id: user.id,
+      trader_id: user.id,
+      trader_uid: user.trader_uid || null,
+      email: user.email,
+      full_name: user.full_name,
+      country: user.country,
+      kyc_status: user.kyc_status,
+      kyc_rejection_reason: user.kyc_rejection_reason || null,
+      affiliate_code: user.affiliate_code,
+      theme_preference: user.theme_preference || 'dark',
+      address_line1: user.address_line1,
+      address_line2: user.address_line2,
+      city: user.city,
+      state_province: user.state_province,
+      postal_code: user.postal_code
+    })
+  } catch (error) {
+    logger.error('Profile update error:', { error: error.message })
+    res.status(500).json({ error: 'Could not update profile' })
   }
 })
 

@@ -96,7 +96,7 @@ export default function Dispute({ user, accounts }) {
               <button
                 className="btn"
                 onClick={() => { setSubmitted(false); setForm({ account_id: '', reason: 'drawdown_error', description: '' }) }}
-                style={{ border: '1px solid var(--navy-border)', padding: '10px 24px', background: 'transparent', color: 'var(--text-muted)', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}
+                style={{ border: '1px solid var(--navy-border)', padding: '10px 24px', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '13px' }}
               >
                 Submit Another Dispute
               </button>
@@ -104,7 +104,7 @@ export default function Dispute({ user, accounts }) {
           ) : (
             <div className="card trader-service-card">
               {error && (
-                <div style={{ background: 'rgba(97, 97, 97, 0.1)', border: '1px solid var(--red)', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', color: 'var(--red)', fontSize: '13px' }}>
+                <div style={{ background: 'color-mix(in srgb, var(--red) 10%, transparent)', border: '1px solid var(--red)', padding: '10px 14px', marginBottom: '16px', color: 'var(--red)', fontSize: '13px' }}>
                   {error}
                 </div>
               )}
@@ -212,7 +212,7 @@ export default function Dispute({ user, accounts }) {
               { step: '4', text: 'If upheld, account is restored or extended' },
             ].map(s => (
               <div key={s.step} style={{ display: 'flex', gap: '12px', marginBottom: '10px', alignItems: 'flex-start' }}>
-                <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'rgba(148, 148, 148, 0.15)', border: '1px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'var(--accent)', fontWeight: '700', flexShrink: 0 }}>
+                <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'color-mix(in srgb, var(--muted) 15%, transparent)', border: '1px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'var(--accent)', fontWeight: '700', flexShrink: 0 }}>
                   {s.step}
                 </div>
                 <span style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5' }}>{s.text}</span>
@@ -242,7 +242,7 @@ export default function Dispute({ user, accounts }) {
                     {d.created_at ? new Date(d.created_at).toLocaleDateString() : ''}
                   </div>
                   {d.admin_response && (
-                    <div style={{ marginTop: '8px', padding: '8px 10px', background: 'rgba(133, 133, 133, 0.06)', border: '1px solid rgba(133, 133, 133, 0.2)', borderRadius: '6px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                    <div style={{ marginTop: '8px', padding: '8px 10px', background: 'color-mix(in srgb, var(--muted) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--muted) 20%, transparent)', fontSize: '12px', color: 'var(--text-muted)' }}>
                       <strong style={{ color: 'var(--cyan)', fontSize: '10px' }}>ADMIN RESPONSE: </strong>
                       {d.admin_response}
                     </div>

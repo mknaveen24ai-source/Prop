@@ -143,12 +143,12 @@ export default function DashboardPayoutsPage({
                 }}
                 style={{
                   background: 'transparent',
-                  border: '1px solid rgba(148,148,148,0.3)',
-                  borderRadius: '6px', padding: '6px 14px',
+                  border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)',
+                  padding: '6px 14px',
                   fontSize: '12px', color: 'var(--accent)',
                   cursor: 'pointer', transition: 'all 0.15s'
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(148,148,148,0.08)'}
+                onMouseEnter={e => e.currentTarget.style.background = 'color-mix(in srgb, var(--muted) 8%, transparent)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 title="Download your payout statement as HTML (printable / save as PDF)"
               >

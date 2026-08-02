@@ -94,9 +94,9 @@ export default function LandingLiveStats() {
                 <span className="mp-badge-dot"></span>
                 Live Payout Tracker
               </div>
-              <h2 id="mp-live-stats-title" className="mp-h2">Real payouts. Real operator data.</h2>
+              <h2 id="mp-live-stats-title" className="mp-h2">We Don't Just Promise Payouts. We Publish Them.</h2>
               <p className="mp-p-lead">
-                This section reads approved payout totals directly from the platform, so public proof updates as your admin team marks traders as paid.
+                Every number below is read live from the platform's approved payout ledger — not a marketing estimate. It updates the moment our team marks a trader paid.
               </p>
             </div>
             <div className={`mp-live-status ${status === 'loading' ? 'loading' : ''}`}>

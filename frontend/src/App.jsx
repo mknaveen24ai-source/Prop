@@ -12,9 +12,13 @@ import { useAuth } from './providers/AuthProvider'
 import './App.css'
 
 const Landing = lazy(() => import('./pages/Landing'))
+const Checkout = lazy(() => import('./pages/Checkout'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Leaderboard = lazy(() => import('./pages/Leaderboard'))
 const TraderProfile = lazy(() => import('./pages/TraderProfile'))
+const Competitions = lazy(() => import('./pages/Competitions'))
+const CompetitionDetail = lazy(() => import('./pages/CompetitionDetail'))
+const Transparency = lazy(() => import('./pages/Transparency'))
 const Chat = lazy(() => import('./pages/Chat'))
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'))
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
@@ -26,17 +30,24 @@ const AdminTrades = lazy(() => import('./pages/admin/AdminTrades'))
 const AdminPayouts = lazy(() => import('./pages/admin/AdminPayouts'))
 const AdminPlatformPnL = lazy(() => import('./pages/admin/AdminPlatformPnL'))
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'))
+const AdminTradingEconomics = lazy(() => import('./pages/admin/AdminTradingEconomics'))
 const AdminStepModels = lazy(() => import('./pages/admin/AdminStepModels'))
 const AdminAccess = lazy(() => import('./pages/admin/AdminAccess'))
-const AdminEmailJobs = lazy(() => import('./pages/admin/AdminEmailJobs'))
-const AdminDisputes = lazy(() => import('./pages/admin/AdminDisputes'))
-const AdminChat = lazy(() => import('./pages/admin/AdminChat'))
 const AdminLeaderboard = lazy(() => import('./pages/admin/AdminLeaderboard'))
-const AdminTradeCopier = lazy(() => import('./pages/admin/AdminTradeCopier'))
 const AdminAccountDetail = lazy(() => import('./pages/admin/AdminAccountDetail'))
 const AdminViolations = lazy(() => import('./pages/admin/AdminViolations'))
+const AdminChat = lazy(() => import('./pages/admin/AdminChat'))
+const AdminDisputes = lazy(() => import('./pages/admin/AdminDisputes'))
 const AdminCommandCenter = lazy(() => import('./pages/admin/AdminCommandCenter'))
 const AdminPromotionReviews = lazy(() => import('./pages/admin/AdminPromotionReviews'))
+const SupportAppealsCenter = lazy(() => import('./pages/admin/SupportAppealsCenter'))
+const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics'))
+const AdminCompetitions = lazy(() => import('./pages/admin/AdminCompetitions'))
+const AdminCompetitionDetail = lazy(() => import('./pages/admin/AdminCompetitionDetail'))
+const AdminCompetitionAnalytics = lazy(() => import('./pages/admin/AdminCompetitionAnalytics'))
+const AdminAffiliates = lazy(() => import('./pages/admin/AdminAffiliates'))
+const AdminAffiliateDetail = lazy(() => import('./pages/admin/AdminAffiliateDetail'))
+const AdminAffiliatePayouts = lazy(() => import('./pages/admin/AdminAffiliatePayouts'))
 
 const pageVariants = {
   initial: { opacity: 0, y: 16 },
@@ -89,6 +100,7 @@ function AnimatedRoutes({ user, login, logout }) {
           <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Landing />} />
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/checkout" element={<Checkout />} />
 
           <Route
             path="/login"
@@ -123,25 +135,36 @@ function AnimatedRoutes({ user, login, logout }) {
             <Route path="challenges" element={<AdminChallenges />} />
             <Route path="funded" element={<AdminFunded />} />
             <Route path="trades" element={<AdminTrades />} />
+            <Route path="analytics" element={<AdminAnalytics />} />
             <Route path="payouts" element={<AdminPayouts />} />
+            <Route path="affiliates" element={<AdminAffiliates />} />
+            <Route path="affiliates/payouts" element={<AdminAffiliatePayouts />} />
+            <Route path="affiliates/:userId" element={<AdminAffiliateDetail />} />
             <Route path="pnl" element={<AdminPlatformPnL />} />
             <Route path="settings" element={<AdminSettings />} />
+            <Route path="trading-economics" element={<AdminTradingEconomics />} />
             <Route path="step-models" element={<AdminStepModels />} />
             <Route path="access" element={<AdminAccess />} />
-            <Route path="email-jobs" element={<AdminEmailJobs />} />
             <Route path="command-center" element={<AdminCommandCenter />} />
             <Route path="promotion-reviews" element={<AdminPromotionReviews />} />
-            <Route path="disputes" element={<AdminDisputes />} />
-            <Route path="chat" element={<AdminChat />} />
             <Route path="leaderboard" element={<AdminLeaderboard />} />
-            <Route path="copier" element={<AdminTradeCopier />} />
             <Route path="violations" element={<AdminViolations />} />
+            <Route path="chat" element={<AdminChat />} />
+            <Route path="disputes" element={<AdminDisputes />} />
+            <Route path="competitions" element={<AdminCompetitions />} />
+            <Route path="competitions/:id" element={<AdminCompetitionDetail />} />
+            <Route path="competitions/:id/analytics" element={<AdminCompetitionAnalytics />} />
             <Route path="accounts/:accountId" element={<AdminAccountDetail />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Route>
 
+          <Route path="/admin/support-appeals-center" element={<SupportAppealsCenter />} />
+
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/trader/:userId" element={<TraderProfile />} />
+          <Route path="/competitions" element={<Competitions />} />
+          <Route path="/competitions/:slug" element={<CompetitionDetail />} />
+          <Route path="/transparency" element={<Transparency />} />
 
           <Route
             path="*"

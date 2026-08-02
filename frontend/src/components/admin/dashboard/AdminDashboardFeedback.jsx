@@ -42,9 +42,8 @@ export function ErrorBanner({ message, onRetry }) {
   return (
     <div
       style={{
-        background: 'rgba(239,68,68,0.08)',
-        border: '1px solid rgba(239,68,68,0.3)',
-        borderRadius: '12px',
+        background: 'color-mix(in srgb, var(--admin-danger) 8%, transparent)',
+        border: '1px solid color-mix(in srgb, var(--admin-danger) 30%, transparent)',
         padding: '24px',
         marginBottom: '24px',
         display: 'flex',

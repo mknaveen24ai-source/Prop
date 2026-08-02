@@ -43,7 +43,6 @@ export default function Pagination({ page, totalPages, onPageChange, pageSize, t
     minWidth: '34px',
     height: '34px',
     padding: '0 8px',
-    borderRadius: '8px',
     border: isActive
       ? '1px solid var(--accent)'
       : '1px solid var(--border)',

@@ -8,6 +8,7 @@ const fs = require('fs')
 const pool = require('../db')
 const { authenticateToken } = require('./middleware')
 const logger = require('../utils/logger')
+const { encryptFileAtRest } = require('../utils/secureKycStorage')
 
 // Ensure upload directory exists
 const uploadDir = path.join(__dirname, '../uploads/kyc')
@@ -185,6 +186,22 @@ router.post('/upload',
         return res.status(400).json({ error: 'Selfie file content does not match declared type' })
       }
 
+      // Encrypt both files at rest before persisting their paths. encryptFileAtRest
+      // writes a sibling `.enc` file and removes the plaintext original, so from here
+      // on the tracked paths (for cleanup and for the DB) must be the `.enc` ones.
+      let idDocStoragePath
+      let selfieStoragePath
+      try {
+        idDocStoragePath  = encryptFileAtRest(idDoc.path)
+        selfieStoragePath = encryptFileAtRest(selfie.path)
+      } catch (encError) {
+        logger.error('[kyc] Failed to encrypt uploaded documents:', { error: encError.message })
+        uploadedFiles.forEach(f => { try { fs.unlinkSync(f) } catch (_) {} })
+        return res.status(500).json({ error: 'Document storage is temporarily unavailable. Please try again later.' })
+      }
+      uploadedFiles.length = 0
+      uploadedFiles.push(idDocStoragePath, selfieStoragePath)
+
       // Fetch existing paths before overwriting (for cleanup)
       const existingResult = await pool.query(
         'SELECT id_document_path, selfie_path FROM users WHERE id = $1',
@@ -192,8 +209,8 @@ router.post('/upload',
       )
       const existing = existingResult.rows[0] || {}
 
-      const idDocRelPath  = toRelativePath(idDoc.path)
-      const selfieRelPath = toRelativePath(selfie.path)
+      const idDocRelPath  = toRelativePath(idDocStoragePath)
+      const selfieRelPath = toRelativePath(selfieStoragePath)
 
       await pool.query(
         `UPDATE users SET

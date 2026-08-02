@@ -7,38 +7,44 @@
    change here, so the whole app re-themes without a component-by-component
    rewrite.
 ──────────────────────────────────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Bitter:wght@400;600;700&family=PT+Sans:wght@400;700&family=PT+Mono&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap');
 
 :root,
 [data-theme="dark"] {
   color-scheme: dark;
 
-  /* ── Ledger Desk primitives (Charcoal Noir) ── */
-  --paper: #161616;
-  --paper-2: #1f1f1f;
-  --ink: #e8e4d8;
-  --rule: #3a3a3a;
-  --gain: #4ade80;
-  --loss: #f87171;
-  --muted: #8a8a82;
-  --warn: #d4a256;
+  /* ── Trading Gazette primitives (Night Edition) ── */
+  --paper: #131211;
+  --paper-2: #1B1917;
+  --ink: #EDE9E0;
+  --rule: #3A3733;
+  --gain: #4FBE6E;
+  --loss: #E05A5A;
+  --muted: #8C8880;
+  --warn: #E8B400;
 
-  --brand-primary: var(--ink);
-  --brand-primary-strong: #cfcbb8;
-  --brand-primary-rgb: 232, 228, 216;
-  --brand-primary-glow: rgba(232, 228, 216, 0.14);
-  --brand-primary-soft: rgba(232, 228, 216, 0.08);
+  /* Glass layer — frosted surfaces over the flat Ledger Desk base */
+  --rule-soft: rgba(237, 233, 224, 0.09);
+  --glass: rgba(31, 28, 25, 0.62);
+  --glass-2: rgba(38, 34, 30, 0.72);
+  --glass-hi: rgba(255, 255, 255, 0.055);
 
-  --brand-accent: var(--ink);
-  --brand-accent-strong: #cfcbb8;
-  --brand-accent-rgb: 232, 228, 216;
-  --brand-accent-glow: rgba(232, 228, 216, 0.14);
-  --brand-accent-soft: rgba(232, 228, 216, 0.08);
+  --brand-primary: #E8B400;
+  --brand-primary-strong: #F5C518;
+  --brand-primary-rgb: 232, 180, 0;
+  --brand-primary-glow: rgba(232, 180, 0, 0.16);
+  --brand-primary-soft: rgba(232, 180, 0, 0.10);
+
+  --brand-accent: #E8B400;
+  --brand-accent-strong: #F5C518;
+  --brand-accent-rgb: 232, 180, 0;
+  --brand-accent-glow: rgba(232, 180, 0, 0.16);
+  --brand-accent-soft: rgba(232, 180, 0, 0.10);
 
   --color-bg-deep: var(--paper);
   --color-bg-base: var(--paper);
   --color-bg-subtle: var(--paper-2);
-  --color-surface-glass: var(--paper-2);
+  --color-surface-glass: var(--glass);
   --color-surface-elevated: var(--paper-2);
   --color-surface-solid: var(--paper-2);
   --color-surface-operator: var(--paper-2);
@@ -50,21 +56,26 @@
   --color-text-primary: var(--ink);
   --color-text-secondary: var(--muted);
   --color-text-muted: var(--muted);
-  --color-text-faint: #5c5c56;
+  --color-text-faint: #6A655C;
   --color-text-disabled: #454540;
 
   --color-success: var(--gain);
-  --color-success-soft: rgba(74, 222, 128, 0.12);
+  --color-success-soft: rgba(79, 190, 110, 0.14);
   --color-warning: var(--warn);
-  --color-warning-soft: rgba(212, 162, 86, 0.14);
+  --color-warning-soft: rgba(232, 180, 0, 0.14);
   --color-danger: var(--loss);
-  --color-danger-soft: rgba(248, 113, 113, 0.12);
+  --color-danger-soft: rgba(224, 90, 90, 0.14);
   --color-info: var(--muted);
-  --color-info-soft: rgba(138, 138, 130, 0.12);
+  --color-info-soft: rgba(140, 136, 128, 0.12);
 
-  --font-ui: 'PT Sans', -apple-system, 'Segoe UI', Helvetica, sans-serif;
-  --font-display: 'Bitter', Georgia, 'Times New Roman', serif;
-  --font-mono: 'PT Mono', 'Courier New', ui-monospace, monospace;
+  --font-ui: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-mono: 'IBM Plex Mono', 'Courier New', ui-monospace, monospace;
+
+  /* Optional pairing for masthead/editorial treatments — layered in
+     alongside the defaults above, not a replacement for them. */
+  --font-display-alt: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --font-ui-alt: 'Lora', Georgia, 'Times New Roman', serif;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -168,36 +179,42 @@
 [data-theme="light"] {
   color-scheme: light;
 
-  /* ── Ledger Desk primitives (Rag Cotton White) ── */
-  --paper: #efe9db;
-  --paper-2: #e5ddc9;
-  --ink: #1b2b3a;
-  --rule: #c7bda5;
-  --gain: #2f5233;
-  --loss: #6e1f22;
-  --muted: #7a7261;
-  --warn: #8a6d3b;
+  /* ── Trading Gazette primitives (Day Edition) ── */
+  --paper: #F7F4EC;
+  --paper-2: #EFEBDF;
+  --ink: #1A1A18;
+  --rule: #C9C2B0;
+  --gain: #2E6B3E;
+  --loss: #8B1E1E;
+  --muted: #6B6862;
+  --warn: #A5730A;
 
-  --brand-primary: var(--ink);
-  --brand-primary-strong: #3d3d3d;
-  --brand-primary-rgb: 35, 35, 35;
-  --brand-primary-glow: rgba(35, 35, 35, 0.1);
-  --brand-primary-soft: rgba(35, 35, 35, 0.06);
+  /* Glass layer — frosted surfaces over the flat Ledger Desk base */
+  --rule-soft: rgba(26, 26, 24, 0.10);
+  --glass: rgba(255, 253, 247, 0.66);
+  --glass-2: rgba(255, 255, 252, 0.8);
+  --glass-hi: rgba(255, 255, 255, 0.75);
 
-  --brand-accent: var(--ink);
-  --brand-accent-strong: #3d3d3d;
-  --brand-accent-rgb: 35, 35, 35;
-  --brand-accent-glow: rgba(35, 35, 35, 0.1);
-  --brand-accent-soft: rgba(35, 35, 35, 0.06);
+  --brand-primary: #8B1E1E;
+  --brand-primary-strong: #6E1717;
+  --brand-primary-rgb: 139, 30, 30;
+  --brand-primary-glow: rgba(139, 30, 30, 0.12);
+  --brand-primary-soft: rgba(139, 30, 30, 0.07);
+
+  --brand-accent: #8B1E1E;
+  --brand-accent-strong: #6E1717;
+  --brand-accent-rgb: 139, 30, 30;
+  --brand-accent-glow: rgba(139, 30, 30, 0.12);
+  --brand-accent-soft: rgba(139, 30, 30, 0.07);
 
   --color-bg-deep: var(--paper);
   --color-bg-base: var(--paper);
   --color-bg-subtle: var(--paper-2);
-  --color-surface-glass: var(--paper-2);
-  --color-surface-elevated: #ffffff;
-  --color-surface-solid: #ffffff;
-  --color-surface-operator: #ffffff;
-  --color-surface-operator-alt: var(--paper-2);
+  --color-surface-glass: var(--glass);
+  --color-surface-elevated: var(--paper-2);
+  --color-surface-solid: var(--paper-2);
+  --color-surface-operator: var(--paper-2);
+  --color-surface-operator-alt: var(--paper);
   --color-border-subtle: var(--rule);
   --color-border-strong: var(--ink);
   --color-border-operator: var(--rule);
@@ -205,22 +222,22 @@
   --color-text-primary: var(--ink);
   --color-text-secondary: var(--muted);
   --color-text-muted: var(--muted);
-  --color-text-faint: #9c988c;
-  --color-text-disabled: #c5c1b5;
+  --color-text-faint: #9C968C;
+  --color-text-disabled: #C7C0B2;
 
   --color-success: var(--gain);
-  --color-success-soft: rgba(47, 82, 51, 0.1);
+  --color-success-soft: rgba(46, 107, 62, 0.10);
   --color-warning: var(--warn);
-  --color-warning-soft: rgba(138, 109, 59, 0.12);
+  --color-warning-soft: rgba(165, 115, 10, 0.12);
   --color-danger: var(--loss);
-  --color-danger-soft: rgba(110, 31, 34, 0.1);
+  --color-danger-soft: rgba(139, 30, 30, 0.10);
   --color-info: var(--muted);
-  --color-info-soft: rgba(106, 103, 94, 0.1);
+  --color-info-soft: rgba(107, 104, 98, 0.10);
 
   --bg-hover: var(--paper-2);
   --nav-bg: var(--paper);
-  --input-bg: #ffffff;
-  --input-focus-bg: #ffffff;
+  --input-bg: var(--paper-2);
+  --input-focus-bg: var(--paper-2);
   --scrollbar-track: var(--paper);
   --scrollbar-thumb: var(--rule);
 }

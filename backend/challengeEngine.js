@@ -320,7 +320,8 @@ async function failAccount(acc, reason, io, platformSettings = null, options = {
           [close_price, demo_pnl, closeReason, trade.id]
         )
       } catch (tradeErr) {
-        logger.error(`failAccount: error closing trade ${trade.id}:`, { error: tradeErr.message })
+        logger.error(`failAccount: failed to close trade ${trade.id}:`, { error: tradeErr.message })
+        throw new Error(`Failed to close trade ${trade.id} while failing account`)
       }
     }
 
@@ -493,10 +494,11 @@ async function passAccount(acc, platformSettings, io) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // evaluateScalingPlan — funded accounts only. Every `scaling_target_pct` net
-// profit milestone bumps the account's risk-capacity multiplier by
-// `scaling_increase_per_milestone_pct`, capped at the model's `scaling_multiplier`.
-// The multiplier is consumed by the lot/exposure caps in routes/trades.js — it
-// does not change the account's literal balance.
+// profit milestone doubles (`scaling_multiplier`x) the account's risk-capacity
+// multiplier, i.e. multiplier = scaling_multiplier ^ milestonesEarned, capped so
+// starting_balance * multiplier never exceeds `scaling_max_account_size`.
+// The multiplier is not currently wired into lot/exposure caps or the
+// account's literal balance — it's computed and persisted for visibility only.
 // ─────────────────────────────────────────────────────────────────────────────
 async function evaluateScalingPlan(acc, io) {
   if (!acc.challenge_model_slug) return
@@ -509,9 +511,9 @@ async function evaluateScalingPlan(acc, io) {
     if (!(startingBalance > 0)) return
 
     const milestonePct = parseFloat(model.scaling_target_pct)
-    const increasePerMilestonePct = parseFloat(model.scaling_increase_per_milestone_pct || 0)
-    const maxMultiplier = parseFloat(model.scaling_multiplier || 1)
-    if (!(milestonePct > 0) || !(increasePerMilestonePct > 0)) return
+    const doublingFactor = parseFloat(model.scaling_multiplier || 1)
+    const maxAccountSize = parseFloat(model.scaling_max_account_size || 0)
+    if (!(milestonePct > 0) || !(doublingFactor > 1)) return
 
     const netProfitPct = ((currentBalance - startingBalance) / startingBalance) * 100
     if (netProfitPct <= 0) return
@@ -520,7 +522,9 @@ async function evaluateScalingPlan(acc, io) {
     const prevMilestones = parseInt(acc.scaling_milestones_claimed || 0, 10)
     if (milestonesEarned <= prevMilestones) return
 
-    const nextMultiplier = Math.min(maxMultiplier, 1 + (milestonesEarned * increasePerMilestonePct / 100))
+    const rawMultiplier = Math.pow(doublingFactor, milestonesEarned)
+    const capMultiplier = maxAccountSize > 0 ? (maxAccountSize / startingBalance) : rawMultiplier
+    const nextMultiplier = Math.min(rawMultiplier, capMultiplier)
 
     const result = await pool.query(
       `UPDATE accounts
@@ -700,9 +704,11 @@ async function processAccount(acc, platformSettings, io) {
 
     const minTradingDays = acc.min_trading_days != null ? parseInt(acc.min_trading_days, 10) : 0
     if (minTradingDays > 0) {
-      const tradingDays = await tradingDaysService.countTradingDays(pool, acc.id)
+      const tradingDays = await tradingDaysService.countQualifyingTradingDays(
+        pool, acc.id, acc.starting_balance, acc.min_daily_profit_pct
+      )
       if (tradingDays < minTradingDays) {
-        return // profit target met, but hasn't traded enough distinct days yet
+        return // profit target met, but hasn't traded enough qualifying days yet
       }
     }
 

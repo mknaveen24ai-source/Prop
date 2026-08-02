@@ -12,9 +12,8 @@ export default function TradingPanelHeader({ priceStatus }) {
           alignItems: 'center',
           gap: '8px',
           padding: '8px 14px',
-          borderRadius: '8px',
-          background: priceStatus.healthy ? 'rgba(0, 200, 153, 0.1)' : 'rgba(255, 71, 87, 0.1)',
-          border: `1px solid ${priceStatus.healthy ? 'rgba(0, 200, 153, 0.3)' : 'rgba(255, 71, 87, 0.3)'}`,
+          background: priceStatus.healthy ? 'color-mix(in srgb, var(--gain) 10%, transparent)' : 'color-mix(in srgb, var(--loss) 10%, transparent)',
+          border: `1px solid ${priceStatus.healthy ? 'color-mix(in srgb, var(--gain) 30%, transparent)' : 'color-mix(in srgb, var(--loss) 30%, transparent)'}`,
           fontSize: '12px',
         }}
       >

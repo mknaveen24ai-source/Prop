@@ -10,8 +10,6 @@ import {
 } from '../utils/instruments'
 import { calculateRiskRewardRatio, formatCurrency, toDecimal, toMoneyNumber } from '../utils/finance'
 
-const STRATEGY_TAGS = ['Breakout', 'Reversal', 'Pullback', 'Scalp', 'Swing', 'News', 'Trend']
-
 function getMarketStatus() {
   const now = new Date()
   const day = now.getUTCDay()
@@ -66,16 +64,6 @@ function renderPendingExplanation(pendingType, ask, bid) {
       <span><strong style={{ color: 'var(--red)' }}>Sell Stop</strong> - Set price <strong>below</strong> current bid ({bid}). Order fills when market breaks down to your price.</span>
     </span>
   )
-}
-
-function sanitizeTagList(value) {
-  if (!value) return ''
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .slice(0, 12)
-    .join(', ')
 }
 
 export default function OrderPanel({
@@ -162,15 +150,7 @@ export default function OrderPanel({
   }
 
   function buildBasePayload(direction) {
-    return {
-      direction,
-      strategyTag: orderForm.strategy_tag?.trim() || null,
-      journalNote: orderForm.journal_note?.trim() || null,
-      journalTags: sanitizeTagList(orderForm.journal_tags),
-      trailingStepPips: orderForm.trailing_step_pips,
-      trailingActivationPrice: orderForm.trailing_activation_price,
-      breakevenTriggerPips: orderForm.breakeven_trigger_pips
-    }
+    return { direction }
   }
 
   function handleMarketOrder(direction) {
@@ -209,9 +189,9 @@ export default function OrderPanel({
     <div className="card order-panel" style={{ padding: '20px' }}>
       {!marketStatus.open && (
         <div style={{
-          background: 'rgba(97, 97, 97, 0.12)',
+          background: 'var(--danger-bg)',
           border: '1px solid var(--red)',
-          borderRadius: '8px',
+          borderRadius: '0',
           padding: '10px 14px',
           marginBottom: '14px',
           display: 'flex',
@@ -230,9 +210,9 @@ export default function OrderPanel({
 
       {marketStatus.open && (
         <div style={{
-          background: 'linear-gradient(90deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.04) 100%)',
-          border: '1px solid rgba(16, 185, 129, 0.22)',
-          borderRadius: '12px',
+          background: 'var(--success-bg)',
+          border: '1px solid var(--green)',
+          borderRadius: '0',
           padding: '10px 14px',
           marginBottom: '16px',
           display: 'flex',
@@ -350,105 +330,11 @@ export default function OrderPanel({
         />
       </div>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: '10px',
-        marginBottom: '14px'
-      }}>
-        <div>
-          <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>TRAILING STEP (PIPS)</label>
-          <input
-            className="input-field"
-            type="number"
-            value={orderForm.trailing_step_pips}
-            onChange={(e) => updateForm({ trailing_step_pips: e.target.value })}
-            min="1"
-            step="1"
-            placeholder="10"
-            style={{ width: '100%', fontSize: '14px' }}
-          />
-        </div>
-        <div>
-          <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>BREAK-EVEN TRIGGER (PIPS)</label>
-          <input
-            className="input-field"
-            type="number"
-            value={orderForm.breakeven_trigger_pips}
-            onChange={(e) => updateForm({ breakeven_trigger_pips: e.target.value })}
-            min="1"
-            step="0.1"
-            placeholder="12"
-            style={{ width: '100%', fontSize: '14px' }}
-          />
-        </div>
-      </div>
-
-      <div style={{ marginBottom: '14px' }}>
-        <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
-          TRAILING ACTIVATION PRICE
-        </label>
-        <input
-          className="input-field"
-          type="number"
-          value={orderForm.trailing_activation_price}
-          onChange={(e) => updateForm({ trailing_activation_price: e.target.value })}
-          placeholder="Price where trailing should activate"
-          step={step}
-          style={{ width: '100%', fontSize: '14px' }}
-        />
-      </div>
-
-      <div style={{ marginBottom: '14px' }}>
-        <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>STRATEGY TAG</label>
-        <input
-          className="input-field"
-          type="text"
-          list="strategy-tag-options"
-          value={orderForm.strategy_tag}
-          onChange={(e) => updateForm({ strategy_tag: e.target.value })}
-          placeholder="e.g. Breakout, Pullback, Scalp"
-          maxLength={60}
-          style={{ width: '100%', fontSize: '14px' }}
-        />
-        <datalist id="strategy-tag-options">
-          {STRATEGY_TAGS.map((tag) => <option key={tag} value={tag} />)}
-        </datalist>
-      </div>
-
-      <div style={{ marginBottom: '14px' }}>
-        <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>JOURNAL TAGS</label>
-        <input
-          className="input-field"
-          type="text"
-          value={orderForm.journal_tags || ''}
-          onChange={(e) => updateForm({ journal_tags: e.target.value })}
-          placeholder="Comma separated tags"
-          style={{ width: '100%', fontSize: '14px' }}
-        />
-      </div>
-
-      <div style={{ marginBottom: '16px' }}>
-        <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>TRADE JOURNAL NOTE</label>
-        <textarea
-          className="textarea-field"
-          rows={4}
-          maxLength={1000}
-          value={orderForm.journal_note || ''}
-          onChange={(e) => updateForm({ journal_note: e.target.value })}
-          placeholder="Why are you taking this trade? What are you seeing in structure, session, or flow?"
-          style={{ width: '100%', fontSize: '13px', resize: 'vertical' }}
-        />
-        <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '6px', textAlign: 'right' }}>
-          {(orderForm.journal_note || '').length}/1000
-        </div>
-      </div>
-
       {rrSummary && (
         <div style={{
-          background: 'rgba(148, 148, 148, 0.04)',
-          border: '1px solid rgba(148, 148, 148, 0.15)',
-          borderRadius: '8px',
+          background: 'color-mix(in srgb, var(--muted) 4%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--muted) 15%, transparent)',
+          borderRadius: '0',
           padding: '10px 12px',
           marginBottom: '16px',
           fontSize: '12px'
@@ -470,9 +356,9 @@ export default function OrderPanel({
                     onClick={() => setMarketPreviewDirection(option.value)}
                     style={{
                       padding: '4px 10px',
-                      borderRadius: '999px',
-                      border: `1px solid ${active ? option.color : 'rgba(148, 148, 148, 0.2)'}`,
-                      background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
+                      borderRadius: 'var(--radius-pill)',
+                      border: `1px solid ${active ? option.color : 'color-mix(in srgb, var(--muted) 20%, transparent)'}`,
+                      background: active ? `color-mix(in srgb, ${option.color} 12%, transparent)` : 'transparent',
                       color: active ? option.color : 'var(--text-muted)',
                       fontSize: '10px',
                       fontWeight: '700',
@@ -486,7 +372,7 @@ export default function OrderPanel({
               })}
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+          <div className="order-panel-rr-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
             <div>
               <div style={{ color: 'var(--text-dim)', fontSize: '10px', marginBottom: '2px' }}>RISK</div>
               <div style={{ color: 'var(--red)', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>
@@ -513,7 +399,7 @@ export default function OrderPanel({
         <div style={{ marginBottom: '16px' }}>
           <div style={{ marginBottom: '14px' }}>
             <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>ORDER TYPE</label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+            <div className="order-panel-type-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
               {[
                 { value: 'buy_limit', label: 'Buy Limit', desc: 'Buy below market', color: 'var(--green)' },
                 { value: 'sell_limit', label: 'Sell Limit', desc: 'Sell above market', color: 'var(--red)' },
@@ -526,9 +412,9 @@ export default function OrderPanel({
                   onClick={() => setPendingType(opt.value)}
                   style={{
                     padding: '10px 8px',
-                    borderRadius: '6px',
+                    borderRadius: '0',
                     border: pendingType === opt.value ? `1px solid ${opt.color}` : '1px solid var(--navy-border)',
-                    background: pendingType === opt.value ? 'rgba(255,255,255,0.06)' : 'var(--navy-card)',
+                    background: pendingType === opt.value ? `color-mix(in srgb, ${opt.color} 10%, transparent)` : 'var(--navy-card)',
                     cursor: 'pointer',
                     textAlign: 'left'
                   }}
@@ -542,7 +428,7 @@ export default function OrderPanel({
 
           <div style={{
             background: 'var(--navy)',
-            borderRadius: '6px',
+            borderRadius: '0',
             padding: '10px 12px',
             marginBottom: '14px',
             fontSize: '11px',
@@ -576,9 +462,9 @@ export default function OrderPanel({
 
           {orderForm.oco_enabled && (
             <div style={{
-              background: 'rgba(148, 148, 148, 0.04)',
-              border: '1px solid rgba(148, 148, 148, 0.15)',
-              borderRadius: '10px',
+              background: 'color-mix(in srgb, var(--muted) 4%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--muted) 15%, transparent)',
+              borderRadius: '0',
               padding: '12px',
               marginBottom: '14px'
             }}>

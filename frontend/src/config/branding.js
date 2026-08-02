@@ -23,8 +23,8 @@ const branding = {
     tagline: 'Funded trading accounts with transparent rules.',
     hero_title: 'PropFirm | Funded Trading Accounts',
     hero_subtitle: 'Transparent rules, real progression, and institutional-grade infrastructure.',
-    primary_color: '#1b2b3a',
-    accent_color: '#1b2b3a'
+    primary_color: null,
+    accent_color: null
   }
 }
 

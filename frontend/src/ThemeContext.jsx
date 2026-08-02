@@ -11,7 +11,7 @@ export function ThemeProvider({ children, initialTheme }) {
   // Without the guard the entire ThemeProvider — and therefore the whole app —
   // crashes before anything renders.
   const [theme, setTheme] = useState(() => {
-    return initialTheme || 'dark'
+    return initialTheme || 'light'
   })
 
   // Sync initialTheme when it arrives from the /me response in App.js.

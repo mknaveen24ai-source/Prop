@@ -15,8 +15,8 @@ const ROWS = [
   },
   {
     label: 'Evaluation model',
-    us: 'Two-phase rules, clear review, admin-approved progression',
-    others: 'Hidden review rules after traders pass'
+    us: 'Same disclosed rules at every phase, whichever model you pick',
+    others: 'Hidden review rules revealed after traders pass'
   },
   {
     label: 'Risk controls',
@@ -44,9 +44,9 @@ export default function LandingComparison() {
                 <span className="mp-badge-dot"></span>
                 Why us vs others
               </div>
-              <h2 id="mp-comparison-title" className="mp-h2">Built like an operating desk, not a landing-page promise.</h2>
+              <h2 id="mp-comparison-title" className="mp-h2">Why Traders Leave Other Firms For Us</h2>
               <p className="mp-p-lead">
-                Traders compare firms before they register. This grid makes the difference obvious without shouting.
+                You'll compare firms before you register — good. Here's the side-by-side, no marketing spin required.
               </p>
             </div>
             <Link to="/register" className="mp-btn-secondary mp-comparison-cta">

@@ -7,6 +7,7 @@ import AdminFilterBar from '../../components/admin/AdminFilterBar';
 import AdminListToolbar from '../../components/admin/AdminListToolbar';
 import AdminModal from '../../components/admin/AdminModal';
 import AdminStatCard from '../../components/admin/AdminStatCard';
+import AdminStatGrid from '../../components/admin/AdminStatGrid';
 import { useToast } from '../../components/admin/AdminToast';
 import { exportAdminResource } from '../../utils/adminList';
 
@@ -31,7 +32,7 @@ const DEFAULT_QUEUE_FILTERS = {
 };
 
 const BULK_ACTION_ORDER = {
-  accounts: ['restore_active', 'restore_with_reset', 'replace_account', 'lock_account', 'clear_review_flag', 'extend_days', 'force_close_open_trades'],
+  accounts: ['restore_active', 'restore_with_reset', 'replace_account', 'lock_account', 'clear_review_flag', 'extend_days', 'force_close_open_trades', 'revoke_funded'],
   users: ['ban', 'unban', 'revoke_sessions', 'approve_kyc', 'reject_kyc', 'manual_account'],
   money: ['flag_payout', 'unflag_payout', 'approve_payout', 'reject_payout', 'waive_violation']
 };
@@ -913,11 +914,11 @@ export default function AdminCommandCenter() {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+      <AdminStatGrid>
         {summaryCards.map((card) => (
           <AdminStatCard key={card.label} icon={card.icon} label={card.label} value={card.value} />
         ))}
-      </div>
+      </AdminStatGrid>
 
       <AdminFilterBar
         searchPlaceholder="Search by trader, email, ID, or queue-specific field..."
@@ -1101,7 +1102,7 @@ export default function AdminCommandCenter() {
       >
         {actionContext && (
           <div style={{ display: 'grid', gap: '16px' }}>
-            <div style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', borderRadius: '10px', padding: '14px' }}>
+            <div style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', padding: '14px' }}>
               <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Target Summary</div>
               <div style={{ color: 'var(--admin-text)' }}>
                 {actionContext.scope === 'bulk' ? `${selectedActionRows.length} selected row(s)` : '1 selected row'}

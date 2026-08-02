@@ -2,7 +2,7 @@
 const express = require('express')
 const router = express.Router()
 const pool = require('../db')
-const { authenticateToken, authenticateAdmin } = require('./middleware')
+const { authenticateToken, authenticateAdmin, requireAdminCapability } = require('./middleware')
 const rateLimit = require('express-rate-limit')
 const logger = require('../utils/logger')
 const { publishDomainEvent } = require('../utils/kafka')
@@ -218,6 +218,7 @@ router.get('/conversations', authenticateToken, async function(req, res) {
     )
     res.json(result.rows)
   } catch (error) {
+    logger.error('Fetch conversations error:', { error: error.message })
     res.status(500).json({ error: 'Could not fetch conversations' })
   }
 })
@@ -268,6 +269,7 @@ router.get('/conversations/:id', authenticateToken, async function(req, res) {
       messages: messagesResult.rows
     })
   } catch (error) {
+    logger.error('Fetch conversation error:', { error: error.message })
     res.status(500).json({ error: 'Could not fetch conversation' })
   }
 })
@@ -379,12 +381,13 @@ router.patch('/conversations/:id/close', authenticateToken, async function(req, 
 
     res.json({ message: 'Conversation closed', conversation: result.rows[0] })
   } catch (error) {
+    logger.error('Close conversation error:', { error: error.message })
     res.status(500).json({ error: 'Could not close conversation' })
   }
 })
 
 // Admin endpoints
-router.get('/admin/conversations', authenticateAdmin, async function(req, res) {
+router.get('/admin/conversations', authenticateAdmin, requireAdminCapability('chat:read:scoped'), async function(req, res) {
   try {
     await ensureChatTables()
     const { status, page = 1, limit = 20 } = req.query
@@ -432,12 +435,13 @@ router.get('/admin/conversations', authenticateAdmin, async function(req, res) {
       limit: parseInt(limit)
     })
   } catch (error) {
+    logger.error('Admin fetch conversations error:', { error: error.message })
     res.status(500).json({ error: 'Could not fetch conversations' })
   }
 })
 
 // Admin get conversation
-router.get('/admin/conversations/:id', authenticateAdmin, async function(req, res) {
+router.get('/admin/conversations/:id', authenticateAdmin, requireAdminCapability('chat:read:scoped'), async function(req, res) {
   try {
     await ensureChatTables()
     const { id } = req.params
@@ -483,12 +487,13 @@ router.get('/admin/conversations/:id', authenticateAdmin, async function(req, re
       messages: messagesResult.rows
     })
   } catch (error) {
+    logger.error('Fetch conversation error:', { error: error.message })
     res.status(500).json({ error: 'Could not fetch conversation' })
   }
 })
 
 // Admin send message
-router.post('/admin/conversations/:id/messages', authenticateAdmin, chatMessageLimiter, async function(req, res) {
+router.post('/admin/conversations/:id/messages', authenticateAdmin, requireAdminCapability('chat:reply:scoped'), chatMessageLimiter, async function(req, res) {
   try {
     await ensureChatTables()
     const { id } = req.params
@@ -565,7 +570,7 @@ router.post('/admin/conversations/:id/messages', authenticateAdmin, chatMessageL
 })
 
 // Admin update conversation status
-router.patch('/admin/conversations/:id', authenticateAdmin, async function(req, res) {
+router.patch('/admin/conversations/:id', authenticateAdmin, requireAdminCapability('chat:reply:scoped'), async function(req, res) {
   try {
     await ensureChatTables()
     const { id } = req.params
@@ -616,12 +621,13 @@ router.patch('/admin/conversations/:id', authenticateAdmin, async function(req, 
 
     res.json({ message: 'Conversation updated', conversation: result.rows[0] })
   } catch (error) {
+    logger.error('Update conversation error:', { error: error.message })
     res.status(500).json({ error: 'Could not update conversation' })
   }
 })
 
 // Admin get stats
-router.get('/admin/chat-stats', authenticateAdmin, async function(req, res) {
+router.get('/admin/chat-stats', authenticateAdmin, requireAdminCapability('chat:read:scoped'), async function(req, res) {
   try {
     await ensureChatTables()
     const stats = await pool.query(`
@@ -636,6 +642,7 @@ router.get('/admin/chat-stats', authenticateAdmin, async function(req, res) {
 
     res.json(stats.rows[0])
   } catch (error) {
+    logger.error('Fetch chat stats error:', { error: error.message })
     res.status(500).json({ error: 'Could not fetch stats' })
   }
 })

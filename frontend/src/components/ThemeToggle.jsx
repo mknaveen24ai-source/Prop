@@ -19,7 +19,7 @@ export default function ThemeToggle() {
         justifyContent: 'space-between',
         width: '56px',
         height: '28px',
-        background: 'var(--bg-elevated)',
+        background: 'var(--paper)',
         border: '1px solid var(--border-strong)',
         borderRadius: '20px',
         padding: '0 4px',
@@ -37,7 +37,7 @@ export default function ThemeToggle() {
           transform: 'translateY(-50%)',
           width: '24px',
           height: '22px',
-          background: isDark ? 'var(--accent)' : 'var(--paper)',
+          background: isDark ? 'var(--accent)' : 'var(--ink)',
           borderRadius: '50%',
           transition: 'all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
           boxShadow: isDark ? '0 0 10px rgba(var(--brand-primary-rgb), 0.5)' : '0 1px 3px rgba(0,0,0,0.2)',
@@ -55,7 +55,7 @@ export default function ThemeToggle() {
           transition: 'color 0.3s'
         }}
       >
-        <Sun size={12} color={isDark ? 'var(--text-muted)' : 'var(--bg-hover)'} />
+        <Sun size={12} color={isDark ? 'var(--muted)' : 'var(--paper)'} />
       </div>
       <div
         style={{
@@ -67,7 +67,7 @@ export default function ThemeToggle() {
           transition: 'color 0.3s'
         }}
       >
-        <Moon size={10} color={isDark ? 'var(--text-primary)' : 'var(--text-muted)'} />
+        <Moon size={10} color={isDark ? 'var(--paper)' : 'var(--muted)'} />
       </div>
     </button>
   )

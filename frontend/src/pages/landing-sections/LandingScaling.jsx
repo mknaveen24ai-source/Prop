@@ -35,10 +35,10 @@ export default function LandingScaling() {
             How It Works
           </div>
           <h2 className="mp-h2 mp-reveal mp-delay-100">
-            From Sign-Up to <span className="mp-glow-text">Funded</span>
+            Here's Exactly What Happens After You Click <span className="mp-glow-text">Start</span>
           </h2>
           <p className="mp-p-lead mp-reveal mp-delay-200" style={{ margin: '0 auto' }}>
-            {`A transparent, straightforward path. Choose your model, same rules at every phase, challenge access starting from ${challengeFeeDisplay}.`}
+            {`No surprise steps, no hidden fine print revealed after checkout. Choose your model, same rules at every phase, challenge access ${challengeFeeDisplay.toLowerCase()}.`}
           </p>
         </div>
 

@@ -73,40 +73,6 @@ services:
       - internal
       - external
 
-  # —— Trade Copier Watcher ——————————————————————————————————————————————————————————————
-  copier:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: propfirm_copier
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: postgresql://${DB_USER:-propfirm}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-propfirm}
-      API_BASE_URL: http://backend:5000
-      ADMIN_JWT: ${COPIER_ADMIN_JWT:-}
-      MT5_BRIDGE_HOST: ${MT5_BRIDGE_HOST:-host.docker.internal}
-      MT5_BRIDGE_PORT: ${MT5_BRIDGE_PORT:-9999}
-      POLL_MS: ${COPIER_POLL_MS:-200}
-      API_POLL_MS: ${COPIER_API_POLL_MS:-1000}
-      WS_URL: ${COPIER_WS_URL:-}
-    command: ["node", "trade-copier/watcher.js"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-      backend:
-        condition: service_healthy
-    volumes:
-      - logs:/app/logs
-    healthcheck:
-      test: ["CMD-SHELL", "node scripts/copier-healthcheck.js"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-    networks:
-      - internal
-
   # ── Frontend ─────────────────────────────────────────────────────────────────
   email-worker:
     build:

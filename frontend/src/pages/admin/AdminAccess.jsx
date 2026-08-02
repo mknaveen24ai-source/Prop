@@ -59,6 +59,17 @@ function createEmptyAdminForm() {
   }
 }
 
+const AUDIT_PAGE_SIZE = 50
+
+function summarizeAuditPayload(entry) {
+  const payload = entry?.payload_json
+  if (!payload || typeof payload !== 'object') return '-'
+  if (payload.action) return `${payload.action}${payload.reason ? ` — ${payload.reason}` : ''}`
+  if (payload.message) return payload.message
+  const asString = JSON.stringify(payload)
+  return asString.length > 140 ? `${asString.slice(0, 140)}…` : asString
+}
+
 export default function AdminAccess() {
   const { adminAxios, session } = useOutletContext()
   const toast = useToast()
@@ -74,6 +85,9 @@ export default function AdminAccess() {
   const [disableCode, setDisableCode] = useState('')
   const [adminForm, setAdminForm] = useState(createEmptyAdminForm())
   const [busyKey, setBusyKey] = useState('')
+  const [auditEntries, setAuditEntries] = useState([])
+  const [auditLoading, setAuditLoading] = useState(false)
+  const [auditHasMore, setAuditHasMore] = useState(true)
 
   const loadAccess = async ({ silent = false } = {}) => {
     if (!silent) setLoading(true)
@@ -106,6 +120,26 @@ export default function AdminAccess() {
 
   useEffect(() => {
     loadAccess()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuperAdmin])
+
+  const loadAuditLog = async ({ offset = 0, append = false } = {}) => {
+    if (!isSuperAdmin) return
+    setAuditLoading(true)
+    try {
+      const res = await adminAxios.get('/api/admin/audit-log', { params: { limit: AUDIT_PAGE_SIZE, offset } })
+      const entries = Array.isArray(res.data?.entries) ? res.data.entries : []
+      setAuditEntries((current) => (append ? [...current, ...entries] : entries))
+      setAuditHasMore(entries.length === AUDIT_PAGE_SIZE)
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Could not load audit log')
+    } finally {
+      setAuditLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (isSuperAdmin) loadAuditLog()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSuperAdmin])
 
@@ -299,14 +333,14 @@ export default function AdminAccess() {
         </div>
 
         {twoFaStatus?.legacy_env_fallback ? (
-          <div style={{ padding: '16px', borderRadius: '10px', border: '1px solid rgba(245, 158, 11, 0.25)', background: 'rgba(245, 158, 11, 0.08)', color: 'var(--admin-text)' }}>
+          <div style={{ padding: '16px', border: '1px solid color-mix(in srgb, var(--admin-warning) 25%, transparent)', background: 'color-mix(in srgb, var(--admin-warning) 8%, transparent)', color: 'var(--admin-text)' }}>
             This session is using the legacy `.env` bootstrap path. Create your first DB-backed platform admin, sign in with that account, and then enroll 2FA.
           </div>
         ) : setupPayload ? (
           <div style={{ display: 'grid', gap: '20px', gridTemplateColumns: 'minmax(240px, 320px) minmax(280px, 1fr)' }}>
             <div className="admin-card" style={{ marginBottom: 0, background: 'var(--admin-bg)' }}>
               <div style={{ fontWeight: 600, marginBottom: '10px' }}>Scan QR Code</div>
-              <img src={setupPayload.qr} alt="Admin 2FA QR" style={{ width: '100%', maxWidth: '240px', borderRadius: '10px', background: 'var(--paper)', padding: '10px' }} />
+              <img src={setupPayload.qr} alt="Admin 2FA QR" style={{ width: '100%', maxWidth: '240px', background: 'var(--paper)', padding: '10px' }} />
             </div>
             <div className="admin-card" style={{ marginBottom: 0, background: 'var(--admin-bg)' }}>
               <div style={{ fontWeight: 600, marginBottom: '10px' }}>Verify Setup</div>
@@ -382,7 +416,7 @@ export default function AdminAccess() {
             </div>
             <div style={{ display: 'grid', gap: '10px', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
               {backupCodes.map((code) => (
-                <div key={code} className="admin-font-mono" style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--admin-border)', background: 'var(--admin-surface)' }}>
+                <div key={code} className="admin-font-mono" style={{ padding: '12px', border: '1px solid var(--admin-border)', background: 'var(--admin-surface)' }}>
                   {code}
                 </div>
               ))}
@@ -515,6 +549,60 @@ export default function AdminAccess() {
                 </tbody>
               </table>
             </div>
+          </div>
+
+          <div className="admin-card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center', marginBottom: '16px' }}>
+              <div>
+                <h2 className="admin-h2" style={{ marginBottom: '6px' }}>Admin Action Audit Log</h2>
+                <div style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+                  Chronological, tamper-evident record of admin logins, approvals, and setting changes.
+                </div>
+              </div>
+              <button className="admin-btn admin-btn-ghost admin-btn-sm" onClick={() => loadAuditLog()} disabled={auditLoading}>
+                {auditLoading ? 'Refreshing...' : 'Refresh'}
+              </button>
+            </div>
+            <div className="admin-table-wrapper">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th className="admin-th">Time</th>
+                    <th className="admin-th">Event</th>
+                    <th className="admin-th">Entity</th>
+                    <th className="admin-th">Actor</th>
+                    <th className="admin-th">Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditEntries.map((entry) => (
+                    <tr key={entry.id}>
+                      <td className="admin-td">{formatDate(entry.created_at)}</td>
+                      <td className="admin-td"><AdminBadge status="neutral" label={entry.event_type} /></td>
+                      <td className="admin-td admin-font-mono">{entry.entity_type ? `${entry.entity_type} #${entry.entity_id}` : '-'}</td>
+                      <td className="admin-td">{entry.actor || '-'}</td>
+                      <td className="admin-td" style={{ maxWidth: '360px' }}>{summarizeAuditPayload(entry)}</td>
+                    </tr>
+                  ))}
+                  {auditEntries.length === 0 && (
+                    <tr>
+                      <td className="admin-td" colSpan={5}>{auditLoading ? 'Loading audit log...' : 'No audit entries yet.'}</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {auditHasMore && auditEntries.length > 0 && (
+              <div style={{ marginTop: '14px', textAlign: 'center' }}>
+                <button
+                  className="admin-btn admin-btn-ghost admin-btn-sm"
+                  onClick={() => loadAuditLog({ offset: auditEntries.length, append: true })}
+                  disabled={auditLoading}
+                >
+                  {auditLoading ? 'Loading...' : 'Load More'}
+                </button>
+              </div>
+            )}
           </div>
 
         </>

@@ -92,7 +92,7 @@ export default function Support({ user }) {
         
         {activeTab === 'new' ? (
           <div className="card trader-service-card">
-            {error && <div style={{ background: 'rgba(231, 76, 60, 0.1)', border: '1px solid var(--red)', borderRadius: '8px', padding: '12px 16px', marginBottom: '20px', color: 'var(--red)', fontSize: '13px' }}>{error}</div>}
+            {error && <div style={{ background: 'color-mix(in srgb, var(--red) 10%, transparent)', border: '1px solid var(--red)', padding: '12px 16px', marginBottom: '20px', color: 'var(--red)', fontSize: '13px' }}>{error}</div>}
             
             <div className="input-group">
               <label className="input-label">CATEGORY</label>
@@ -149,7 +149,7 @@ export default function Support({ user }) {
                        <div style={{ color:'var(--text-dim)', fontSize:'12px', marginTop:'4px' }}>#{t.id} • {t.category.toUpperCase()}</div>
                      </td>
                      <td style={{ padding:'16px' }}>
-                       <span style={{ padding:'4px 8px', borderRadius:'4px', fontSize:'11px', fontWeight:600, background: t.status === 'resolved' || t.status === 'closed' ? 'rgba(46, 204, 113, 0.1)' : t.status === 'open' ? 'rgba(231, 76, 60, 0.1)' : 'rgba(148, 148, 148, 0.1)', color: t.status === 'resolved' || t.status === 'closed' ? 'var(--green)' : t.status === 'open' ? 'var(--red)' : 'var(--accent)' }}>
+                       <span style={{ padding:'4px 8px', fontSize:'11px', fontWeight:600, background: t.status === 'resolved' || t.status === 'closed' ? 'color-mix(in srgb, var(--green) 10%, transparent)' : t.status === 'open' ? 'color-mix(in srgb, var(--red) 10%, transparent)' : 'color-mix(in srgb, var(--muted) 10%, transparent)', color: t.status === 'resolved' || t.status === 'closed' ? 'var(--green)' : t.status === 'open' ? 'var(--red)' : 'var(--accent)' }}>
                          {t.status.toUpperCase()}
                        </span>
                      </td>
@@ -217,8 +217,8 @@ function TicketChat({ ticket, user, onBack }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '65vh', border:'1px solid var(--navy-border)', borderRadius:'12px', background:'var(--navy-card)', overflow:'hidden' }}>
-      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--navy-border)', display: 'flex', alignItems: 'center', background:'rgba(16, 24, 40, 0.4)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '65vh', border:'1px solid var(--navy-border)', background:'var(--navy-card)', overflow:'hidden' }}>
+      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--navy-border)', display: 'flex', alignItems: 'center', background:'color-mix(in srgb, var(--navy) 40%, transparent)' }}>
         <button onClick={onBack} style={{ background:'transparent', border:'none', color:'var(--text-muted)', cursor:'pointer', marginRight:'16px', fontSize:'24px', lineHeight:'1', display: 'inline-flex', alignItems: 'center' }}>
           {renderIcon('arrow', { size: 18, color: 'currentColor', style: { transform: 'rotate(180deg)' } })}
         </button>
@@ -234,7 +234,7 @@ function TicketChat({ ticket, user, onBack }) {
             {/* Original message */}
             <div style={{ alignSelf: 'flex-end', maxWidth: '75%' }}>
               <div style={{ fontSize:'11px', color:'var(--text-muted)', marginBottom:'4px', textAlign:'right', marginRight:'4px' }}>You • {formatTime(ticket.created_at)}</div>
-              <div style={{ background: 'var(--accent)', color: 'var(--paper)', padding: '12px 16px', borderRadius: '16px', borderBottomRightRadius: '4px', lineHeight:'1.5', whiteSpace:'pre-wrap' }}>
+              <div style={{ background: 'var(--accent)', color: 'var(--paper)', padding: '12px 16px', lineHeight:'1.5', whiteSpace:'pre-wrap' }}>
                 {ticket.message}
               </div>
             </div>
@@ -244,7 +244,7 @@ function TicketChat({ ticket, user, onBack }) {
                 <div style={{ fontSize:'11px', color:'var(--text-muted)', marginBottom:'4px', marginLeft: m.sender_type === 'user' ? 0 : '4px', marginRight: m.sender_type === 'user' ? '4px' : 0, textAlign: m.sender_type === 'user' ? 'right' : 'left' }}>
                   {m.sender_name || (m.sender_type==='admin'?'Support Team':'You')} • {formatTime(m.created_at)}
                 </div>
-                <div style={{ background: m.sender_type === 'user' ? 'var(--accent)' : 'var(--navy)', color: m.sender_type === 'user' ? 'var(--paper)' : 'var(--text)', padding: '12px 16px', borderRadius: '16px', borderBottomRightRadius: m.sender_type === 'user' ? '4px' : '16px', borderBottomLeftRadius: m.sender_type === 'admin' ? '4px' : '16px', lineHeight:'1.5', whiteSpace:'pre-wrap' }}>
+                <div style={{ background: m.sender_type === 'user' ? 'var(--accent)' : 'var(--navy)', color: m.sender_type === 'user' ? 'var(--paper)' : 'var(--text)', padding: '12px 16px', lineHeight:'1.5', whiteSpace:'pre-wrap' }}>
                   {m.message}
                 </div>
               </div>
@@ -254,20 +254,20 @@ function TicketChat({ ticket, user, onBack }) {
         )}
       </div>
 
-      <div style={{ padding: '16px', borderTop: '1px solid var(--navy-border)', background:'rgba(16, 24, 40, 0.4)' }}>
+      <div style={{ padding: '16px', borderTop: '1px solid var(--navy-border)', background:'color-mix(in srgb, var(--navy) 40%, transparent)' }}>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <input 
-             value={reply} 
-             onChange={e => setReply(e.target.value)} 
+          <input
+             value={reply}
+             onChange={e => setReply(e.target.value)}
              onKeyDown={e => e.key === 'Enter' && handleSend()}
-             placeholder="Type a reply..." 
-             style={{ flex: 1, padding: '12px 16px', borderRadius: '24px', border: '1px solid var(--navy-border)', background: 'var(--navy)', color: 'var(--text)', outline: 'none' }} 
+             placeholder="Type a reply..."
+             style={{ flex: 1, padding: '12px 16px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--navy-border)', background: 'var(--navy)', color: 'var(--text)', outline: 'none' }}
              disabled={ticket.status === 'closed'}
           />
-          <button 
-             onClick={handleSend} 
-             disabled={sending || ticket.status === 'closed'} 
-             style={{ padding: '0 24px', borderRadius: '24px', background: ticket.status === 'closed' ? 'var(--navy-border)' : 'var(--accent)', color: 'var(--paper)', border: 'none', fontWeight: 600, cursor: ticket.status === 'closed' ? 'not-allowed' : 'pointer' }}>
+          <button
+             onClick={handleSend}
+             disabled={sending || ticket.status === 'closed'}
+             style={{ padding: '0 24px', borderRadius: 'var(--radius-pill)', background: ticket.status === 'closed' ? 'var(--navy-border)' : 'var(--accent)', color: 'var(--paper)', border: 'none', fontWeight: 600, cursor: ticket.status === 'closed' ? 'not-allowed' : 'pointer' }}>
              Send
           </button>
         </div>

@@ -6,8 +6,9 @@ import AdminFilterBar from '../../components/admin/AdminFilterBar';
 import AdminListToolbar from '../../components/admin/AdminListToolbar';
 import AdminModal from '../../components/admin/AdminModal';
 import AdminStatCard from '../../components/admin/AdminStatCard';
+import AdminStatGrid from '../../components/admin/AdminStatGrid';
 import { useToast } from '../../components/admin/AdminToast';
-import { exportAdminResource } from '../../utils/adminList';
+import { exportAdminResource, normalizeAdminListResponse } from '../../utils/adminList';
 
 const DEFAULT_FILTERS = {
   direction: 'all',
@@ -43,11 +44,15 @@ export default function AdminTrades() {
   const [searchParams] = useSearchParams();
 
   const [loading, setLoading] = useState(true);
-  const [trades, setTrades] = useState([]);
+  const [listData, setListData] = useState({
+    rows: [],
+    pagination: { current: 1, total: 1, total_items: 0, page_size: 25 }
+  });
   const [views, setViews] = useState([]);
   const [activeViewId, setActiveViewId] = useState('');
   const [search, setSearch] = useState(searchParams.get('account') || searchParams.get('q') || '');
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [page, setPage] = useState(1);
   const [density, setDensity] = useState('comfortable');
   const [visibleColumnKeys, setVisibleColumnKeys] = useState(ALL_COLUMN_KEYS);
   const [selectedTrade, setSelectedTrade] = useState(null);
@@ -62,11 +67,23 @@ export default function AdminTrades() {
     }
   };
 
-  const fetchTrades = async ({ silent = false } = {}) => {
+  // FIX (AUDIT): mirrors AdminUsers.jsx's pageOverride pattern — the debounced
+  // search/filter effect below calls setPage(1) then fetchTrades({silent:true}),
+  // but fetchTrades would otherwise close over the pre-update `page`.
+  const fetchTrades = async ({ silent = false, pageOverride } = {}) => {
+    const effectivePage = pageOverride ?? page;
     if (!silent) setLoading(true);
     try {
-      const res = await adminAxios.get('/api/admin/trades').catch(() => ({ data: [] }));
-      setTrades(Array.isArray(res.data) ? res.data : []);
+      const res = await adminAxios.get('/api/admin/trades', {
+        params: {
+          page: effectivePage,
+          page_size: 25,
+          search,
+          direction: filters.direction !== 'all' ? filters.direction : undefined,
+          status: filters.status !== 'all' ? filters.status : undefined
+        }
+      });
+      setListData(normalizeAdminListResponse(res.data));
     } catch {
       toast.error('Failed to load global executions');
     } finally {
@@ -78,12 +95,21 @@ export default function AdminTrades() {
     fetchTrades();
     fetchViews();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     const nextSearch = searchParams.get('account') || searchParams.get('q') || '';
     setSearch(nextSearch);
   }, [searchParams]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setPage(1);
+      fetchTrades({ silent: true, pageOverride: 1 });
+    }, 150);
+    return () => clearTimeout(timeout);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, filters]);
 
   useEffect(() => {
     if (!socket) return undefined;
@@ -95,7 +121,10 @@ export default function AdminTrades() {
       socket.off('admin_command_center_updated', refresh);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socket]);
+  }, [socket, page, search, filters]);
+
+  const trades = listData.rows || [];
+  const pagination = listData.pagination || { current: 1, total: 1 };
 
   const executeForceClose = async () => {
     if (!selectedTrade) return;
@@ -193,33 +222,11 @@ export default function AdminTrades() {
     }
   };
 
-  const filteredTrades = useMemo(() => {
-    return trades.filter((trade) => {
-      const query = search.trim().toLowerCase();
-      if (query) {
-        const haystack = [
-          trade.id,
-          trade.account_id,
-          trade.user_id,
-          trade.symbol,
-          trade.type
-        ].join(' ').toLowerCase();
-        if (!haystack.includes(query)) return false;
-      }
-      if (filters.direction !== 'all' && String(trade.type || '').toLowerCase() !== filters.direction) return false;
-      if (filters.status !== 'all' && String(trade.status || '').toLowerCase() !== filters.status) return false;
-      return true;
-    });
-  }, [filters.direction, filters.status, search, trades]);
-
-  const summary = useMemo(() => ({
-    total: filteredTrades.length,
-    open: filteredTrades.filter((trade) => trade.status === 'open').length,
-    pending: filteredTrades.filter((trade) => trade.status === 'pending').length,
-    closed: filteredTrades.filter((trade) => trade.status === 'closed').length,
-    buy: filteredTrades.filter((trade) => trade.type === 'BUY').length,
-    sell: filteredTrades.filter((trade) => trade.type === 'SELL').length
-  }), [filteredTrades]);
+  // Filtering (search/direction/status) and the summary breakdown are now done
+  // server-side (see GET /api/admin/trades) so pagination reflects the real
+  // filtered total instead of slicing an unbounded, fully-loaded array.
+  const filteredTrades = trades;
+  const summary = listData.summary || { total: 0, open: 0, pending: 0, closed: 0 };
 
   const columns = useMemo(() => {
     const allColumns = [
@@ -318,12 +325,12 @@ export default function AdminTrades() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+      <AdminStatGrid>
         <AdminStatCard icon="trades" label="Visible Trades" value={summary.total} />
         <AdminStatCard icon="activity" label="Open" value={summary.open} />
         <AdminStatCard icon="history" label="Pending" value={summary.pending} />
         <AdminStatCard icon="approve" label="Closed" value={summary.closed} />
-      </div>
+      </AdminStatGrid>
 
       <AdminFilterBar searchPlaceholder="Search by trade ID, account, trader, or symbol..." searchValue={search} onSearchChange={setSearch}>
         {['all', 'buy', 'sell'].map((value) => (
@@ -368,8 +375,8 @@ export default function AdminTrades() {
           data={filteredTrades}
           loading={loading}
           rowActions={rowActions}
-          pagination={{ current: 1, total: 1 }}
-          onPageChange={() => {}}
+          pagination={pagination}
+          onPageChange={setPage}
           density={density}
           onRowClick={(trade) => handleTradeAction(trade)}
         />
@@ -409,7 +416,7 @@ export default function AdminTrades() {
               </div>
             </div>
 
-            <div style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', padding: '16px', borderRadius: '8px', marginBottom: '24px', textAlign: 'center' }}>
+            <div style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', padding: '16px', marginBottom: '24px', textAlign: 'center' }}>
               <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Net Floating P&L</div>
               <div style={{ fontSize: '32px', fontFamily: 'var(--admin-font-mono)', fontWeight: 700, color: (parseFloat(selectedTrade.pnl) || 0) >= 0 ? 'var(--admin-success)' : 'var(--admin-danger)' }}>
                 {(parseFloat(selectedTrade.pnl) || 0) >= 0 ? '+' : ''}${(parseFloat(selectedTrade.pnl) || 0).toFixed(2)}
@@ -417,7 +424,7 @@ export default function AdminTrades() {
             </div>
 
             {selectedTrade.status === 'open' && (
-              <div style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.2)', padding: '16px', borderRadius: '8px' }}>
+              <div style={{ background: 'color-mix(in srgb, var(--admin-danger) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--admin-danger) 20%, transparent)', padding: '16px' }}>
                 <p style={{ fontSize: '13px', color: 'var(--admin-text-muted)', marginBottom: '16px' }}>
                   As an administrator, you may forcibly close this active market execution. This action will realize the current floating P&L and cannot be reversed.
                 </p>

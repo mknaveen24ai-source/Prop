@@ -18,13 +18,12 @@ export default function TradingPriceTicker({ prices, orderForm, setOrderForm }) 
             style={{
               background: 'var(--navy-card)',
               border: isSelected ? '1px solid var(--accent)' : '1px solid var(--navy-border)',
-              borderRadius: '8px',
               padding: '10px 14px',
               cursor: 'pointer',
               minWidth: '110px',
               flexShrink: 0,
               transition: 'all 0.15s',
-              boxShadow: isSelected ? '0 0 12px rgba(148, 148, 148, 0.2)' : 'none',
+              boxShadow: isSelected ? '0 0 12px color-mix(in srgb, var(--muted) 20%, transparent)' : 'none',
             }}
           >
             <div style={{ fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.08em', marginBottom: '4px' }}>{instrument}</div>

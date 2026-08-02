@@ -12,7 +12,8 @@ import Support from './Support'
 import Dispute from './Dispute'
 import Chat from './Chat'
 import { calculatePnL } from '../utils/instruments'
-import { createIdempotencyHeaders, normalizeApiError } from '../services/api'
+import { createIdempotencyHeaders, normalizeApiError, authAPI } from '../services/api'
+import { useAuth } from '../providers/AuthProvider'
 import useStore from '../store/useStore'
 import { renderIcon } from '../utils/iconMap'
 import { calculatePayoutPreview, calculateRealizedProfit, formatCurrency, toMoneyNumber } from '../utils/finance'
@@ -20,6 +21,9 @@ import { filterVisibleTraderAccounts, isTraderAccountVisible } from '../utils/ac
 import Pagination from '../components/Pagination'
 import DashboardKYCPage from './DashboardKYCPage'
 import DashboardPayoutsPage from './DashboardPayoutsPage'
+import DashboardAffiliatePage from './DashboardAffiliatePage'
+import DashboardCompetitionsPage from './DashboardCompetitionsPage'
+import DashboardProfilePage from './DashboardProfilePage'
 import GetChallenge from './GetChallenge'
 import ErrorBoundary from '../ErrorBoundary'
 
@@ -83,6 +87,17 @@ function DashboardSectionFallback({ label = 'Loading module...' }) {
 }
 
 function Dashboard({ user, onLogout }) {
+  const { login } = useAuth()
+  const [profileForm, setProfileForm] = useState({
+    full_name: user?.full_name || '',
+    country: user?.country || '',
+    address_line1: user?.address_line1 || '',
+    address_line2: user?.address_line2 || '',
+    city: user?.city || '',
+    state_province: user?.state_province || '',
+    postal_code: user?.postal_code || ''
+  })
+  const [profileSaving, setProfileSaving] = useState(false)
   const [stats, setStats] = useState(null)
   const [accountRules, setAccountRules] = useState(null)
   const [tradeHistory, setTradeHistory] = useState([])
@@ -91,12 +106,12 @@ function Dashboard({ user, onLogout }) {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [activePage, setActivePage] = useState('dashboard')
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(
-    () => localStorage.getItem('sidebarCollapsed') === 'true'
-  )
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('sidebarCollapsed') === 'true' } catch { return false }
+  })
   const handleToggleSidebar = () => setSidebarCollapsed(prev => {
     const next = !prev
-    localStorage.setItem('sidebarCollapsed', String(next))
+    try { localStorage.setItem('sidebarCollapsed', String(next)) } catch {}
     return next
   })
   const [orderForm, setOrderForm] = useState({
@@ -104,12 +119,6 @@ function Dashboard({ user, onLogout }) {
     lots: '0.01',
     stop_loss: '',
     take_profit: '',
-    strategy_tag: '',
-    journal_note: '',
-    journal_tags: '',
-    trailing_step_pips: '',
-    trailing_activation_price: '',
-    breakeven_trigger_pips: '',
     oco_enabled: false,
     oco_order_type: 'sell_stop',
     oco_pending_price: ''
@@ -151,6 +160,8 @@ function Dashboard({ user, onLogout }) {
   // ── Platform announcement banner ──
   const [announcement, setAnnouncement] = useState(null)
   const [announcementDismissed, setAnnouncementDismissed] = useState(false)
+  const dismissedAnnouncementKeyRef = useRef(null)
+  const announcementKey = (a) => a ? `${a.message}|${a.updated_at}` : null
 
   const {
     activeAccount: selectedAccount,
@@ -179,7 +190,12 @@ function Dashboard({ user, onLogout }) {
       axios.get(`${API_URL}/api/announcement`)
         .then(res => {
           setAnnouncement(res.data || null)
-          if (!res.data) setAnnouncementDismissed(false)
+          // Reset dismissal when the announcement disappears OR changes to
+          // different content — a dismissed banner shouldn't stay hidden
+          // forever once an admin posts a new one.
+          if (announcementKey(res.data) !== dismissedAnnouncementKeyRef.current) {
+            setAnnouncementDismissed(false)
+          }
         })
         .catch(() => {})
     }, 5 * 60 * 1000)
@@ -346,6 +362,13 @@ function Dashboard({ user, onLogout }) {
       )
       setError(data.message)
     })
+
+    // ── Platform-wide admin broadcasts (Notification Center → "web" channel) ──
+    socket.on('platform_notification', (data) => {
+      if (!data?.message) return
+      pushNotification(data.title ? `${data.title}: ${data.message}` : data.message, data.type || 'info')
+    })
+
     return () => socket.disconnect()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -579,12 +602,6 @@ function Dashboard({ user, onLogout }) {
     direction,
     orderType,
     pendingPrice,
-    strategyTag,
-    journalNote,
-    journalTags,
-    trailingStepPips,
-    trailingActivationPrice,
-    breakevenTriggerPips,
     ocoSibling
   }) {
     if (tradeSubmitting) return
@@ -601,12 +618,6 @@ function Dashboard({ user, onLogout }) {
       if (pendingPrice) payload.pending_price = pendingPrice
       if (orderForm.stop_loss) payload.stop_loss = parseFloat(orderForm.stop_loss)
       if (orderForm.take_profit) payload.take_profit = parseFloat(orderForm.take_profit)
-      if (strategyTag) payload.strategy_tag = strategyTag
-      if (journalNote) payload.trader_note = journalNote
-      if (journalTags) payload.tags = journalTags
-      if (trailingStepPips) payload.trailing_step_pips = parseInt(trailingStepPips, 10)
-      if (trailingActivationPrice) payload.trailing_activation_price = parseFloat(trailingActivationPrice)
-      if (breakevenTriggerPips) payload.breakeven_trigger_pips = parseFloat(breakevenTriggerPips)
       if (ocoSibling) payload.oco_sibling = ocoSibling
       await axios.post(`${API_URL}/api/trades/open`, payload, {
         headers: createIdempotencyHeaders('trades:open')
@@ -616,11 +627,6 @@ function Dashboard({ user, onLogout }) {
         ...f,
         stop_loss: '',
         take_profit: '',
-        journal_note: '',
-        journal_tags: '',
-        trailing_step_pips: '',
-        trailing_activation_price: '',
-        breakeven_trigger_pips: '',
         oco_enabled: false,
         oco_order_type: 'sell_stop',
         oco_pending_price: ''
@@ -725,6 +731,21 @@ function Dashboard({ user, onLogout }) {
     }
   }
 
+  async function updateProfile(e) {
+    e.preventDefault()
+    if (profileSaving) return
+    setProfileSaving(true)
+    try {
+      const res = await authAPI.updateProfile(profileForm)
+      login(res.data)
+      setSuccess('Profile updated!')
+    } catch (err) {
+      setError(normalizeApiError(err, 'Could not update profile').message)
+    } finally {
+      setProfileSaving(false)
+    }
+  }
+
   const fundedAccount = accounts.find(a => a.account_type === 'funded' && a.status === 'active')
   const availableProfit = fundedAccount
     ? Math.max(0, calculateRealizedProfit(fundedAccount.current_balance, fundedAccount.starting_balance))
@@ -768,7 +789,11 @@ function Dashboard({ user, onLogout }) {
               {announcement.message}
             </span>
             <button
-              onClick={() => setAnnouncementDismissed(true)}
+              onClick={() => {
+                dismissedAnnouncementKeyRef.current = announcementKey(announcement)
+                setAnnouncementDismissed(true)
+              }}
+              aria-label="Dismiss announcement"
               style={{ background: 'none', border: 'none', color: c.text, cursor: 'pointer', fontSize: '16px', opacity: 0.7, padding: '0 4px' }}
             >
               {renderIcon('close', { size: 16, color: c.text })}
@@ -778,6 +803,7 @@ function Dashboard({ user, onLogout }) {
       })()}
 
       <Sidebar
+        user={user}
         activePage={activePage}
         setActivePage={setActivePage}
         kycStatus={kycStatus}
@@ -790,10 +816,9 @@ function Dashboard({ user, onLogout }) {
       {/* Main Content */}
       <div className="dashboard-main animate-fade-up" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         {/* Top Nav */}
-      <div className="nav dashboard-topbar" style={{ 
-        margin: '16px 24px', 
-        borderRadius: '16px', 
-        background: 'var(--bg-surface)', 
+      <div className="nav dashboard-topbar" style={{
+        margin: '16px 24px',
+        background: 'var(--bg-surface)',
         backdropFilter: 'blur(16px)',
         border: '1px solid var(--border)',
         boxShadow: 'var(--shadow-surface)' 
@@ -803,7 +828,7 @@ function Dashboard({ user, onLogout }) {
             {renderIcon('activity', { size: 14, color: connected ? 'var(--accent-green)' : 'var(--accent-red)' })}
           </span>
           <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Terminal Status</span>
-          <span className={`badge ${connected ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '10px', padding: '4px 10px', boxShadow: connected ? '0 0 10px rgba(16,185,129,0.3)' : '0 0 10px rgba(239,68,68,0.3)' }}>
+          <span className={`badge ${connected ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '10px', padding: '4px 10px', boxShadow: connected ? '0 0 10px color-mix(in srgb, var(--gain) 30%, transparent)' : '0 0 10px color-mix(in srgb, var(--loss) 30%, transparent)' }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
               {renderIcon(connected ? 'activity' : 'close', { size: 10, color: 'currentColor' })}
               <span>{connected ? 'LIVE SYNC' : 'OFFLINE'}</span>
@@ -918,6 +943,17 @@ function Dashboard({ user, onLogout }) {
           />
         )}
 
+        {/* Profile Page */}
+        {activePage === 'profile' && (
+          <DashboardProfilePage
+            kycStatus={kycStatus}
+            profileForm={profileForm}
+            setProfileForm={setProfileForm}
+            updateProfile={updateProfile}
+            profileSaving={profileSaving}
+          />
+        )}
+
         {activePage === 'get-challenge' && (
           <GetChallenge
             onCreateAccount={createAccount}
@@ -1027,6 +1063,20 @@ function Dashboard({ user, onLogout }) {
           />
         )}
 
+        {/* Affiliate Page */}
+        {activePage === 'affiliate' && (
+          <ErrorBoundary variant="section" label="Affiliate">
+            <DashboardAffiliatePage />
+          </ErrorBoundary>
+        )}
+
+        {/* Competitions Page */}
+        {activePage === 'competitions' && (
+          <ErrorBoundary variant="section" label="Competitions">
+            <DashboardCompetitionsPage />
+          </ErrorBoundary>
+        )}
+
       </div>
         {/* Account History Page */}
         {activePage === 'history' && (
@@ -1071,7 +1121,7 @@ function Dashboard({ user, onLogout }) {
                                 {acc.phase_end_date && acc.status !== 'active' && ` · Ended ${new Date(acc.phase_end_date).toLocaleDateString()}`}
                               </div>
                             </div>
-                            <span style={{ padding: '3px 10px', borderRadius: '99px', fontSize: '11px', fontWeight: '700', color: statusColor, border: `1px solid ${statusColor}`, background: 'rgba(0,0,0,0.05)' }}>
+                            <span style={{ padding: '3px 10px', borderRadius: 'var(--radius-pill)', fontSize: '11px', fontWeight: '700', color: statusColor, border: `1px solid ${statusColor}`, background: `color-mix(in srgb, ${statusColor} 10%, transparent)` }}>
                               {acc.status.toUpperCase()}
                             </span>
                           </div>

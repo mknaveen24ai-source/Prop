@@ -44,7 +44,7 @@ function CountdownBoxes({ countdown, accent = 'var(--accent)' }) {
         { label: 'Min', value: countdown.minutes },
         { label: 'Sec', value: countdown.seconds },
       ].map(item => (
-        <div key={item.label} style={{ minWidth: '72px', padding: '12px 14px', borderRadius: '12px', border: '1px solid var(--navy-border)', background: 'var(--bg-hover)', textAlign: 'center' }}>
+        <div key={item.label} style={{ minWidth: '72px', padding: '12px 14px', border: '1px solid var(--navy-border)', background: 'var(--bg-hover)', textAlign: 'center' }}>
           <div style={{ fontSize: '24px', fontWeight: 800, color: accent, fontFamily: 'var(--font-mono)' }}>
             {String(item.value).padStart(2, '0')}
           </div>
@@ -62,6 +62,75 @@ function RuleRow({ label, value, accent = false }) {
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '11px 0', borderBottom: '1px solid var(--navy-border)' }}>
       <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{label}</span>
       <span style={{ color: accent ? 'var(--accent)' : 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-mono)', textAlign: 'right' }}>{value}</span>
+    </div>
+  )
+}
+
+function ConsistencyGauge({ consistency }) {
+  const size = 120
+  const strokeWidth = 12
+  const radius = (size - strokeWidth) / 2
+  const circumference = 2 * Math.PI * radius
+
+  if (!consistency || consistency.score == null) {
+    return (
+      <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+        <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', alignSelf: 'flex-start', marginBottom: '10px' }}>Consistency Score</div>
+        <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '20px 0' }}>
+          Not enough closed-trade history yet to calculate a consistency score.
+        </div>
+      </div>
+    )
+  }
+
+  const { score, best_day_pct, best_day_profit, threshold_pct, realized_profit } = consistency
+  const color = score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--warn)' : 'var(--red)'
+  const offset = circumference * (1 - Math.max(0, Math.min(100, score)) / 100)
+
+  return (
+    <div className="card">
+      <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', marginBottom: '10px' }}>
+        Consistency Score
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="var(--navy-border)"
+            strokeWidth={strokeWidth}
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke={color}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+            style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+          />
+          <text
+            x="50%"
+            y="50%"
+            textAnchor="middle"
+            dominantBaseline="central"
+            style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: '22px', fill: color }}
+          >
+            <CountUp end={score} decimals={0} duration={1.2} preserveValue={true} useEasing={true} />
+          </text>
+        </svg>
+        <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.7 }}>
+          <div>Best day: <strong style={{ color: 'var(--text)' }}>{formatMoney(best_day_profit)}</strong> ({best_day_pct}% of profit)</div>
+          <div>Total profit: <strong style={{ color: 'var(--text)' }}>{formatMoney(realized_profit)}</strong></div>
+          <div>Firm limit: <strong style={{ color: 'var(--text)' }}>{threshold_pct}%</strong> per day</div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -84,7 +153,7 @@ function DrawdownCard({ title, usedPct, remainingPct, limitPct, tone = 'var(--ac
           % used
         </div>
       </div>
-      <div style={{ height: '10px', borderRadius: '999px', background: 'var(--navy-border)', overflow: 'hidden', marginBottom: '10px' }}>
+      <div style={{ height: '10px', background: 'var(--navy-border)', overflow: 'hidden', marginBottom: '10px' }}>
         <div style={{ height: '100%', width: `${fill}%`, background: color, transition: 'width 0.4s ease' }} />
       </div>
       <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
@@ -296,7 +365,6 @@ export default function DashboardHome({
                   color: isSelected ? 'var(--paper)' : 'var(--text-primary)',
                   border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
                   padding: '16px 20px',
-                  borderRadius: '16px',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'flex-start',
@@ -310,7 +378,7 @@ export default function DashboardHome({
                 <div style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '0.02em' }}>
                   {account.account_type.toUpperCase()} ${parseFloat(account.account_size).toLocaleString('en-US')}
                 </div>
-                <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: isSelected ? 'rgba(255,255,255,0.72)' : 'var(--text-muted)' }}>
+                <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: isSelected ? 'color-mix(in srgb, var(--paper) 72%, transparent)' : 'var(--text-muted)' }}>
                   #{account.account_uid ? account.account_uid.slice(0, 8) : account.id}
                 </div>
                 <span style={{
@@ -319,9 +387,8 @@ export default function DashboardHome({
                   fontWeight: 800,
                   letterSpacing: '0.1em',
                   color: isSelected ? 'var(--paper)' : getStatusColor(account.status),
-                  background: isSelected ? 'rgba(255,255,255,0.18)' : 'var(--bg-hover)',
-                  padding: '4px 8px',
-                  borderRadius: '6px'
+                  background: isSelected ? 'color-mix(in srgb, var(--paper) 18%, transparent)' : 'var(--bg-hover)',
+                  padding: '4px 8px'
                 }}>
                   • {account.status.toUpperCase()}
                 </span>
@@ -332,7 +399,7 @@ export default function DashboardHome({
       )}
 
       {quotaFull && (
-        <div className="card" style={{ marginBottom: '24px', border: '1px solid rgba(97, 97, 97, 0.4)', background: 'rgba(97, 97, 97, 0.04)' }}>
+        <div className="card" style={{ marginBottom: '24px', border: '1px solid color-mix(in srgb, var(--muted) 40%, transparent)', background: 'color-mix(in srgb, var(--muted) 4%, transparent)' }}>
           <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
             <h3 style={{ color: 'var(--red)', marginBottom: '8px' }}>Account Creation Closed</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '18px' }}>
@@ -471,7 +538,7 @@ export default function DashboardHome({
                   % complete
                 </span>
               </div>
-              <div style={{ height: '10px', borderRadius: '999px', background: 'var(--navy-border)', overflow: 'hidden', marginBottom: '10px' }}>
+              <div style={{ height: '10px', background: 'var(--navy-border)', overflow: 'hidden', marginBottom: '10px' }}>
                 <div style={{ height: '100%', width: `${profitProgressPct}%`, background: 'linear-gradient(90deg, var(--green), var(--accent))', transition: 'width 0.4s ease' }} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', fontSize: '12px', color: 'var(--text-muted)' }}>
@@ -489,6 +556,7 @@ export default function DashboardHome({
               remainingPct={stats.stats.total_drawdown_remaining_pct}
               limitPct={stats.rules?.max_drawdown_pct || stats.account.max_drawdown_pct}
             />
+            <ConsistencyGauge consistency={stats.stats.consistency} />
           </div>
 
           <div className="grid-2 dashboard-info-grid">

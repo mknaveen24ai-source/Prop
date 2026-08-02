@@ -1,4 +1,4 @@
-export const ALL_ACCOUNT_SIZES = Object.freeze([5000, 10000, 25000, 50000, 100000])
+export const ALL_ACCOUNT_SIZES = Object.freeze([5000, 10000, 25000, 50000, 100000, 200000, 400000])
 export const UNLIMITED_QUOTA = 999999
 
 function normalizeNumber(value, fallback = 0) {

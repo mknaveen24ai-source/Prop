@@ -60,11 +60,14 @@ function runLockedSchedulerJob(lockName, label, fn) {
  *   checkPendingOrders: Function,
  *   checkFloatingDrawdown: Function,
  *   runChallengeEngine: Function,
+ *   runCompetitionEngine: Function,
+ *   tickCompetitionBots: Function,
  *   checkNewsForceClose: Function,
  *   weekendForceCloseByTenant: Function,
  *   pruneOldPriceHistory: Function,
  *   syncHourlyPriceHistory: Function,
  *   syncDedicatedPriceFeedWatchers: Function,
+ *   processQueuedNotifications: Function,
  * }} deps
  */
 function startAllSchedulers(io, deps) {
@@ -73,12 +76,15 @@ function startAllSchedulers(io, deps) {
     checkPendingOrders,
     checkFloatingDrawdown,
     runChallengeEngine,
+    runCompetitionEngine,
+    tickCompetitionBots,
     checkNewsForceClose,
     weekendForceCloseByTenant,
     flatByCloseForAccounts,
     pruneOldPriceHistory,
     syncHourlyPriceHistory,
-    syncDedicatedPriceFeedWatchers
+    syncDedicatedPriceFeedWatchers,
+    processQueuedNotifications
   } = deps
 
   // ── Trading engine ──────────────────────────────────────────────────────────
@@ -103,6 +109,24 @@ function startAllSchedulers(io, deps) {
     runLockedSchedulerJob('jobs:challenge_engine', 'challenge_engine', () => runChallengeEngine(io))
   }, 30000)
 
+  // ── Competition engine ───────────────────────────────────────────────────────
+  // Run once immediately on startup, then every 30 s — same cadence as the
+  // challenge engine, since both drive account status off similar deadlines.
+  runLockedSchedulerJob('jobs:competition_engine', 'competition_engine', () => runCompetitionEngine(io))
+  registerTrackedInterval(() => {
+    runLockedSchedulerJob('jobs:competition_engine', 'competition_engine', () => runCompetitionEngine(io))
+  }, 30000)
+
+  // ── Competition bot P&L tick ─────────────────────────────────────────────────
+  // Slower than the 30s challenge/competition cadence so bot leaderboard
+  // movement reads as gradual, not jumpy.
+  if (tickCompetitionBots) {
+    runLockedSchedulerJob('jobs:competition_bot_tick', 'competition_bot_tick', tickCompetitionBots)
+    registerTrackedInterval(() => {
+      runLockedSchedulerJob('jobs:competition_bot_tick', 'competition_bot_tick', tickCompetitionBots)
+    }, 60000)
+  }
+
   // ── News force close ────────────────────────────────────────────────────────
   registerTrackedInterval(() => {
     runLockedSchedulerJob('jobs:news_force_close', 'news_force_close', checkNewsForceClose)
@@ -118,6 +142,13 @@ function startAllSchedulers(io, deps) {
     registerTrackedInterval(() => {
       runLockedSchedulerJob('jobs:flat_by_close', 'flat_by_close', flatByCloseForAccounts)
     }, 60 * 1000)
+  }
+
+  // ── Notification delivery ───────────────────────────────────────────────────
+  if (processQueuedNotifications) {
+    registerTrackedInterval(() => {
+      runLockedSchedulerJob('jobs:notification_delivery', 'notification_delivery', () => processQueuedNotifications(io))
+    }, 20 * 1000)
   }
 
   // ── Price feed maintenance ──────────────────────────────────────────────────

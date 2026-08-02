@@ -40,6 +40,28 @@ async function countTradingDays(db, accountId) {
   return parseInt(result.rows[0]?.days || 0, 10)
 }
 
+// Counts only days whose net P&L reached `minDailyProfitPct`% of starting
+// balance — days that don't clear the bar don't count toward min_trading_days.
+async function countQualifyingTradingDays(db, accountId, startingBalance, minDailyProfitPct) {
+  const balance = parseFloat(startingBalance)
+  const threshold = parseFloat(minDailyProfitPct)
+  if (!(balance > 0) || !Number.isFinite(threshold) || threshold <= 0) {
+    return countTradingDays(db, accountId)
+  }
+  const result = await db.query(
+    `SELECT COUNT(*) AS days
+       FROM (
+         SELECT DATE(close_time AT TIME ZONE 'UTC') AS trading_day, SUM(demo_pnl) AS day_pnl
+           FROM trades
+          WHERE account_id = $1 AND status = 'closed'
+          GROUP BY DATE(close_time AT TIME ZONE 'UTC')
+       ) daily
+      WHERE (day_pnl / $2::numeric) * 100 >= $3`,
+    [accountId, balance, threshold]
+  )
+  return parseInt(result.rows[0]?.days || 0, 10)
+}
+
 async function getBestDayProfit(db, accountId) {
   const result = await db.query(
     `SELECT COALESCE(MAX(day_pnl), 0) AS best_day
@@ -75,6 +97,7 @@ module.exports = {
   utcDayStart,
   getTodayRealizedPnl,
   countTradingDays,
+  countQualifyingTradingDays,
   getBestDayProfit,
   checkConsistencyRule
 }

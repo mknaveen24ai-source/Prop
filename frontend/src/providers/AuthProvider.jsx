@@ -35,8 +35,9 @@ export function AuthProvider({ children }) {
       error => {
         const status = error.response?.status
         const url = error.config?.url || ''
+        const skipAuthRedirect = error.config?.skipAuthRedirect === true
 
-        if ((status === 401 || status === 403) && !url.includes('/api/admin')) {
+        if ((status === 401 || status === 403) && !url.includes('/api/admin') && !skipAuthRedirect) {
           setUser(null)
         }
 

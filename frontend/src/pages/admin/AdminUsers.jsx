@@ -5,6 +5,7 @@ import AdminDataTable from '../../components/admin/AdminDataTable';
 import AdminFilterBar from '../../components/admin/AdminFilterBar';
 import AdminBadge from '../../components/admin/AdminBadge';
 import AdminStatCard from '../../components/admin/AdminStatCard';
+import AdminStatGrid from '../../components/admin/AdminStatGrid';
 import { useToast } from '../../components/admin/AdminToast';
 import AdminListToolbar from '../../components/admin/AdminListToolbar';
 import AdminEntityDrawer from '../../components/admin/AdminEntityDrawer';
@@ -383,12 +384,12 @@ export default function AdminUsers() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+        <AdminStatGrid>
           <AdminStatCard icon="users" label="Total Traders" value={summary.total || 0} />
           <AdminStatCard icon="kyc" label="Pending KYC" value={summary.pending_kyc || 0} />
           <AdminStatCard icon="funded" label="Funded Traders" value={summary.funded_traders || 0} />
           <AdminStatCard icon="warning" label="Needs Attention" value={summary.needs_attention || 0} />
-        </div>
+        </AdminStatGrid>
 
         <AdminFilterBar searchPlaceholder="Search via email, name, country, referral, or UID..." searchValue={search} onSearchChange={setSearch}>
           {['all', 'approved', 'pending', 'rejected'].map((status) => (

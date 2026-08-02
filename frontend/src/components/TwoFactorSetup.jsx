@@ -25,7 +25,7 @@ function Card({ children, style }) {
     <div style={{
       background: 'var(--navy-card)',
       border: '1px solid var(--navy-border)',
-      borderRadius: '12px',
+      borderRadius: '0',
       padding: '24px',
       ...style
     }}>
@@ -49,7 +49,7 @@ function Btn({ children, variant = 'default', disabled, onClick, style: s, ...re
       disabled={disabled}
       style={{
         padding: '10px 20px',
-        borderRadius: '8px',
+        borderRadius: '0',
         border: `1px solid ${c.border}`,
         background: c.bg,
         color: c.color,
@@ -131,7 +131,7 @@ function TotpBox({ onComplete, disabled }) {
             fontSize: '22px', fontFamily: 'monospace', fontWeight: 700,
             background: 'var(--navy-hover)',
             border: `2px solid ${d ? 'var(--accent)' : 'var(--navy-border)'}`,
-            borderRadius: '10px', color: 'var(--text)', outline: 'none',
+            borderRadius: '0', color: 'var(--text)', outline: 'none',
             transition: 'border-color 0.2s',
           }}
         />
@@ -260,8 +260,7 @@ function TwoFactorSetup({ apiBase = '' }) {
           <div style={{ textAlign: 'center', marginBottom: '20px' }}>
             <div style={{
               display: 'inline-block', background: '#fff',
-              padding: '12px', borderRadius: '12px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
+              padding: '12px', border: '1px solid var(--rule)'
             }}>
               <img src={qrUrl} alt="2FA QR Code" style={{ display: 'block', width: '180px', height: '180px' }} />
             </div>
@@ -276,7 +275,7 @@ function TwoFactorSetup({ apiBase = '' }) {
             </div>
             <div style={{
               background: 'var(--navy-hover)', border: '1px solid var(--navy-border)',
-              borderRadius: '8px', padding: '12px 14px',
+              borderRadius: '0', padding: '12px 14px',
               fontFamily: 'monospace', fontSize: '14px',
               color: 'var(--accent)', letterSpacing: '0.12em',
               wordBreak: 'break-all', textAlign: 'center'
@@ -326,14 +325,14 @@ function TwoFactorSetup({ apiBase = '' }) {
         {/* Backup codes grid */}
         <div style={{
           background: 'var(--navy-hover)', border: '1px solid var(--navy-border)',
-          borderRadius: '10px', padding: '16px', marginBottom: '16px'
+          borderRadius: '0', padding: '16px', marginBottom: '16px'
         }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             {backupCodes.map((code, i) => (
               <div key={i} style={{
                 fontFamily: 'monospace', fontSize: '14px',
                 color: 'var(--text)', letterSpacing: '0.08em',
-                background: 'var(--navy-card)', borderRadius: '6px',
+                background: 'var(--navy-card)', borderRadius: '0',
                 padding: '8px 12px', textAlign: 'center',
                 border: '1px solid var(--navy-border)'
               }}>
@@ -373,7 +372,7 @@ function TwoFactorSetup({ apiBase = '' }) {
             placeholder="Your account password"
             style={{
               width: '100%', background: 'var(--navy-hover)', border: '1px solid var(--navy-border)',
-              borderRadius: '6px', padding: '10px 12px', color: 'var(--text)', fontSize: '14px'
+              borderRadius: '0', padding: '10px 12px', color: 'var(--text)', fontSize: '14px'
             }}
           />
         </div>
@@ -403,9 +402,9 @@ function TwoFactorSetup({ apiBase = '' }) {
     <Card>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
         <div style={{
-          width: '44px', height: '44px', borderRadius: '12px', flexShrink: 0,
-          background: is2faEnabled ? 'rgba(0,200,150,0.12)' : 'rgba(255,71,87,0.08)',
-          border: `1px solid ${is2faEnabled ? 'rgba(0,200,150,0.25)' : 'rgba(255,71,87,0.2)'}`,
+          width: '44px', height: '44px', borderRadius: '0', flexShrink: 0,
+          background: is2faEnabled ? 'color-mix(in srgb, var(--gain) 12%, transparent)' : 'color-mix(in srgb, var(--loss) 8%, transparent)',
+          border: `1px solid ${is2faEnabled ? 'color-mix(in srgb, var(--gain) 25%, transparent)' : 'color-mix(in srgb, var(--loss) 20%, transparent)'}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px'
         }}>
           {is2faEnabled ? '🔐' : '🔓'}
@@ -416,10 +415,10 @@ function TwoFactorSetup({ apiBase = '' }) {
               Two-Factor Authentication
             </span>
             <span style={{
-              padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600,
-              background: is2faEnabled ? 'rgba(0,200,150,0.12)' : 'rgba(255,71,87,0.08)',
+              padding: '2px 8px', borderRadius: '0', fontSize: '11px', fontWeight: 600,
+              background: is2faEnabled ? 'color-mix(in srgb, var(--gain) 12%, transparent)' : 'color-mix(in srgb, var(--loss) 8%, transparent)',
               color: is2faEnabled ? 'var(--gain)' : 'var(--loss)',
-              border: `1px solid ${is2faEnabled ? 'rgba(0,200,150,0.25)' : 'rgba(255,71,87,0.2)'}`
+              border: `1px solid ${is2faEnabled ? 'color-mix(in srgb, var(--gain) 25%, transparent)' : 'color-mix(in srgb, var(--loss) 20%, transparent)'}`
             }}>
               {is2faEnabled ? 'ENABLED' : 'DISABLED'}
             </span>

@@ -42,7 +42,7 @@ function statusColor(status) {
 }
 
 export default function AdminChat() {
-  const { adminAxios } = useOutletContext();
+  const { adminAxios, socket } = useOutletContext();
   const toast = useToast();
 
   const [conversations, setConversations] = useState([]);
@@ -63,6 +63,10 @@ export default function AdminChat() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkSaving, setBulkSaving] = useState(false);
   const bottomRef = useRef(null);
+  const [traderTyping, setTraderTyping] = useState(false);
+  const traderTypingTimeoutRef = useRef(null);
+  const [isReplyTyping, setIsReplyTyping] = useState(false);
+  const replyTypingTimeoutRef = useRef(null);
 
   const fetchViews = useCallback(async () => {
     try {
@@ -147,6 +151,63 @@ export default function AdminChat() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Live updates — the admin socket auto-joins the 'admin' room on connect
+  // (see AdminSessionProvider), so this fires whenever any trader sends a
+  // message, without polling.
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onNewMessage = (payload) => {
+      fetchConversations({ silent: true });
+      fetchStats();
+      if (selectedConversationId && payload?.conversation_id === selectedConversationId) {
+        fetchConversation(selectedConversationId, { silent: true });
+      }
+    };
+    socket.on('chat_new_message', onNewMessage);
+    return () => socket.off('chat_new_message', onNewMessage);
+  }, [socket, selectedConversationId, fetchConversations, fetchStats, fetchConversation]);
+
+  // Join the conversation's room so the trader's typing_start relay (scoped to
+  // `chat:<id>`, see services/socketService.js) actually reaches this admin.
+  useEffect(() => {
+    if (!socket || !selectedConversationId) return undefined;
+    socket.emit('join_chat', selectedConversationId);
+    setTraderTyping(false);
+    return () => socket.emit('leave_chat', selectedConversationId);
+  }, [socket, selectedConversationId]);
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onUserTyping = (data) => {
+      if (data?.isAdmin) return; // ignore other admins replying elsewhere
+      if (selectedConversationId && data?.conversationId === selectedConversationId) {
+        if (traderTypingTimeoutRef.current) clearTimeout(traderTypingTimeoutRef.current);
+        if (data.isTyping) {
+          setTraderTyping(true);
+          traderTypingTimeoutRef.current = setTimeout(() => setTraderTyping(false), 3000);
+        } else {
+          setTraderTyping(false);
+        }
+      }
+    };
+    socket.on('user_typing', onUserTyping);
+    return () => socket.off('user_typing', onUserTyping);
+  }, [socket, selectedConversationId]);
+
+  const handleReplyChange = (e) => {
+    setReply(e.target.value);
+    if (!socket || !selectedConversationId) return;
+    if (!isReplyTyping) {
+      setIsReplyTyping(true);
+      socket.emit('typing_start', { conversationId: selectedConversationId, isTyping: true });
+    }
+    if (replyTypingTimeoutRef.current) clearTimeout(replyTypingTimeoutRef.current);
+    replyTypingTimeoutRef.current = setTimeout(() => {
+      setIsReplyTyping(false);
+      socket.emit('typing_start', { conversationId: selectedConversationId, isTyping: false });
+    }, 1000);
+  };
 
   const filteredConversations = useMemo(() => conversations.filter((conversation) => {
     const query = search.trim().toLowerCase();
@@ -371,8 +432,7 @@ export default function AdminChat() {
           background: 'var(--admin-surface)',
           borderRight: '1px solid var(--admin-border)',
           display: 'flex',
-          flexDirection: 'column',
-          borderRadius: '12px 0 0 12px'
+          flexDirection: 'column'
         }}>
           <div style={{ padding: '16px', borderBottom: '1px solid var(--admin-border)' }}>
             <div style={{ color: 'var(--admin-text-muted)', fontSize: '12px' }}>
@@ -419,7 +479,14 @@ export default function AdminChat() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                         {visibleColumnKeys.includes('user') && (
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ color: 'var(--admin-text)', fontWeight: 600, fontSize: '13px' }}>
+                            <div style={{
+                              color: 'var(--admin-text)',
+                              fontWeight: 600,
+                              fontSize: '13px',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}>
                               {conversation.user_email || conversation.user_name || `User #${conversation.user_id}`}
                             </div>
                             {visibleColumnKeys.includes('subject') && (
@@ -436,7 +503,7 @@ export default function AdminChat() {
                             color: 'var(--paper)',
                             fontSize: '10px',
                             fontWeight: 700,
-                            borderRadius: '10px',
+                            borderRadius: 'var(--radius-pill)',
                             padding: '1px 6px',
                             flexShrink: 0
                           }}>
@@ -488,7 +555,6 @@ export default function AdminChat() {
           display: 'flex',
           flexDirection: 'column',
           background: 'var(--admin-bg)',
-          borderRadius: '0 12px 12px 0',
           border: '1px solid var(--admin-border)',
           borderLeft: 'none'
         }}>
@@ -595,6 +661,12 @@ export default function AdminChat() {
                 <div ref={bottomRef} />
               </div>
 
+              {traderTyping && (
+                <div style={{ padding: '4px 24px', fontSize: '12px', color: 'var(--admin-text-faint)', fontStyle: 'italic' }}>
+                  Trader is typing…
+                </div>
+              )}
+
               {selectedConversation.status !== 'closed' && (
                 <div style={{
                   padding: '16px 24px',
@@ -606,7 +678,7 @@ export default function AdminChat() {
                   <textarea
                     className="admin-textarea"
                     value={reply}
-                    onChange={(e) => setReply(e.target.value)}
+                    onChange={handleReplyChange}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();

@@ -58,13 +58,12 @@ vi.mock('./pages/admin/AdminTrades', () => ({ default: () => <div>admin-trades</
 vi.mock('./pages/admin/AdminPayouts', () => ({ default: () => <div>admin-payouts</div> }))
 vi.mock('./pages/admin/AdminPlatformPnL', () => ({ default: () => <div>admin-pnl</div> }))
 vi.mock('./pages/admin/AdminSettings', () => ({ default: () => <div>admin-settings</div> }))
-vi.mock('./pages/admin/AdminDisputes', () => ({ default: () => <div>admin-disputes</div> }))
-vi.mock('./pages/admin/AdminChat', () => ({ default: () => <div>admin-chat</div> }))
 vi.mock('./pages/admin/AdminLeaderboard', () => ({ default: () => <div>admin-leaderboard</div> }))
-vi.mock('./pages/admin/AdminTradeCopier', () => ({ default: () => <div>admin-copier</div> }))
 vi.mock('./pages/admin/AdminAccountDetail', () => ({ default: () => <div>admin-account-detail</div> }))
 vi.mock('./pages/admin/AdminViolations', () => ({ default: () => <div>admin-violations</div> }))
 vi.mock('./pages/admin/AdminCommandCenter', () => ({ default: () => <div>admin-command-center</div> }))
+vi.mock('./pages/admin/SupportAppealsCenter', () => ({ default: () => <div>support-appeals-center</div> }))
+vi.mock('./pages/admin/AdminAnalytics', () => ({ default: () => <div>admin-analytics</div> }))
 
 describe('App routing', () => {
   beforeEach(() => {

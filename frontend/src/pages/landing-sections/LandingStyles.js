@@ -48,14 +48,25 @@ export const MASTERPIECE_CSS = `
     --mp-text-muted: var(--muted);
     --mp-text-dim: var(--muted);
 
-    --mp-glass-bg: var(--paper-2);
+    --mp-glass-bg: var(--glass);
     --mp-glass-bg-solid: var(--paper-2);
-    --mp-glass-blur: none;
+    --mp-glass-blur: blur(20px) saturate(140%);
+    --mp-glass-border: var(--rule-soft);
   }
 
   /* ══ RESET & BASE ══ */
+  /* Halftone "print plate" backdrop — same device as the auth shell, so
+     glass surfaces scrolling over this page have something to frost
+     instead of a flat tint. Dot colors reuse gain/loss/warn, no new hues. */
   .masterpiece-landing {
-    background: var(--paper);
+    background-color: var(--paper);
+    background-image:
+      radial-gradient(circle, color-mix(in srgb, var(--warn) 70%, transparent) 1.6px, transparent 1.7px),
+      radial-gradient(circle, color-mix(in srgb, var(--gain) 55%, transparent) 1.4px, transparent 1.5px),
+      radial-gradient(circle, color-mix(in srgb, var(--loss) 55%, transparent) 1.4px, transparent 1.5px);
+    background-size: 26px 26px, 34px 34px, 40px 40px;
+    background-position: 0 0, 9px 14px, 21px 5px;
+    background-attachment: fixed;
     color: var(--mp-text);
     font-family: var(--font-ui);
     overflow-x: hidden;
@@ -71,7 +82,7 @@ export const MASTERPIECE_CSS = `
 
   /* ══ TYPOGRAPHY ══ */
   .mp-h1 {
-    font-family: var(--font-display);
+    font-family: var(--font-display-alt);
     font-size: clamp(48px, 8vw, 96px);
     font-weight: 700;
     line-height: 1.05;
@@ -131,7 +142,7 @@ export const MASTERPIECE_CSS = `
     padding: 18px 40px;
     background: var(--ink);
     color: var(--paper);
-    font-family: var(--font-display);
+    font-family: var(--font-mono);
     font-size: 16px;
     font-weight: 600;
     text-transform: uppercase;
@@ -153,9 +164,11 @@ export const MASTERPIECE_CSS = `
     padding: 16px 36px;
     background: transparent;
     color: var(--mp-text);
-    font-family: var(--font-display);
+    font-family: var(--font-mono);
     font-size: 16px;
     font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
     border: 1px solid var(--mp-border);
     transition: border-color 0.2s ease;
     cursor: pointer;
@@ -165,37 +178,12 @@ export const MASTERPIECE_CSS = `
     border-color: var(--mp-border-hover);
   }
 
-  .masterpiece-landing.has-sticky-cta main {
-    padding-bottom: 128px;
-  }
-
-  .mp-sticky-cta {
-    position: fixed;
-    left: 24px;
-    right: 24px;
-    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-    z-index: 1100;
-    pointer-events: none;
-  }
-
-  .mp-sticky-cta-inner {
-    width: min(1120px, 100%);
-    margin: 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 18px;
-    padding: 16px 18px;
-    background: var(--paper);
-    border: 1px solid var(--mp-border);
-    border-top: 3px double var(--ink);
-    pointer-events: auto;
-  }
-
-  /* ══ FLAT BORDERED CARD (formerly "glass") ══ */
+  /* ══ GLASS CARD ══ */
   .mp-glass-card {
     background: var(--mp-glass-bg);
-    border: 1px solid var(--mp-border);
+    border: 1px solid var(--mp-glass-border);
+    backdrop-filter: var(--mp-glass-blur);
+    -webkit-backdrop-filter: var(--mp-glass-blur);
     padding: 40px;
     transition: border-color 0.3s ease;
     position: relative;
@@ -212,8 +200,10 @@ export const MASTERPIECE_CSS = `
     align-items: center;
     gap: 10px;
     padding: 8px 18px;
-    background: transparent;
-    border: 1px solid var(--mp-border);
+    background: var(--mp-glass-bg);
+    backdrop-filter: var(--mp-glass-blur);
+    -webkit-backdrop-filter: var(--mp-glass-blur);
+    border: 1px solid var(--mp-glass-border);
     color: var(--mp-accent-bright);
     font-family: var(--font-mono);
     font-size: 13px;
@@ -278,7 +268,9 @@ export const MASTERPIECE_CSS = `
 
   .mp-bento-item {
     background: var(--mp-glass-bg);
-    border: 1px solid var(--mp-border);
+    border: 1px solid var(--mp-glass-border);
+    backdrop-filter: var(--mp-glass-blur);
+    -webkit-backdrop-filter: var(--mp-glass-blur);
     padding: 40px;
     position: relative;
     overflow: hidden;
@@ -402,7 +394,7 @@ export const MASTERPIECE_CSS = `
     justify-content: center;
     font-size: 22px;
     font-weight: 700;
-    font-family: var(--font-display);
+    font-family: var(--font-mono);
     color: var(--mp-accent-bright);
     z-index: 2;
     flex-shrink: 0;
@@ -521,18 +513,6 @@ export const MASTERPIECE_CSS = `
     .mp-faq-icon {
       width: 32px;
       height: 32px;
-    }
-    .masterpiece-landing.has-sticky-cta main { padding-bottom: 184px; }
-    .mp-sticky-cta {
-      left: 12px;
-      right: 12px;
-      bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-    }
-    .mp-sticky-cta-inner {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 14px;
-      padding: 14px;
     }
   }
 
@@ -661,23 +641,6 @@ export const MASTERPIECE_CSS = `
       padding: 20px 0;
     }
 
-    .masterpiece-landing.has-sticky-cta main {
-      padding-bottom: 220px !important;
-    }
-
-    .mp-sticky-cta-inner > div:last-child {
-      width: 100%;
-      display: grid !important;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px !important;
-    }
-
-    .mp-sticky-cta-inner .mp-btn-primary,
-    .mp-sticky-cta-inner .mp-btn-secondary {
-      min-height: 42px;
-      padding: 10px 12px !important;
-      font-size: 12px !important;
-    }
   }
 
   /* ══ STAT COUNTER ══ */
@@ -719,9 +682,11 @@ export const MASTERPIECE_CSS = `
     position: relative;
     overflow: hidden;
     padding: 42px;
-    border: 1px solid var(--mp-border);
+    border: 1px solid var(--mp-glass-border);
     border-top: 3px double var(--ink);
     background: var(--mp-glass-bg);
+    backdrop-filter: var(--mp-glass-blur);
+    -webkit-backdrop-filter: var(--mp-glass-blur);
   }
 
   .mp-live-stats-header,
@@ -791,7 +756,7 @@ export const MASTERPIECE_CSS = `
     font-size: 12px;
     font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.12em;
     font-family: var(--font-mono);
   }
 
@@ -902,7 +867,7 @@ export const MASTERPIECE_CSS = `
     font-size: 12px;
     font-weight: 900;
     text-transform: uppercase;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.12em;
     font-family: var(--font-mono);
   }
 

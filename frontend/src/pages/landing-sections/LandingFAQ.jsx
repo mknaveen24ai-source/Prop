@@ -25,7 +25,7 @@ export default function LandingFAQ() {
     {
       category: "General",
       q: "Can I have more than one account?",
-      a: "NO You cant have more than one active evaluation and one funded account at a time. If your evaluation fails, you may claim a new one when spots are available."
+      a: "No — you can have one active evaluation and one funded account at a time. If your evaluation fails, you may claim a new one when spots are available."
     },
     {
       category: "Rules",
@@ -65,7 +65,7 @@ export default function LandingFAQ() {
     {
       category: "Rules",
       q: "Can I trade news events?",
-      a: "Yes, news trading is allowed. However, Opening position and Closing positions before 3 min and after 3 min of a red folder news is restricted.Traders cant peform any actions during that time. "
+      a: "Yes, news trading is allowed. Opening or closing a position within 2 minutes before or after a red-folder news release is restricted — no actions are permitted during that window."
     },
     {
       category: "Funded",
@@ -106,7 +106,7 @@ export default function LandingFAQ() {
             <span className="mp-badge-dot"></span>
             FAQ
           </div>
-          <h2 className="mp-h2 mp-reveal mp-delay-100">Frequently Asked Questions</h2>
+          <h2 className="mp-h2 mp-reveal mp-delay-100">Still On The Fence? Here's Every Answer.</h2>
           <p className="mp-p-lead mp-reveal mp-delay-200" style={{ margin: '0 auto' }}>
             {landingCopy.faqLead}
           </p>

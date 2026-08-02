@@ -133,6 +133,26 @@ export const INSTRUMENT_GROUPS = Object.freeze({
 
 export const TRADABLE_INSTRUMENTS_SUMMARY = '28 forex pairs + XAUUSD, XAGUSD, US30, NAS100'
 
+// Maps this platform's instrument codes to TradingView's public widget
+// tickers (OANDA feed — the standard free/no-key data source their embed
+// widget resolves). Forex pairs match 1:1; the commodity/index tickers are
+// the standard OANDA CFD convention and worth a manual spot-check against
+// TradingView's symbol search since this environment can't verify them live.
+export const TRADINGVIEW_SYMBOL_MAP = Object.freeze({
+  ...FOREX_INSTRUMENTS.reduce((acc, symbol) => {
+    acc[symbol] = `OANDA:${symbol}`
+    return acc
+  }, {}),
+  XAUUSD: 'OANDA:XAUUSD',
+  XAGUSD: 'OANDA:XAGUSD',
+  US30: 'OANDA:US30USD',
+  NAS100: 'OANDA:NAS100USD',
+})
+
+export function getTradingViewSymbol(instrument) {
+  return TRADINGVIEW_SYMBOL_MAP[instrument] || `OANDA:${instrument}`
+}
+
 export function getAvailableInstrumentList(prices, fallback = []) {
   const livePrices = prices && typeof prices === 'object' ? prices : {}
   const availableSet = new Set(

@@ -8,7 +8,7 @@ describe('tenant marketing copy', () => {
 
   it('returns paid-model copy with no "free" wording anywhere', () => {
     const copy = getTenantLandingCopy()
-    expect(copy.heroTitleHighlight).toBe('Firm-Backed Capital.')
+    expect(copy.heroTitleHighlight).toBe('Your Own Capital.')
     const serialized = JSON.stringify(copy).toLowerCase()
     expect(serialized).not.toContain('free')
   })

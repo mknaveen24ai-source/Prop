@@ -6,6 +6,7 @@ import AdminSidebar from '../../components/admin/AdminSidebar'
 import AdminTopBar from '../../components/admin/AdminTopBar'
 import { useAdminSession } from '../../providers/AdminSessionProvider'
 import ErrorBoundary from '../../ErrorBoundary'
+import ThemeToggle from '../../components/ThemeToggle'
 
 function formatViolationLabel(value) {
   return String(value || 'critical violation')
@@ -54,7 +55,7 @@ function AdminRealtimeAlerts({ socket }) {
   return null
 }
 
-function AdminLoginScreen({ onLoginSuccess }) {
+export function AdminLoginScreen({ onLoginSuccess }) {
   const { adminAxios } = useAdminSession()
   const [step, setStep] = useState('password')
   const [email, setEmail] = useState('')
@@ -140,10 +141,13 @@ function AdminLoginScreen({ onLoginSuccess }) {
   }
 
   return (
-    <div className="mode-operator admin-layout" style={{ justifyContent: 'center', alignItems: 'center' }}>
+    <div className="mode-operator admin-layout" style={{ justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
+      <div style={{ position: 'absolute', top: '24px', right: '24px', zIndex: 20 }}>
+        <ThemeToggle />
+      </div>
       <div className="admin-card ui-surface ui-auth-card" style={{ position: 'relative', zIndex: 10 }}>
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--admin-accent-bg)', color: 'var(--admin-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: '24px' }}>
+          <div style={{ width: '48px', height: '48px', background: 'var(--admin-accent-bg)', color: 'var(--admin-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: '24px' }}>
             {step === 'totp' ? '🔐' : '⚡'}
           </div>
           <h1 className="admin-h1">Admin Portal</h1>
@@ -153,7 +157,7 @@ function AdminLoginScreen({ onLoginSuccess }) {
         </div>
 
         {errorMsg && (
-          <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: 'var(--admin-danger)', padding: '10px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px', textAlign: 'center' }}>
+          <div style={{ background: 'color-mix(in srgb, var(--admin-danger) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--admin-danger) 20%, transparent)', color: 'var(--admin-danger)', padding: '10px', marginBottom: '16px', fontSize: '13px', textAlign: 'center' }}>
             {errorMsg}
           </div>
         )}
@@ -232,7 +236,6 @@ function AdminLoginScreen({ onLoginSuccess }) {
                     fontWeight: 700,
                     background: 'var(--admin-bg)',
                     border: `1px solid ${digit ? 'var(--admin-accent)' : 'var(--admin-border)'}`,
-                    borderRadius: '8px',
                     color: 'var(--admin-text)',
                     outline: 'none'
                   }}

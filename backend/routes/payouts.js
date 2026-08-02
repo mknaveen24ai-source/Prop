@@ -59,6 +59,12 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
       return res.status(400).json({ error: 'All fields are required' })
     }
 
+    // Must match the options actually offered in the payout request form.
+    const ALLOWED_PAYMENT_METHODS = ['crypto', 'bank', 'wise', 'paypal']
+    if (!ALLOWED_PAYMENT_METHODS.includes(String(payment_method))) {
+      return res.status(400).json({ error: `Invalid payment method. Must be one of: ${ALLOWED_PAYMENT_METHODS.join(', ')}` })
+    }
+
     const accountIdStr = String(account_id || '').trim()
     // FIX (LOW #29): Replace dead code `|| false` with proper numeric validation
     if (!accountIdStr || isNaN(parseInt(accountIdStr))) {

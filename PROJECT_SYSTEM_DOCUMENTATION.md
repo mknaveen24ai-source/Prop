@@ -152,7 +152,7 @@ Instead of traditional ORM abstractions, the application writes optimized raw SQ
   - Structure: `id` (UUID), `email` (CITEXT for case-insensitive unique indexes), `password` (BCRYPT hash), `is_banned` (BOOLEAN), `two_factor_secret`, `trader_uid`.
 - **`accounts` Table:**
   - Structure: `user_id` (FK), `current_balance`, `starting_balance`, `peak_balance` (Highest Water Mark recorded for trailing drawdowns), `status` (ENUM: `active`, `passed`, `failed`, `expired`, `locked`).
-  - Critical usage: Requires transactional boundaries for any updates to guarantee that overlapping rapid REST executions (e.g. Copier trades) don't duplicate ledger math.
+  - Critical usage: Requires transactional boundaries for any updates to guarantee that overlapping rapid REST executions don't duplicate ledger math.
 - **`trades` Table:**
   - Structure: `direction` (buy/sell), `lot_size`, `open_price`, `close_price`, `open_time`, `close_time`, `demo_pnl`, `commission`, `status`.
 - **`platform_settings` Table:**
@@ -242,7 +242,6 @@ No software is perfect. Right now, the code works well but is built in a way tha
 - **Ticket/Chat Duplication:** `disputes.js`, `chat.js`, and `admin.js` functionally implement overlapping independent DB design approaches modeling historical conversations that should be universally merged for UX parity.
 - **Limited Testing Boundaries:** Insufficient E2E integration boundaries aggressively shift the burden of release stability monitoring strictly onto Manual QA verifications which limits confident deployments.
 - **Mixed Schema Ownership:** `Knex.js` is established yet only covers baseline primitives. Inline SQL DDL `CREATE TABLE` actions deployed inside internal server route components causes substantial tracking opacity requiring alignment.
-- **Data Integrity Hardening:** Specifically concerning `challengeEngine.js` risk limits crossing paths with Copier execution arrays. Further hardening of execution race condition evaluations guarantees zero-drift scenarios.
 
 ---
 
@@ -274,7 +273,7 @@ No software is perfect. Right now, the code works well but is built in a way tha
 
 ### Scalability Improvements
 - **Connection Telemetry Pipeline:** Enable absolute granular PostgreSQL connection array logging maximizing visibility into query exhaustion bounds prior to deployment bottlenecks.
-- **Expanded Pub/Sub Adoption:** Complete integration of the `Kafka` baseline bus bridging high-frequency operational events securely toward background data copiers completely untethered from synchronous REST API overhead loops.
+- **Expanded Pub/Sub Adoption:** Complete integration of the `Kafka` baseline bus bridging high-frequency operational events securely toward background workers completely untethered from synchronous REST API overhead loops.
 
 ### Documentation/Process Improvements
 - **CI/CD Strictness:** Formally establish GitHub action pipelines guaranteeing restrictive code compliance verifications resolving prior lint/test boundary requirements executing blocking controls dynamically.

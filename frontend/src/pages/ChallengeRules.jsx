@@ -30,7 +30,7 @@ function ProgressCard({ title, used, remaining, limit, fill, tone = 'var(--accen
         <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)' }}>{title}</div>
       <div style={{ fontSize: '12px', color: fill >= 80 ? 'var(--red)' : tone, fontFamily: 'var(--font-mono)' }}>{fill.toFixed(1)}%</div>
       </div>
-      <div style={{ height: '10px', borderRadius: '999px', background: 'var(--navy-border)', overflow: 'hidden', marginBottom: '12px' }}>
+      <div style={{ height: '10px', background: 'var(--navy-border)', overflow: 'hidden', marginBottom: '12px' }}>
         <div style={{ height: '100%', width: `${Math.min(fill, 100)}%`, background: fill >= 80 ? 'var(--red)' : tone, transition: 'width 0.4s ease' }} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '10px' }}>

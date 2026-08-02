@@ -5,6 +5,7 @@ import AdminFilterBar from '../../components/admin/AdminFilterBar';
 import AdminBadge from '../../components/admin/AdminBadge';
 import AdminModal from '../../components/admin/AdminModal';
 import AdminStatCard from '../../components/admin/AdminStatCard';
+import AdminStatGrid from '../../components/admin/AdminStatGrid';
 import { useToast } from '../../components/admin/AdminToast';
 import AdminListToolbar from '../../components/admin/AdminListToolbar';
 import { exportAdminResource, normalizeAdminListResponse } from '../../utils/adminList';
@@ -316,12 +317,12 @@ export default function AdminChallenges() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+      <AdminStatGrid>
         <AdminStatCard icon="wallet" label="Total Challenges" value={(summary.total || 0)} />
         <AdminStatCard icon="activity" label="Active" value={summary.active || 0} />
         <AdminStatCard icon="warning" label="Breached / Locked" value={summary.breached || 0} />
         <AdminStatCard icon="warning" label="Review Flagged" value={summary.review_flagged || 0} />
-      </div>
+      </AdminStatGrid>
 
       <AdminFilterBar searchPlaceholder="Search via account ID, UID, or trader email..." searchValue={search} onSearchChange={setSearch}>
         {[
@@ -421,7 +422,7 @@ export default function AdminChallenges() {
                 { label: 'Balance', value: formatMoney(selectedAcc.current_balance) },
                 { label: 'Peak', value: formatMoney(selectedAcc.peak_balance) }
               ].map((card) => (
-                <div key={card.label} style={{ background: 'var(--admin-bg)', padding: '16px', borderRadius: '10px', border: '1px solid var(--admin-border)' }}>
+                <div key={card.label} style={{ background: 'var(--admin-bg)', padding: '16px', border: '1px solid var(--admin-border)' }}>
                   <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>{card.label}</div>
                   <div style={{ marginTop: '6px', fontSize: '22px', fontFamily: 'var(--admin-font-mono)', fontWeight: 700 }}>
                     {card.value}

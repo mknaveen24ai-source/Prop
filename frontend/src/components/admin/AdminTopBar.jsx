@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Menu } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { renderIcon } from '../../utils/iconMap'
+import ThemeToggle from '../ThemeToggle'
 
 export default function AdminTopBar({ onMobileMenuClick, onLogout, session }) {
   const location = useLocation()
@@ -43,12 +44,6 @@ export default function AdminTopBar({ onMobileMenuClick, onLogout, session }) {
     .map((part) => part.charAt(0).toUpperCase())
     .join('') || 'AD'
 
-  const notifications = [
-    { title: 'New KYC Submitted', time: '5m ago', icon: 'kyc' },
-    { title: 'Payout Request: $5,240', time: '12m ago', icon: 'payouts' },
-    { title: 'New Dispute Opened', time: '1h ago', icon: 'dispute' }
-  ]
-
   return (
     <header className="admin-topbar">
       <div className="admin-topbar-left">
@@ -61,17 +56,6 @@ export default function AdminTopBar({ onMobileMenuClick, onLogout, session }) {
         </div>
       </div>
 
-      <div className="admin-topbar-center">
-        <span className="admin-search-icon">
-          {renderIcon('search', { size: 14, color: 'var(--admin-text-faint)' })}
-        </span>
-        <input
-          type="text"
-          className="admin-search-input"
-          placeholder="Search users, trades, accounts..."
-        />
-      </div>
-
       <div className="admin-topbar-right">
         <div style={{
           display: 'flex',
@@ -80,8 +64,7 @@ export default function AdminTopBar({ onMobileMenuClick, onLogout, session }) {
           gap: '2px',
           padding: '8px 12px',
           border: '1px solid var(--admin-border)',
-          borderRadius: '10px',
-          background: 'rgba(255,255,255,0.02)'
+          background: 'var(--glass)'
         }}>
           <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             {roleLabel}
@@ -91,30 +74,28 @@ export default function AdminTopBar({ onMobileMenuClick, onLogout, session }) {
           </div>
         </div>
 
+        <ThemeToggle />
+
+        <button
+          className="admin-icon-btn"
+          title="Support & Appeals Center"
+          onClick={() => navigate('/admin/support-appeals-center')}
+        >
+          {renderIcon('dispute', { size: 16, color: 'var(--admin-text)' })}
+        </button>
+
         <div style={{ position: 'relative' }} ref={notifRef}>
           <button className="admin-icon-btn" onClick={() => setShowNotifications((visible) => !visible)}>
             {renderIcon('bell', { size: 16, color: 'var(--admin-text)' })}
-            <span className="badge">3</span>
           </button>
 
           {showNotifications && (
             <div className="admin-dropdown" style={{ width: '320px', padding: 0 }}>
-              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--admin-border)', display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--admin-border)' }}>
                 <strong style={{ fontSize: '13px' }}>Notifications</strong>
-                <button className="admin-btn-ghost" style={{ fontSize: '11px', padding: 0, border: 'none' }}>Mark all read</button>
               </div>
-              <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                {notifications.map((notification, index) => (
-                  <div key={index} style={{ padding: '12px 16px', borderBottom: '1px solid var(--admin-border)', display: 'flex', gap: '12px', cursor: 'pointer' }} className="admin-dropdown-item">
-                    <span style={{ display: 'inline-flex' }}>
-                      {renderIcon(notification.icon, { size: 16, color: 'var(--admin-accent)' })}
-                    </span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '13px', color: 'var(--admin-text)' }}>{notification.title}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--admin-text-faint)' }}>{notification.time}</div>
-                    </div>
-                  </div>
-                ))}
+              <div className="admin-empty-state" style={{ padding: '24px 16px' }}>
+                Nothing yet.
               </div>
             </div>
           )}
@@ -148,7 +129,7 @@ export default function AdminTopBar({ onMobileMenuClick, onLogout, session }) {
               </button>
               <button
                 className="admin-dropdown-item danger"
-                style={{ marginTop: '4px', borderTop: '1px solid var(--admin-border)', borderRadius: '0 0 8px 8px' }}
+                style={{ marginTop: '4px', borderTop: '1px solid var(--admin-border)' }}
                 onClick={async () => {
                   await onLogout?.()
                   setShowProfile(false)

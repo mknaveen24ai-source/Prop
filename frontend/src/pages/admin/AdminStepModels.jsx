@@ -41,7 +41,7 @@ function PhaseRow({ model, phase, phaseIndex, onSave, saving }) {
             type="number"
             value={draft[key]}
             onChange={(e) => update(key, e.target.value)}
-            style={{ width: '90px', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }}
+            style={{ width: '90px', padding: '6px 8px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }}
           />
         </td>
       ))}
@@ -70,14 +70,14 @@ function PricingRow({ model, sizeInfo, onSave, saving }) {
           type="number"
           value={price}
           onChange={(e) => setPrice(e.target.value)}
-          style={{ width: '90px', padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }}
+          style={{ width: '90px', padding: '6px 8px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }}
         />
       </td>
       <td style={{ padding: '6px 8px' }}>
         <select
           value={isActive ? 'true' : 'false'}
           onChange={(e) => setIsActive(e.target.value === 'true')}
-          style={{ padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }}
+          style={{ padding: '6px 8px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }}
         >
           <option value="true">Active</option>
           <option value="false">Inactive</option>

@@ -1,9 +1,11 @@
-import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import OrderPanel from './OrderPanel'
+import TradingViewWidget from './TradingViewWidget'
 import SimulatedTradingDisclaimer from './SimulatedTradingDisclaimer'
 import RiskWarningBanner from './RiskWarningBanner'
 import api from '../services/api'
 import useStore from '../store/useStore'
+import { useTheme } from '../ThemeContext'
 import { renderIcon } from '../utils/iconMap'
 import {
   getAvailableInstrumentList,
@@ -19,10 +21,15 @@ import {
   sumMoney,
 } from '../utils/finance'
 import { filterVisibleTraderAccounts, isTraderAccountVisible } from '../utils/accountVisibility'
+import { getMemoryItem, setMemoryItem } from '../utils/memoryStore'
 import Pagination from './Pagination'
 import Button from './ui/Button'
 
-const MultiChartGrid = lazy(() => import('./MultiChartGrid'))
+const TRADING_SPLIT_MIN = 50
+const TRADING_SPLIT_MAX = 85
+const TRADING_SPLIT_DEFAULT = 70
+const TRADING_SPLIT_STORAGE_KEY = 'tradingSplitPct'
+const WATCHLIST_STORAGE_KEY = 'tradingWatchlist'
 
 // ── Phase timer helpers ────────────────────────────────────────────────────────
 function getTimeRemaining(endDateStr) {
@@ -120,23 +127,129 @@ function buildBatchFeedback(actionType, data) {
   }
 }
 
-function ChartFallback() {
+// Memoized so a price tick affecting one instrument doesn't force every open
+// trade's row to re-render — only re-renders when this specific trade's own
+// price-derived/editable fields (or its pending action state) actually change.
+function areTradeRowPropsEqual(prev, next) {
+  if (prev.isPending !== next.isPending) return false
+  if (prev.isModifying !== next.isModifying) return false
+  if (prev.isClosing !== next.isClosing) return false
+  if (prev.dec !== next.dec) return false
+  const a = prev.trade
+  const b = next.trade
   return (
-    <div
-      className="card"
-      style={{
-        minHeight: '400px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: 'var(--text-muted)',
-        background: 'rgba(255,255,255,0.02)'
-      }}
-    >
-      Loading chart workspace...
-    </div>
+    a.id === b.id &&
+    a.status === b.status &&
+    a.current_price === b.current_price &&
+    a.floating_pnl === b.floating_pnl &&
+    a.stop_loss === b.stop_loss &&
+    a.take_profit === b.take_profit &&
+    a.pending_price === b.pending_price &&
+    a.lot_size === b.lot_size
   )
 }
+
+const TradeRow = React.memo(function TradeRow({
+  trade, dec, isPending, isModifying, isClosing,
+  onToggleModify, onCancelOrder, onPartialClick, onClose
+}) {
+  return (
+    <tr style={{ opacity: isPending ? 0.75 : 1 }}>
+      <td style={{ fontWeight: '600' }}>
+        {trade.instrument}
+        {isPending && (
+          <span style={{
+            marginLeft: '6px', fontSize: '9px', padding: '2px 5px',
+            background: 'color-mix(in srgb, var(--muted) 15%, transparent)', border: '1px solid var(--accent)',
+            color: 'var(--accent)', verticalAlign: 'middle'
+          }}>
+            PENDING
+          </span>
+        )}
+      </td>
+      <td style={{ color: trade.direction === 'buy' ? 'var(--green)' : 'var(--red)', fontWeight: '600' }}>
+        {isPending
+          ? trade.order_type.replace(/_/g, ' ').toUpperCase()
+          : trade.direction.toUpperCase()
+        }
+      </td>
+      <td>{parseFloat(trade.lot_size).toFixed(2)}</td>
+      <td>
+        {isPending
+          ? (trade.pending_price ? parseFloat(trade.pending_price).toFixed(dec) : '—')
+          : (trade.open_price != null ? parseFloat(trade.open_price).toFixed(dec) : '—')
+        }
+      </td>
+      <td style={{ color: 'var(--accent)' }}>
+        {isPending ? '—' : (trade.current_price ? parseFloat(trade.current_price).toFixed(dec) : '—')}
+      </td>
+      <td style={{ color: 'var(--red)' }}>
+        {trade.stop_loss ? parseFloat(trade.stop_loss).toFixed(dec) : '—'}
+      </td>
+      <td style={{ color: 'var(--green)' }}>
+        {trade.take_profit ? parseFloat(trade.take_profit).toFixed(dec) : '—'}
+      </td>
+      <td style={{
+        color: isPending
+          ? 'var(--text-muted)'
+          : ((trade.floating_pnl ?? 0) >= 0 ? 'var(--green)' : 'var(--red)'),
+        fontWeight: 'bold'
+      }}>
+        {isPending
+          ? '—'
+          : `${(trade.floating_pnl ?? 0) >= 0 ? '+' : ''}$${(trade.floating_pnl ?? 0).toFixed(2)}`
+        }
+      </td>
+      <td>
+        <div className="trade-actions" style={{ display: 'flex', gap: '6px' }}>
+          {isPending ? (
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onToggleModify}
+              >
+                {isModifying ? 'Cancel' : 'Modify'}
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={onCancelOrder}
+              >
+                Cancel Order
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onToggleModify}
+              >
+                {isModifying ? 'Cancel' : 'Modify'}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onPartialClick}
+              >
+                Partial
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={onClose}
+                disabled={isClosing}
+              >
+                {isClosing ? 'Closing...' : 'Close'}
+              </Button>
+            </>
+          )}
+        </div>
+      </td>
+    </tr>
+  )
+}, areTradeRowPropsEqual)
 
 export default function TradingPanel({
   prices: propPrices,
@@ -157,11 +270,65 @@ export default function TradingPanel({
     allAccounts: storeAccounts,
     setActiveAccount,
   } = useStore()
+  const { theme } = useTheme()
   const [positionView, setPositionView] = useState('all')
   const [partialForm, setPartialForm] = useState(null)
   const [batchActionPending, setBatchActionPending] = useState('')
   const [batchFeedback, setBatchFeedback] = useState(null)
   const [knownAvailableInstruments, setKnownAvailableInstruments] = useState([])
+
+  // ── Resizable chart/order-panel split ──────────────────────────────────────
+  const tradingLayoutRef = useRef(null)
+  const [splitPct, setSplitPct] = useState(() => {
+    const saved = parseFloat(getMemoryItem(TRADING_SPLIT_STORAGE_KEY))
+    return Number.isFinite(saved) && saved >= TRADING_SPLIT_MIN && saved <= TRADING_SPLIT_MAX
+      ? saved
+      : TRADING_SPLIT_DEFAULT
+  })
+
+  const handleSplitDragStart = useCallback((e) => {
+    e.preventDefault()
+    const container = tradingLayoutRef.current
+    if (!container) return
+    const startX = e.clientX
+    const startPct = splitPct
+    const containerWidth = container.getBoundingClientRect().width
+
+    function onMouseMove(moveEvent) {
+      const deltaPct = ((moveEvent.clientX - startX) / containerWidth) * 100
+      const nextPct = Math.max(TRADING_SPLIT_MIN, Math.min(TRADING_SPLIT_MAX, startPct + deltaPct))
+      setSplitPct(nextPct)
+    }
+    function onMouseUp() {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+      setSplitPct((current) => {
+        setMemoryItem(TRADING_SPLIT_STORAGE_KEY, String(Math.round(current)))
+        return current
+      })
+    }
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+  }, [splitPct])
+
+  // ── Watchlist (pinned instruments) ──────────────────────────────────────────
+  const [pinnedInstruments, setPinnedInstruments] = useState(() => {
+    try {
+      const saved = JSON.parse(getMemoryItem(WATCHLIST_STORAGE_KEY) || '[]')
+      return Array.isArray(saved) ? saved : []
+    } catch {
+      return []
+    }
+  })
+  const togglePin = useCallback((instrument) => {
+    setPinnedInstruments((current) => {
+      const next = current.includes(instrument)
+        ? current.filter((sym) => sym !== instrument)
+        : [...current, instrument]
+      setMemoryItem(WATCHLIST_STORAGE_KEY, JSON.stringify(next))
+      return next
+    })
+  }, [])
 
   const prices = Object.keys(storePrices || {}).length > 0 ? storePrices : (propPrices || {})
   const liveAvailableInstruments = useMemo(() => getAvailableInstrumentList(prices), [prices])
@@ -169,6 +336,61 @@ export default function TradingPanel({
   const availableInstruments = knownAvailableInstruments.length > 0
     ? knownAvailableInstruments
     : liveAvailableInstruments
+  const sortedInstruments = useMemo(() => {
+    const pinnedSet = new Set(pinnedInstruments)
+    return [...availableInstruments].sort((a, b) => (pinnedSet.has(b) ? 1 : 0) - (pinnedSet.has(a) ? 1 : 0))
+  }, [availableInstruments, pinnedInstruments])
+
+  // ── Auto-scrolling symbol ticker ────────────────────────────────────────────
+  const symbolRowRef = useRef(null)
+  const symbolMarqueePausedRef = useRef(false)
+  const symbolMarqueeResumeTimeoutRef = useRef(null)
+
+  const pauseSymbolMarquee = useCallback(() => {
+    symbolMarqueePausedRef.current = true
+  }, [])
+
+  const resumeSymbolMarquee = useCallback(() => {
+    symbolMarqueePausedRef.current = false
+  }, [])
+
+  const resumeSymbolMarqueeDelayed = useCallback(() => {
+    clearTimeout(symbolMarqueeResumeTimeoutRef.current)
+    symbolMarqueeResumeTimeoutRef.current = setTimeout(() => {
+      symbolMarqueePausedRef.current = false
+    }, 1500)
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
+
+    let frameId
+    const SCROLL_SPEED_PX_PER_FRAME = 0.6
+
+    function step() {
+      const el = symbolRowRef.current
+      if (el && !symbolMarqueePausedRef.current) {
+        // The symbol list is rendered twice back-to-back (see the symbol row
+        // below), so scrollWidth covers both copies — halfWidth is exactly
+        // one copy's width. Subtracting it (instead of resetting to 0) once
+        // scrollLeft crosses that point lands on the pixel-identical spot in
+        // the second copy, so the loop has no visible jump.
+        const halfWidth = el.scrollWidth / 2
+        if (halfWidth > el.clientWidth) {
+          const next = el.scrollLeft + SCROLL_SPEED_PX_PER_FRAME
+          el.scrollLeft = next >= halfWidth ? next - halfWidth : next
+        }
+      }
+      frameId = requestAnimationFrame(step)
+    }
+    frameId = requestAnimationFrame(step)
+
+    return () => {
+      cancelAnimationFrame(frameId)
+      clearTimeout(symbolMarqueeResumeTimeoutRef.current)
+    }
+  }, [])
   const openTrades = storeOpenPositions.length > 0 ? storeOpenPositions : (propOpenTrades || [])
   const rawAccounts = storeAccounts.length > 0 ? storeAccounts : (propAccounts || [])
   const accounts = useMemo(() => filterVisibleTraderAccounts(rawAccounts), [rawAccounts])
@@ -223,10 +445,7 @@ export default function TradingPanel({
   const [modifyForm, setModifyForm] = useState({
     pending_price: '',
     stop_loss: '',
-    take_profit: '',
-    trailing_step_pips: '',
-    trailing_activation_price: '',
-    breakeven_trigger_pips: ''
+    take_profit: ''
   })
   const [modifyError, setModifyError] = useState('')
   const [modifySuccess, setModifySuccess] = useState('')
@@ -270,41 +489,6 @@ export default function TradingPanel({
     }))
   }, [availableInstruments, orderForm?.instrument, setOrderForm])
 
-  // ── Trade journal notes ────────────────────────────────────────────────────
-  const [editingNoteId, setEditingNoteId] = useState(null)
-  const [noteText, setNoteText]           = useState('')
-  const [noteTags, setNoteTags]           = useState('')
-  const [noteStrategyTag, setNoteStrategyTag] = useState('')
-  const [noteSaved, setNoteSaved]         = useState(false)
-  const [noteSaving, setNoteSaving]       = useState(false)  // FIX: guard against double-save
- 
-  // FIX: reset noteSaved when user opens a different trade's note editor,
-  // so "✓ Saved" from a previous save never bleeds into the new trade's form.
-  React.useEffect(() => {
-    setNoteSaved(false)
-  }, [editingNoteId])
- 
-  async function saveNote(tradeId) {
-    if (noteSaving) return  // FIX: prevent double-save on rapid clicks
-    setNoteSaving(true)
-    try {
-      await api.patch('/api/trades/note', {
-        trade_id: tradeId,
-        note: noteText,
-        tags: noteTags,
-        strategy_tag: noteStrategyTag
-      })
-      setNoteSaved(true)
-      // Update the trade in-place so the 📝 icon reflects the new note state
-      if (onTradeModified) onTradeModified()
-    } catch (err) {
-      console.error('Save note error:', err.response?.data?.error || err.message)
-    } finally {
-      setNoteSaving(false)
-    }
-  }
- 
-
   // ── Live phase countdown timer ─────────────────────────────────────────────
   const [timeRemaining, setTimeRemaining] = useState(null)
 
@@ -328,10 +512,7 @@ export default function TradingPanel({
     setModifyForm({
       pending_price: trade.pending_price ? parseFloat(trade.pending_price).toString() : '',
       stop_loss:   trade.stop_loss   ? parseFloat(trade.stop_loss).toString()   : '',
-      take_profit: trade.take_profit ? parseFloat(trade.take_profit).toString() : '',
-      trailing_step_pips: trade.trailing_step_pips ? String(trade.trailing_step_pips) : '',
-      trailing_activation_price: trade.trailing_activation_price ? parseFloat(trade.trailing_activation_price).toString() : '',
-      breakeven_trigger_pips: trade.breakeven_trigger_pips ? parseFloat(trade.breakeven_trigger_pips).toString() : ''
+      take_profit: trade.take_profit ? parseFloat(trade.take_profit).toString() : ''
     })
     setModifyError('')
     setModifySuccess('')
@@ -342,10 +523,7 @@ export default function TradingPanel({
     setModifyForm({
       pending_price: '',
       stop_loss: '',
-      take_profit: '',
-      trailing_step_pips: '',
-      trailing_activation_price: '',
-      breakeven_trigger_pips: ''
+      take_profit: ''
     })
     setModifyError('')
     setModifySuccess('')
@@ -360,11 +538,6 @@ export default function TradingPanel({
       }
       payload.stop_loss   = modifyForm.stop_loss   === '' ? null : parseFloat(modifyForm.stop_loss)
       payload.take_profit = modifyForm.take_profit === '' ? null : parseFloat(modifyForm.take_profit)
-      if (trade.status !== 'pending') {
-        payload.trailing_step_pips = modifyForm.trailing_step_pips === '' ? null : parseInt(modifyForm.trailing_step_pips, 10)
-        payload.trailing_activation_price = modifyForm.trailing_activation_price === '' ? null : parseFloat(modifyForm.trailing_activation_price)
-        payload.breakeven_trigger_pips = modifyForm.breakeven_trigger_pips === '' ? null : parseFloat(modifyForm.breakeven_trigger_pips)
-      }
 
       await api.patch(trade.status === 'pending' ? '/api/trades/modify-pending' : '/api/trades/modify', payload)
 
@@ -398,31 +571,6 @@ export default function TradingPanel({
     }
   }
 
-  function openNoteEditor(trade) {
-    setEditingNoteId(trade.id)
-    setNoteText(trade.trader_note || '')
-    setNoteTags(Array.isArray(trade.tags) ? trade.tags.join(', ') : (trade.tags || ''))
-    setNoteStrategyTag(trade.strategy_tag || '')
-    setNoteSaved(false)
-  }
-
-  function closeNoteEditor() {
-    setEditingNoteId(null)
-    setNoteText('')
-    setNoteTags('')
-    setNoteStrategyTag('')
-    setNoteSaved(false)
-  }
-
-  const handleTradeLineAdjust = useCallback(async (tradeId, changeSet) => {
-    try {
-      await api.patch('/api/trades/modify', { trade_id: tradeId, ...changeSet })
-      if (onTradeModified) onTradeModified()
-    } catch (err) {
-      setModifyError(err.response?.data?.error || 'Could not update trade from chart')
-    }
-  }, [onTradeModified])
-
   async function handleCloseTrade(trade) {
     if (closingTradeSet.has(trade.id)) return
     await onCloseTrade(trade.id)
@@ -432,171 +580,6 @@ export default function TradingPanel({
     await onOpenTrade(payload)
   }
 
-  function getTradeTags(trade) {
-    if (Array.isArray(trade?.tags)) {
-      return trade.tags.filter(Boolean)
-    }
-    if (typeof trade?.tags === 'string') {
-      return trade.tags.split(',').map((tag) => tag.trim()).filter(Boolean)
-    }
-    return []
-  }
-
-  function renderTradeMetaBadges(trade) {
-    const tags = getTradeTags(trade).slice(0, 2)
-    const badges = []
-
-    if (trade.strategy_tag) {
-      badges.push({
-        key: 'strategy',
-        label: trade.strategy_tag,
-        color: 'var(--accent)',
-        background: 'rgba(var(--brand-primary-rgb), 0.14)',
-        border: 'rgba(var(--brand-primary-rgb), 0.28)'
-      })
-    }
-
-    tags.forEach((tag, index) => {
-      badges.push({
-        key: `tag-${index}`,
-        label: `#${tag}`,
-        color: 'var(--text-muted)',
-        background: 'rgba(148, 148, 148, 0.08)',
-        border: 'rgba(148, 148, 148, 0.18)'
-      })
-    })
-
-    if (trade.trailing_step_pips) {
-      badges.push({
-        key: 'trail',
-        label: `Trail ${trade.trailing_step_pips}p`,
-        color: 'var(--green)',
-        background: 'rgba(0, 200, 153, 0.1)',
-        border: 'rgba(0, 200, 153, 0.25)'
-      })
-    }
-
-    if (trade.breakeven_trigger_pips) {
-      badges.push({
-        key: 'be',
-        label: `BE ${trade.breakeven_trigger_pips}p`,
-        color: 'var(--accent-gold, #fbbf24)',
-        background: 'rgba(251, 191, 36, 0.1)',
-        border: 'rgba(251, 191, 36, 0.25)'
-      })
-    }
-
-    if (badges.length === 0) return null
-
-    return (
-      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
-        {badges.map((badge) => (
-          <span
-            key={badge.key}
-            style={{
-              padding: '2px 7px',
-              borderRadius: '999px',
-              fontSize: '10px',
-              fontWeight: '700',
-              letterSpacing: '0.03em',
-              color: badge.color,
-              background: badge.background,
-              border: `1px solid ${badge.border}`
-            }}
-          >
-            {badge.label}
-          </span>
-        ))}
-      </div>
-    )
-  }
-
-  function renderTradeNoteEditor(trade, colSpan = 8) {
-    return (
-      <tr>
-        <td colSpan={colSpan} style={{ padding: '0', borderBottom: '1px solid var(--navy-border)' }}>
-          <div style={{
-            padding: '12px 16px',
-            background: 'rgba(148, 148, 148, 0.04)',
-            borderTop: '1px solid rgba(148, 148, 148, 0.15)'
-          }}>
-            <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '8px', letterSpacing: '0.08em' }}>
-              TRADE JOURNAL — {trade.instrument} {trade.direction?.toUpperCase()} {parseFloat(trade.lot_size).toFixed(2)} lots
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-              <input
-                type="text"
-                placeholder="Strategy tag"
-                value={noteStrategyTag}
-                onChange={(e) => { setNoteStrategyTag(e.target.value); setNoteSaved(false) }}
-                style={{ width: '100%', fontSize: '13px', background: 'var(--navy)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 12px', color: 'var(--text)' }}
-              />
-              <input
-                type="text"
-                placeholder="Tags (comma separated, e.g. A+ Setup, Revenge)"
-                value={noteTags}
-                onChange={(e) => { setNoteTags(e.target.value); setNoteSaved(false) }}
-                style={{ width: '100%', fontSize: '13px', background: 'var(--navy)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 12px', color: 'var(--accent)', fontFamily: 'var(--font-ui)' }}
-              />
-            </div>
-            <textarea
-              value={noteText}
-              onChange={(e) => { setNoteText(e.target.value); setNoteSaved(false) }}
-              placeholder="Add your trade notes here — strategy used, lessons learned, market context..."
-              maxLength={1000}
-              rows={3}
-              style={{
-                width: '100%', fontSize: '13px', resize: 'vertical',
-                background: 'var(--navy)', border: '1px solid var(--navy-border)',
-                borderRadius: '6px', padding: '8px 12px',
-                color: 'var(--text)', fontFamily: 'var(--font-ui)',
-                lineHeight: '1.5', marginBottom: '8px'
-              }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{noteText.length}/1000</span>
-              </div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                {noteSaved && (
-                  <span style={{ fontSize: '11px', color: 'var(--green)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                    {renderIcon('approve', { size: 11, color: 'var(--accent-green)' })}
-                    <span>Saved</span>
-                  </span>
-                )}
-                <button
-                  onClick={() => saveNote(trade.id)}
-                  disabled={noteSaving}
-                  style={{
-                    background: noteSaving ? 'var(--navy-border)' : 'var(--accent)',
-                    color: noteSaving ? 'var(--text-muted)' : 'var(--navy)',
-                    border: 'none', borderRadius: '6px',
-                    padding: '6px 16px', fontSize: '12px',
-                    fontWeight: '700',
-                    cursor: noteSaving ? 'not-allowed' : 'pointer',
-                    fontFamily: 'var(--font-ui)'
-                  }}
-                >
-                  {noteSaving ? 'Saving...' : 'Save Note'}
-                </button>
-                <button
-                  onClick={closeNoteEditor}
-                  style={{
-                    background: 'transparent', border: '1px solid var(--navy-border)',
-                    borderRadius: '6px', padding: '6px 12px',
-                    fontSize: '12px', color: 'var(--text-muted)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </td>
-      </tr>
-    )
-  }
 
   const currentBalance = stats ? Number(stats.account?.current_balance || 0) : 0
   const floatingProfit = openTrades
@@ -636,13 +619,13 @@ export default function TradingPanel({
   const priceStatusState = priceStatus?.status || (priceStatus?.healthy ? 'healthy' : 'unhealthy')
   const priceFeedLive = priceStatusState === 'healthy'
   const priceFeedDegraded = priceStatusState === 'degraded'
-  const priceFeedColor = priceFeedLive ? 'var(--green)' : (priceFeedDegraded ? 'var(--warning, #f59e0b)' : 'var(--red)')
+  const priceFeedColor = priceFeedLive ? 'var(--green)' : (priceFeedDegraded ? 'var(--warn)' : 'var(--red)')
   const priceFeedBackground = priceFeedLive
-    ? 'rgba(0, 200, 153, 0.1)'
-    : (priceFeedDegraded ? 'rgba(245, 158, 11, 0.12)' : 'rgba(255, 71, 87, 0.1)')
+    ? 'var(--success-bg)'
+    : (priceFeedDegraded ? 'var(--warning-bg)' : 'var(--danger-bg)')
   const priceFeedBorder = priceFeedLive
-    ? 'rgba(0, 200, 153, 0.3)'
-    : (priceFeedDegraded ? 'rgba(245, 158, 11, 0.28)' : 'rgba(255, 71, 87, 0.3)')
+    ? 'var(--green)'
+    : (priceFeedDegraded ? 'var(--warn)' : 'var(--red)')
   const priceFeedLabel = priceFeedLive ? 'Live' : (priceFeedDegraded ? 'Degraded' : 'Delayed')
 
   return (
@@ -657,7 +640,6 @@ export default function TradingPanel({
           alignItems: 'center',
           gap: '8px',
           padding: '8px 14px',
-          borderRadius: '8px',
           background: priceFeedBackground,
           border: `1px solid ${priceFeedBorder}`,
           fontSize: '12px'
@@ -687,15 +669,16 @@ export default function TradingPanel({
       {accounts.length > 0 && (
         <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
           {accounts.map(acc => (
-            <button key={acc.id} className="btn" onClick={() => setSelectedAccount(acc)}
+            <button key={acc.id} className={`btn ${selectedAccount?.id === acc.id ? '' : 'glass-panel'}`} onClick={() => setSelectedAccount(acc)}
               style={{
-                background: selectedAccount?.id === acc.id ? 'var(--accent)' : 'var(--navy-card)',
+                background: selectedAccount?.id === acc.id ? 'var(--accent)' : undefined,
                 color:      selectedAccount?.id === acc.id ? 'var(--navy)' : 'var(--text)',
                 border: '1px solid var(--accent)',
+                borderRadius: '0',
                 fontSize: '12px',
                 padding: '8px 14px'
               }}>
-              {acc.account_type.toUpperCase()} ${parseFloat(acc.account_size).toLocaleString()}
+              {acc.account_type === 'competition' && acc.competition_title ? acc.competition_title.toUpperCase() : acc.account_type.toUpperCase()} ${parseFloat(acc.account_size).toLocaleString()}
               <span style={{ marginLeft: '6px', fontSize: '10px', color: selectedAccount?.id === acc.id ? 'var(--navy)' : getStatusColor(acc.status) }}>
                 ● {acc.status.toUpperCase()}
               </span>
@@ -704,33 +687,65 @@ export default function TradingPanel({
         </div>
       )}
 
-      {/* Symbol Selector */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))',
+      {/* Symbol Selector — auto-scrolling live ticker (pauses on hover/touch) */}
+      <div
+        ref={symbolRowRef}
+        onMouseEnter={pauseSymbolMarquee}
+        onMouseLeave={resumeSymbolMarquee}
+        onTouchStart={pauseSymbolMarquee}
+        onTouchEnd={resumeSymbolMarqueeDelayed}
+        style={{
+        display: 'flex',
+        flexWrap: 'nowrap',
+        overflowX: 'auto',
+        width: '100%',
+        maxWidth: '100%',
         gap: '8px',
-        marginBottom: '20px'
+        marginBottom: '20px',
+        paddingBottom: '4px'
       }}>
-        {availableInstruments.map(instrument => {
+        {/* Rendered twice back-to-back so the auto-scroll loop can reset at the
+            halfway point with no visible jump — see the rAF loop above. */}
+        {[0, 1].flatMap(copy => sortedInstruments.map(instrument => {
           const data = prices[instrument]
           const isSelected = orderForm.instrument === instrument
+          const isPinned = pinnedInstruments.includes(instrument)
           const bidText = data ? formatPrice(data.bid, instrument) : '--'
           const askText = data ? formatPrice(data.ask, instrument) : '--'
           return (
             <div
-              key={instrument}
+              key={`${instrument}-${copy}`}
+              className="glass-panel"
               onClick={() => setOrderForm(f => ({ ...f, instrument, stop_loss: '', take_profit: '' }))}
               style={{
-                background:  'var(--navy-card)',
                 border:      isSelected ? '1px solid var(--accent)' : '1px solid var(--navy-border)',
-                borderRadius:'8px',
                 padding:     '10px 12px',
                 cursor:      'pointer',
                 transition:  'all 0.15s',
-                boxShadow:   isSelected ? '0 0 12px rgba(148, 148, 148, 0.2)' : 'none',
-                minHeight:   '78px'
+                boxShadow:   isSelected ? '0 0 12px color-mix(in srgb, var(--muted) 20%, transparent)' : 'none',
+                minHeight:   '78px',
+                flexShrink:  0,
+                minWidth:    '96px',
+                position:    'relative'
               }}
             >
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); togglePin(instrument) }}
+                aria-label={isPinned ? `Remove ${instrument} from watchlist` : `Add ${instrument} to watchlist`}
+                title={isPinned ? 'Remove from watchlist' : 'Add to watchlist'}
+                style={{
+                  position: 'absolute', top: '4px', right: '4px',
+                  background: 'transparent', border: 'none', padding: '2px',
+                  cursor: 'pointer', display: 'flex', lineHeight: 0
+                }}
+              >
+                {renderIcon('star', {
+                  size: 12,
+                  color: isPinned ? 'var(--accent)' : 'var(--text-dim)',
+                  style: { fill: isPinned ? 'currentColor' : 'none' }
+                })}
+              </button>
               <div style={{ fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.08em', marginBottom: '4px' }}>{instrument}</div>
               <div style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
                 {bidText}
@@ -740,7 +755,7 @@ export default function TradingPanel({
               </div>
             </div>
           )
-        })}
+        }))}
       </div>
 
       {/* No account yet */}
@@ -775,17 +790,17 @@ export default function TradingPanel({
 
       {/* Main Trading Layout — active accounts only */}
       {!accountLoading && selectedAccount && selectedAccount.status === 'active' && (
-        <div className='trading-layout' style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '20px', alignItems: 'start' }}>
+        <div className='trading-layout' ref={tradingLayoutRef} style={{ '--trading-split': `${splitPct}%` }}>
 
           {/* Left — Chart + Positions */}
-          <div>
+          <div className='trading-main-column'>
 
             {/* FIX Step 3: SimulatedTradingDisclaimer — shown above the chart on active accounts */}
             <SimulatedTradingDisclaimer />
 
             {/* Balance Bar */}
             {stats && (
-              <div className='trading-stats-grid' style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', marginBottom: '16px' }}>
+              <div className='trading-stats-grid' style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '16px', alignItems: 'stretch' }}>
                 {[
                   { label: 'Balance', value: `$${currentBalance.toFixed(2)}` },
                   { label: 'Floating P&L', value: `${floatingProfit >= 0 ? '+' : ''}$${floatingProfit.toFixed(2)}`, color: floatingProfit >= 0 ? 'var(--green)' : 'var(--red)' },
@@ -806,9 +821,8 @@ export default function TradingPanel({
 
             {stats && profitTargetAmount > 0 && (
               <div style={{
-                background: 'rgba(148, 148, 148, 0.06)',
-                border: '1px solid rgba(148, 148, 148, 0.24)',
-                borderRadius: '8px',
+                background: 'color-mix(in srgb, var(--muted) 6%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--muted) 24%, transparent)',
                 padding: '10px 14px',
                 marginBottom: '16px'
               }}>
@@ -820,7 +834,7 @@ export default function TradingPanel({
                     {targetProgressPct.toFixed(1)}%
                   </div>
                 </div>
-                <div style={{ height: '8px', borderRadius: '4px', background: 'var(--navy-border)', overflow: 'hidden' }}>
+                <div style={{ height: '8px', background: 'var(--navy-border)', overflow: 'hidden' }}>
                   <div style={{
                     height: '100%',
                     width: `${targetProgressPct}%`,
@@ -828,10 +842,10 @@ export default function TradingPanel({
                     background: targetProgressPct >= 100
                       ? 'var(--green)'
                       : targetProgressPct >= 75
-                        ? 'var(--muted)'
+                        ? 'var(--warn)'
                         : targetProgressPct >= 50
-                          ? 'var(--muted)'
-                          : 'var(--accent)'
+                          ? 'var(--accent)'
+                          : 'var(--muted)'
                   }} />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '11px' }}>
@@ -859,17 +873,17 @@ export default function TradingPanel({
 
               const level = usedPct >= 90 ? 'critical' : usedPct >= 75 ? 'high' : usedPct >= 50 ? 'medium' : 'low'
               const levelColors = {
-                critical: { bg: 'rgba(97, 97, 97, 0.15)', border: 'var(--red)',   bar: 'var(--muted)', text: 'var(--red)',   icon: 'risk-alerts' },
-                high:     { bg: 'rgba(122, 122, 122, 0.10)', border: 'var(--muted)',      bar: 'var(--muted)', text: 'var(--muted)',     icon: 'warning' },
-                medium:   { bg: 'rgba(139, 139, 139, 0.10)', border: 'var(--muted)',     bar: 'var(--muted)', text: 'var(--muted)',     icon: 'analytics' },
-                low:      { bg: 'rgba(148, 148, 148, 0.06)', border: 'rgba(148, 148, 148, 0.3)', bar: 'var(--accent)', text: 'var(--text-muted)', icon: 'floating_down' },
+                critical: { bg: 'color-mix(in srgb, var(--loss) 15%, transparent)', border: 'var(--loss)', bar: 'var(--loss)', text: 'var(--loss)', icon: 'risk-alerts' },
+                high:     { bg: 'color-mix(in srgb, var(--loss) 8%, transparent)', border: 'color-mix(in srgb, var(--warn) 40%, var(--loss) 60%)', bar: 'color-mix(in srgb, var(--warn) 40%, var(--loss) 60%)', text: 'color-mix(in srgb, var(--warn) 40%, var(--loss) 60%)', icon: 'warning' },
+                medium:   { bg: 'color-mix(in srgb, var(--warn) 10%, transparent)', border: 'var(--warn)', bar: 'var(--warn)', text: 'var(--warn)', icon: 'analytics' },
+                low:      { bg: 'color-mix(in srgb, var(--accent) 6%, transparent)', border: 'color-mix(in srgb, var(--accent) 30%, transparent)', bar: 'var(--accent)', text: 'var(--text-muted)', icon: 'floating_down' },
               }
               const c = levelColors[level]
 
               return (
                 <div style={{
                   background: c.bg, border: `1px solid ${c.border}`,
-                  borderRadius: '8px', padding: '10px 14px',
+                  padding: '10px 14px',
                   marginBottom: '16px'
                 }}>
                   {/* Header row */}
@@ -890,9 +904,9 @@ export default function TradingPanel({
                   </div>
 
                   {/* Drawdown gauge bar */}
-                  <div style={{ height: '6px', background: 'var(--navy-border)', borderRadius: '3px', overflow: 'hidden' }}>
+                  <div style={{ height: '6px', background: 'var(--navy-border)', overflow: 'hidden' }}>
                     <div style={{
-                      height: '100%', borderRadius: '3px',
+                      height: '100%',
                       width: `${usedPct}%`,
                       background: `linear-gradient(90deg, var(--accent), ${c.bar})`,
                       transition: 'width 0.5s ease',
@@ -912,25 +926,8 @@ export default function TradingPanel({
             })()}
 
 
-              <div style={{ width: '100%', height: '400px', marginBottom: '16px' }}>
-                <Suspense fallback={<ChartFallback />}>
-                  <MultiChartGrid
-                    selectedInstrument={orderForm.instrument}
-                    availableInstruments={availableInstruments}
-                    openTrades={openTrades}
-                    tradeHistory={tradeHistory}
-                    prices={prices}
-                    selectedAccount={selectedAccount}
-                    stats={stats}
-                    onTradeLineAdjust={handleTradeLineAdjust}
-                    onPrimaryInstrumentChange={(instrument) => setOrderForm((current) => ({
-                      ...current,
-                      instrument,
-                      stop_loss: '',
-                      take_profit: ''
-                    }))}
-                  />
-                </Suspense>
+              <div style={{ width: '100%', height: '500px', marginBottom: '16px' }}>
+                <TradingViewWidget symbol={orderForm.instrument} theme={theme} />
               </div>
 
             {/* ── Phase Countdown Timer ── */}
@@ -939,10 +936,9 @@ export default function TradingPanel({
                 display: 'flex', alignItems: 'center', gap: '12px',
                 padding: '10px 16px', marginBottom: '16px',
                 background: timeRemaining.urgent
-                  ? 'rgba(97, 97, 97, 0.12)'
-                  : 'rgba(148, 148, 148, 0.06)',
-                border: `1px solid ${timeRemaining.urgent ? 'var(--red)' : 'rgba(148, 148, 148, 0.25)'}`,
-                borderRadius: '8px'
+                  ? 'color-mix(in srgb, var(--muted) 12%, transparent)'
+                  : 'color-mix(in srgb, var(--muted) 6%, transparent)',
+                border: `1px solid ${timeRemaining.urgent ? 'var(--red)' : 'color-mix(in srgb, var(--muted) 25%, transparent)'}`
               }}>
                 <span style={{ display: 'inline-flex' }}>
                   {renderIcon(
@@ -978,9 +974,9 @@ export default function TradingPanel({
                       const used  = new Date() - new Date(selectedAccount.phase_start_date)
                       const pct   = Math.min(Math.max((used / total) * 100, 0), 100)
                       return (
-                        <div style={{ height: '4px', background: 'var(--navy-border)', borderRadius: '2px' }}>
+                        <div style={{ height: '4px', background: 'var(--navy-border)' }}>
                           <div style={{
-                            height: '100%', borderRadius: '2px',
+                            height: '100%',
                             width: `${pct}%`,
                             background: pct > 80 ? 'var(--red)' : pct > 60 ? 'var(--muted)' : 'var(--accent)',
                             transition: 'width 1s linear'
@@ -1069,7 +1065,7 @@ export default function TradingPanel({
                 <div className="trade-batch-hint">
                   Batch close follows your trading rules, including minimum hold time and live market availability.
                 </div>
-                <div className="table-wrapper trading-table-wrapper">
+                <div className="table-wrapper trading-table-wrapper trading-table-wrapper--open">
                   <table className="data-table trading-table">
                     <thead>
                       <tr>
@@ -1085,115 +1081,23 @@ export default function TradingPanel({
 
                         return (
                           <React.Fragment key={trade.id}>
-                            <tr style={{ opacity: isPending ? 0.75 : 1 }}>
-                              <td style={{ fontWeight: '600' }}>
-                                {trade.instrument}
-                                {isPending && (
-                                  <span style={{
-                                    marginLeft: '6px', fontSize: '9px', padding: '2px 5px',
-                                    background: 'rgba(148, 148, 148, 0.15)', border: '1px solid var(--accent)',
-                                    borderRadius: '3px', color: 'var(--accent)', verticalAlign: 'middle'
-                                  }}>
-                                    PENDING
-                                  </span>
-                                )}
-                                {renderTradeMetaBadges(trade)}
-                              </td>
-                              <td style={{ color: trade.direction === 'buy' ? 'var(--green)' : 'var(--red)', fontWeight: '600' }}>
-                                {isPending
-                                  ? trade.order_type.replace(/_/g, ' ').toUpperCase()
-                                  : trade.direction.toUpperCase()
-                                }
-                              </td>
-                              <td>{parseFloat(trade.lot_size).toFixed(2)}</td>
-                              <td>
-                                {isPending
-                                  ? (trade.pending_price ? parseFloat(trade.pending_price).toFixed(dec) : '—')
-                                  : (trade.open_price != null ? parseFloat(trade.open_price).toFixed(dec) : '—')
-                                }
-                              </td>
-                              <td style={{ color: 'var(--accent)' }}>
-                                {isPending ? '—' : (trade.current_price ? parseFloat(trade.current_price).toFixed(dec) : '—')}
-                              </td>
-                              <td style={{ color: 'var(--red)' }}>
-                                {trade.stop_loss ? parseFloat(trade.stop_loss).toFixed(dec) : '—'}
-                              </td>
-                              <td style={{ color: 'var(--green)' }}>
-                                {trade.take_profit ? parseFloat(trade.take_profit).toFixed(dec) : '—'}
-                              </td>
-                              <td style={{
-                                color: isPending
-                                  ? 'var(--text-muted)'
-                                  : ((trade.floating_pnl ?? 0) >= 0 ? 'var(--green)' : 'var(--red)'),
-                                fontWeight: 'bold'
-                              }}>
-                                {isPending
-                                  ? '—'
-                                  : `${(trade.floating_pnl ?? 0) >= 0 ? '+' : ''}$${(trade.floating_pnl ?? 0).toFixed(2)}`
-                                }
-                              </td>
-                              <td>
-                                <div className="trade-actions" style={{ display: 'flex', gap: '6px' }}>
-                                  {isPending ? (
-                                    <>
-                                      <Button
-                                        variant="secondary"
-                                        size="sm"
-                                        onClick={() => isModifying ? cancelModify() : openModifyForm(trade)}
-                                      >
-                                        {isModifying ? 'Cancel' : 'Modify'}
-                                      </Button>
-                                      <Button
-                                        variant="danger"
-                                        size="sm"
-                                        onClick={() => onCancelOrder(trade.id)}
-                                      >
-                                        Cancel Order
-                                      </Button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Button
-                                        variant="secondary"
-                                        size="sm"
-                                        onClick={() => isModifying ? cancelModify() : openModifyForm(trade)}
-                                      >
-                                        {isModifying ? 'Cancel' : 'Modify'}
-                                      </Button>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => editingNoteId === trade.id ? closeNoteEditor() : openNoteEditor(trade)}
-                                        style={trade.trader_note ? { color: 'var(--ink)' } : undefined}
-                                      >
-                                        Journal
-                                      </Button>
-                                      <Button
-                                        variant="secondary"
-                                        size="sm"
-                                        onClick={() => setPartialForm({ id: trade.id, lots: parseFloat(trade.lot_size).toFixed(2) })}
-                                      >
-                                        Partial
-                                      </Button>
-                                      <Button
-                                        variant="danger"
-                                        size="sm"
-                                        onClick={() => handleCloseTrade(trade)}
-                                        disabled={closingTradeSet.has(trade.id)}
-                                      >
-                                        {closingTradeSet.has(trade.id) ? 'Closing...' : 'Close'}
-                                      </Button>
-                                    </>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
+                            <TradeRow
+                              trade={trade}
+                              dec={dec}
+                              isPending={isPending}
+                              isModifying={isModifying}
+                              isClosing={closingTradeSet.has(trade.id)}
+                              onToggleModify={() => isModifying ? cancelModify() : openModifyForm(trade)}
+                              onCancelOrder={() => onCancelOrder(trade.id)}
+                              onPartialClick={() => setPartialForm({ id: trade.id, lots: parseFloat(trade.lot_size).toFixed(2) })}
+                              onClose={() => handleCloseTrade(trade)}
+                            />
 
                             {/* Inline Partial Close Form */}
                             {!isPending && partialForm?.id === trade.id && (
                               <tr>
                                 <td colSpan="9" style={{ padding: '0' }}>
-                                  <div style={{ background: 'var(--navy-card)', border: '1px dashed var(--accent)', borderRadius: '8px', padding: '12px 16px', margin: '4px 0 8px 0', display: 'grid', gap: '10px' }}>
+                                  <div style={{ background: 'var(--navy-card)', border: '1px dashed var(--accent)', padding: '12px 16px', margin: '4px 0 8px 0', display: 'grid', gap: '10px' }}>
                                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                                       <span style={{ fontSize: '12px', color: 'var(--text)' }}>Close Fraction (Current: {parseFloat(trade.lot_size).toFixed(2)}):</span>
                                       <input type="number" step="0.01" max={Math.max(parseFloat(trade.lot_size) - 0.01, 0.01).toFixed(2)} value={partialForm.val || ''} onChange={e => setPartialForm({ ...partialForm, val: e.target.value })} style={{ width: '80px', padding: '4px 8px', fontSize: '12px' }} />
@@ -1214,9 +1118,9 @@ export default function TradingPanel({
                                             onClick={() => handlePartialClose(trade.id, trade.lot_size, closeLots.toFixed(2))}
                                             style={{
                                               padding: '6px 10px',
-                                              borderRadius: '999px',
+                                              borderRadius: 'var(--radius-pill)',
                                               border: '1px solid var(--navy-border)',
-                                              background: invalid || closingTradeSet.has(trade.id) ? 'rgba(255,255,255,0.03)' : 'rgba(var(--brand-primary-rgb),0.08)',
+                                              background: invalid || closingTradeSet.has(trade.id) ? 'var(--glass)' : 'rgba(var(--brand-primary-rgb),0.08)',
                                               color: invalid || closingTradeSet.has(trade.id) ? 'var(--text-dim)' : 'var(--accent)',
                                               cursor: invalid || closingTradeSet.has(trade.id) ? 'not-allowed' : 'pointer',
                                               fontSize: '11px',
@@ -1236,7 +1140,7 @@ export default function TradingPanel({
                             {isPending && isModifying && (
                               <tr>
                                 <td colSpan="9" style={{ padding: '0' }}>
-                                  <div style={{ background: 'var(--navy-card)', border: '1px solid var(--accent)', borderRadius: '8px', padding: '16px', margin: '4px 0 8px 0' }}>
+                                  <div style={{ background: 'var(--navy-card)', border: '1px solid var(--accent)', padding: '16px', margin: '4px 0 8px 0' }}>
                                     <div style={{ fontSize: '12px', color: 'var(--accent)', marginBottom: '12px', fontWeight: '600' }}>
                                       Modify {trade.instrument} {trade.order_type.replace(/_/g, ' ').toUpperCase()} - Target: {trade.pending_price ? parseFloat(trade.pending_price).toFixed(dec) : '-'}
                                     </div>
@@ -1306,7 +1210,7 @@ export default function TradingPanel({
                                   <div style={{
                                     background: 'var(--navy-card)',
                                     border: '1px solid var(--accent)',
-                                    borderRadius: '8px',
+                                    borderRadius: '0',
                                     padding: '16px',
                                     margin: '4px 0 8px 0'
                                   }}>
@@ -1339,45 +1243,6 @@ export default function TradingPanel({
                                           placeholder={`e.g. ${trade.current_price ? (parseFloat(trade.current_price) * (trade.direction === 'buy' ? 1.001 : 0.999)).toFixed(dec) : '—'}`}
                                           step={getInputStepString(trade.instrument)}
                                           style={{ width: '140px', fontSize: '13px', padding: '7px 10px' }}
-                                        />
-                                      </div>
-                                      <div>
-                                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
-                                          Trailing Step (pips)
-                                        </label>
-                                        <input
-                                          type="number"
-                                          value={modifyForm.trailing_step_pips}
-                                          onChange={e => setModifyForm(f => ({ ...f, trailing_step_pips: e.target.value }))}
-                                          placeholder="10"
-                                          step="1"
-                                          style={{ width: '120px', fontSize: '13px', padding: '7px 10px' }}
-                                        />
-                                      </div>
-                                      <div>
-                                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
-                                          Trail Activation
-                                        </label>
-                                        <input
-                                          type="number"
-                                          value={modifyForm.trailing_activation_price}
-                                          onChange={e => setModifyForm(f => ({ ...f, trailing_activation_price: e.target.value }))}
-                                          placeholder="Activation price"
-                                          step={getInputStepString(trade.instrument)}
-                                          style={{ width: '140px', fontSize: '13px', padding: '7px 10px' }}
-                                        />
-                                      </div>
-                                      <div>
-                                        <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
-                                          Breakeven Trigger
-                                        </label>
-                                        <input
-                                          type="number"
-                                          value={modifyForm.breakeven_trigger_pips}
-                                          onChange={e => setModifyForm(f => ({ ...f, breakeven_trigger_pips: e.target.value }))}
-                                          placeholder="Pips to BE"
-                                          step="0.1"
-                                          style={{ width: '120px', fontSize: '13px', padding: '7px 10px' }}
                                         />
                                       </div>
                                       <div style={{ display: 'flex', gap: '8px' }}>
@@ -1414,9 +1279,8 @@ export default function TradingPanel({
                                 </td>
                               </tr>
                             )}
-                            {!isPending && editingNoteId === trade.id && renderTradeNoteEditor(trade, 9)}
                           </React.Fragment>
-                        ) 
+                        )
                       })}
                       {visibleOpenTrades.length === 0 && (
                         <tr>
@@ -1461,20 +1325,12 @@ export default function TradingPanel({
                               lots:       parseFloat(lastClosed.lot_size).toFixed(2),
                               stop_loss:  lastClosed.stop_loss  ? parseFloat(lastClosed.stop_loss).toString()  : '',
                               take_profit: lastClosed.take_profit ? parseFloat(lastClosed.take_profit).toString() : '',
-                              strategy_tag: lastClosed.strategy_tag || '',
-                              journal_note: lastClosed.trader_note || '',
-                              journal_tags: Array.isArray(lastClosed.tags)
-                                ? lastClosed.tags.join(', ')
-                                : (typeof lastClosed.tags === 'string' ? lastClosed.tags : ''),
-                              trailing_step_pips: lastClosed.trailing_step_pips ? String(lastClosed.trailing_step_pips) : '',
-                              trailing_activation_price: lastClosed.trailing_activation_price ? parseFloat(lastClosed.trailing_activation_price).toString() : '',
-                              breakeven_trigger_pips: lastClosed.breakeven_trigger_pips ? parseFloat(lastClosed.breakeven_trigger_pips).toString() : '',
                             }))
                           }}
                           style={{
                             background: 'transparent',
-                            border: '1px solid rgba(148, 148, 148, 0.3)',
-                            borderRadius: '6px',
+                            border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)',
+                            borderRadius: '0',
                             padding: '6px 12px',
                             fontSize: '11px',
                             color: 'var(--accent)',
@@ -1482,7 +1338,7 @@ export default function TradingPanel({
                             display: 'flex', alignItems: 'center', gap: '5px',
                             transition: 'all 0.15s'
                           }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(148, 148, 148, 0.08)'}
+                          onMouseEnter={e => e.currentTarget.style.background = 'color-mix(in srgb, var(--muted) 8%, transparent)'}
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                           title={`Repeat: ${lastClosed.instrument} ${lastClosed.direction?.toUpperCase()} ${parseFloat(lastClosed.lot_size).toFixed(2)} lots`}
                         >
@@ -1500,7 +1356,7 @@ export default function TradingPanel({
                       style={{
                         background: 'transparent',
                         border: '1px solid var(--navy-border)',
-                        borderRadius: '6px',
+                        borderRadius: '0',
                         padding: '6px 12px',
                         fontSize: '11px',
                         color: 'var(--text-muted)',
@@ -1522,7 +1378,7 @@ export default function TradingPanel({
                     <thead>
                       <tr>
                         <th>Symbol</th><th>Type</th><th>Lots</th>
-                        <th>Open Price</th><th>Close Price</th><th>Reason</th><th>P&L</th><th>{renderIcon('journal', { size: 12, color: 'var(--text-secondary)' })}</th>
+                        <th>Open Price</th><th>Close Price</th><th>Reason</th><th>P&L</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1532,13 +1388,11 @@ export default function TradingPanel({
                       ).map(trade => {
                         const dec = getPriceDecimals(trade.instrument)
                         const isCancelled = trade.status === 'cancelled'
-                        const isEditingNote = editingNoteId === trade.id
                         return (
                           <React.Fragment key={trade.id}>
                             <tr style={{ opacity: isCancelled ? 0.6 : 1 }}>
                               <td style={{ fontWeight: '600' }}>
                                 {trade.instrument}
-                                {renderTradeMetaBadges(trade)}
                               </td>
                               <td style={{ color: trade.direction === 'buy' ? 'var(--green)' : 'var(--red)', fontWeight: '600' }}>
                                 {trade.order_type && trade.order_type !== 'market'
@@ -1567,100 +1421,7 @@ export default function TradingPanel({
                               }}>
                                 {isCancelled ? '—' : `${parseFloat(trade.demo_pnl || 0) >= 0 ? '+' : ''}$${parseFloat(trade.demo_pnl || 0).toFixed(2)}`}
                               </td>
-                              {/* Note button */}
-                              <td>
-                                <button
-                                  onClick={() => {
-                                    if (isEditingNote) {
-                                      closeNoteEditor()
-                                    } else {
-                                      openNoteEditor(trade)
-                                    }
-                                  }}
-                                  className="trade-note-btn"
-                                  style={{
-                                    borderColor: trade.trader_note ? 'var(--accent)' : 'var(--navy-border)',
-                                    color: trade.trader_note ? 'var(--accent)' : 'var(--text-dim)'
-                                  }}
-                                  title={trade.trader_note ? 'View/edit note' : 'Add note'}
-                                >
-                                  {renderIcon(trade.trader_note ? 'journal' : 'plus', {
-                                    size: 12,
-                                    color: trade.trader_note ? 'var(--accent)' : 'var(--text-secondary)'
-                                  })}
-                                </button>
-                              </td>
                             </tr>
-
-                            {/* Inline note editor row */}
-                            {null && (
-                              <tr>
-                                <td colSpan={8} style={{ padding: '0', borderBottom: '1px solid var(--navy-border)' }}>
-                                  <div style={{
-                                    padding: '12px 16px',
-                                    background: 'rgba(148, 148, 148, 0.04)',
-                                    borderTop: '1px solid rgba(148, 148, 148, 0.15)'
-                                  }}>
-                                    <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '8px', letterSpacing: '0.08em' }}>
-                                      TRADE NOTE — {trade.instrument} {trade.direction?.toUpperCase()} {parseFloat(trade.lot_size).toFixed(2)} lots
-                                    </div>
-                                    <input type="text" placeholder="Tags (comma separated, e.g. A+ Setup, Revenge)" value={noteTags} onChange={e => { setNoteTags(e.target.value); setNoteSaved(false) }} style={{ width: '100%', fontSize: '13px', background: 'var(--navy)', border: '1px solid var(--navy-border)', borderRadius: '6px', padding: '8px 12px', color: 'var(--accent)', fontFamily: 'var(--font-ui)', marginBottom: '8px' }} />
-                                    <textarea
-                                      value={noteText}
-                                      onChange={e => { setNoteText(e.target.value); setNoteSaved(false) }}
-                                      placeholder="Add your trade notes here — strategy used, lessons learned, market context..."
-                                      maxLength={1000}
-                                      rows={3}
-                                      style={{
-                                        width: '100%', fontSize: '13px', resize: 'vertical',
-                                        background: 'var(--navy)', border: '1px solid var(--navy-border)',
-                                        borderRadius: '6px', padding: '8px 12px',
-                                        color: 'var(--text)', fontFamily: 'var(--font-ui)',
-                                        lineHeight: '1.5', marginBottom: '8px'
-                                      }}
-                                    />
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                      <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{noteText.length}/1000</span>
-                                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                        {noteSaved && (
-                                          <span style={{ fontSize: '11px', color: 'var(--green)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                                            {renderIcon('approve', { size: 11, color: 'var(--accent-green)' })}
-                                            <span>Saved</span>
-                                          </span>
-                                        )}
-                                         <button
-                                          onClick={() => saveNote(trade.id)}
-                                          disabled={noteSaving}
-                                          style={{
-                                            background: noteSaving ? 'var(--navy-border)' : 'var(--accent)',
-                                            color: noteSaving ? 'var(--text-muted)' : 'var(--navy)',
-                                            border: 'none', borderRadius: '6px',
-                                            padding: '6px 16px', fontSize: '12px',
-                                            fontWeight: '700',
-                                            cursor: noteSaving ? 'not-allowed' : 'pointer',
-                                            fontFamily: 'var(--font-ui)'
-                                          }}
-                                        >
-                                          {noteSaving ? 'Saving...' : 'Save Note'}
-                                        </button>
-                                        <button
-                                          onClick={() => setEditingNoteId(null)}
-                                          style={{
-                                            background: 'transparent', border: '1px solid var(--navy-border)',
-                                            borderRadius: '6px', padding: '6px 12px',
-                                            fontSize: '12px', color: 'var(--text-muted)',
-                                            cursor: 'pointer'
-                                          }}
-                                        >
-                                          Close
-                                        </button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                            {isEditingNote && renderTradeNoteEditor(trade, 8)}
                           </React.Fragment>
                         )
                       })}
@@ -1679,8 +1440,21 @@ export default function TradingPanel({
             </div>
           </div>
 
+          {/* Drag handle to resize chart/order-panel split */}
+          <div
+            className='trading-split-handle'
+            onMouseDown={handleSplitDragStart}
+            onDoubleClick={() => {
+              setSplitPct(TRADING_SPLIT_DEFAULT)
+              setMemoryItem(TRADING_SPLIT_STORAGE_KEY, String(TRADING_SPLIT_DEFAULT))
+            }}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize chart and order panel columns (double-click to reset)"
+          />
+
           {/* Right — Order Panel */}
-          <div className='order-panel-sticky' style={{ position: 'sticky', top: '84px' }}>
+          <div className='trading-side-column order-panel-sticky'>
             <OrderPanel
               prices={prices}
               selectedAccount={selectedAccount}

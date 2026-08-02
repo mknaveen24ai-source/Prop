@@ -10,7 +10,6 @@ const SUPER_ADMIN_PERMISSIONS = [
   'payout:*',
   'kyc:*',
   'violation:*',
-  'copier:*',
   'command_center:*',
   'bulk:*'
 ]
@@ -284,6 +283,26 @@ async function authenticatePre2FA(req, res, next) {
 
   if (decoded.type !== 'pre_2fa') {
     return res.status(403).json({ error: 'Invalid token type' })
+  }
+
+  try {
+    const result = await pool.query(
+      'SELECT token_version, is_banned FROM users WHERE id = $1',
+      [decoded.userId]
+    )
+    if (result.rows.length === 0) {
+      return res.status(403).json({ error: 'User not found' })
+    }
+    const { token_version, is_banned } = result.rows[0]
+    if (is_banned) {
+      return res.status(403).json({ error: 'Account has been suspended' })
+    }
+    if (decoded.tv !== undefined && decoded.tv < token_version) {
+      return res.status(401).json({ error: 'Session expired - please log in again' })
+    }
+  } catch (dbErr) {
+    logger.error('[auth] Pre-2FA token version check failed:', { error: dbErr.message })
+    return res.status(503).json({ error: 'Authentication service unavailable' })
   }
 
   req.pre2fa = decoded

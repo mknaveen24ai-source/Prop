@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useBranding } from '../BrandingContext'
 
 function EyeIcon({ hidden }) {
@@ -39,6 +40,7 @@ const STEP_OTP   = 'otp'
 
 function Register({ onLogin }) {
   const { tenant } = useBranding()
+  const [searchParams] = useSearchParams()
 
   const [step, setStep] = useState(STEP_FORM)
 
@@ -64,6 +66,33 @@ function Register({ onLogin }) {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const cooldownIntervalRef = useRef(null)
+  useEffect(() => () => clearInterval(cooldownIntervalRef.current), [])
+
+  // Prefill referral code from a ?ref= link (e.g. shared from the affiliate dashboard).
+  useEffect(() => {
+    const ref = searchParams.get('ref')
+    if (ref) setForm(f => ({ ...f, referred_by: ref.toUpperCase() }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Non-blocking referral code validation — just a hint, the server remains
+  // authoritative on whether the code is actually applied at signup.
+  const [referralCheck, setReferralCheck] = useState(null)
+  const [checkingReferral, setCheckingReferral] = useState(false)
+  useEffect(() => {
+    const code = form.referred_by.trim()
+    if (!code) { setReferralCheck(null); return undefined }
+    setCheckingReferral(true)
+    const timeout = setTimeout(() => {
+      axios.get(`${API_URL}/api/affiliates/validate-code/${encodeURIComponent(code)}`)
+        .then(res => setReferralCheck(res.data))
+        .catch(() => setReferralCheck({ valid: false }))
+        .finally(() => setCheckingReferral(false))
+    }, 500)
+    return () => clearTimeout(timeout)
+  }, [form.referred_by])
 
   const strength = getPasswordStrength(form.password)
   const passwordValid = strength.score === 5
@@ -129,10 +158,11 @@ function Register({ onLogin }) {
   }
 
   function startCooldown(seconds) {
+    clearInterval(cooldownIntervalRef.current)
     setOtpCooldown(seconds)
-    const interval = setInterval(() => {
+    cooldownIntervalRef.current = setInterval(() => {
       setOtpCooldown(prev => {
-        if (prev <= 1) { clearInterval(interval); return 0 }
+        if (prev <= 1) { clearInterval(cooldownIntervalRef.current); return 0 }
         return prev - 1
       })
     }, 1000)
@@ -171,7 +201,7 @@ function Register({ onLogin }) {
     try {
       const response = await axios.post(
         `${API_URL}/api/auth/register`,
-        { ...form, phone_verified_token: token }
+        { ...form, phone_verified_token: token, terms_accepted: termsAccepted, signup_source: sessionStorage.getItem('signup_source') || 'direct' }
       )
       onLogin(response.data.user)
     } catch (err) {
@@ -209,6 +239,14 @@ function Register({ onLogin }) {
       position: 'relative',
       overflow: 'hidden'
     }}>
+      <Link
+        to="/"
+        className="auth-secondary-button"
+        style={{ position: 'absolute', top: '24px', left: '24px', width: 'auto', display: 'inline-block', textDecoration: 'none', zIndex: 20 }}
+      >
+        ← Back to Home
+      </Link>
+
       <div className="auth-ambient auth-ambient-primary" />
       <div className="auth-ambient auth-ambient-secondary" />
 
@@ -284,7 +322,7 @@ function Register({ onLogin }) {
                 <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
                   {[1,2,3,4,5].map(i => (
                     <div key={i} style={{
-                      flex: 1, height: '3px', borderRadius: '2px',
+                      flex: 1, height: '3px',
                       background: i <= strength.score ? strength.color : 'var(--navy-border)',
                       transition: 'background 0.2s'
                     }} />
@@ -330,8 +368,8 @@ function Register({ onLogin }) {
               <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 PHONE / WHATSAPP
                 <span style={{
-                  fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: '99px',
-                  background: 'rgba(99,102,241,0.12)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)'
+                  fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: 'var(--radius-pill)',
+                  background: 'color-mix(in srgb, var(--accent) 12%, transparent)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)'
                 }}>OTP REQUIRED</span>
               </label>
               <input
@@ -351,6 +389,17 @@ function Register({ onLogin }) {
             <div className="input-group">
               <label className="input-label">REFERRAL CODE (optional)</label>
               <input type="text" name="referred_by" className="input-field" value={form.referred_by} onChange={handleChange} placeholder="Enter referral code if you have one" />
+              {form.referred_by.trim() && !checkingReferral && referralCheck && (
+                referralCheck.valid ? (
+                  <p style={{ fontSize: '11px', color: 'var(--gain)', marginTop: '5px', marginBottom: 0 }}>
+                    ✓ Valid code — you'll get {referralCheck.discount_pct}% off your first challenge
+                  </p>
+                ) : (
+                  <p style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '5px', marginBottom: 0 }}>
+                    Code not recognized — you can still register without it
+                  </p>
+                )
+              )}
             </div>
 
             {/* Terms checkbox */}
@@ -383,7 +432,7 @@ function Register({ onLogin }) {
 
             <p style={{ textAlign: 'center', marginTop: '24px', color: 'var(--text-muted)', fontSize: '14px' }}>
               Already have an account?{' '}
-              <a href="/login" style={{ color: 'var(--accent)' }}>Sign in here</a>
+              <Link to="/login" style={{ color: 'var(--accent)' }}>Sign in here</Link>
             </p>
           </form>
         )}

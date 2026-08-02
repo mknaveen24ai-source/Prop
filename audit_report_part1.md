@@ -238,7 +238,6 @@ e:\propfirm\
 │   │   ├── swagger.js         (10KB) # API documentation
 │   │   ├── kyc.js             (10KB) # KYC document upload + review
 │   │   ├── importMT5History.js (8KB) # MT5 trade history import
-│   │   ├── copier-routes.js   (8KB)  # Trade copier endpoints
 │   │   ├── adminViolations.js (4KB)  # Violation management
 │   │   ├── disputes.js        (4KB)  # Trade dispute handling
 │   │   └── tenant.js          (702B) # Tenant info endpoint
@@ -274,7 +273,6 @@ e:\propfirm\
 │   ├── scripts/                      # Utility scripts
 │   ├── test/                         # Test files
 │   ├── tools/                        # Development tools
-│   ├── trade-copier/                 # Trade copier module
 │   └── uploads/                      # KYC document storage
 │
 ├── frontend/                         # React SPA

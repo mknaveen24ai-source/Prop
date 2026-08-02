@@ -76,18 +76,25 @@ const {
 } = require('./routes/trades')
 const adminRoutes          = require('./routes/admin')
 const adminViolationRoutes = require('./routes/adminViolations')
+const adminAnalyticsRoutes = require('./routes/adminAnalytics')
+const adminCompetitionRoutes = require('./routes/adminCompetitions')
+const adminTradingEconomicsRoutes = require('./routes/adminTradingEconomics')
+const competitionRoutes    = require('./routes/competitions')
+const adminAffiliateRoutes = require('./routes/adminAffiliates')
+const affiliateRoutes      = require('./routes/affiliates')
 const payoutRoutes         = require('./routes/payouts')
 const kycRoutes            = require('./routes/kyc')
 const chatRoutes           = require('./routes/chat')
 const swaggerRoutes        = require('./routes/swagger')
 const { router: billingRoutes, billingWebhookHandler, ensureBillingInfrastructure } = require('./routes/billing')
-const { router: copierRoutes, ensureCopierSettings } = require('./routes/copier-routes')
 const {
   authenticateToken: authTok,
   authenticateAdmin: authAdm,
   requireSuperAdmin
 } = require('./routes/middleware')
 const { runChallengeEngine } = require('./challengeEngine')
+const { runCompetitionEngine } = require('./competitionEngine')
+const { tickCompetitionBots } = require('./services/competitionBotService')
 const { validateEnv } = require('./env')
 const { ensureChatTables } = require('./routes/chat')
 
@@ -324,9 +331,6 @@ pool.query(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS original_commission NUME
 ensureChatTables().catch(err => {
   logger.error('[startup] Failed to ensure chat tables:', { error: err.message })
 })
-ensureCopierSettings().catch(err => {
-  logger.error('[startup] Failed to ensure copier settings:', { error: err.message })
-})
 ensureBillingInfrastructure().catch(err => {
   logger.error('[startup] Failed to ensure billing infrastructure:', { error: err.message })
 })
@@ -359,6 +363,7 @@ app.use(securityMonitor.checkAttackPatterns)
 // Rate limiters
 const authLimiter    = rateLimit({ windowMs: 1 * 60 * 1000,  max: 10, message: { error: 'Too many attempts. Wait 1 minute.' },                    standardHeaders: true, legacyHeaders: false })
 const supportLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, message: { error: 'Too many support requests. Wait before retrying.' },    standardHeaders: true, legacyHeaders: false })
+const trackLimiter   = rateLimit({ windowMs: 60 * 1000,      max: 20, message: { error: 'Too many tracking events.' },                          standardHeaders: true, legacyHeaders: false })
 
 const io = new Server(httpServer, {
   cors: {
@@ -389,7 +394,7 @@ app.use(sentryRequestHandler())
 app.use(sentryTracingHandler())
 
 app.use(helmet({
-  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? { directives: { defaultSrc: ["'self'"], styleSrc: ["'self'", "'unsafe-inline'"], imgSrc: ["'self'", 'data:', 'https:'], connectSrc: ["'self'", 'wss:'], fontSrc: ["'self'"], frameSrc: ["'none'"], objectSrc: ["'none'"], upgradeInsecureRequests: [] } } : false,
+  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'", 'https://s3.tradingview.com'], styleSrc: ["'self'", "'unsafe-inline'"], imgSrc: ["'self'", 'data:', 'https:'], connectSrc: ["'self'", 'wss:'], fontSrc: ["'self'"], frameSrc: ['https://www.tradingview.com', 'https://s.tradingview.com', 'https://www.tradingview-widget.com'], objectSrc: ["'none'"], upgradeInsecureRequests: [] } } : false,
   crossOriginEmbedderPolicy: false,
   hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
   frameguard: { action: 'deny' },
@@ -431,12 +436,18 @@ app.use('/api/accounts', accountRoutes)
 app.use('/api/trades',   tradeRoutes)
 app.use('/api/admin',    adminRoutes)
 app.use('/api/admin',    adminViolationRoutes)
-app.use('/api/admin',    copierRoutes)
+app.use('/api/admin',    adminAnalyticsRoutes)
+app.use('/api/admin',    adminCompetitionRoutes)
+app.use('/api/admin',    adminTradingEconomicsRoutes)
+app.use('/api/admin',    adminAffiliateRoutes)
+app.use('/api/competitions', competitionRoutes)
+app.use('/api/affiliates', affiliateRoutes)
 app.use('/api/payouts',  payoutRoutes)
 app.use('/api/kyc',      kycRoutes)
 app.use('/api/chat',     chatRoutes)
 app.use('/api/disputes', require('./routes/disputes'))
 app.use('/api/billing',  billingRoutes)
+app.use('/api/transparency', require('./routes/transparency'))
 
 // ─── Performance & Health endpoints ──────────────────────────────────────────
 app.get('/api/health', async function (req, res) {
@@ -470,6 +481,25 @@ app.get('/api/leaderboard', async function (req, res) {
   }
 })
 
+// ── Marketing funnel tracking (public, unauthenticated) ───────────────────────
+// Fire-and-forget "visit" events from the public Landing page — the only
+// pre-registration funnel stage this platform ever tracked was none at all;
+// this is deliberately minimal (no PII, no fingerprinting), just a count.
+app.post('/api/analytics/track', trackLimiter, async function (req, res) {
+  try {
+    const eventType = ['visit'].includes(req.body?.event_type) ? req.body.event_type : 'visit'
+    const sessionId = req.body?.session_id ? sanitizeString(String(req.body.session_id), 100) : null
+    await pool.query(
+      `INSERT INTO marketing_funnel_events (event_type, session_id) VALUES ($1, $2)`,
+      [eventType, sessionId]
+    )
+    res.status(201).json({ ok: true })
+  } catch (error) {
+    // Best-effort — tracking must never break the page for a visitor.
+    res.status(200).json({ ok: false })
+  }
+})
+
 // ── Support tickets (user-facing + admin-facing) ──────────────────────────────
 app.post('/api/support/ticket', supportLimiter, function optionalAuth(req, res, next) {
   const jwtLib = require('jsonwebtoken')
@@ -484,7 +514,7 @@ app.post('/api/support/ticket', supportLimiter, function optionalAuth(req, res, 
     const user_id = req.user?.userId
     if (!subject || !message) return res.status(400).json({ error: 'Subject and message are required' })
     await pool.query(
-      `INSERT INTO support_tickets (user_id, email, name, category, subject, message) VALUES ($1, $2, $3, $4, $5, $6)`,
+      `INSERT INTO support_tickets (user_id, email, name, category, subject, message, sla_due_at) VALUES ($1, $2, $3, $4, $5, $6, NOW() + INTERVAL '24 hours')`,
       [user_id || null, sanitizeString(String(email || ''), 200), sanitizeString(String(name || ''), 100), category || 'other', subject, message]
     )
     res.status(201).json({ message: 'Support ticket submitted successfully' })
@@ -564,15 +594,68 @@ app.get('/api/admin/support-tickets', authAdm, async function (req, res) {
 
 app.patch('/api/admin/support-tickets/:id', authAdm, async function (req, res) {
   try {
-    const { status } = req.body
-    if (!['open', 'resolved', 'closed'].includes(status)) return res.status(400).json({ error: 'Invalid status' })
+    const { status, assigned_agent, internal_notes } = req.body
+    const sets = []
+    const values = []
+    if (status !== undefined) {
+      if (!['open', 'resolved', 'closed'].includes(status)) return res.status(400).json({ error: 'Invalid status' })
+      values.push(status)
+      sets.push(`status = $${values.length}`)
+    }
+    if (assigned_agent !== undefined) {
+      values.push(sanitizeString(String(assigned_agent || ''), 100) || null)
+      sets.push(`assigned_agent = $${values.length}`)
+    }
+    if (internal_notes !== undefined) {
+      values.push(sanitizeString(String(internal_notes || ''), 5000) || null)
+      sets.push(`internal_notes = $${values.length}`)
+    }
+    if (sets.length === 0) return res.status(400).json({ error: 'Nothing to update' })
+    values.push(req.params.id)
     const result = await pool.query(
-      `UPDATE support_tickets SET status = $1 WHERE id = $2 RETURNING *`,
-      [status, req.params.id]
+      `UPDATE support_tickets SET ${sets.join(', ')} WHERE id = $${values.length} RETURNING *`,
+      values
     )
     if (result.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' })
     res.json({ message: 'Ticket updated', ticket: result.rows[0] })
   } catch (error) { res.status(500).json({ error: 'Could not update ticket' }) }
+})
+
+app.get('/api/admin/support-tickets/:id', authAdm, async function (req, res) {
+  try {
+    const ticketId = parseInt(req.params.id, 10)
+    if (!Number.isFinite(ticketId)) return res.status(400).json({ error: 'Invalid ticket id' })
+    const ticketResult = await pool.query(`SELECT * FROM support_tickets WHERE id = $1`, [ticketId])
+    if (ticketResult.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' })
+    const messagesResult = await pool.query(
+      `SELECT id, sender_type, sender_name, message, created_at FROM support_ticket_messages WHERE ticket_id = $1 ORDER BY created_at ASC, id ASC`,
+      [ticketId]
+    )
+    res.json({ ticket: ticketResult.rows[0], messages: messagesResult.rows })
+  } catch (error) {
+    logger.error('Admin support ticket detail error:', { error: error.message })
+    res.status(500).json({ error: 'Could not load ticket thread' })
+  }
+})
+
+app.post('/api/admin/support-tickets/:id/reply', authAdm, async function (req, res) {
+  try {
+    const ticketId = parseInt(req.params.id, 10)
+    if (!Number.isFinite(ticketId)) return res.status(400).json({ error: 'Invalid ticket id' })
+    const message = sanitizeString(String(req.body?.message || ''), 2000)
+    if (!message) return res.status(400).json({ error: 'Reply message is required' })
+    const ticketResult = await pool.query(`SELECT id FROM support_tickets WHERE id = $1`, [ticketId])
+    if (ticketResult.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' })
+    const senderName = req.admin?.full_name || req.admin?.email || 'Support'
+    const replyResult = await pool.query(
+      `INSERT INTO support_ticket_messages (ticket_id, sender_type, sender_name, message) VALUES ($1, 'admin', $2, $3) RETURNING id, sender_type, sender_name, message, created_at`,
+      [ticketId, senderName, message]
+    )
+    res.status(201).json({ message: 'Reply sent successfully', reply: replyResult.rows[0] })
+  } catch (error) {
+    logger.error('Admin support ticket reply error:', { error: error.message })
+    res.status(500).json({ error: 'Could not send reply' })
+  }
 })
 
 // ── Disputes (user-facing + admin-facing) ─────────────────────────────────────
@@ -712,12 +795,15 @@ startAllSchedulers(io, {
   checkPendingOrders,
   checkFloatingDrawdown,
   runChallengeEngine,
+  runCompetitionEngine,
+  tickCompetitionBots,
   checkNewsForceClose,
   weekendForceCloseByTenant,
   flatByCloseForAccounts,
   pruneOldPriceHistory:          require('./priceFeed').pruneOldPriceHistory,
   syncHourlyPriceHistory:        require('./priceFeed').syncHourlyPriceHistory,
-  syncDedicatedPriceFeedWatchers: require('./priceFeed').syncDedicatedPriceFeedWatchers
+  syncDedicatedPriceFeedWatchers: require('./priceFeed').syncDedicatedPriceFeedWatchers,
+  processQueuedNotifications:    require('./services/notificationDeliveryService').processQueuedNotifications
 })
 
 // ─── Sentry error handler (before global handler) ─────────────────────────────

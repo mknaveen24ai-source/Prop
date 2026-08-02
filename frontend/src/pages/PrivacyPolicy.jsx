@@ -160,11 +160,11 @@ We encourage you to review this policy periodically. Your continued use of the p
       <div style={{
         textAlign: 'center', padding: '64px 24px 48px',
         borderBottom: '1px solid var(--navy-border)',
-        background: 'radial-gradient(ellipse at 50% 0%, rgba(133, 133, 133, 0.05) 0%, transparent 60%)'
+        background: 'radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--muted) 5%, transparent) 0%, transparent 60%)'
       }}>
         <div style={{
-          display: 'inline-block', background: 'rgba(133, 133, 133, 0.1)',
-          border: '1px solid rgba(133, 133, 133, 0.3)', borderRadius: '99px',
+          display: 'inline-block', background: 'color-mix(in srgb, var(--muted) 10%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)', borderRadius: 'var(--radius-pill)',
           padding: '5px 14px', fontSize: '11px', color: 'var(--cyan)',
           letterSpacing: '0.1em', marginBottom: '20px'
         }}>
@@ -185,8 +185,8 @@ We encourage you to review this policy periodically. Your continued use of the p
 
         {/* Intro box */}
         <div style={{
-          background: 'rgba(133, 133, 133, 0.05)', border: '1px solid rgba(133, 133, 133, 0.15)',
-          borderRadius: '12px', padding: '24px 28px', marginBottom: '40px'
+          background: 'color-mix(in srgb, var(--muted) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--muted) 15%, transparent)',
+            padding: '24px 28px', marginBottom: '40px'
         }}>
           <p style={{ color: 'var(--text)', lineHeight: '1.8', fontSize: '14px', margin: 0 }}>
             This Privacy Policy explains how we collect, use, and protect your personal information when you use our platform. We are committed to handling your data responsibly and transparently, in compliance with GDPR and applicable data protection laws.
@@ -199,8 +199,8 @@ We encourage you to review this policy periodically. Your continued use of the p
             key={section.id}
             style={{
               background: 'var(--navy-card)',
-              border: `1px solid ${activeSection === section.id ? 'rgba(133, 133, 133, 0.3)' : 'var(--navy-border)'}`,
-              borderRadius: '12px', marginBottom: '12px',
+              border: `1px solid ${activeSection === section.id ? 'color-mix(in srgb, var(--muted) 30%, transparent)' : 'var(--navy-border)'}`,
+                marginBottom: '12px',
               overflow: 'hidden', transition: 'border-color 0.2s ease'
             }}
           >
@@ -238,7 +238,7 @@ We encourage you to review this policy periodically. Your continued use of the p
         {/* Footer note */}
         <div style={{
           marginTop: '40px', padding: '24px', background: 'var(--navy-mid)',
-          border: '1px solid var(--navy-border)', borderRadius: '12px', textAlign: 'center'
+          border: '1px solid var(--navy-border)',   textAlign: 'center'
         }}>
           <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0, lineHeight: '1.7' }}>
             For privacy-related requests or concerns, contact our data protection team at<br />

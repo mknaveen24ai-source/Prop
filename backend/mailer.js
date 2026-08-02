@@ -16,7 +16,12 @@ const EMAIL_TEMPLATE_KEYS = Object.freeze([
   'kyc_rejected',
   'payout_requested',
   'payout_approved',
-  'payout_rejected'
+  'payout_rejected',
+  'affiliate_commission_earned',
+  'affiliate_payout_requested',
+  'affiliate_payout_approved',
+  'affiliate_payout_rejected',
+  'competition_prize_voucher'
 ])
 
 let transporter = null
@@ -512,6 +517,102 @@ function buildPayoutRejectedEmail(payload, tenant = null) {
   }
 }
 
+function buildAffiliateCommissionEarnedEmail(payload, tenant = null) {
+  const to = String(payload?.toEmail || '').trim()
+  const fullName = String(payload?.fullName || 'Affiliate')
+  const commissionAmount = Number(payload?.commissionAmount || 0)
+  const referredName = String(payload?.referredName || 'a trader you referred')
+  const context = resolveMailContext(tenant)
+  return {
+    to,
+    subject: `${context.firmName} - You Earned a Referral Commission`,
+    html: htmlWrap(`Hi ${fullName}, you just earned a commission.`, `
+      <p>${referredName} completed a paid challenge purchase, earning you a commission of <strong style="color:#c9a84c;">${formatUsd(commissionAmount)}</strong>.</p>
+      <p>This has been added to your available affiliate balance.</p>
+      <p style="margin:24px 0;"><a href="${context.baseUrl}/dashboard" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">View Affiliate Dashboard</a></p>
+    `, tenant),
+    text: `You earned a referral commission of ${formatUsd(commissionAmount)} from ${referredName}.`
+  }
+}
+
+function buildAffiliatePayoutRequestedEmail(payload, tenant = null) {
+  const to = String(payload?.toEmail || '').trim()
+  const fullName = String(payload?.fullName || 'Affiliate')
+  const amountRequested = Number(payload?.amountRequested || 0)
+  const context = resolveMailContext(tenant)
+  return {
+    to,
+    subject: `${context.firmName} - Affiliate Payout Request Received`,
+    html: htmlWrap(`Hi ${fullName}, your affiliate payout request is under review.`, `
+      <p>We received your affiliate payout request for <strong style="color:#c9a84c;">${formatUsd(amountRequested)}</strong>.</p>
+      <p>Our team will review the request and update the status inside your affiliate dashboard.</p>
+      <p style="margin:24px 0;"><a href="${context.baseUrl}/dashboard" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">View Affiliate Dashboard</a></p>
+    `, tenant),
+    text: `We received your affiliate payout request for ${formatUsd(amountRequested)}.`
+  }
+}
+
+function buildAffiliatePayoutApprovedEmail(payload, tenant = null) {
+  const to = String(payload?.toEmail || '').trim()
+  const fullName = String(payload?.fullName || 'Affiliate')
+  const amountPayable = Number(payload?.amountPayable || 0)
+  const paymentMethod = String(payload?.paymentMethod || 'selected payment method')
+  const context = resolveMailContext(tenant)
+  return {
+    to,
+    subject: `${context.firmName} - Affiliate Payout Approved`,
+    html: htmlWrap(`Hi ${fullName}, your affiliate payout has been approved.`, `
+      <p>Your affiliate payout of <strong style="color:#c9a84c;">${formatUsd(amountPayable)}</strong> via ${paymentMethod} has been approved and marked for payment.</p>
+      <p style="color:#888;font-size:13px;">Processing time: up to 7 business days. Check your payment details for the transfer.</p>
+      <p style="margin:24px 0;"><a href="${context.baseUrl}/dashboard" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">View Affiliate Dashboard</a></p>
+    `, tenant),
+    text: `Affiliate payout of ${formatUsd(amountPayable)} approved via ${paymentMethod}.`
+  }
+}
+
+function buildAffiliatePayoutRejectedEmail(payload, tenant = null) {
+  const to = String(payload?.toEmail || '').trim()
+  const fullName = String(payload?.fullName || 'Affiliate')
+  const amountRequested = Number(payload?.amountRequested || 0)
+  const reason = payload?.reason ? String(payload.reason) : ''
+  const context = resolveMailContext(tenant)
+  return {
+    to,
+    subject: `${context.firmName} - Affiliate Payout Request Declined`,
+    html: htmlWrap(`Hi ${fullName}, your affiliate payout request could not be processed.`, `
+      <p>Your affiliate payout request of <strong>${formatUsd(amountRequested)}</strong> was declined.</p>
+      ${reason ? `<div style="background:#1a0a0a;border-left:3px solid #c0392b;padding:12px 16px;border-radius:4px;margin:16px 0;color:#e74c3c;font-size:14px;">${reason}</div>` : ''}
+      <p>If you believe this is an error, please contact support.</p>
+      <p style="margin:24px 0;"><a href="${context.baseUrl}/dashboard" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">Go to Dashboard</a></p>
+    `, tenant),
+    text: `Affiliate payout of ${formatUsd(amountRequested)} declined.`
+  }
+}
+
+function buildCompetitionPrizeVoucherEmail(payload, tenant = null) {
+  const to = String(payload?.toEmail || '').trim()
+  const fullName = String(payload?.fullName || 'Trader')
+  const competitionTitle = String(payload?.competitionTitle || 'the competition')
+  const voucherCode = String(payload?.voucherCode || '')
+  const accountSize = Number(payload?.accountSize || 0)
+  const expiresAt = payload?.expiresAt ? new Date(payload.expiresAt) : null
+  const context = resolveMailContext(tenant)
+  const expiryText = expiresAt && !Number.isNaN(expiresAt.getTime())
+    ? ` before ${expiresAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
+    : ''
+  return {
+    to,
+    subject: `${context.firmName} - You Won a Free Challenge Account!`,
+    html: htmlWrap(`Congratulations ${fullName}!`, `
+      <p>You placed in <strong>${competitionTitle}</strong> and won a free <strong style="color:#c9a84c;">$${accountSize.toLocaleString()}</strong> challenge account.</p>
+      <p>Redeem it at checkout with this code${expiryText}:</p>
+      <p style="margin:24px 0;font-size:20px;font-weight:700;letter-spacing:0.08em;color:#c9a84c;">${voucherCode}</p>
+      <p style="margin:24px 0;"><a href="${context.baseUrl}/dashboard" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">Claim Your Prize</a></p>
+    `, tenant),
+    text: `You won a free $${accountSize.toLocaleString()} challenge account in ${competitionTitle}. Redeem code ${voucherCode} at checkout${expiryText}.`
+  }
+}
+
 function buildEmailMessage(templateKey, payload = {}, options = {}) {
   const normalizedKey = String(templateKey || '').trim().toLowerCase()
   const tenant = options?.tenant || null
@@ -543,6 +644,16 @@ function buildEmailMessage(templateKey, payload = {}, options = {}) {
       return buildPayoutApprovedEmail(payload, tenant)
     case 'payout_rejected':
       return buildPayoutRejectedEmail(payload, tenant)
+    case 'affiliate_commission_earned':
+      return buildAffiliateCommissionEarnedEmail(payload, tenant)
+    case 'affiliate_payout_requested':
+      return buildAffiliatePayoutRequestedEmail(payload, tenant)
+    case 'affiliate_payout_approved':
+      return buildAffiliatePayoutApprovedEmail(payload, tenant)
+    case 'affiliate_payout_rejected':
+      return buildAffiliatePayoutRejectedEmail(payload, tenant)
+    case 'competition_prize_voucher':
+      return buildCompetitionPrizeVoucherEmail(payload, tenant)
     default:
       throw new Error(`Unsupported email template: ${normalizedKey || 'unknown'}`)
   }
@@ -643,6 +754,26 @@ async function sendPayoutRejectedEmail(toEmail, fullName, amountRequested, reaso
   return sendWithTemplate('payout_rejected', { toEmail, fullName, amountRequested, reason }, options)
 }
 
+async function sendAffiliateCommissionEarnedEmail(toEmail, fullName, commissionAmount, referredName, options = {}) {
+  return sendWithTemplate('affiliate_commission_earned', { toEmail, fullName, commissionAmount, referredName }, options)
+}
+
+async function sendAffiliatePayoutRequestedEmail(toEmail, fullName, amountRequested, options = {}) {
+  return sendWithTemplate('affiliate_payout_requested', { toEmail, fullName, amountRequested }, options)
+}
+
+async function sendAffiliatePayoutApprovedEmail(toEmail, fullName, amountPayable, paymentMethod, options = {}) {
+  return sendWithTemplate('affiliate_payout_approved', { toEmail, fullName, amountPayable, paymentMethod }, options)
+}
+
+async function sendCompetitionPrizeVoucherEmail(toEmail, fullName, competitionTitle, voucherCode, accountSize, expiresAt, options = {}) {
+  return sendWithTemplate('competition_prize_voucher', { toEmail, fullName, competitionTitle, voucherCode, accountSize, expiresAt }, options)
+}
+
+async function sendAffiliatePayoutRejectedEmail(toEmail, fullName, amountRequested, reason, options = {}) {
+  return sendWithTemplate('affiliate_payout_rejected', { toEmail, fullName, amountRequested, reason }, options)
+}
+
 module.exports = {
   EMAIL_TEMPLATE_KEYS,
   getMailTransporter,
@@ -667,6 +798,11 @@ module.exports = {
   sendPayoutRequestedEmail,
   sendPayoutApprovedEmail,
   sendPayoutRejectedEmail,
+  sendAffiliateCommissionEarnedEmail,
+  sendAffiliatePayoutRequestedEmail,
+  sendAffiliatePayoutApprovedEmail,
+  sendAffiliatePayoutRejectedEmail,
+  sendCompetitionPrizeVoucherEmail,
   hasConfiguredSendGridKey,
   __resetMailTransporterForTests() {
     transporter = null

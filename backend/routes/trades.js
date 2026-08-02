@@ -30,13 +30,13 @@ const { validatePendingOrderPrice } = require('../utils/pendingOrderValidation')
 const { VALID_CHART_TIMEFRAME_LABELS, getChartTimeframeMinutes } = require('../utils/chartTimeframes')
 const { ensureViolationTables, recordEnforcementEvent, recordViolation } = require('../services/violationEngine')
 const { getTenantFeedConfig, getTenantSettings } = require('../services/tenantPolicyService')
+const { resolveTieredInstrumentSetting } = require('../utils/tenantSettings')
 const {
   abandonIdempotentRequest,
   beginIdempotentRequest,
   completeIdempotentRequest,
   getIdempotencyKey
 } = require('../utils/idempotency')
-const { writeCopierEvent } = require('../utils/copierV2')
 const drawdownService = require('../services/drawdownService')
 const tradingDaysService = require('../services/tradingDaysService')
 const { fetchStepModelBySlug } = require('../utils/stepModels')
@@ -52,11 +52,13 @@ const VALID_INSTRUMENTS = INSTRUMENTS
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Combined exposure limits per $1,000 of account size
-//   Forex (all supported forex pairs combined):        0.20 lots per $1k
+//   Forex (all supported forex pairs combined):        0.10 lots per $1k
 //   Commodities (XAUUSD + XAGUSD combined):            0.02 lots per $1k
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const FOREX_LOTS_PER_1K     = 0.20
+const FOREX_LOTS_PER_1K     = 0.10
 const COMMODITY_LOTS_PER_1K = 0.02
+// Flat cap, not scaled by account size (spec: "Max 10 open positions at once").
+const MAX_OPEN_POSITIONS = 10
 
 // â”€â”€ Load admin-configurable trading rules from platform_settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Falls back to hardcoded defaults if a setting hasn't been configured yet.
@@ -74,9 +76,12 @@ const TRADING_RULE_KEYS = [
   'commodity_lots_per_1k',
   'min_lot_size',
   'max_trades_per_1k',
+  'max_open_positions',
   'dynamic_commission_per_lot',
+  'commission_per_lot_json',
   'slippage_simulator_enabled',
   'slippage_max_pips_adverse',
+  'slippage_max_pips_adverse_json',
   'weekend_holding_enabled',
   'max_daily_trades'
 ]
@@ -86,6 +91,7 @@ const DEFAULT_TRADING_RULES = {
   commodityLotsPer1k: COMMODITY_LOTS_PER_1K,
   minLotSize: 0.01,
   maxTradesPer1k: 1,
+  maxOpenPositions: MAX_OPEN_POSITIONS,
   maxDailyTrades: 20,
   dynamicCommissionPerLot: 3.0,
   slippageSimulatorEnabled: false,
@@ -137,14 +143,8 @@ async function ensureTradeExperienceInfrastructure() {
   }
 
   tradeFeatureInfraPromise.current = (async () => {
-    await pool.query(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS trader_note TEXT`)
-    await pool.query(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]'::jsonb`)
-    await pool.query(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS strategy_tag TEXT`)
     await pool.query(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS open_screenshot_path TEXT`)
     await pool.query(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS close_screenshot_path TEXT`)
-    await pool.query(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS trailing_activation_price NUMERIC(15,5)`)
-    await pool.query(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS trailing_step_pips INTEGER`)
-    await pool.query(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS breakeven_trigger_pips NUMERIC(10,2)`)
     await pool.query(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS oco_group_id TEXT`)
     await pool.query(`CREATE INDEX IF NOT EXISTS trades_oco_group_idx ON trades(oco_group_id) WHERE oco_group_id IS NOT NULL`)
     await fs.promises.mkdir(TRADE_JOURNAL_UPLOAD_ROOT, { recursive: true })
@@ -156,52 +156,10 @@ async function ensureTradeExperienceInfrastructure() {
   return tradeFeatureInfraPromise.current
 }
 
-function sanitizeStrategyTag(value) {
-  if (typeof value !== 'string') return null
-  const trimmed = value.trim().slice(0, 60)
-  if (!trimmed) return null
-  return trimmed.replace(/[^a-zA-Z0-9 _-]/g, '')
-}
-
-function normalizeTradeTags(tags) {
-  if (!tags) return []
-  if (typeof tags === 'string') {
-    return tags
-      .split(',')
-      .map((tag) => tag.trim())
-      .filter(Boolean)
-      .slice(0, 12)
-  }
-  if (Array.isArray(tags)) {
-    return tags
-      .map((tag) => String(tag || '').trim())
-      .filter(Boolean)
-      .slice(0, 12)
-  }
-  return []
-}
-
 function normalizePositiveNumber(value) {
   if (value === '' || value === null || value === undefined) return null
   const parsed = parseFloat(value)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null
-}
-
-function normalizePositiveInteger(value) {
-  if (value === '' || value === null || value === undefined) return null
-  const parsed = parseInt(value, 10)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
-}
-
-function getBreakevenTriggerPrice(trade) {
-  const triggerPips = normalizePositiveNumber(trade?.breakeven_trigger_pips)
-  if (!triggerPips) return null
-  const openPrice = parseFloat(trade.open_price)
-  if (!Number.isFinite(openPrice)) return null
-  const pipSize = getPipSize(trade.instrument)
-  return trade.direction === 'buy'
-    ? openPrice + triggerPips * pipSize
-    : openPrice - triggerPips * pipSize
 }
 
 function isValidImageDataUrl(dataUrl) {
@@ -246,56 +204,10 @@ function buildTradeScreenshotAbsolutePath(relativePath) {
 function mapTradeRow(row) {
   if (!row || typeof row !== 'object') return row
 
-  let parsedTags = []
-  try {
-    if (Array.isArray(row.tags)) {
-      parsedTags = row.tags
-    } else if (typeof row.tags === 'string' && row.tags.trim()) {
-      parsedTags = JSON.parse(row.tags)
-    }
-  } catch {
-    parsedTags = []
-  }
-
   return {
     ...row,
-    tags: Array.isArray(parsedTags) ? parsedTags : [],
     open_screenshot_url: row.open_screenshot_path ? `/api/trades/${row.id}/screenshot/open` : null,
     close_screenshot_url: row.close_screenshot_path ? `/api/trades/${row.id}/screenshot/close` : null
-  }
-}
-
-async function emitCopierEventSafe(payload) {
-  try {
-    await writeCopierEvent(pool, payload)
-  } catch (error) {
-    logger.warn('[copier] Failed to write trade copier event:', {
-      error: error.message,
-      eventType: payload?.eventType,
-      masterTradeId: payload?.masterTradeId,
-      masterAccountId: payload?.masterAccountId
-    })
-  }
-}
-
-function buildCopierTradePayload(trade = {}, overrides = {}) {
-  return {
-    instrument: trade.instrument || null,
-    direction: trade.direction || null,
-    status: trade.status || null,
-    order_type: trade.order_type || null,
-    pending_price: trade.pending_price ?? null,
-    open_price: trade.open_price ?? null,
-    close_price: trade.close_price ?? null,
-    stop_loss: trade.stop_loss ?? null,
-    take_profit: trade.take_profit ?? null,
-    lot_size: trade.lot_size ?? null,
-    close_reason: trade.close_reason || null,
-    trailing_step_pips: trade.trailing_step_pips ?? null,
-    trailing_activation_price: trade.trailing_activation_price ?? null,
-    breakeven_trigger_pips: trade.breakeven_trigger_pips ?? null,
-    source: overrides.source || 'trades_engine',
-    ...overrides
   }
 }
 
@@ -309,11 +221,16 @@ async function getTradingRules() {
     // Parse each value with the correct type: booleans use strict string comparison,
     // numerics continue to use parseFloat.
     const BOOL_KEYS = new Set(['slippage_simulator_enabled', 'weekend_holding_enabled'])
+    const JSON_KEYS = new Set(['commission_per_lot_json', 'slippage_max_pips_adverse_json'])
     const parsed = {}
     for (const [key, value] of Object.entries(settings)) {
-      parsed[key] = BOOL_KEYS.has(key)
-        ? (value === 'true' || value === true)
-        : parseFloat(value)
+      if (JSON_KEYS.has(key)) {
+        parsed[key] = value
+      } else {
+        parsed[key] = BOOL_KEYS.has(key)
+          ? (value === 'true' || value === true)
+          : parseFloat(value)
+      }
     }
     const resolved = {
       minHoldSeconds: parsed.min_hold_seconds ?? DEFAULT_TRADING_RULES.minHoldSeconds,
@@ -321,12 +238,15 @@ async function getTradingRules() {
       commodityLotsPer1k: parsed.commodity_lots_per_1k ?? DEFAULT_TRADING_RULES.commodityLotsPer1k,
       minLotSize: parsed.min_lot_size ?? DEFAULT_TRADING_RULES.minLotSize,
       maxTradesPer1k: parsed.max_trades_per_1k ?? DEFAULT_TRADING_RULES.maxTradesPer1k,
+      maxOpenPositions: parsed.max_open_positions ?? DEFAULT_TRADING_RULES.maxOpenPositions,
       maxDailyTrades: parsed.max_daily_trades ?? DEFAULT_TRADING_RULES.maxDailyTrades,
       dynamicCommissionPerLot: parsed.dynamic_commission_per_lot ?? DEFAULT_TRADING_RULES.dynamicCommissionPerLot,
+      commissionPerLotJson: parsed.commission_per_lot_json ?? '{}',
       slippageSimulatorEnabled: parsed.slippage_simulator_enabled ?? DEFAULT_TRADING_RULES.slippageSimulatorEnabled,
       slippageMaxPipsAdverse: Number.isFinite(parsed.slippage_max_pips_adverse)
         ? parsed.slippage_max_pips_adverse
         : DEFAULT_TRADING_RULES.slippageMaxPipsAdverse,
+      slippageMaxPipsAdverseJson: parsed.slippage_max_pips_adverse_json ?? '{}',
       weekendHoldingEnabled: parsed.weekend_holding_enabled ?? DEFAULT_TRADING_RULES.weekendHoldingEnabled,
     }
     _tradingRulesCache = { value: resolved, cachedAt: Date.now() }
@@ -472,8 +392,7 @@ async function checkSLTP(io) {
     const openTrades = await pool.query(
       `SELECT t.id, t.account_id, t.instrument, t.direction, t.lot_size, t.open_price,
               t.stop_loss, t.take_profit, t.status, t.open_time, t.demo_trade_id,
-              t.commission, t.trailing_step_pips, t.trailing_activation_price,
-              t.breakeven_trigger_pips,
+              t.commission,
               a.user_id
        FROM trades t
        JOIN accounts a ON t.account_id = a.id
@@ -481,8 +400,6 @@ async function checkSLTP(io) {
        AND (
          t.stop_loss IS NOT NULL
          OR t.take_profit IS NOT NULL
-         OR t.trailing_step_pips IS NOT NULL
-         OR t.breakeven_trigger_pips IS NOT NULL
        )`
     )
 
@@ -497,84 +414,6 @@ async function checkSLTP(io) {
       const currentPrice = trade.direction === 'buy'
         ? parseFloat(price.bid)
         : parseFloat(price.ask)
-
-      // â”€â”€ Trailing Stop Loss Logic â”€â”€
-      if (trade.breakeven_trigger_pips) {
-        const breakevenPrice = getBreakevenTriggerPrice(trade)
-        const currentStopLoss = parseFloat(trade.stop_loss)
-        const openPrice = parseFloat(trade.open_price)
-        const shouldMoveToBreakeven = Number.isFinite(breakevenPrice) && (
-          (trade.direction === 'buy' && currentPrice >= breakevenPrice) ||
-          (trade.direction === 'sell' && currentPrice <= breakevenPrice)
-        )
-        const alreadyAtBreakeven = Number.isFinite(currentStopLoss)
-          && Math.abs(currentStopLoss - openPrice) < getPipSize(trade.instrument)
-
-        if (shouldMoveToBreakeven && !alreadyAtBreakeven) {
-          try {
-            const roundedBreakeven = roundPrice(openPrice, trade.instrument)
-            await pool.query(
-              `UPDATE trades
-               SET stop_loss = $1,
-                   breakeven_trigger_pips = NULL
-               WHERE id = $2`,
-              [roundedBreakeven, trade.id]
-            )
-            trade.stop_loss = roundedBreakeven
-            trade.breakeven_trigger_pips = null
-            await emitCopierEventSafe({
-              masterAccountId: trade.account_id,
-              masterTradeId: trade.id,
-              eventType: 'MODIFY_POSITION',
-              payload: buildCopierTradePayload(trade, {
-                source: 'trade_modify_breakeven_auto'
-              })
-            })
-          } catch (breakevenErr) {
-            logger.warn(`Breakeven update failed for trade ${trade.id}:`, { error: breakevenErr.message })
-          }
-        }
-      }
-
-      if (trade.trailing_step_pips) {
-        const stepDist = trade.trailing_step_pips * getPipSize(trade.instrument)
-        let idealSL = null
-
-        const isActivated = !trade.trailing_activation_price ||
-          (trade.direction === 'buy' && currentPrice >= parseFloat(trade.trailing_activation_price)) ||
-          (trade.direction === 'sell' && currentPrice <= parseFloat(trade.trailing_activation_price))
-
-        if (isActivated) {
-          if (trade.direction === 'buy') idealSL = currentPrice - stepDist
-          else idealSL = currentPrice + stepDist
-
-          let shouldUpdate = false
-          if (trade.stop_loss == null) shouldUpdate = true
-          else if (trade.direction === 'buy' && idealSL > parseFloat(trade.stop_loss)) shouldUpdate = true
-          else if (trade.direction === 'sell' && idealSL < parseFloat(trade.stop_loss)) shouldUpdate = true
-
-          if (shouldUpdate) {
-            // FIX (MEDIUM #21): Use async/await with error handling for trailing SL updates
-            // instead of fire-and-forget .catch(()=>{}) to ensure proper error tracking
-            // and prevent potential data loss on server crash.
-            try {
-              const roundedStopLoss = roundPrice(idealSL, trade.instrument)
-              await pool.query('UPDATE trades SET stop_loss = $1 WHERE id = $2', [roundedStopLoss, trade.id])
-              trade.stop_loss = roundedStopLoss
-              await emitCopierEventSafe({
-                masterAccountId: trade.account_id,
-                masterTradeId: trade.id,
-                eventType: 'MODIFY_POSITION',
-                payload: buildCopierTradePayload(trade, {
-                  source: 'trade_modify_trailing_auto'
-                })
-              })
-            } catch (slErr) {
-              logger.warn(`Trailing SL update failed for trade ${trade.id}:`, { error: slErr.message })
-            }
-          }
-        }
-      }
 
       let triggered   = false
       let closeReason = ''
@@ -644,21 +483,6 @@ async function checkSLTP(io) {
 
         await client.query('COMMIT')
 
-        await emitCopierEventSafe({
-          masterAccountId: trade.account_id,
-          masterTradeId: trade.id,
-          eventType: 'CLOSE_POSITION',
-          payload: buildCopierTradePayload({
-            ...trade,
-            close_price: currentPrice,
-            close_reason: closeReason,
-            status: 'closed'
-          }, {
-            source: closeReason === 'Stop Loss' ? 'trade_close_stop_loss' : 'trade_close_take_profit',
-            pnl: demo_pnl
-          })
-        })
-
         if (io) {
           io.to(String(trade.user_id)).emit('account_update', {
             message: `${closeReason} triggered on ${trade.instrument}`,
@@ -693,15 +517,15 @@ async function cancelPendingOrder(orderId, reason) {
   )
 }
 
-async function validatePendingTrigger(client, order, rules) {
+async function validatePendingTrigger(client, order, rules, livePrices) {
   const lotsNum = parseFloat(order.lot_size)
   if (isNaN(lotsNum) || lotsNum <= 0) {
     return 'Invalid lot size on pending order'
   }
 
-  const accountSizeK = parseFloat(order.account_size) / 1000
-
-  // Fetch the fresh account balance inside the transaction
+  // Fetch the fresh account balance inside the transaction (account_type/
+  // scaling_multiplier come from the batch join in checkPendingOrders since
+  // they don't change mid-tick the way balance can).
   const accountResult = await client.query(
     `SELECT current_balance FROM accounts WHERE id = $1`,
     [order.account_id]
@@ -710,6 +534,13 @@ async function validatePendingTrigger(client, order, rules) {
     return 'Account not found during pending order trigger'
   }
   const current_balance = parseFloat(accountResult.rows[0].current_balance)
+
+  // Funded accounts' scaling-plan multiplier raises risk capacity (lot caps)
+  // proportionally, matching the same check in POST /open.
+  const scalingMultiplier = order.account_type === 'funded' && order.scaling_multiplier != null
+    ? parseFloat(order.scaling_multiplier)
+    : 1
+  const accountSizeK = (parseFloat(order.account_size) / 1000) * (Number.isFinite(scalingMultiplier) ? scalingMultiplier : 1)
 
   if (COMMODITY_INSTRUMENTS.includes(order.instrument)) {
     const maxCommodityLots = parseFloat((accountSizeK * rules.commodityLotsPer1k).toFixed(4))
@@ -743,7 +574,7 @@ async function validatePendingTrigger(client, order, rules) {
     }
   }
 
-  const maxOpenTrades = Math.min(50, Math.max(5, Math.floor(parseFloat(order.account_size) / 1000) * rules.maxTradesPer1k))
+  const maxOpenTrades = rules.maxOpenPositions
   const openTradeCountResult = await client.query(
     `SELECT COUNT(*) FROM trades WHERE account_id = $1 AND status IN ('open', 'pending') AND id <> $2`,
     [order.account_id, order.id]
@@ -755,7 +586,6 @@ async function validatePendingTrigger(client, order, rules) {
 
   const margin = calculateMargin(order.instrument, lotsNum)
   let floatingPnl = new Decimal(0)
-  const livePrices = await getCurrentPricesForTenant()
   const openTradesResult = await client.query(
     `SELECT t.direction, t.open_price, t.lot_size, t.instrument, t.commission
      FROM trades t
@@ -785,7 +615,8 @@ async function checkPendingOrders(io) {
     const pendingOrders = await pool.query(
       `SELECT t.id, t.account_id, t.instrument, t.direction, t.lot_size, t.order_type,
               t.pending_price, t.status, a.user_id, a.current_balance, a.peak_balance,
-              a.status as account_status, a.account_size, t.oco_group_id
+              a.status as account_status, a.account_size, a.phase_end_date,
+              a.account_type, a.scaling_multiplier, t.oco_group_id
        FROM trades t
        JOIN accounts a ON t.account_id = a.id
        WHERE t.status = 'pending'`
@@ -794,16 +625,14 @@ async function checkPendingOrders(io) {
     const priceMap = await getLivePriceMap()
     const rules = await getTradingRules()
 
-    const copierEvents = []
     for (const order of pendingOrders.rows) {
       if (order.account_status !== 'active') {
         await cancelPendingOrder(order.id, 'Account inactive')
-        await emitCopierEventSafe({
-          masterAccountId: order.account_id,
-          masterTradeId: order.id,
-          eventType: 'CANCEL_PENDING',
-          payload: buildCopierTradePayload({ ...order, status: 'cancelled', close_reason: 'Account inactive' }, { source: 'pending_account_inactive_cancel' })
-        })
+        continue
+      }
+
+      if (order.phase_end_date && new Date(order.phase_end_date) <= new Date()) {
+        await cancelPendingOrder(order.id, 'Challenge phase expired')
         continue
       }
 
@@ -844,19 +673,13 @@ async function checkPendingOrders(io) {
             continue
           }
 
-          const limitError = await validatePendingTrigger(client, order, rules)
+          const limitError = await validatePendingTrigger(client, order, rules, priceMap)
           if (limitError) {
             await client.query(
               `UPDATE trades SET status = 'cancelled', close_time = NOW(), close_reason = $1 WHERE id = $2`,
               [limitError, order.id]
             )
             await client.query('COMMIT')
-            await emitCopierEventSafe({
-              masterAccountId: order.account_id,
-              masterTradeId: order.id,
-              eventType: 'CANCEL_PENDING',
-              payload: buildCopierTradePayload({ ...order, status: 'cancelled', close_reason: limitError }, { source: 'pending_trigger_rejected' })
-            })
             continue
           }
 
@@ -888,32 +711,6 @@ async function checkPendingOrders(io) {
           }
 
           await client.query('COMMIT')
-
-          await emitCopierEventSafe({
-            masterAccountId: order.account_id,
-            masterTradeId: order.id,
-            eventType: 'OPEN_MARKET',
-            payload: buildCopierTradePayload({
-              ...order,
-              open_price,
-              status: 'open'
-            }, {
-              source: 'pending_trigger'
-            })
-          })
-          for (const sibling of cancelledSiblingRows) {
-            await emitCopierEventSafe({
-              masterAccountId: order.account_id,
-              masterTradeId: sibling.id,
-              eventType: 'CANCEL_PENDING',
-              payload: buildCopierTradePayload({
-                ...sibling,
-                status: 'cancelled'
-              }, {
-                source: 'pending_oco_cancel'
-              })
-            })
-          }
 
           if (io) {
             io.to(String(order.user_id)).emit('account_update', {
@@ -963,7 +760,6 @@ async function autoCloseAndFail(acc, reason, io) {
       [acc.id]
     )
     const priceMap = await getCurrentPricesForTenant()
-    const copierEvents = []
 
     // FIX (AUDIT): Use Decimal accumulator — native float += on many trades
     // causes sub-penny rounding drift in the final balance update.
@@ -983,20 +779,6 @@ async function autoCloseAndFail(acc, reason, io) {
              WHERE id = $1`,
             [trade.id]
           )
-          copierEvents.push({
-            masterAccountId: acc.id,
-            masterTradeId: trade.id,
-            eventType: 'CLOSE_POSITION',
-            payload: buildCopierTradePayload({
-              ...trade,
-              close_price: trade.open_price,
-              close_reason: 'Account Failed',
-              status: 'closed'
-            }, {
-              source: 'account_auto_fail',
-              pnl: 0
-            })
-          })
           continue
         }
 
@@ -1025,20 +807,6 @@ async function autoCloseAndFail(acc, reason, io) {
            WHERE id = $3`,
            [close_price, demo_pnl, trade.id]
         )
-        copierEvents.push({
-          masterAccountId: acc.id,
-          masterTradeId: trade.id,
-          eventType: 'CLOSE_POSITION',
-          payload: buildCopierTradePayload({
-            ...trade,
-            close_price,
-            close_reason: 'Account Failed',
-            status: 'closed'
-          }, {
-            source: 'account_auto_fail',
-            pnl: demo_pnl
-          })
-        })
       } catch (err) {
         logger.error(`Failed to close trade ${trade.id} during drawdown breach`, { error: err.message })
       }
@@ -1079,24 +847,6 @@ async function autoCloseAndFail(acc, reason, io) {
     )
 
     await client.query('COMMIT')
-
-    for (const pendingTrade of cancelledPendingResult.rows) {
-      copierEvents.push({
-        masterAccountId: acc.id,
-        masterTradeId: pendingTrade.id,
-        eventType: 'CANCEL_PENDING',
-        payload: buildCopierTradePayload({
-          ...pendingTrade,
-          status: 'cancelled',
-          close_reason: 'Account Failed'
-        }, {
-          source: 'account_auto_fail'
-        })
-      })
-    }
-    for (const event of copierEvents) {
-      await emitCopierEventSafe(event)
-    }
 
     await safeRecordViolation({
       violationType: 'floating_drawdown_breach',
@@ -1169,7 +919,6 @@ async function autoCloseAndPass(acc, io) {
       [acc.id]
     )
     const priceMap = await getCurrentPricesForTenant()
-    const copierEvents = []
 
     const closeReason = acc.account_type === 'phase1' ? 'Phase 1 Passed' : 'Phase 2 Passed'
     // FIX (AUDIT): Use Decimal accumulator — native float += on many trades
@@ -1206,20 +955,6 @@ async function autoCloseAndPass(acc, io) {
            WHERE id = $4`,
            [close_price, demo_pnl, closeReason, trade.id]
         )
-        copierEvents.push({
-          masterAccountId: acc.id,
-          masterTradeId: trade.id,
-          eventType: 'CLOSE_POSITION',
-          payload: buildCopierTradePayload({
-            ...trade,
-            close_price,
-            close_reason: closeReason,
-            status: 'closed'
-          }, {
-            source: 'account_auto_pass',
-            pnl: demo_pnl
-          })
-        })
       } catch (err) {
         logger.error(`Failed to close trade ${trade.id} on profit target:`, { error: err.message })
         throw err
@@ -1253,24 +988,6 @@ async function autoCloseAndPass(acc, io) {
     const newAccountId = promoted ? promoted.new_account_id : null
 
     await client.query('COMMIT')
-
-    for (const pendingTrade of cancelledPendingResult.rows) {
-      copierEvents.push({
-        masterAccountId: acc.id,
-        masterTradeId: pendingTrade.id,
-        eventType: 'CANCEL_PENDING',
-        payload: buildCopierTradePayload({
-          ...pendingTrade,
-          status: 'cancelled',
-          close_reason: closeReason
-        }, {
-          source: 'account_auto_pass'
-        })
-      })
-    }
-    for (const event of copierEvents) {
-      await emitCopierEventSafe(event)
-    }
 
     const passMsg = acc.account_type === 'phase1'
       ? `ðŸ† Phase 1 PASSED! Floating profit target hit. All trades closed. Phase 2 activating shortly.`
@@ -1437,7 +1154,9 @@ async function checkFloatingDrawdown(io) {
         }
       }
 
-      if (acc.account_type === 'funded') continue
+      // Competition accounts have no profit-target auto-pass — they run for a
+      // fixed window and are settled by competitionEngine.js at end_at instead.
+      if (acc.account_type === 'funded' || acc.account_type === 'competition') continue
 
       let profit_target = acc.profit_target
       if (profit_target <= 0) {
@@ -1641,12 +1360,6 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       take_profit,
       order_type,
       pending_price,
-      trader_note,
-      tags,
-      strategy_tag,
-      trailing_step_pips,
-      trailing_activation_price,
-      breakeven_trigger_pips,
       screenshot_data_url,
       oco_sibling
     } = req.body
@@ -1656,18 +1369,6 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       return res.status(400).json({ error: 'account_id, instrument, direction, and lots are required' })
     }
 
-    if (trader_note != null && typeof trader_note !== 'string') {
-      return res.status(400).json({ error: 'trader_note must be a string' })
-    }
-    if (typeof trader_note === 'string' && trader_note.length > 1000) {
-      return res.status(400).json({ error: 'Trade journal note must be 1000 characters or less' })
-    }
-    if (strategy_tag != null && typeof strategy_tag !== 'string') {
-      return res.status(400).json({ error: 'strategy_tag must be a string' })
-    }
-    if (tags != null && typeof tags !== 'string' && !Array.isArray(tags)) {
-      return res.status(400).json({ error: 'tags must be a comma separated string or array' })
-    }
     if (screenshot_data_url != null && !isValidImageDataUrl(screenshot_data_url)) {
       return res.status(400).json({ error: 'Invalid screenshot data' })
     }
@@ -1702,13 +1403,6 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
     }
 
     const lotsNum = parseFloat(lots)
-    const trailingStepPips = normalizePositiveInteger(trailing_step_pips)
-    const trailingActivationPrice = normalizePositiveNumber(trailing_activation_price)
-    const breakevenTriggerPips = normalizePositiveNumber(breakeven_trigger_pips)
-    const normalizedStrategyTag = sanitizeStrategyTag(strategy_tag)
-    const normalizedTradeNote = typeof trader_note === 'string' ? trader_note.trim().slice(0, 1000) : null
-    const normalizedTags = normalizeTradeTags(tags)
-
     // â”€â”€ Minimum lot size (admin-configurable) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let rules = await getTradingRules()
     const MIN_LOT_SIZE = rules.minLotSize
@@ -1766,7 +1460,6 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
     // in the DB when it runs its checks.
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const client = await pool.connect()
-    const copierEvents = []
     let newTrade
     try {
       await client.query('BEGIN')
@@ -1774,7 +1467,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       // Lock the account row for this transaction
       const lockedAccount = await client.query(
         `SELECT id, user_id, account_size, current_balance, starting_balance, peak_balance,
-                status, account_type, phase_end_date, scaling_multiplier
+                status, account_type, phase_end_date, scaling_multiplier, challenge_model_slug
          FROM accounts WHERE id = $1 AND user_id = $2 AND status = 'active' FOR UPDATE`,
         [accountIdStr, req.user.userId]
       )
@@ -1795,6 +1488,65 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       if (account.phase_end_date && new Date(account.phase_end_date) <= new Date()) {
         await client.query('ROLLBACK')
         return res.status(400).json({ error: 'Challenge phase has expired. No new trades allowed.' })
+      }
+
+      // ── Trading-restriction flags from the account's challenge model ──────────
+      // no_ea_bots is intentionally not enforced here — there is no reliable
+      // server-side signal (e.g. client fingerprinting) to distinguish bot-driven
+      // orders from manual ones, so a check would just be security theater.
+      if (account.challenge_model_slug) {
+        const model = await fetchStepModelBySlug(account.challenge_model_slug)
+        if (model) {
+          if (model.no_hedging) {
+            const oppositeDirection = directionFinal === 'buy' ? 'sell' : 'buy'
+            const hedgeCheck = await client.query(
+              `SELECT 1 FROM trades
+               WHERE account_id = $1 AND instrument = $2 AND direction = $3
+                 AND status IN ('open', 'pending') LIMIT 1`,
+              [accountIdStr, instrumentFinal, oppositeDirection]
+            )
+            if (hedgeCheck.rows.length > 0) {
+              await client.query('ROLLBACK')
+              return res.status(400).json({
+                error: `Hedging is not allowed on this account. Close your existing ${instrumentFinal} position before opening the opposite direction.`
+              })
+            }
+          }
+
+          // Simplified enforcement: one open/pending position per instrument+direction.
+          if (model.no_grid_trading) {
+            const gridCheck = await client.query(
+              `SELECT 1 FROM trades
+               WHERE account_id = $1 AND instrument = $2 AND direction = $3
+                 AND status IN ('open', 'pending') LIMIT 1`,
+              [accountIdStr, instrumentFinal, directionFinal]
+            )
+            if (gridCheck.rows.length > 0) {
+              await client.query('ROLLBACK')
+              return res.status(400).json({
+                error: `Grid trading is not allowed on this account. You already have an open or pending ${directionFinal} order on ${instrumentFinal}.`
+              })
+            }
+          }
+
+          // Simplified enforcement: can't size up on the same instrument+direction
+          // right after that setup closed at a loss (classic doubling-down pattern).
+          if (model.no_martingale) {
+            const lastClosed = await client.query(
+              `SELECT lot_size, demo_pnl FROM trades
+               WHERE account_id = $1 AND instrument = $2 AND direction = $3 AND status = 'closed'
+               ORDER BY close_time DESC LIMIT 1`,
+              [accountIdStr, instrumentFinal, directionFinal]
+            )
+            const lastRow = lastClosed.rows[0]
+            if (lastRow && parseFloat(lastRow.demo_pnl) < 0 && lotsNum > parseFloat(lastRow.lot_size)) {
+              await client.query('ROLLBACK')
+              return res.status(400).json({
+                error: `Martingale trading is not allowed on this account. You cannot increase lot size after a loss on the same ${instrumentFinal} ${directionFinal} setup.`
+              })
+            }
+          }
+        }
       }
 
       if (rules.maxDailyTrades > 0) {
@@ -1860,7 +1612,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       }
 
       // â”€â”€ Max simultaneous open trades cap (inside transaction) â”€â”€â”€â”€â”€â”€â”€â”€â”€
-      const maxOpenTrades = Math.min(50, Math.max(5, Math.floor(accountSizeK) * rules.maxTradesPer1k))
+      const maxOpenTrades = rules.maxOpenPositions
       const openTradeCountResult = await client.query(
         `SELECT COUNT(*) FROM trades WHERE account_id = $1 AND status IN ('open', 'pending')`,
         [accountIdStr]
@@ -1900,7 +1652,8 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       }
 
       const demo_trade_id = uuidv4()
-      const tradeCommission = parseFloat((lotsNum * rules.dynamicCommissionPerLot).toFixed(2))
+      const commissionPerLot = resolveTieredInstrumentSetting(rules.commissionPerLotJson, account.account_type, instrumentFinal, rules.dynamicCommissionPerLot)
+      const tradeCommission = parseFloat((lotsNum * commissionPerLot).toFixed(2))
 
       async function ensureTradeOpenIdempotencyClaim() {
         if (idempotencyClaim) return null
@@ -1962,9 +1715,8 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
           `INSERT INTO trades
            (account_id, demo_trade_id, instrument, direction, lot_size,
             status, stop_loss, take_profit, order_type, pending_price, commission, original_commission,
-            trader_note, tags, strategy_tag, trailing_step_pips, trailing_activation_price,
-            breakeven_trigger_pips, oco_group_id)
-           VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $10, $11, $12::jsonb, $13, $14, $15, $16, $17)
+            oco_group_id)
+           VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $10, $11)
            RETURNING *`,
           [accountIdStr, demo_trade_id, instrumentFinal, directionFinal, lotsNum,
            stop_loss   ? parseFloat(stop_loss)   : null,
@@ -1972,12 +1724,6 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
            orderTypeFinal,
            parseFloat(pending_price),
            tradeCommission,
-           normalizedTradeNote || null,
-           JSON.stringify(normalizedTags),
-           normalizedStrategyTag,
-           trailingStepPips,
-           trailingActivationPrice,
-           breakevenTriggerPips,
            ocoGroupId]
         )
         if (screenshot_data_url) {
@@ -1998,9 +1744,8 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
             `INSERT INTO trades
              (account_id, demo_trade_id, instrument, direction, lot_size,
               status, stop_loss, take_profit, order_type, pending_price, commission, original_commission,
-              trader_note, tags, strategy_tag, trailing_step_pips, trailing_activation_price,
-              breakeven_trigger_pips, oco_group_id)
-             VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $10, $11, $12::jsonb, $13, $14, $15, $16, $17)
+              oco_group_id)
+             VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $10, $11)
              RETURNING *`,
             [accountIdStr, uuidv4(), instrumentFinal, ocoSiblingConfig.direction, lotsNum,
              stop_loss   ? parseFloat(stop_loss)   : null,
@@ -2008,25 +1753,9 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
              ocoSiblingConfig.order_type,
              ocoSiblingConfig.pending_price,
              tradeCommission,
-             normalizedTradeNote || null,
-             JSON.stringify(normalizedTags),
-             normalizedStrategyTag,
-             trailingStepPips,
-             trailingActivationPrice,
-             breakevenTriggerPips,
              ocoGroupId]
           )
           siblingTradeId = siblingTrade.rows[0]?.id || null
-          if (siblingTrade.rows[0]) {
-            copierEvents.push({
-              masterAccountId: accountIdStr,
-              masterTradeId: siblingTrade.rows[0].id,
-              eventType: 'PLACE_PENDING',
-              payload: buildCopierTradePayload(siblingTrade.rows[0], {
-                source: 'trade_open_pending_oco'
-              })
-            })
-          }
         }
         await client.query(
           `INSERT INTO trade_logs (trade_id, user_id, account_id, ip_address, logged_at)
@@ -2036,17 +1765,6 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
         await client.query('COMMIT')
 
         const tradeRow = newTrade.rows[0]
-        copierEvents.push({
-          masterAccountId: accountIdStr,
-          masterTradeId: tradeRow.id,
-          eventType: 'PLACE_PENDING',
-          payload: buildCopierTradePayload(tradeRow, {
-            source: 'trade_open_pending'
-          })
-        })
-        for (const event of copierEvents) {
-          await emitCopierEventSafe(event)
-        }
 
         const responseBody = {
           message: `${orderTypeFinal.replace(/_/g, ' ')} order placed`,
@@ -2074,11 +1792,12 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       let open_price = directionFinal === 'buy' ? parseFloat(price.ask) : parseFloat(price.bid)
 
       let slippageIncurred = 0
-      if (rules.slippageSimulatorEnabled && rules.slippageMaxPipsAdverse > 0) {
-        const randPips = Math.random() * rules.slippageMaxPipsAdverse
+      const openSlippageMaxPipsAdverse = resolveTieredInstrumentSetting(rules.slippageMaxPipsAdverseJson, account.account_type, instrumentFinal, rules.slippageMaxPipsAdverse)
+      if (rules.slippageSimulatorEnabled && openSlippageMaxPipsAdverse > 0) {
+        const randPips = Math.random() * openSlippageMaxPipsAdverse
         slippageIncurred = parseFloat(randPips.toFixed(2))
         const slippageAmt = randPips * getPipSize(instrumentFinal)
-        
+
         open_price = directionFinal === 'buy' ? open_price + slippageAmt : open_price - slippageAmt
         open_price = roundPrice(open_price, instrumentFinal)
       }
@@ -2105,17 +1824,6 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
         }
       }
 
-      if (trailingActivationPrice) {
-        const invalidTrailingActivation = (
-          (directionFinal === 'buy' && trailingActivationPrice <= open_price) ||
-          (directionFinal === 'sell' && trailingActivationPrice >= open_price)
-        )
-        if (invalidTrailingActivation) {
-          await client.query('ROLLBACK')
-          return res.status(400).json({ error: 'Trailing activation price must be beyond the entry price in profit direction' })
-        }
-      }
-
       const marketClaimResult = await ensureTradeOpenIdempotencyClaim()
       if (marketClaimResult) {
         await client.query('ROLLBACK')
@@ -2125,21 +1833,14 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       newTrade = await client.query(
         `INSERT INTO trades
          (account_id, demo_trade_id, instrument, direction, lot_size, open_price, open_time,
-          status, stop_loss, take_profit, order_type, commission, original_commission, slippage_pips,
-          trader_note, tags, strategy_tag, trailing_step_pips, trailing_activation_price, breakeven_trigger_pips)
-         VALUES ($1, $2, $3, $4, $5, $6, NOW(), 'open', $7, $8, 'market', $9, $9, $10, $11, $12::jsonb, $13, $14, $15, $16)
+          status, stop_loss, take_profit, order_type, commission, original_commission, slippage_pips)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW(), 'open', $7, $8, 'market', $9, $9, $10)
          RETURNING *`,
         [accountIdStr, demo_trade_id, instrumentFinal, directionFinal, lotsNum, open_price,
          stop_loss   ? parseFloat(stop_loss)   : null,
          take_profit ? parseFloat(take_profit) : null,
          tradeCommission,
-         slippageIncurred,
-         normalizedTradeNote || null,
-         JSON.stringify(normalizedTags),
-         normalizedStrategyTag,
-         trailingStepPips,
-         trailingActivationPrice,
-         breakevenTriggerPips]
+         slippageIncurred]
       )
 
       if (screenshot_data_url) {
@@ -2162,18 +1863,6 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       )
 
       await client.query('COMMIT')
-
-      copierEvents.push({
-        masterAccountId: accountIdStr,
-        masterTradeId: newTrade.rows[0].id,
-        eventType: 'OPEN_MARKET',
-        payload: buildCopierTradePayload(newTrade.rows[0], {
-          source: 'trade_open_market'
-        })
-      })
-      for (const event of copierEvents) {
-        await emitCopierEventSafe(event)
-      }
 
     } catch (txErr) {
       await client.query('ROLLBACK').catch(() => {})
@@ -2240,7 +1929,7 @@ router.post('/close', authenticateToken, tradeCloseLimiter, async function(req, 
 
     // Pre-flight check (outside transaction) for quick rejection
     const tradeResult = await pool.query(
-      `SELECT t.*, t.original_commission, a.user_id FROM trades t
+      `SELECT t.*, t.original_commission, a.user_id, a.account_type FROM trades t
        JOIN accounts a ON t.account_id = a.id
        WHERE t.id = $1 AND t.status = 'open'`,
       [trade_id]
@@ -2284,10 +1973,11 @@ router.post('/close', authenticateToken, tradeCloseLimiter, async function(req, 
       ? parseFloat(price.bid)
       : parseFloat(price.ask)
 
-    if (rules.slippageSimulatorEnabled && rules.slippageMaxPipsAdverse > 0) {
-      const randPips = Math.random() * rules.slippageMaxPipsAdverse
+    const closeSlippageMaxPipsAdverse = resolveTieredInstrumentSetting(rules.slippageMaxPipsAdverseJson, trade.account_type, trade.instrument, rules.slippageMaxPipsAdverse)
+    if (rules.slippageSimulatorEnabled && closeSlippageMaxPipsAdverse > 0) {
+      const randPips = Math.random() * closeSlippageMaxPipsAdverse
       const slippageAmt = randPips * getPipSize(trade.instrument)
-      
+
       close_price = trade.direction === 'buy' ? close_price - slippageAmt : close_price + slippageAmt
       close_price = roundPrice(close_price, trade.instrument)
     }
@@ -2312,7 +2002,7 @@ router.post('/close', authenticateToken, tradeCloseLimiter, async function(req, 
       for (let attempt = 0; attempt < 2; attempt++) {
         lockResult = await client.query(
           `SELECT id, account_id, instrument, direction, lot_size, open_price, open_time,
-                  commission, original_commission, trader_note, tags, strategy_tag
+                  commission, original_commission
            FROM trades
            WHERE id = $1 AND status = 'open'
            FOR UPDATE SKIP LOCKED`,
@@ -2392,8 +2082,8 @@ router.post('/close', authenticateToken, tradeCloseLimiter, async function(req, 
         const partialCloseResult = await client.query(
           `INSERT INTO trades (account_id, demo_trade_id, instrument, direction, lot_size, open_price, open_time,
            status, close_price, close_time, demo_pnl, close_reason, commission, original_commission, parent_trade_id, is_partial,
-           trader_note, tags, strategy_tag, close_screenshot_path)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, 'closed', $8, NOW(), $9, 'Manual Partial Close', $10, $10, $11, true, $12, $13::jsonb, $14, NULL)
+           close_screenshot_path)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'closed', $8, NOW(), $9, 'Manual Partial Close', $10, $10, $11, true, NULL)
            RETURNING id`,
           [
             lockedTrade.account_id,
@@ -2406,10 +2096,7 @@ router.post('/close', authenticateToken, tradeCloseLimiter, async function(req, 
             close_price,
             demo_pnl,
             partialCommission,
-            trade_id,
-            lockedTrade.trader_note || null,
-            JSON.stringify(Array.isArray(lockedTrade.tags) ? lockedTrade.tags : []),
-            lockedTrade.strategy_tag || null
+            trade_id
           ]
         )
         closedTradeId = partialCloseResult.rows[0]?.id || null
@@ -2453,28 +2140,6 @@ router.post('/close', authenticateToken, tradeCloseLimiter, async function(req, 
       )
 
       await client.query('COMMIT')
-
-      const basePayload = buildCopierTradePayload({
-        ...lockedTrade,
-        stop_loss: trade.stop_loss,
-        take_profit: trade.take_profit,
-        close_price,
-        close_reason: isPartial ? 'Manual Partial Close' : 'Manual Close',
-        status: isPartial ? 'partial_close' : 'closed'
-      }, {
-        source: isPartial ? 'trade_close_partial' : 'trade_close_manual',
-        close_lots: closeLotsNum,
-        remaining_lots: remainingLotsNum,
-        close_ratio: currentLotSizeDec.eq(0) ? null : closeLotsDec.div(currentLotSizeDec).toNumber(),
-        pnl: demo_pnl
-      })
-
-      await emitCopierEventSafe({
-        masterAccountId: lockedTrade.account_id,
-        masterTradeId: trade_id,
-        eventType: isPartial ? 'PARTIAL_CLOSE' : 'CLOSE_POSITION',
-        payload: basePayload
-      })
     } catch (txErr) {
       await client.query('ROLLBACK').catch(() => {})
       throw txErr
@@ -2539,19 +2204,6 @@ router.post('/cancel', authenticateToken, tradeCloseLimiter, async function(req,
       return res.status(409).json({ error: 'Pending order was already processed' })
     }
 
-    await emitCopierEventSafe({
-      masterAccountId: tradeResult.rows[0].account_id,
-      masterTradeId: trade_id,
-      eventType: 'CANCEL_PENDING',
-      payload: buildCopierTradePayload({
-        ...tradeResult.rows[0],
-        status: 'cancelled',
-        close_reason: 'Cancelled by trader'
-      }, {
-        source: 'trade_cancel_manual'
-      })
-    })
-
     res.json({ message: 'Order cancelled' })
 
   } catch (error) {
@@ -2602,8 +2254,8 @@ router.patch('/modify-pending', authenticateToken, tradeModifyLimiter, async fun
 
     const prices = await getLivePriceMap()
     const price = prices[trade.instrument]
-    const bid = price ? parseFloat(price.bid) : 0
-    const ask = price ? parseFloat(price.ask) : 0
+    const bid = price ? parseFloat(price.bid) : NaN
+    const ask = price ? parseFloat(price.ask) : NaN
 
     const nextPendingPrice = pending_price != null ? parseFloat(pending_price) : parseFloat(trade.pending_price)
     const priceError = validatePendingOrderPrice(trade.order_type, nextPendingPrice, bid, ask)
@@ -2626,13 +2278,6 @@ router.patch('/modify-pending', authenticateToken, tradeModifyLimiter, async fun
     if (updated.rowCount === 0) return res.status(409).json({ error: 'Trade was already processed' })
     const row = updated.rows[0]
 
-    await emitCopierEventSafe({
-      masterAccountId: trade.account_id,
-      masterTradeId: trade_id,
-      eventType: 'MODIFY_PENDING',
-      payload: buildCopierTradePayload({ ...row }, { source: 'trade_modify_pending_manual' })
-    })
-
     res.json({ message: 'Pending order updated', trade: row })
 
   } catch (error) {
@@ -2649,9 +2294,6 @@ router.patch('/modify', authenticateToken, tradeModifyLimiter, async function(re
       trade_id,
       stop_loss,
       take_profit,
-      trailing_step_pips,
-      trailing_activation_price,
-      breakeven_trigger_pips,
       move_to_breakeven
     } = req.body
 
@@ -2662,9 +2304,6 @@ router.patch('/modify', authenticateToken, tradeModifyLimiter, async function(re
     if (
       stop_loss === undefined
       && take_profit === undefined
-      && trailing_step_pips === undefined
-      && trailing_activation_price === undefined
-      && breakeven_trigger_pips === undefined
       && !move_to_breakeven
     ) {
       return res.status(400).json({ error: 'Provide at least one trade modification field' })
@@ -2710,33 +2349,6 @@ router.patch('/modify', authenticateToken, tradeModifyLimiter, async function(re
       if (Math.abs(open_price - tp) < MIN_DISTANCE) return res.status(400).json({ error: `Take profit must be at least ${MIN_DISTANCE} away from entry price` })
     }
 
-    const trailingStepPips = normalizePositiveInteger(trailing_step_pips)
-    const trailingActivationPrice = trailing_activation_price === '' || trailing_activation_price === null
-      ? null
-      : parseFloat(trailing_activation_price)
-    const breakevenTriggerPips = breakeven_trigger_pips === '' || breakeven_trigger_pips === null
-      ? null
-      : parseFloat(breakeven_trigger_pips)
-
-    if (trailing_step_pips !== undefined && trailing_step_pips !== '' && !trailingStepPips) {
-      return res.status(400).json({ error: 'Trailing step must be a positive whole number of pips' })
-    }
-    if (trailing_activation_price !== undefined && trailing_activation_price !== '' && !Number.isFinite(trailingActivationPrice)) {
-      return res.status(400).json({ error: 'Invalid trailing activation price' })
-    }
-    if (Number.isFinite(trailingActivationPrice)) {
-      const invalidActivation = (
-        (trade.direction === 'buy' && trailingActivationPrice <= open_price) ||
-        (trade.direction === 'sell' && trailingActivationPrice >= open_price)
-      )
-      if (invalidActivation) {
-        return res.status(400).json({ error: 'Trailing activation price must be beyond entry in profit direction' })
-      }
-    }
-    if (breakeven_trigger_pips !== undefined && breakeven_trigger_pips !== '' && !(Number.isFinite(breakevenTriggerPips) && breakevenTriggerPips > 0)) {
-      return res.status(400).json({ error: 'Breakeven trigger must be a positive pip distance' })
-    }
-
     const updates = []
     const values  = []
     let idx = 1
@@ -2754,21 +2366,6 @@ router.patch('/modify', authenticateToken, tradeModifyLimiter, async function(re
       values.push(take_profit === '' || take_profit === null ? null : parseFloat(take_profit))
     }
 
-    if (trailing_step_pips !== undefined) {
-      updates.push(`trailing_step_pips = $${idx++}`)
-      values.push(trailing_step_pips === '' || trailing_step_pips === null ? null : trailingStepPips)
-    }
-
-    if (trailing_activation_price !== undefined) {
-      updates.push(`trailing_activation_price = $${idx++}`)
-      values.push(trailing_activation_price === '' || trailing_activation_price === null ? null : trailingActivationPrice)
-    }
-
-    if (breakeven_trigger_pips !== undefined) {
-      updates.push(`breakeven_trigger_pips = $${idx++}`)
-      values.push(breakeven_trigger_pips === '' || breakeven_trigger_pips === null ? null : breakevenTriggerPips)
-    }
-
     values.push(trade_id)
     const modResult = await pool.query(
       `UPDATE trades SET ${updates.join(', ')} WHERE id = $${idx} AND status = 'open'`,
@@ -2778,81 +2375,11 @@ router.patch('/modify', authenticateToken, tradeModifyLimiter, async function(re
       return res.status(409).json({ error: 'Trade was already processed' })
     }
 
-    const nextTradeState = {
-      ...trade,
-      stop_loss: move_to_breakeven
-        ? roundPrice(open_price, trade.instrument)
-        : (stop_loss === undefined ? trade.stop_loss : (stop_loss === '' || stop_loss === null ? null : parseFloat(stop_loss))),
-      take_profit: take_profit === undefined ? trade.take_profit : (take_profit === '' || take_profit === null ? null : parseFloat(take_profit)),
-      trailing_step_pips: trailing_step_pips === undefined ? trade.trailing_step_pips : (trailing_step_pips === '' || trailing_step_pips === null ? null : trailingStepPips),
-      trailing_activation_price: trailing_activation_price === undefined ? trade.trailing_activation_price : (trailing_activation_price === '' || trailing_activation_price === null ? null : trailingActivationPrice),
-      breakeven_trigger_pips: breakeven_trigger_pips === undefined ? trade.breakeven_trigger_pips : (breakeven_trigger_pips === '' || breakeven_trigger_pips === null ? null : breakevenTriggerPips)
-    }
-
-    await emitCopierEventSafe({
-      masterAccountId: trade.account_id,
-      masterTradeId: trade.id,
-      eventType: 'MODIFY_POSITION',
-      payload: buildCopierTradePayload(nextTradeState, {
-        source: move_to_breakeven ? 'trade_modify_breakeven' : 'trade_modify_manual'
-      })
-    })
-
     res.json({ message: 'Trade modified successfully' })
 
   } catch (error) {
     logger.error('Modify trade error:', { error: error.message })
     res.status(500).json({ error: 'Could not modify trade' })
-  }
-})
-
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-
-// PATCH /api/trades/note  â€” Save a personal note on a trade
-// Notes are private â€” only the trade owner can read/write them.
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-router.patch('/note', authenticateToken, tradeModifyLimiter, async function(req, res) {
-  try {
-    await ensureTradeExperienceInfrastructure()
-
-    const { trade_id, note, tags, strategy_tag } = req.body
-
-    if (!trade_id) return res.status(400).json({ error: 'trade_id required' })
-    if (typeof note !== 'string') return res.status(400).json({ error: 'note must be a string' })
-    if (note.length > 1000) return res.status(400).json({ error: 'Note must be 1000 characters or less' })
-    if (tags && typeof tags !== 'string') return res.status(400).json({ error: 'tags must be a comma separated string' })
-    if (strategy_tag != null && typeof strategy_tag !== 'string') return res.status(400).json({ error: 'strategy_tag must be a string' })
-
-    // Verify trade belongs to this user
-    const tradeCheck = await pool.query(
-      `SELECT t.id FROM trades t
-       JOIN accounts a ON t.account_id = a.id
-       WHERE t.id = $1 AND a.user_id = $2`,
-      [trade_id, req.user.userId]
-    )
-    if (tradeCheck.rows.length === 0) {
-      return res.status(404).json({ error: 'Trade not found' })
-    }
-
-    const tagsJson = JSON.stringify(normalizeTradeTags(tags))
-    const normalizedStrategyTag = sanitizeStrategyTag(strategy_tag)
-
-    await pool.query(
-      `UPDATE trades SET trader_note = $1, tags = $2::jsonb, strategy_tag = $3 WHERE id = $4`,
-      [note.trim() || null, tagsJson, normalizedStrategyTag, trade_id]
-    )
-
-    res.json({
-      message: 'Note and tags saved',
-      trade_id,
-      note: note.trim() || null,
-      tags: JSON.parse(tagsJson),
-      strategy_tag: normalizedStrategyTag
-    })
-  } catch (error) {
-    logger.error('Save note error:', { error: error.message })
-    res.status(500).json({ error: 'Could not save note' })
   }
 })
 
@@ -2875,8 +2402,7 @@ router.get('/open', authenticateToken, async function(req, res) {
     const trades = await pool.query(
       `SELECT id, account_id, instrument, direction, lot_size, open_price, stop_loss,
               take_profit, status, demo_pnl, open_time, close_time, close_reason, order_type,
-              trader_note, tags, strategy_tag, trailing_step_pips, trailing_activation_price,
-              breakeven_trigger_pips, open_screenshot_path, close_screenshot_path
+              open_screenshot_path, close_screenshot_path
        FROM trades WHERE account_id = $1 AND status = 'open' ORDER BY open_time DESC`,
       [account_id]
     )
@@ -2906,8 +2432,7 @@ router.get('/pending', authenticateToken, async function(req, res) {
 
     const trades = await pool.query(
       `SELECT id, account_id, instrument, direction, lot_size, pending_price, order_type,
-              status, open_time, demo_trade_id, stop_loss, take_profit, trader_note, tags,
-              strategy_tag, trailing_step_pips, trailing_activation_price, breakeven_trigger_pips,
+              status, open_time, demo_trade_id, stop_loss, take_profit,
               oco_group_id, open_screenshot_path, close_screenshot_path
        FROM trades WHERE account_id = $1 AND status = 'pending' ORDER BY open_time DESC`,
       [account_id]
@@ -2939,8 +2464,7 @@ router.get('/history', authenticateToken, async function(req, res) {
     const trades = await pool.query(
       `SELECT id, account_id, instrument, direction, lot_size, open_price, close_price,
               stop_loss, take_profit, status, demo_pnl, open_time, close_time, close_reason,
-              order_type, trader_note, tags, strategy_tag, trailing_step_pips, trailing_activation_price,
-              breakeven_trigger_pips, pending_price, open_screenshot_path, close_screenshot_path
+              order_type, pending_price, open_screenshot_path, close_screenshot_path
        FROM trades WHERE account_id = $1 AND status NOT IN ('open', 'pending') ORDER BY close_time DESC`,
       [account_id]
     )
@@ -2972,7 +2496,7 @@ router.get('/export', authenticateToken, async function(req, res) {
     const tradesResult = await pool.query(
       `SELECT id, account_id, instrument, direction, lot_size, open_price, close_price,
               stop_loss, take_profit, status, demo_pnl, open_time, close_time, close_reason,
-              order_type, strategy_tag, trader_note
+              order_type
        FROM trades
        WHERE account_id = $1
        AND status NOT IN ('open', 'pending')
@@ -2985,7 +2509,7 @@ router.get('/export', authenticateToken, async function(req, res) {
     const headers = [
       'ID', 'Instrument', 'Direction', 'Lots',
       'Open Price', 'Close Price', 'Open Time', 'Close Time',
-      'P&L', 'Close Reason', 'Order Type', 'Strategy Tag', 'Trader Note'
+      'P&L', 'Close Reason', 'Order Type'
     ]
 
     const rows = trades.map(t => [
@@ -2999,9 +2523,7 @@ router.get('/export', authenticateToken, async function(req, res) {
       t.close_time  ? new Date(t.close_time).toISOString() : '',
       t.demo_pnl    ? parseFloat(t.demo_pnl).toFixed(2)    : '0.00',
       t.close_reason || 'Manual',
-      t.order_type  || 'market',
-      t.strategy_tag || '',
-      t.trader_note || ''
+      t.order_type  || 'market'
     ])
 
     // FIX (Bug 12): Sanitize CSV values to prevent formula injection
@@ -3754,7 +3276,7 @@ router.get('/analytics', authenticateToken, async function(req, res) {
     const tradesResult = await pool.query(
       `SELECT id, account_id, instrument, direction, lot_size, open_price, close_price,
               stop_loss, take_profit, status, demo_pnl, open_time, close_time, close_reason,
-      	       order_type, strategy_tag, trader_note, tags
+              order_type
        FROM trades WHERE account_id = $1 AND status = 'closed' ORDER BY close_time ASC`,
       [account_id]
     )
@@ -3784,8 +3306,7 @@ router.get('/analytics', authenticateToken, async function(req, res) {
           breakdowns: {
             symbol: [],
             weekday: [],
-            session: [],
-            strategy: []
+            session: []
           },
           hold_time: buildHoldTimeAnalytics([], [], [], tenantSettings.min_hold_seconds),
           setup_report: buildSetupReports([], [], []),
@@ -3800,8 +3321,7 @@ router.get('/analytics', authenticateToken, async function(req, res) {
             riskConsistency: buildRiskConsistencyScore([]),
             payoutForecast: buildPayoutForecast(account, userProfile, payoutRows, openTradeSummary, tenantSettings, []),
             setupReports: buildSetupReports([], [], [])
-          }),
-          strategy_breakdown: []
+          })
         }
       })
     }
@@ -3865,13 +3385,9 @@ router.get('/analytics', authenticateToken, async function(req, res) {
       }
     })
     const sessionBreakdown = buildPerformanceBreakdown(trades, (trade) => getAnalyticsSessionMeta(trade.open_time))
-    const strategyBreakdown = buildPerformanceBreakdown(trades, (trade) => {
-      const strategyKey = sanitizeStrategyTag(trade.strategy_tag) || 'Unlabelled'
-      return { key: strategyKey, label: strategyKey, order: Number.MAX_SAFE_INTEGER }
-    })
 
-    const holdTime = buildHoldTimeAnalytics(trades, symbolBreakdown, strategyBreakdown, tenantSettings.min_hold_seconds)
-    const setupReport = buildSetupReports(symbolBreakdown, sessionBreakdown, strategyBreakdown)
+    const holdTime = buildHoldTimeAnalytics(trades, symbolBreakdown, [], tenantSettings.min_hold_seconds)
+    const setupReport = buildSetupReports(symbolBreakdown, sessionBreakdown, [])
     const disciplineScore = buildDisciplineScore(trades, violations, tenantSettings)
     const riskConsistencyScore = buildRiskConsistencyScore(trades)
     const breachAnalysis = buildBreachAnalysis(account, trades, violations)
@@ -3880,8 +3396,7 @@ router.get('/analytics', authenticateToken, async function(req, res) {
       breakdowns: {
         symbol: symbolBreakdown,
         weekday: weekdayBreakdown,
-        session: sessionBreakdown,
-        strategy: strategyBreakdown
+        session: sessionBreakdown
       },
       holdTime,
       discipline: disciplineScore,
@@ -3909,8 +3424,7 @@ router.get('/analytics', authenticateToken, async function(req, res) {
         breakdowns: {
           symbol: symbolBreakdown,
           weekday: weekdayBreakdown,
-          session: sessionBreakdown,
-          strategy: strategyBreakdown
+          session: sessionBreakdown
         },
         hold_time: holdTime,
         setup_report: setupReport,
@@ -3918,8 +3432,7 @@ router.get('/analytics', authenticateToken, async function(req, res) {
         risk_consistency_score: riskConsistencyScore,
         breach_analysis: breachAnalysis,
         payout_forecast: payoutForecast,
-        improvement_suggestions: improvementSuggestions,
-        strategy_breakdown: strategyBreakdown
+        improvement_suggestions: improvementSuggestions
       }
     })
 
@@ -3966,12 +3479,12 @@ router.post('/batch-action', authenticateToken, tradingLimiter, async function(r
 
     const rules = await getTradingRules()
     let affectedCount = 0
-    const copierEvents = []
     const skipped = {
       min_hold: 0,
       price_unavailable: 0,
       no_match: 0,
-      locked: 0
+      locked: 0,
+      error: 0
     }
 
     const tradeIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown'
@@ -4015,67 +3528,47 @@ router.post('/batch-action', authenticateToken, tradingLimiter, async function(r
           continue
         }
 
-        await client.query('BEGIN')
-        // Lock trade row
-        const lock = await client.query(
-          `SELECT id FROM trades WHERE id = $1 AND status = 'open' FOR UPDATE SKIP LOCKED`,
-          [trade.id]
-        )
-        if (lock.rows.length === 0) {
-          skipped.locked++
-          await client.query('ROLLBACK')
-          continue
-        }
+        try {
+          await client.query('BEGIN')
+          // Lock trade row
+          const lock = await client.query(
+            `SELECT id FROM trades WHERE id = $1 AND status = 'open' FOR UPDATE SKIP LOCKED`,
+            [trade.id]
+          )
+          if (lock.rows.length === 0) {
+            skipped.locked++
+            await client.query('ROLLBACK')
+            continue
+          }
 
-        if (action === 'breakeven_winning') {
-          await client.query(
-            `UPDATE trades SET stop_loss = $1 WHERE id = $2`,
-            [trade.open_price, trade.id]
-          )
-          await client.query('COMMIT')
-          affectedCount++
-          copierEvents.push({
-            masterAccountId: trade.account_id,
-            masterTradeId: trade.id,
-            eventType: 'MODIFY_POSITION',
-            payload: buildCopierTradePayload(trade, { stop_loss: trade.open_price, source: 'batch_breakeven' })
-          })
-        } else {
-          // Close trade logic
-          await client.query(
-            `UPDATE trades SET status = 'closed', close_price = $1, close_time = NOW(), demo_pnl = $2, close_reason = 'Batch Close' WHERE id = $3`,
-            [currentPrice, demo_pnl, trade.id]
-          )
-          await client.query(
-            `UPDATE accounts SET current_balance = current_balance + $1, peak_balance = GREATEST(peak_balance, current_balance + $1) WHERE id = $2`,
-            [demo_pnl, trade.account_id]
-          )
-          await client.query('COMMIT')
-          affectedCount++
-          copierEvents.push({
-            masterAccountId: trade.account_id,
-            masterTradeId: trade.id,
-            eventType: 'CLOSE_POSITION',
-            payload: buildCopierTradePayload(trade, {
-              status: 'closed',
-              close_price: currentPrice,
-              demo_pnl,
-              close_reason: 'Batch Close',
-              source: 'batch_close'
-            })
-          })
+          if (action === 'breakeven_winning') {
+            await client.query(
+              `UPDATE trades SET stop_loss = $1 WHERE id = $2`,
+              [trade.open_price, trade.id]
+            )
+            await client.query('COMMIT')
+            affectedCount++
+          } else {
+            // Close trade logic
+            await client.query(
+              `UPDATE trades SET status = 'closed', close_price = $1, close_time = NOW(), demo_pnl = $2, close_reason = 'Batch Close' WHERE id = $3`,
+              [currentPrice, demo_pnl, trade.id]
+            )
+            await client.query(
+              `UPDATE accounts SET current_balance = current_balance + $1, peak_balance = GREATEST(peak_balance, current_balance + $1) WHERE id = $2`,
+              [demo_pnl, trade.account_id]
+            )
+            await client.query('COMMIT')
+            affectedCount++
+          }
+        } catch (txErr) {
+          await client.query('ROLLBACK').catch(() => {})
+          logger.error('Batch action trade error:', { tradeId: trade.id, error: txErr.message })
+          skipped.error++
         }
       }
-    } catch (txErr) {
-       await client.query('ROLLBACK').catch(() => {})
-       throw txErr
     } finally {
        client.release()
-    }
-
-    // Emit copier events collected during the batch (after all transactions committed)
-    for (const event of copierEvents) {
-      await emitCopierEventSafe(event)
     }
 
     const attempted = openTradesResult.rows.length
@@ -4161,6 +3654,8 @@ module.exports = {
   checkFloatingDrawdown,
   getTradingRules,
   getMarketStatus,
-  ensureTradeExperienceInfrastructure
+  ensureTradeExperienceInfrastructure,
+  calculatePnL,
+  getLivePriceMap
 }
 

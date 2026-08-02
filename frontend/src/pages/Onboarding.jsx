@@ -40,9 +40,9 @@ const STEPS = [
             ['Instruments',      TRADABLE_INSTRUMENTS_SUMMARY],
           ].map(([label, val]) => (
             <div key={label} style={{
-              background: 'rgba(148, 148, 148, 0.06)',
-              border: '1px solid rgba(148, 148, 148, 0.15)',
-              borderRadius: '6px', padding: '8px 10px'
+              background: 'color-mix(in srgb, var(--muted) 6%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--muted) 15%, transparent)',
+              padding: '8px 10px'
             }}>
               <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '2px' }}>{label}</div>
             <div style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--font-mono)' }}>{val}</div>
@@ -144,13 +144,14 @@ export default function Onboarding({ onComplete, onNavigate }) {
       backdropFilter: 'blur(4px)'
     }}>
       <div style={{
-        background: 'var(--navy-card)',
-        border: '1px solid var(--navy-border)',
-        borderRadius: '16px',
+        background: 'var(--glass-2)',
+        border: '1px solid var(--rule-soft)',
+        borderTop: '3px double var(--ink)',
         padding: '36px 32px',
         width: '100%',
         maxWidth: '480px',
-        boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(20px) saturate(140%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(140%)',
         position: 'relative'
       }}>
 
@@ -161,8 +162,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
             position: 'absolute', top: '16px', right: '16px',
             background: 'transparent', border: 'none',
             color: 'var(--text-dim)', fontSize: '12px',
-            cursor: 'pointer', padding: '4px 8px',
-            borderRadius: '4px'
+            cursor: 'pointer', padding: '4px 8px'
           }}
         >
           Skip tour
@@ -177,7 +177,6 @@ export default function Onboarding({ onComplete, onNavigate }) {
               style={{
                 width: i === step ? '20px' : '8px',
                 height: '8px',
-                borderRadius: '4px',
                 background: i === step ? 'var(--accent)' : i < step ? 'var(--accent-dim)' : 'var(--navy-border)',
                 border: 'none', cursor: 'pointer',
                 transition: 'all 0.25s ease',
@@ -194,7 +193,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
 
         {/* Title */}
         <h2 style={{
-            fontFamily: 'var(--font-ui)',
+            fontFamily: 'var(--font-display)',
           color: 'var(--accent)',
           fontSize: '20px',
           marginBottom: '14px',
@@ -223,7 +222,6 @@ export default function Onboarding({ onComplete, onNavigate }) {
                 background: 'transparent',
                 border: '1px solid var(--navy-border)',
                 color: 'var(--text-muted)',
-                borderRadius: '8px',
                 padding: '10px 20px',
                 fontSize: '13px',
                 cursor: 'pointer'
@@ -240,7 +238,6 @@ export default function Onboarding({ onComplete, onNavigate }) {
                 background: 'transparent',
                 border: '1px solid var(--accent)',
                 color: 'var(--accent)',
-                borderRadius: '8px',
                 padding: '10px 18px',
                 fontSize: '13px',
                 cursor: 'pointer',
@@ -258,7 +255,6 @@ export default function Onboarding({ onComplete, onNavigate }) {
               background: 'var(--accent)',
               color: 'var(--navy)',
               border: 'none',
-              borderRadius: '8px',
               padding: '11px 28px',
               fontSize: '14px',
               fontWeight: '700',

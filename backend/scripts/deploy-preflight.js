@@ -92,13 +92,6 @@ function checkEnvironment(failures) {
   } else {
     pass('Production secret/sender/proxy values look safe')
   }
-
-  const copierDryRun = String(process.env.COPIER_DRY_RUN ?? 'true').trim().toLowerCase()
-  if (strict && !['1', 'true', 'yes', 'on'].includes(copierDryRun)) {
-    fail(failures, 'COPIER_DRY_RUN must be true for first production deployment')
-  } else {
-    pass(`Copier dry-run default: ${copierDryRun || 'true'}`)
-  }
 }
 
 async function main() {

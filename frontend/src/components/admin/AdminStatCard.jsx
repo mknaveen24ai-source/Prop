@@ -7,7 +7,9 @@ export default function AdminStatCard({
   value,
   trend,
   trendDirection = 'neutral',
-  onClick
+  onClick,
+  alert = false,
+  alertColor = 'var(--admin-danger)'
 }) {
   const trendIcon = trendDirection === 'up'
     ? renderIcon('trade', { size: 12, color: 'var(--admin-success)' })
@@ -16,10 +18,18 @@ export default function AdminStatCard({
       : renderIcon('arrow', { size: 12, color: 'var(--admin-text-faint)' });
 
   return (
-    <div className="admin-stat-card" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
+    <div
+      className="admin-stat-card"
+      onClick={onClick}
+      style={{
+        cursor: onClick ? 'pointer' : 'default',
+        border: alert ? `1px solid ${alertColor}` : undefined,
+        background: alert ? 'var(--glass-2)' : undefined
+      }}
+    >
       <div className="admin-stat-header">
         <div className="admin-stat-icon-wrap">
-          {renderIcon(icon, { size: 16, color: 'var(--admin-accent)' })}
+          {renderIcon(icon, { size: 16, color: alert ? alertColor : 'var(--admin-accent)' })}
         </div>
         {trend && (
           <div className={`admin-stat-trend ${trendDirection}`}>
@@ -29,7 +39,7 @@ export default function AdminStatCard({
         )}
       </div>
       <div>
-        <div className="admin-stat-value">{value}</div>
+        <div className="admin-stat-value" style={alert ? { color: alertColor } : undefined}>{value}</div>
         <div className="admin-stat-label">{label}</div>
       </div>
     </div>

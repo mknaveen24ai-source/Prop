@@ -19,8 +19,6 @@ export default function AdminSidebar({
     challenges: 0,
     funded: 0,
     payouts: 0,
-    disputes: 0,
-    chatUnread: 0,
     violations: 0
   })
 
@@ -44,7 +42,6 @@ export default function AdminSidebar({
             challenges: overview.active_challenges || 0,
             funded: overview.funded_accounts || 0,
             payouts: overview.pending_payouts || 0,
-            disputes: overview.open_disputes || 0,
             violations: totals.total_open || 0
           }))
         })
@@ -74,8 +71,6 @@ export default function AdminSidebar({
     const handleCountUpdate = (data) => {
       if (data.type === 'kyc') setCounts((current) => ({ ...current, kyc: current.kyc + 1 }))
       if (data.type === 'payout') setCounts((current) => ({ ...current, payouts: current.payouts + 1 }))
-      if (data.type === 'dispute') setCounts((current) => ({ ...current, disputes: current.disputes + 1 }))
-      if (data.type === 'chat') setCounts((current) => ({ ...current, chatUnread: current.chatUnread + 1 }))
       if (data.type === 'violation') setCounts((current) => ({ ...current, violations: current.violations + 1 }))
     }
 
@@ -121,12 +116,25 @@ export default function AdminSidebar({
           <div className="admin-nav-group">
             <div className="admin-nav-label">Trading</div>
             <NavItem to="/admin/trades" icon="trades" label="All Trades" />
-            <NavItem to="/admin/copier" icon="copier" label="Trade Copier" />
+            <NavItem to="/admin/competitions" icon="leaderboard" label="Competitions" />
+          </div>
+
+          <div className="admin-nav-group">
+            <div className="admin-nav-label">Analytics</div>
+            <NavItem to="/admin/analytics" icon="analytics" label="Analytics" />
+          </div>
+
+          <div className="admin-nav-group">
+            <div className="admin-nav-label">Support</div>
+            <NavItem to="/admin/chat" icon="chat" label="Chat" />
+            <NavItem to="/admin/disputes" icon="dispute" label="Disputes" />
           </div>
 
           <div className="admin-nav-group">
             <div className="admin-nav-label">Finance</div>
             <NavItem to="/admin/payouts" icon="payouts" label="Payouts" badge={counts.payouts > 0 ? { val: counts.payouts, color: 'amber' } : null} />
+            <NavItem to="/admin/affiliates" icon="affiliate" label="Affiliates" />
+            <NavItem to="/admin/affiliates/payouts" icon="affiliate" label="Affiliate Payouts" />
             {isSuperAdmin && <NavItem to="/admin/pnl" icon="pnl" label="Platform P&L" />}
           </div>
 
@@ -134,12 +142,10 @@ export default function AdminSidebar({
             <div className="admin-nav-label">Platform</div>
             {isSuperAdmin && <NavItem to="/admin/command-center" icon="command" label="Command Center" />}
             <NavItem to="/admin/access" icon="key" label="Access & Security" />
-            <NavItem to="/admin/email-jobs" icon="mail" label="Email Jobs" />
             <NavItem to="/admin/settings" icon="settings" label="Settings" />
+            <NavItem to="/admin/trading-economics" icon="settings" label="Trading Economics" />
             {isSuperAdmin && <NavItem to="/admin/step-models" icon="challenges" label="Challenge Models" />}
             <NavItem to="/admin/violations" icon="violations" label="Violations" badge={counts.violations > 0 ? { val: counts.violations, color: 'red' } : null} />
-            <NavItem to="/admin/disputes" icon="dispute" label="Disputes" badge={counts.disputes > 0 ? { val: counts.disputes, color: 'red' } : null} />
-            <NavItem to="/admin/chat" icon="chat" label="Support Chat" badge={counts.chatUnread > 0 ? { val: counts.chatUnread, color: 'red' } : null} />
             <NavItem to="/admin/leaderboard" icon="leaderboard" label="Leaderboard" />
           </div>
         </div>

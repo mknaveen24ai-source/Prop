@@ -27,7 +27,7 @@ export default function Leaderboard() {
           <ThemeToggle />
         </div>
 
-        <div className="container" style={{ maxWidth: '800px', marginTop: '48px' }}>
+        <div style={{ maxWidth: '800px', margin: '48px auto 0', padding: '0 24px' }}>
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
             {renderIcon('leaderboard', { size: 48, color: 'var(--accent-gold)' })}
@@ -62,12 +62,12 @@ export default function Leaderboard() {
                   gap: '20px',
                   padding: '20px 24px',
                   borderLeft: `3px solid ${idx === 0 ? 'var(--rule)' : idx === 1 ? 'var(--rule)' : idx === 2 ? 'var(--rule)' : 'var(--navy-border)'}`,
-                  background: idx === 0 ? 'rgba(157, 157, 157, 0.04)' : 'var(--navy-card)',
+                  background: idx === 0 ? 'color-mix(in srgb, var(--muted) 4%, transparent)' : 'var(--navy-card)',
                   cursor: 'pointer',
                   transition: 'background 0.15s'
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(148, 148, 148, 0.06)'}
-                onMouseLeave={e => e.currentTarget.style.background = idx === 0 ? 'rgba(157, 157, 157, 0.04)' : 'var(--navy-card)'}
+                onMouseEnter={e => e.currentTarget.style.background = 'color-mix(in srgb, var(--muted) 6%, transparent)'}
+                onMouseLeave={e => e.currentTarget.style.background = idx === 0 ? 'color-mix(in srgb, var(--muted) 4%, transparent)' : 'var(--navy-card)'}
               >
                 {/* Rank */}
                 <div style={{ minWidth: '36px', textAlign: 'center', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }}>

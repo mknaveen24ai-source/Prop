@@ -86,7 +86,7 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
 
           <h1 className="mp-h1 mp-reveal mp-delay-100 mp-active" style={{ textWrap: 'balance' }}>
             {landingCopy.heroTitleLead} <span className="mp-glow-text" style={{ whiteSpace: 'nowrap' }}>{landingCopy.heroTitleHighlight}</span><br />
-            Trade with <span style={{ color: 'var(--gain)' }}>Firm-Backed</span> Capital.
+            Start Trading <span style={{ color: 'var(--gain)' }}>Ours.</span>
           </h1>
 
           <p className="mp-p-lead mp-reveal mp-delay-200 mp-active" style={{ textWrap: 'balance' }}>
@@ -97,16 +97,17 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
             <button
               className="mp-btn-primary"
               onClick={() => {
-                // Save pending challenge intent in memory so
-                // Login.js / Register.js can auto-create the account after authentication.
-                // Default size 10000; overridden by the pricing section if a size was selected.
+                // Save pending challenge intent in memory so /checkout can
+                // show the right order summary. Default size 10000; overridden
+                // by the pricing section if a size was selected there instead.
                 const selectedSize = parseInt(getMemoryItem('heroSelectedSize') || '10000')
                 setMemoryItem('pendingChallenge', JSON.stringify({
                   accountSize: selectedSize,
-                  accountType: 'phase1'
+                  accountType: 'phase1',
+                  stepModel: null
                 }))
                 if (onPrimaryCta) onPrimaryCta();
-                navigate('/login');
+                navigate('/checkout');
               }}
               style={{ padding: '22px 54px', fontSize: '18px' }}
             >

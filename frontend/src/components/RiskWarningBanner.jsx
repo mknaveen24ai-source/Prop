@@ -55,8 +55,8 @@ export default function RiskWarningBanner({ floating = false }) {
       ref={bannerRef}
       className={`risk-warning-banner${floating ? ' risk-warning-banner-floating' : ''}`}
       style={{
-      background: 'rgba(97, 97, 97, 0.08)',
-      borderBottom: '1px solid rgba(97, 97, 97, 0.3)',
+      background: 'color-mix(in srgb, var(--muted) 8%, transparent)',
+      borderBottom: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)',
       padding: floating ? 'calc(12px + env(safe-area-inset-top)) 48px 12px' : '12px 48px',
       display: 'flex',
       alignItems: 'center',
@@ -88,10 +88,9 @@ export default function RiskWarningBanner({ floating = false }) {
         onClick={handleDismiss}
         style={{
           background: 'transparent',
-          border: '1px solid rgba(97, 97, 97, 0.3)',
+          border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)',
           color: 'var(--text-dim)',
           padding: '4px 12px',
-          borderRadius: '4px',
           cursor: 'pointer',
           fontSize: '12px',
           flexShrink: 0,

@@ -472,7 +472,6 @@ export default function AdminDisputes() {
                 <div style={{
                   background: 'var(--admin-bg)',
                   border: '1px solid var(--admin-border)',
-                  borderRadius: '8px',
                   padding: '16px',
                   color: 'var(--admin-text)',
                   fontSize: '13px',

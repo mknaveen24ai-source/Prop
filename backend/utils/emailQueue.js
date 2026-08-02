@@ -195,6 +195,26 @@ async function enqueuePayoutRejectedEmail(toEmail, fullName, amountRequested, re
   return enqueueTemplateEmail('payout_rejected', { toEmail, fullName, amountRequested, reason }, options)
 }
 
+async function enqueueAffiliateCommissionEarnedEmail(toEmail, fullName, commissionAmount, referredName, options = {}) {
+  return enqueueTemplateEmail('affiliate_commission_earned', { toEmail, fullName, commissionAmount, referredName }, options)
+}
+
+async function enqueueAffiliatePayoutRequestedEmail(toEmail, fullName, amountRequested, options = {}) {
+  return enqueueTemplateEmail('affiliate_payout_requested', { toEmail, fullName, amountRequested }, options)
+}
+
+async function enqueueAffiliatePayoutApprovedEmail(toEmail, fullName, amountPayable, paymentMethod, options = {}) {
+  return enqueueTemplateEmail('affiliate_payout_approved', { toEmail, fullName, amountPayable, paymentMethod }, options)
+}
+
+async function enqueueAffiliatePayoutRejectedEmail(toEmail, fullName, amountRequested, reason, options = {}) {
+  return enqueueTemplateEmail('affiliate_payout_rejected', { toEmail, fullName, amountRequested, reason }, options)
+}
+
+async function enqueueCompetitionPrizeVoucherEmail(toEmail, fullName, competitionTitle, voucherCode, accountSize, expiresAt, options = {}) {
+  return enqueueTemplateEmail('competition_prize_voucher', { toEmail, fullName, competitionTitle, voucherCode, accountSize, expiresAt }, options)
+}
+
 async function claimPendingEmailJobs(limit = 10) {
   await ensureEmailQueueInfrastructure()
   await pool.query(
@@ -531,6 +551,11 @@ module.exports = {
   enqueuePayoutRequestedEmail,
   enqueuePayoutApprovedEmail,
   enqueuePayoutRejectedEmail,
+  enqueueAffiliateCommissionEarnedEmail,
+  enqueueAffiliatePayoutRequestedEmail,
+  enqueueAffiliatePayoutApprovedEmail,
+  enqueueAffiliatePayoutRejectedEmail,
+  enqueueCompetitionPrizeVoucherEmail,
   claimPendingEmailJobs,
   processEmailQueueBatch,
   runEmailAutomationPass,

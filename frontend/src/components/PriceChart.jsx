@@ -226,9 +226,8 @@ function PriceChart({ instrument, prices }) {
               padding:      '4px 10px',
               fontSize:     '12px',
               fontWeight:   selectedTF === tf.label ? '700' : '400',
-              background:   selectedTF === tf.label ? 'rgba(148, 148, 148, 0.15)' : 'transparent',
+              background:   selectedTF === tf.label ? 'color-mix(in srgb, var(--muted) 15%, transparent)' : 'transparent',
               border:       selectedTF === tf.label ? '1px solid var(--accent)' : '1px solid var(--navy-border)',
-              borderRadius: '4px',
               color:        selectedTF === tf.label ? 'var(--accent)' : 'var(--text-muted)',
               cursor:       'pointer',
               transition:   'all 0.15s',
@@ -256,7 +255,6 @@ function PriceChart({ instrument, prices }) {
         style={{
           width:        '100%',
           height:       '420px',
-          borderRadius: '8px',
           overflow:     'hidden',
           border:       '1px solid var(--navy-border)',
         }}

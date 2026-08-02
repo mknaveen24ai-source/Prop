@@ -1,5 +1,6 @@
 import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../ThemeContext'
 import { Headset, ChevronLeft, ChevronRight } from 'lucide-react'
 import { renderIcon } from '../utils/iconMap'
@@ -11,14 +12,17 @@ const NAV_ITEMS = [
   { id: 'trade', icon: 'trade', label: 'Trade' },
   { id: 'analytics', icon: 'analytics', label: 'Analytics' },
   { id: 'history', icon: 'history', label: 'History' },
+  { id: 'competitions', icon: 'leaderboard', label: 'Competitions' },
   { id: 'kyc', icon: 'kyc', label: 'KYC' },
   { id: 'payouts', icon: 'payouts', label: 'Payouts' },
+  { id: 'affiliate', icon: 'affiliate', label: 'Affiliate' },
   { id: 'chat', icon: 'chat', label: 'Live Chat' },
   { id: 'dispute', icon: 'dispute', label: 'Appeal' },
   { id: 'support', icon: 'support', label: 'Support' },
 ]
 
 export default function Sidebar({
+  user,
   activePage,
   setActivePage,
   kycStatus,
@@ -28,6 +32,23 @@ export default function Sidebar({
   onToggleCollapse,
 }) {
   useTheme()
+  const navigate = useNavigate()
+
+  function handleNavClick(item) {
+    if (item.externalPath) {
+      navigate(item.externalPath)
+      return
+    }
+    setActivePage(item.id)
+  }
+
+  const displayName = user?.full_name || 'Trader'
+  const initials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('') || 'TR'
 
   const sidebarWidth = collapsed ? '64px' : '220px'
 
@@ -36,9 +57,10 @@ export default function Sidebar({
       <div
         className="sidebar"
         style={{
-          background: 'var(--bg-surface)',
-          backdropFilter: 'blur(20px)',
-          borderRight: '1px solid var(--border)',
+          background: 'var(--glass)',
+          backdropFilter: 'blur(20px) saturate(140%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(140%)',
+          borderRight: '1px solid var(--rule-soft)',
           width: sidebarWidth,
           minWidth: sidebarWidth,
           transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)',
@@ -64,7 +86,6 @@ export default function Sidebar({
               width: '36px',
               height: '36px',
               flexShrink: 0,
-              borderRadius: '10px',
               background: 'linear-gradient(135deg, var(--accent), var(--info))',
               display: 'flex',
               alignItems: 'center',
@@ -114,7 +135,6 @@ export default function Sidebar({
               cursor: 'pointer',
               zIndex: 10,
               color: 'var(--text-secondary)',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
               transition: 'background 0.15s, color 0.15s',
             }}
             onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--paper)' }}
@@ -165,7 +185,7 @@ export default function Sidebar({
               badge = (
                 <span className="badge badge-danger" style={{
                   marginLeft: collapsed ? 0 : 'auto', flexShrink: 0,
-                  padding: '2px 6px', fontSize: '10px', borderRadius: '20px',
+                  padding: '2px 6px', fontSize: '10px', borderRadius: 'var(--radius-pill)',
                   position: collapsed ? 'absolute' : 'static',
                   top: collapsed ? '2px' : undefined, right: collapsed ? '2px' : undefined,
                 }}>
@@ -177,7 +197,7 @@ export default function Sidebar({
               badge = (
                 <span className="badge badge-danger" style={{
                   marginLeft: collapsed ? 0 : 'auto', flexShrink: 0,
-                  padding: '2px 6px', fontSize: '10px', borderRadius: '20px',
+                  padding: '2px 6px', fontSize: '10px', borderRadius: 'var(--radius-pill)',
                   position: collapsed ? 'absolute' : 'static',
                   top: collapsed ? '2px' : undefined, right: collapsed ? '2px' : undefined,
                 }}>
@@ -194,7 +214,7 @@ export default function Sidebar({
                 style={{ position: 'relative' }}
               >
                 <button
-                  onClick={() => setActivePage(item.id)}
+                  onClick={() => handleNavClick(item)}
                   title={collapsed ? item.label : undefined}
                   className={`sidebar-item ${isActive ? 'active' : ''}`}
                   style={{
@@ -203,7 +223,7 @@ export default function Sidebar({
                     background: isActive ? 'var(--accent-glow)' : 'transparent',
                     color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
                     textAlign: 'left',
-                    borderRadius: '10px',
+                    borderRadius: '0',
                     padding: collapsed ? '12px 0' : '12px 14px',
                     marginBottom: '4px',
                     position: 'relative',
@@ -217,7 +237,7 @@ export default function Sidebar({
                     <div style={{
                       position: 'absolute', left: '-8px', top: '10%',
                       height: '80%', width: '4px',
-                      background: 'var(--accent)', borderRadius: '0 4px 4px 0'
+                      background: 'var(--accent)'
                     }} />
                   )}
 
@@ -251,27 +271,35 @@ export default function Sidebar({
           })}
         </nav>
 
-        {/* Footer */}
+        {/* Footer — click through to the Profile tab */}
         <div className="sidebar-footer" style={{ borderTop: '1px solid var(--border)', padding: collapsed ? '16px 8px' : '20px 16px', transition: 'padding 0.25s' }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            padding: collapsed ? '8px' : '12px',
-            borderRadius: '12px',
-            background: 'var(--bg-hover)',
-            cursor: 'pointer',
-            border: '1px solid var(--border-strong)',
-            justifyContent: collapsed ? 'center' : 'flex-start',
-            transition: 'padding 0.25s',
-          }}>
+          <button
+            type="button"
+            onClick={() => setActivePage('profile')}
+            title="View profile"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              width: '100%',
+              padding: collapsed ? '8px' : '10px 12px',
+              background: activePage === 'profile' ? 'var(--accent-glow)' : 'var(--bg-hover)',
+              cursor: 'pointer',
+              border: activePage === 'profile' ? '1px solid var(--accent)' : '1px solid var(--border-strong)',
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              transition: 'background 0.15s, border-color 0.15s',
+              textAlign: 'left',
+            }}
+            onMouseEnter={(e) => { if (activePage !== 'profile') e.currentTarget.style.background = 'var(--accent-glow)' }}
+            onMouseLeave={(e) => { if (activePage !== 'profile') e.currentTarget.style.background = 'var(--bg-hover)' }}
+          >
             <div style={{
               width: '32px', height: '32px', flexShrink: 0,
               borderRadius: '50%', background: 'var(--accent)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: 'var(--paper)', fontSize: '12px', fontWeight: 600,
             }}>
-              TR
+              {initials}
             </div>
             <AnimatePresence>
               {!collapsed && (
@@ -280,16 +308,16 @@ export default function Sidebar({
                   animate={{ opacity: 1, width: 'auto' }}
                   exit={{ opacity: 0, width: 0 }}
                   transition={{ duration: 0.2 }}
-                  style={{ flex: 1, overflow: 'hidden' }}
+                  style={{ flex: 1, overflow: 'hidden', minWidth: 0 }}
                 >
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-                    Trader
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {displayName}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--success)' }}>• Active</div>
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
+          </button>
         </div>
       </div>
 
@@ -300,7 +328,7 @@ export default function Sidebar({
           return (
             <button
               key={item.id}
-              onClick={() => setActivePage(item.id)}
+              onClick={() => handleNavClick(item)}
               className="mobile-tab-btn"
               style={{
                 color: isActive ? 'var(--accent)' : 'var(--text-muted)',
@@ -326,7 +354,7 @@ export default function Sidebar({
                   <span style={{
                     position: 'absolute', top: '-4px', right: '-8px',
                     background: 'var(--accent)', color: 'var(--navy)',
-                    borderRadius: '99px', fontSize: '9px', fontWeight: '700',
+                    borderRadius: 'var(--radius-pill)', fontSize: '9px', fontWeight: '700',
                     padding: '0 4px', lineHeight: '14px', minWidth: '14px',
                     textAlign: 'center'
                   }}>
@@ -340,6 +368,26 @@ export default function Sidebar({
             </button>
           )
         })}
+
+        {/* Profile — mobile-only entry point (desktop reaches it via the
+            sidebar footer avatar instead, so it's intentionally not in
+            NAV_ITEMS/the desktop list). */}
+        <button
+          onClick={() => setActivePage('profile')}
+          className="mobile-tab-btn"
+          style={{
+            color: activePage === 'profile' ? 'var(--accent)' : 'var(--text-muted)',
+            borderTop: activePage === 'profile' ? '2px solid var(--accent)' : '2px solid transparent',
+            background: 'transparent',
+          }}
+        >
+          <span style={{ display: 'inline-flex', lineHeight: 1 }}>
+            {renderIcon('profile', { size: 18, color: activePage === 'profile' ? 'var(--accent)' : 'var(--text-muted)' })}
+          </span>
+          <span style={{ fontSize: '10px', fontWeight: activePage === 'profile' ? '600' : '400', marginTop: '3px' }}>
+            Profile
+          </span>
+        </button>
       </nav>
     </>
   )

@@ -6,8 +6,11 @@ const logger = require('../utils/logger')
 const { authenticateToken } = require('./middleware')
 const {
   ensureTenantSettingsInfrastructure,
-  getTenantSettingsMap
+  getTenantSettingsMap,
+  parseBooleanSetting
 } = require('../utils/tenantSettings')
+const { computeEffectiveTier } = require('../utils/affiliates')
+const { enqueueAffiliateCommissionEarnedEmail } = require('../utils/emailQueue')
 
 const router = express.Router()
 
@@ -161,6 +164,9 @@ async function createChallengePaymentSession({ req, orderId, userId = null }) {
     throw new Error('Challenge order not found')
   }
   const order = orderResult.rows[0]
+  if (order.status === 'paid') {
+    return { configured: true, checkout_url: null, already_paid: true }
+  }
 
   const session = await createStripeCheckoutSession({
     secretKey,
@@ -258,6 +264,54 @@ async function markChallengeOrderPaid(client, { orderId, providerPaymentId, payl
       WHERE order_id = $1`,
     [order.id, JSON.stringify({ paid_at: new Date().toISOString() })]
   )
+
+  // Affiliate commission — fires on EVERY paid order from a referred user, for
+  // the lifetime of the referral relationship, not just their first purchase
+  // (that first-purchase-only rule applies to the referred user's own discount,
+  // applied earlier in accounts.js, and is intentionally independent of this).
+  const referralResult = await client.query(
+    `SELECT id, referrer_user_id FROM affiliate_referrals WHERE referred_user_id = $1::uuid`,
+    [order.user_id]
+  )
+  const referral = referralResult.rows[0]
+  if (referral) {
+    // Advisory-locked per referrer so concurrent webhook deliveries for two
+    // different orders from the same referred user can't race on tier computation.
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext('affiliate_commission'), hashtext($1))`, [String(referral.referrer_user_id)])
+    const affiliateSettings = await getTenantSettingsMap(['affiliate_program_enabled', 'affiliate_default_commission_pct'])
+    if (parseBooleanSetting(affiliateSettings.affiliate_program_enabled, true)) {
+      const { tier_rank, commission_pct } = await computeEffectiveTier(client, referral.referrer_user_id, order.user_id)
+      const commissionAmount = Math.round(amount * (commission_pct / 100) * 100) / 100
+      const commissionInsert = await client.query(
+        `INSERT INTO affiliate_commissions
+           (referral_id, referrer_user_id, referred_user_id, order_id, tier_rank, commission_rate_pct, order_amount, commission_amount, status)
+         VALUES ($1, $2, $3::uuid, $4, $5, $6, $7, $8, 'available')
+         ON CONFLICT (order_id) WHERE order_id IS NOT NULL DO NOTHING
+         RETURNING id`,
+        [referral.id, referral.referrer_user_id, order.user_id, order.id, tier_rank, commission_pct, amount, commissionAmount]
+      )
+      // Non-fatal — a notification failure must never roll back a payment.
+      // Only fires when a new row was actually inserted (not on webhook redelivery).
+      if (commissionInsert.rows.length > 0) {
+        try {
+          const referrerResult = await client.query(`SELECT email, full_name FROM users WHERE id = $1`, [referral.referrer_user_id])
+          const referredResult = await client.query(`SELECT full_name FROM users WHERE id = $1::uuid`, [order.user_id])
+          const referrerUser = referrerResult.rows[0]
+          if (referrerUser?.email) {
+            await enqueueAffiliateCommissionEarnedEmail(
+              referrerUser.email,
+              referrerUser.full_name,
+              commissionAmount,
+              referredResult.rows[0]?.full_name || 'a trader you referred',
+              { userId: referral.referrer_user_id }
+            )
+          }
+        } catch (emailErr) {
+          logger.warn('[billing] Failed to enqueue affiliate commission earned email:', { error: emailErr.message })
+        }
+      }
+    }
+  }
 
   return order
 }

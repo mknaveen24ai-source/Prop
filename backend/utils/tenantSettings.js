@@ -8,21 +8,24 @@ const DEFAULT_TENANT_SETTINGS = {
   phase2_profit_target_pct: '5',
   phase2_max_drawdown_pct: '5',
   phase2_day_limit: '30',
-  funded_max_drawdown_pct: '5',
-  profit_share_pct: '80',
+  funded_max_drawdown_pct: '4',
+  profit_share_pct: '75',
   max_accounts_per_user: '5',
   max_daily_trades: '20',
   min_hold_seconds: '60',
   min_lot_size: '0.01',
-  forex_lots_per_1k: '0.20',
+  forex_lots_per_1k: '0.10',
   commodity_lots_per_1k: '0.02',
   max_trades_per_1k: '5',
+  max_open_positions: '10',
   inactivity_auto_fail_enabled: 'true',
   inactivity_fail_days: '30',
   weekend_holding_enabled: 'true',
   shared_price_feed_enabled: 'true',
   use_shared_feed_only: 'true',
   spread_markup_points_json: '{}',
+  commission_per_lot_json: '{}',
+  slippage_max_pips_adverse_json: '{}',
   allow_custom_mt5_feed: 'false',
   payment_provider: '',
   payment_provider_public_key: '',
@@ -218,6 +221,39 @@ function getInstrumentSpreadMarkup(settings, instrument) {
   return Number.isFinite(wildcard) ? wildcard : 0
 }
 
+// Normalizes the DB's 5 raw account_type values down to the 3-way tier axis
+// used by per-symbol commission/slippage config: challenge (phase1/2/3),
+// funded, competition.
+function normalizeAccountTypeTier(accountType) {
+  const type = String(accountType || '').toLowerCase()
+  if (type === 'funded') return 'funded'
+  if (type === 'competition') return 'competition'
+  return 'challenge'
+}
+
+// Two-level (tier -> instrument) lookup with wildcard fallback at both
+// levels, e.g. {"challenge":{"XAUUSD":5,"*":3},"funded":{"*":2}}. Falls
+// through tier-specific -> tier wildcard -> global tier ('*') specific ->
+// global tier wildcard -> caller-supplied fallback (the legacy flat setting).
+function resolveTieredInstrumentSetting(rawJsonValue, accountType, instrument, fallback) {
+  const map = parseSpreadMarkupMap(rawJsonValue)
+  const tier = normalizeAccountTypeTier(accountType)
+
+  const tierMap = map?.[tier]
+  const tierSpecific = Number(tierMap?.[instrument])
+  if (Number.isFinite(tierSpecific)) return tierSpecific
+  const tierWildcard = Number(tierMap?.['*'])
+  if (Number.isFinite(tierWildcard)) return tierWildcard
+
+  const globalTierMap = map?.['*']
+  const globalSpecific = Number(globalTierMap?.[instrument])
+  if (Number.isFinite(globalSpecific)) return globalSpecific
+  const globalWildcard = Number(globalTierMap?.['*'])
+  if (Number.isFinite(globalWildcard)) return globalWildcard
+
+  return fallback
+}
+
 module.exports = {
   DEFAULT_TENANT_SETTINGS,
   ensureTenantSettingDefaults,
@@ -225,7 +261,9 @@ module.exports = {
   getInstrumentSpreadMarkup,
   getTenantSettingValue,
   getTenantSettingsMap,
+  normalizeAccountTypeTier,
   parseBooleanSetting,
   parseSpreadMarkupMap,
+  resolveTieredInstrumentSetting,
   upsertTenantSettings
 }

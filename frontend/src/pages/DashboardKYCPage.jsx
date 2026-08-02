@@ -37,7 +37,7 @@ export default function DashboardKYCPage({
       ) : kycStatus === 'pending' ? (
         <div className="card" style={{
           textAlign: 'left', padding: '28px', marginBottom: '20px',
-          border: '1px solid rgba(245, 158, 11, 0.35)', maxWidth: '720px'
+          border: '1px solid color-mix(in srgb, var(--accent-gold) 35%, transparent)', maxWidth: '720px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '10px' }}>
             {renderIcon('timer', { size: 40, color: 'var(--accent-gold)' })}
@@ -66,8 +66,8 @@ export default function DashboardKYCPage({
               {user?.kyc_rejection_reason && (
                 <div style={{
                   marginTop: '12px', padding: '12px 16px',
-                  background: 'rgba(97,97,97,0.08)', border: '1px solid rgba(97,97,97,0.3)',
-                  borderRadius: '8px', textAlign: 'left'
+                  background: 'color-mix(in srgb, var(--muted) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)',
+                  textAlign: 'left'
                 }}>
                   <div style={{ fontSize: '11px', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
                     Reason from Admin

@@ -30,7 +30,7 @@ Use this checklist before promoting the platform to production or a live pilot.
 
 - Run pending migrations before starting production services.
 - Confirm startup does not rely on heavy repeated `ALTER TABLE` work.
-- Confirm indexes exist for price history, candles, account lists, KYC queues, payout queues, copier jobs, and email jobs.
+- Confirm indexes exist for price history, candles, account lists, KYC queues, payout queues, and email jobs.
 - Verify backups and restore procedure before accepting real users.
 
 ## KYC Storage
@@ -53,12 +53,6 @@ Use this checklist before promoting the platform to production or a live pilot.
 - Run manual smoke tests: market open, pending create, pending trigger, SL close, TP close, manual close, partial close, drawdown fail, profit pass, and news block.
 - Keep close/reduce-risk actions allowed during news restrictions.
 
-## Copier
-
-- Use dry-run copier mode before sending to any real MT5 account.
-- Confirm bridge heartbeat, follower snapshots, job retries, dead letters, and reconciliation views are healthy.
-- Confirm default policies: Phase 1 reverse, Phase 2 reverse, Funded mirror.
-
 ## Verification Commands
 
 Run these before deployment:
@@ -76,4 +70,4 @@ npm audit --audit-level=moderate
 
 ## Go / No-Go
 
-- Do not go live if tests fail, audits have unresolved moderate+ production vulnerabilities, admin 2FA is incomplete, database recovery is unstable, price feed is stale, or copier dry-run/reconciliation has unexplained mismatches.
+- Do not go live if tests fail, audits have unresolved moderate+ production vulnerabilities, admin 2FA is incomplete, database recovery is unstable, or price feed is stale.

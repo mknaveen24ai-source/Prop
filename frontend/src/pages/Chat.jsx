@@ -24,6 +24,8 @@ function Chat() {
   // FIX (MEDIUM #23): Use useRef for typing timeout instead of useState.
   // useState can lead to stale closures where clearTimeout uses an outdated timeout ID.
   const typingTimeoutRef = useRef(null)
+  const [supportTyping, setSupportTyping] = useState(false)
+  const supportTypingTimeoutRef = useRef(null)
   const [chatStats, setChatStats] = useState(null)
   const messagesEndRef = useRef(null)
 
@@ -64,8 +66,17 @@ function Chat() {
     })
 
     socketRef.current.on('user_typing', (data) => {
-      if (selectedConversation && data.conversation_id === selectedConversation.id) {
-        // Could show typing indicator here
+      // The backend relays this with camelCase `conversationId` and an
+      // `isAdmin` flag (services/socketService.js) — only show the indicator
+      // for the support side typing in the conversation currently open.
+      if (selectedConversation && data.conversationId === selectedConversation.id && data.isAdmin) {
+        if (supportTypingTimeoutRef.current) clearTimeout(supportTypingTimeoutRef.current)
+        if (data.isTyping) {
+          setSupportTyping(true)
+          supportTypingTimeoutRef.current = setTimeout(() => setSupportTyping(false), 3000)
+        } else {
+          setSupportTyping(false)
+        }
       }
     })
 
@@ -90,6 +101,8 @@ function Chat() {
     if (selectedConversation && socketRef.current) {
       socketRef.current.emit('join_chat', selectedConversation.id)
     }
+    setSupportTyping(false)
+    if (supportTypingTimeoutRef.current) clearTimeout(supportTypingTimeoutRef.current)
     return () => {
       if (selectedConversation && socketRef.current) {
         socketRef.current.emit('leave_chat', selectedConversation.id)
@@ -425,6 +438,12 @@ function Chat() {
                 <div ref={messagesEndRef} />
               </div>
 
+              {supportTyping && (
+                <div className="typing-indicator" style={{ padding: '4px 16px', fontSize: '12px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                  Support is typing…
+                </div>
+              )}
+
               <form className="message-input-form" onSubmit={sendMessage}>
                 <input
                   type="text"
@@ -501,7 +520,7 @@ function Chat() {
         .chat-stats-badge {
           background: var(--success-bg);
           color: var(--success);
-          border: 1px solid rgba(16, 185, 129, 0.22);
+          border: 1px solid var(--success);
           padding: 6px 12px;
           border-radius: 20px;
           font-size: 14px;
@@ -658,7 +677,7 @@ function Chat() {
         .status-open { background: rgba(var(--brand-primary-rgb), 0.14); color: var(--accent-hover); }
         .status-pending { background: var(--warning-bg); color: var(--warning); }
         .status-resolved { background: var(--success-bg); color: var(--success); }
-        .status-closed { background: rgba(148, 163, 184, 0.14); color: var(--text-secondary); }
+        .status-closed { background: var(--bg-hover); color: var(--text-secondary); }
 
         .conv-preview {
           display: flex;
@@ -720,7 +739,7 @@ function Chat() {
         .btn-close-chat {
           background: var(--danger-bg);
           color: var(--danger);
-          border: 1px solid rgba(239, 68, 68, 0.22);
+          border: 1px solid var(--danger);
           padding: 8px 16px;
           border-radius: 6px;
           cursor: pointer;
@@ -731,7 +750,7 @@ function Chat() {
           flex: 1;
           overflow-y: auto;
           padding: 20px;
-          background: rgba(8, 12, 24, 0.26);
+          background: var(--paper);
         }
 
         .message-date-separator {
@@ -844,7 +863,7 @@ function Chat() {
           padding: 10px 20px;
           text-align: center;
           font-size: 13px;
-          border-top: 1px solid rgba(245, 158, 11, 0.2);
+          border-top: 1px solid var(--warning);
         }
 
         .no-chat-selected {
@@ -852,7 +871,7 @@ function Chat() {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: rgba(8, 12, 24, 0.26);
+          background: var(--paper);
         }
 
         .welcome-chat {

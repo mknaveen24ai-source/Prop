@@ -317,7 +317,7 @@ export default function AdminAccountDetail() {
         </div>
 
         {(flagMeta?.review_flag_reason || account.review_flag_reason) && (
-          <div style={{ marginTop: '16px', background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', borderRadius: '8px', padding: '14px' }}>
+          <div style={{ marginTop: '16px', background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', padding: '14px' }}>
             <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>Review Flag Reason</div>
             <div style={{ color: 'var(--admin-text)' }}>{flagMeta.review_flag_reason || account.review_flag_reason}</div>
           </div>

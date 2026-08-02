@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import api from '../services/api'
+import api, { affiliateAPI } from '../services/api'
 import toast from 'react-hot-toast'
 import { TRADABLE_INSTRUMENTS_SUMMARY } from '../utils/instruments'
 import { renderIcon } from '../utils/iconMap'
@@ -7,10 +7,10 @@ import { renderIcon } from '../utils/iconMap'
 function Pill({ children, color = 'var(--accent)' }) {
   return (
     <span style={{
-      display: 'inline-block', padding: '3px 10px', borderRadius: '99px',
+      display: 'inline-block', padding: '3px 10px', borderRadius: 'var(--radius-pill)',
       fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em',
       color, border: `1px solid ${color}`,
-      background: `${color}15`
+      background: `color-mix(in srgb, ${color} 15%, transparent)`
     }}>{children}</span>
   )
 }
@@ -24,6 +24,7 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
   const [creating, setCreating]         = useState(false)
   const [error, setError]               = useState('')
   const [successMsg, setSuccessMsg]     = useState('')
+  const [discountEligibility, setDiscountEligibility] = useState(null)
 
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -40,6 +41,14 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
   }, [])
 
   useEffect(() => { loadAll() }, [loadAll])
+
+  useEffect(() => {
+    // Preview only — the server independently (and authoritatively) re-checks
+    // eligibility when the order is actually created.
+    affiliateAPI.getMyDiscountEligibility()
+      .then(res => setDiscountEligibility(res.data))
+      .catch(() => setDiscountEligibility(null))
+  }, [])
 
   const model = useMemo(
     () => models.find((m) => m.slug === selectedModel) || null,
@@ -120,9 +129,9 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
       {kycBlocked && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: '16px',
-          padding: '18px 22px', borderRadius: '14px', marginBottom: '28px',
-          background: 'rgba(245, 158, 11, 0.08)',
-          border: '1px solid rgba(245, 158, 11, 0.35)',
+          padding: '18px 22px', borderRadius: '0', marginBottom: '28px',
+          background: 'var(--warning-bg)',
+          border: '1px solid var(--warn)',
         }}>
           <span style={{ display: 'inline-flex' }}>
             {renderIcon('kyc', { size: 28, color: 'var(--warn)' })}
@@ -136,8 +145,8 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
           <button
             onClick={() => setActivePage('kyc')}
             style={{
-              padding: '9px 20px', borderRadius: '10px', border: '1px solid var(--warn)',
-              background: 'rgba(245,158,11,0.12)', color: 'var(--warn)',
+              padding: '9px 20px', borderRadius: '0', border: '1px solid var(--warn)',
+              background: 'var(--warning-bg)', color: 'var(--warn)',
               fontSize: '13px', fontWeight: 600, cursor: 'pointer',
               whiteSpace: 'nowrap'
             }}
@@ -152,12 +161,12 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
 
       {/* ── Success / Error banners ── */}
       {successMsg && (
-        <div style={{ padding: '14px 18px', borderRadius: '10px', marginBottom: '20px', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: 'var(--green)', fontSize: '14px', fontWeight: 600 }}>
+        <div style={{ padding: '14px 18px', borderRadius: '0', marginBottom: '20px', background: 'var(--success-bg)', border: '1px solid var(--green)', color: 'var(--green)', fontSize: '14px', fontWeight: 600 }}>
           {successMsg}
         </div>
       )}
       {error && (
-        <div style={{ padding: '14px 18px', borderRadius: '10px', marginBottom: '20px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--red)', fontSize: '14px' }}>
+        <div style={{ padding: '14px 18px', borderRadius: '0', marginBottom: '20px', background: 'var(--danger-bg)', border: '1px solid var(--red)', color: 'var(--red)', fontSize: '14px' }}>
           {error}
         </div>
       )}
@@ -165,7 +174,7 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
       {loading ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '18px' }}>
           {Array(3).fill(0).map((_, i) => (
-            <div key={i} style={{ height: '220px', borderRadius: '16px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+            <div key={i} style={{ height: '220px', borderRadius: '0', background: 'var(--bg-elevated)', border: '1px solid var(--border)', animation: 'pulse 1.5s ease-in-out infinite' }} />
           ))}
         </div>
       ) : !model ? (
@@ -188,7 +197,7 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
                 onClick={() => { setError(''); setSelectedModel(m.slug) }}
                 style={{
                   textAlign: 'left', cursor: 'pointer', border: '1px solid var(--border)',
-                  background: 'var(--bg-elevated)', borderRadius: '16px', padding: '24px',
+                  background: 'var(--bg-elevated)', borderRadius: '0', padding: '24px',
                   transition: 'all 0.2s ease'
                 }}
                 onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'var(--accent)' }}
@@ -245,7 +254,7 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
             ].map(({ icon, label, value, small }) => (
               <div key={label} style={{
                 background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-                borderRadius: '14px', padding: '16px 20px',
+                borderRadius: '0', padding: '16px 20px',
               }}>
                 <div style={{ marginBottom: '8px', display: 'inline-flex' }}>
                   {renderIcon(icon, { size: 20, color: 'var(--accent)' })}
@@ -273,8 +282,8 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
                   style={{
                     position: 'relative', border: 'none', textAlign: 'left', cursor: isLocked ? 'not-allowed' : 'pointer',
                     background: isLocked ? 'var(--bg-surface)' : 'var(--bg-elevated)',
-                    borderRadius: '16px', padding: '22px',
-                    outline: confirmSize === size ? '2px solid var(--accent)' : `1px solid ${almostFull ? 'rgba(245,158,11,0.5)' : 'var(--border)'}`,
+                    borderRadius: '0', padding: '22px',
+                    outline: confirmSize === size ? '2px solid var(--accent)' : `1px solid ${almostFull ? 'color-mix(in srgb, var(--warn) 50%, transparent)' : 'var(--border)'}`,
                     opacity: isLocked ? 0.52 : 1,
                     transition: 'all 0.2s ease',
                   }}
@@ -326,9 +335,10 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
           onClick={e => { if (e.target === e.currentTarget) setConfirmSize(null) }}
         >
           <div style={{
-            background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-            borderRadius: '20px', padding: '32px', maxWidth: '440px', width: '100%',
-            boxShadow: '0 24px 64px rgba(0,0,0,0.4)'
+            background: 'var(--glass-2)', border: '1px solid var(--rule-soft)', borderTop: '3px double var(--ink)',
+            padding: '32px', maxWidth: '440px', width: '100%',
+            backdropFilter: 'blur(20px) saturate(140%)', WebkitBackdropFilter: 'blur(20px) saturate(140%)',
+            boxShadow: 'inset 0 1px 0 var(--glass-hi)'
           }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
               {renderIcon('trade', { size: 40, color: 'var(--accent)' })}
@@ -336,15 +346,30 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
             <h3 style={{ fontSize: '22px', fontWeight: 800, marginBottom: '8px', color: 'var(--text-primary)', textAlign: 'center' }}>
               Start ${confirmSize.toLocaleString()} {model.name} Challenge?
             </h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '24px', lineHeight: 1.6, textAlign: 'center' }}>
-              You'll receive a simulated <strong style={{ color: 'var(--accent)' }}>${confirmSize.toLocaleString()}</strong> account and must hit a <strong>{model.profit_targets_pct[0]}%</strong> profit target within <strong>{model.time_limits_days[0]} days</strong> while staying within a <strong>{parseFloat(model.max_drawdown_pct)}%</strong> max drawdown. This challenge costs <strong style={{ color: 'var(--accent)' }}>${priceForSize(model, confirmSize)}</strong>, paid securely via checkout.
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: discountEligibility?.eligible ? '8px' : '24px', lineHeight: 1.6, textAlign: 'center' }}>
+              You'll receive a simulated <strong style={{ color: 'var(--accent)' }}>${confirmSize.toLocaleString()}</strong> account and must hit a <strong>{model.profit_targets_pct[0]}%</strong> profit target within <strong>{model.time_limits_days[0]} days</strong> while staying within a <strong>{parseFloat(model.max_drawdown_pct)}%</strong> max drawdown. This challenge costs{' '}
+              {discountEligibility?.eligible ? (
+                <>
+                  <span style={{ textDecoration: 'line-through', color: 'var(--text-dim)' }}>${priceForSize(model, confirmSize)}</span>{' '}
+                  <strong style={{ color: 'var(--gain)' }}>
+                    ${(priceForSize(model, confirmSize) * (1 - discountEligibility.discount_pct / 100)).toFixed(2)}
+                  </strong>
+                </>
+              ) : (
+                <strong style={{ color: 'var(--accent)' }}>${priceForSize(model, confirmSize)}</strong>
+              )}, paid securely via checkout.
             </p>
+            {discountEligibility?.eligible && (
+              <p style={{ color: 'var(--gain)', fontSize: '12px', marginBottom: '24px', textAlign: 'center' }}>
+                ✓ {discountEligibility.discount_pct}% referral discount applied (first challenge only)
+              </p>
+            )}
             <div style={{ display: 'flex', gap: '10px' }}>
               <button
                 onClick={handleConfirm}
                 disabled={creating}
                 style={{
-                  flex: 1, padding: '13px', borderRadius: '12px',
+                  flex: 1, padding: '13px', borderRadius: '0',
                   background: 'var(--accent)', color: 'var(--paper)',
                   border: 'none', fontSize: '14px', fontWeight: 700,
                   cursor: creating ? 'not-allowed' : 'pointer',
@@ -362,7 +387,7 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
                 onClick={() => { setConfirmSize(null); setError('') }}
                 disabled={creating}
                 style={{
-                  padding: '13px 20px', borderRadius: '12px',
+                  padding: '13px 20px', borderRadius: '0',
                   background: 'transparent', border: '1px solid var(--border)',
                   color: 'var(--text-muted)', fontSize: '14px', fontWeight: 600,
                   cursor: 'pointer'
@@ -372,7 +397,7 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
               </button>
             </div>
             {error && (
-              <div style={{ marginTop: '14px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--red)', fontSize: '13px' }}>
+              <div style={{ marginTop: '14px', padding: '10px 14px', borderRadius: '0', background: 'var(--danger-bg)', border: '1px solid var(--red)', color: 'var(--red)', fontSize: '13px' }}>
                 {error}
               </div>
             )}
@@ -390,7 +415,7 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
               { step: '02', title: 'Pass the evaluation', desc: 'Hit each phase’s profit target within the time limit, staying within the drawdown rules' },
               { step: '03', title: 'Get funded', desc: 'Receive a live-simulated funded account with profit withdrawals enabled' },
             ].map(s => (
-              <div key={s.step} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '14px', padding: '18px 20px' }}>
+              <div key={s.step} style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '0', padding: '18px 20px' }}>
                 <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontWeight: 700, marginBottom: '8px', letterSpacing: '0.1em' }}>STEP {s.step}</div>
                 <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>{s.title}</div>
                 <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5 }}>{s.desc}</div>

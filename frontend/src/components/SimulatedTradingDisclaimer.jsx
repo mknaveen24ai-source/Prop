@@ -6,9 +6,8 @@ export default function SimulatedTradingDisclaimer() {
 
   return (
     <div className="simulated-disclaimer" style={{
-      background: 'rgba(148, 148, 148, 0.04)',
-      border: '1px solid rgba(148, 148, 148, 0.15)',
-      borderRadius: '8px',
+      background: 'color-mix(in srgb, var(--muted) 4%, transparent)',
+      border: '1px solid color-mix(in srgb, var(--muted) 15%, transparent)',
       padding: expanded ? '14px 16px' : '10px 16px',
       marginBottom: '20px',
       transition: 'all 0.2s ease'
@@ -21,9 +20,8 @@ export default function SimulatedTradingDisclaimer() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{
-            background: 'rgba(148, 148, 148, 0.15)',
-            border: '1px solid rgba(148, 148, 148, 0.3)',
-            borderRadius: '4px',
+            background: 'color-mix(in srgb, var(--muted) 15%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)',
             padding: '2px 8px',
             fontSize: '10px',
             color: 'var(--accent)',
@@ -57,6 +55,7 @@ export default function SimulatedTradingDisclaimer() {
         {expanded && (
           <button
             onClick={() => setExpanded(false)}
+            aria-label="Dismiss"
             style={{
               background: 'transparent', border: 'none', color: 'var(--text-dim)',
               fontSize: '18px', cursor: 'pointer', padding: '0', lineHeight: 1,
@@ -72,7 +71,7 @@ export default function SimulatedTradingDisclaimer() {
         <div style={{
           marginTop: '12px',
           paddingTop: '12px',
-          borderTop: '1px solid rgba(148, 148, 148, 0.1)'
+          borderTop: '1px solid color-mix(in srgb, var(--muted) 10%, transparent)'
         }}>
           <p style={{
             color: 'var(--text-muted)', fontSize: '12px', lineHeight: '1.8', margin: 0

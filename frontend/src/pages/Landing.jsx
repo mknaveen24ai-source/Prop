@@ -4,7 +4,6 @@ import ThemeToggle from '../components/ThemeToggle';
 import { useTheme } from '../ThemeContext';
 import { trackEvent } from '../utils/analytics';
 import { useBranding } from '../BrandingContext';
-import { getChallengeFeeDisplay } from '../utils/tenantMarketing';
 
 // Import Masterpiece sections
 import { MASTERPIECE_CSS } from './landing-sections/LandingStyles';
@@ -14,6 +13,7 @@ const LandingCalculator = lazy(() => import('./landing-sections/LandingCalculato
 const LandingFeatures = lazy(() => import('./landing-sections/LandingFeatures'));
 const LandingScaling = lazy(() => import('./landing-sections/LandingScaling'));
 const LandingWallOfLove = lazy(() => import('./landing-sections/LandingWallOfLove'));
+const LandingAffiliate = lazy(() => import('./landing-sections/LandingAffiliate'));
 const LandingComparison = lazy(() => import('./landing-sections/LandingComparison'));
 const LandingFAQ = lazy(() => import('./landing-sections/LandingFAQ'));
 const LandingFooter = lazy(() => import('./landing-sections/LandingFooter'));
@@ -48,11 +48,9 @@ function upsertMetaTag({ name, property, content, id }) {
 export default function Landing() {
   const { tenant } = useBranding();
   const { theme } = useTheme();
-  const challengeFeeDisplay = getChallengeFeeDisplay();
   const defaultTitle = `${tenant?.name || 'PropFirm'} | Prop Trading Challenges`;
   const defaultDescription = 'Start a prop trading challenge with transparent rules, clear progression, and white-label infrastructure.';
   const [scrolled, setScrolled] = useState(false);
-  const [showStickyCta, setShowStickyCta] = useState(false);
 
   useEffect(() => {
     // Inject Masterpiece CSS
@@ -111,16 +109,46 @@ export default function Landing() {
     });
     domObserver.observe(document.body, { childList: true, subtree: true });
 
-    // Nav bar + sticky CTA scroll effect
+    // Nav bar scroll effect
     const handleScroll = () => {
       const y = window.scrollY;
       setScrolled(y > 50);
-      setShowStickyCta(y > Math.max(420, window.innerHeight * 0.65));
     };
     window.addEventListener('scroll', handleScroll);
     handleScroll();
 
     trackEvent('landing_view', { page: 'landing' });
+
+    // Internal "Visitors" funnel stage for the admin Analytics section —
+    // separate from trackEvent() above, which only forwards to GA/GTM if
+    // configured. Fire-and-forget, best-effort.
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      let sessionId = sessionStorage.getItem('funnel_session_id');
+      if (!sessionId) {
+        sessionId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
+        sessionStorage.setItem('funnel_session_id', sessionId);
+      }
+      fetch(`${API_URL}/api/analytics/track`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_type: 'visit', session_id: sessionId }),
+      }).catch(() => {});
+
+      // Real acquisition-source capture (utm_source, else referrer host, else
+      // 'direct') for the Model Optimization "Revenue per Segment" chart —
+      // stashed so Register.jsx can send it along at signup.
+      if (!sessionStorage.getItem('signup_source')) {
+        const utmSource = new URLSearchParams(window.location.search).get('utm_source');
+        let source = utmSource;
+        if (!source) {
+          source = document.referrer ? new URL(document.referrer).hostname : 'direct';
+        }
+        sessionStorage.setItem('signup_source', source.slice(0, 100));
+      }
+    } catch {
+      // no-op — tracking must never break the landing page
+    }
 
     // Cleanup
     return () => {
@@ -215,7 +243,7 @@ export default function Landing() {
 
   return (
     <>
-      <div className={`mode-public ui-shell masterpiece-landing${showStickyCta ? ' has-sticky-cta' : ''}`} data-theme={theme}>
+      <div className="mode-public ui-shell masterpiece-landing" data-theme={theme}>
 
       {/* Glass Navbar */}
       <nav className={`nav-transparent ${scrolled ? 'scrolled' : ''}`}>
@@ -231,6 +259,7 @@ export default function Landing() {
                 { label: 'Funding', href: '#mp-calculator' },
                 { label: 'Features', href: '#mp-features' },
                 { label: 'How It Works', href: '#mp-scaling' },
+                { label: 'Refer & Earn', href: '#mp-affiliate' },
                 { label: 'FAQ', href: '#faq' },
               ].map(link => (
                 <a key={link.label} href={link.href} style={{
@@ -252,6 +281,19 @@ export default function Landing() {
                 }}
                 >{link.label}</a>
               ))}
+              <Link
+                to="/transparency"
+                style={{
+                  color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '14px',
+                  fontFamily: 'var(--font-ui)', fontWeight: '500',
+                  transition: 'color 0.2s',
+                }}
+                onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'}
+                onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+                onClick={() => trackEvent('landing_nav_click', { label: 'Transparency', href: '/transparency' })}
+              >
+                Transparency
+              </Link>
             </div>
 
             {/* Right Actions */}
@@ -294,6 +336,9 @@ export default function Landing() {
         <div data-mp-section="testimonials" id="mp-testimonials">
           <LandingWallOfLove />
         </div>
+        <div data-mp-section="affiliate" id="mp-affiliate">
+          <LandingAffiliate />
+        </div>
         <div data-mp-section="comparison" id="mp-comparison">
           <LandingComparison />
         </div>
@@ -305,43 +350,6 @@ export default function Landing() {
         </div>
       </Suspense>
       </main>
-
-      {/* Sticky Conversion CTA */}
-      {showStickyCta && (
-        <div className="mp-sticky-cta">
-          <div className="mp-sticky-cta-inner">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '14px', color: 'var(--ink)' }}>
-                Start Your Trading Challenge Today
-              </span>
-              <span style={{ color: 'var(--muted)', fontSize: '12px' }}>
-                {`Live quota-controlled access from ${challengeFeeDisplay}.`}
-              </span>
-            </div>
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                className="mp-btn-secondary"
-                style={{ padding: '10px 16px', fontSize: '13px' }}
-                onClick={() => {
-                  trackEvent('landing_cta_click', { placement: 'sticky', action: 'view_rules' });
-                  scrollToId('faq');
-                }}
-              >
-                View Rules
-              </button>
-              <Link
-                to={'/register'}
-                className="mp-btn-primary"
-                style={{ padding: '10px 18px', fontSize: '13px', textDecoration: 'none' }}
-                onClick={() => trackEvent('landing_cta_click', { placement: 'sticky', action: 'register' })}
-              >
-                Get Funded
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
 
       </div>
     </>
