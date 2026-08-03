@@ -2,7 +2,6 @@ import React, { Suspense, lazy, useState, useEffect, useMemo, useRef } from 'rea
 import axios from 'axios'
 import { io } from 'socket.io-client'
 import toast from 'react-hot-toast'
-import ThemeToggle from '../components/ThemeToggle'
 import MarketStatusPill from '../components/MarketStatusPill'
 import CommandPaletteTrigger from '../components/CommandPaletteTrigger'
 import Sidebar, { NAV_GROUPS } from '../components/Sidebar'
@@ -35,6 +34,34 @@ import ErrorBoundary from '../ErrorBoundary'
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 const TradingPanel = lazy(() => import('../components/TradingPanel'))
 const Analytics = lazy(() => import('./Analytics'))
+
+// Header breadcrumb + page title per screen (Modern Gazette handoff spec
+// TITLES map — breadcrumb is a separate, narrower label than the sidebar
+// nav group name, e.g. 'dispute' breadcrumbs under "Support" even though
+// its nav item lives in the Help group).
+const PAGE_TITLES = {
+  dashboard: ['Trader Desk', null], // title is the personalized greeting, built at render time
+  trade: ['Trading Desk', 'Order Ticket & Chart'],
+  analytics: ['Trader Desk', 'Performance Analytics'],
+  competitions: ['Programme', 'Competitions & Leaderboard'],
+  rules: ['Programme', 'Challenge Rules'],
+  history: ['Programme', 'Trade History'],
+  kyc: ['Account', 'Identity Verification'],
+  payouts: ['Account', 'Payouts'],
+  chat: ['Support', 'Live Chat with the Desk'],
+  dispute: ['Support', 'File an Appeal'],
+  'get-challenge': ['Programme', 'New Challenge'],
+  affiliate: ['Account', 'Affiliate'],
+  support: ['Support', 'Support'],
+  profile: ['Account', 'Profile'],
+}
+
+function greeting() {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
+  return 'Good evening'
+}
 
 function enrichTradesWithPrices(trades = [], currentPrices = {}) {
   return trades.map(trade => {
@@ -805,6 +832,7 @@ function Dashboard({ user, onLogout }) {
         kycStatus={kycStatus}
         pendingPayouts={payouts.filter(p => p.status === 'pending').length}
         unreadNotifications={notifications.filter(n => !n.read).length}
+        onLogout={onLogout}
         collapsed={sidebarCollapsed}
         onToggleCollapse={handleToggleSidebar}
       />
@@ -825,111 +853,87 @@ function Dashboard({ user, onLogout }) {
       <div
         className={`dashboard-main animate-fade-up ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
         style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        {/* Top Nav */}
+        {/* Top Nav — flush, full-width header matching the prototype exactly
+            (breadcrumb + Playfair title, search, MARKETS OPEN — no floating
+            card/margin, that's what was creating the visible gap around it). */}
       <div className="nav dashboard-topbar" style={{
-        margin: '16px 24px',
-        background: 'var(--bg-surface)',
-        backdropFilter: 'blur(16px)',
-        border: '1px solid var(--border)',
-        boxShadow: 'var(--shadow-surface)' 
+        margin: 0,
+        padding: '14px 24px',
+        display: 'flex', alignItems: 'center', gap: '16px',
+        background: 'var(--glass)',
+        backdropFilter: 'blur(18px)',
+        WebkitBackdropFilter: 'blur(18px)',
+        borderBottom: '1px solid var(--rule)',
+        borderRadius: 0,
+        boxShadow: 'none',
       }}>
-        <div className="dashboard-topbar-left" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ display: 'inline-flex' }}>
-            {renderIcon('activity', { size: 14, color: connected ? 'var(--accent-green)' : 'var(--accent-red)' })}
-          </span>
-          <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Terminal Status</span>
-          <span className={`badge ${connected ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '10px', padding: '4px 10px', boxShadow: connected ? '0 0 10px color-mix(in srgb, var(--gain) 30%, transparent)' : '0 0 10px color-mix(in srgb, var(--loss) 30%, transparent)' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-              {renderIcon(connected ? 'activity' : 'close', { size: 10, color: 'currentColor' })}
-              <span>{connected ? 'LIVE SYNC' : 'OFFLINE'}</span>
-            </span>
-          </span>
-          <MarketStatusPill />
-        </div>
-        <div className="dashboard-topbar-right" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <CommandPaletteTrigger />
-          <span className="dashboard-user-name" style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500' }}>{user?.full_name || 'Trader'}</span>
-          {kycStatus !== 'approved' && (
-            <span className={`badge ${kycStatus === 'pending' ? 'badge-warning' : 'badge-danger'}`} onClick={() => setActivePage('kyc')} style={{ cursor: 'pointer' }}>
-              <span style={{ display: 'inline-flex', marginRight: '6px', verticalAlign: 'middle' }}>
-                {renderIcon(kycStatus === 'pending' ? 'timer' : 'warning', {
-                  size: 12,
-                  color: kycStatus === 'pending' ? 'var(--accent-gold)' : 'var(--accent-red)'
-                })}
-              </span>
-              {kycStatus === 'pending' ? 'KYC Pending' : 'Complete KYC'}
-            </span>
-          )}
-          {kycStatus === 'approved' && (
-            <span className="badge badge-success">
-              <span style={{ display: 'inline-flex', marginRight: '6px', verticalAlign: 'middle' }}>
-                {renderIcon('approve', { size: 12, color: 'var(--accent-green)' })}
-              </span>
-              KYC Verified
-            </span>
-          )}
-
-          {/* ── Notification Bell ── */}
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => { 
-                setShowNotifications(p => {
-                  if (!p) markAllRead()
-                  return !p
-                })
-              }}
-              className="btn btn-secondary" style={{ padding: '6px 10px', fontSize: '16px' }}
-            >
-              {renderIcon('bell', { size: 16, color: 'var(--text-primary)' })}
-              {notifications.filter(n => !n.read).length > 0 && (
-                <span className="badge badge-danger" style={{
-                  position: 'absolute', top: '-6px', right: '-6px',
-                  padding: '2px 6px', fontSize: '9px'
-                }}>
-                  {notifications.filter(n => !n.read).length}
-                </span>
-              )}
-            </button>
-            {showNotifications && (
-              <div style={{
-                position: 'absolute', right: 0, top: '42px', width: '320px', maxHeight: '400px',
-                background: 'var(--bg-surface)', border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)', zIndex: 999,
-                overflow: 'hidden', display: 'flex', flexDirection: 'column'
-              }}>
-                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: '600', fontSize: '13px', color: 'var(--accent)' }}>Notifications</span>
-                  {notifications.length > 0 && (
-                    <button onClick={clearNotifications} className="btn-ghost" style={{ border: 'none', color: 'var(--text-secondary)', fontSize: '11px', cursor: 'pointer' }}>Clear all</button>
-                  )}
-                </div>
-                <div style={{ overflowY: 'auto', maxHeight: '340px' }}>
-                  {notifications.length === 0 ? (
-                    <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '13px' }}>No notifications yet</div>
-                  ) : (
-                    notifications.map(n => (
-                      <div key={n.id} style={{
-                        padding: '12px 16px', borderBottom: '1px solid var(--border)',
-                        borderLeft: `3px solid ${n.type === 'error' ? 'var(--danger)' : n.type === 'success' ? 'var(--success)' : 'var(--accent)'}`,
-                        background: 'transparent'
-                      }}>
-                        <div style={{ fontSize: '13px', color: 'var(--text-primary)', marginBottom: '4px' }}>{n.message}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                          {new Date(n.time).toLocaleString()}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.18em', textTransform: 'uppercase', color: 'var(--muted)' }}>
+            {(PAGE_TITLES[activePage] || ['Trader Desk'])[0]}
           </div>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '23px', fontWeight: 500, margin: '2px 0 0', letterSpacing: '-.01em' }}>
+            {activePage === 'dashboard'
+              ? `${greeting()}, ${(user?.full_name || 'Trader').split(' ')[0]}`
+              : (PAGE_TITLES[activePage]?.[1] || 'Dashboard')}
+          </h1>
+        </div>
+        <div style={{ flex: 1 }} />
+        <CommandPaletteTrigger />
+        <MarketStatusPill />
 
-          <ThemeToggle />
-          <button className="btn btn-danger" onClick={onLogout} style={{ padding: '6px 12px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-            {renderIcon('logout', { size: 14, color: 'currentColor' })}
-            <span>Logout</span>
+        {/* ── Notification Bell ── */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => {
+              setShowNotifications(p => {
+                if (!p) markAllRead()
+                return !p
+              })
+            }}
+            style={{ display: 'flex', alignItems: 'center', padding: '8px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)', color: 'var(--muted)' }}
+          >
+            {renderIcon('bell', { size: 15, color: 'var(--muted)' })}
+            {notifications.filter(n => !n.read).length > 0 && (
+              <span className="lx-badge" style={{
+                position: 'absolute', top: '-6px', right: '-6px', color: 'var(--loss)',
+                padding: '1px 5px', fontSize: '9px',
+              }}>
+                {notifications.filter(n => !n.read).length}
+              </span>
+            )}
           </button>
+          {showNotifications && (
+            <div style={{
+              position: 'absolute', right: 0, top: '42px', width: '320px', maxHeight: '400px',
+              background: 'var(--glass-2)', backdropFilter: 'blur(24px) saturate(160%)', WebkitBackdropFilter: 'blur(24px) saturate(160%)',
+              border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', boxShadow: 'var(--elev-lg)', zIndex: 999,
+              overflow: 'hidden', display: 'flex', flexDirection: 'column'
+            }}>
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--rule)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontFamily: 'var(--font-display)', fontSize: '14px', color: 'var(--accent)' }}>Notifications</span>
+                {notifications.length > 0 && (
+                  <button onClick={clearNotifications} style={{ border: 'none', background: 'transparent', color: 'var(--muted)', fontSize: '11px', cursor: 'pointer' }}>Clear all</button>
+                )}
+              </div>
+              <div style={{ overflowY: 'auto', maxHeight: '340px' }}>
+                {notifications.length === 0 ? (
+                  <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: '13px' }}>No notifications yet</div>
+                ) : (
+                  notifications.map(n => (
+                    <div key={n.id} style={{
+                      padding: '12px 16px', borderBottom: '1px solid var(--rule-soft)',
+                      borderLeft: `3px solid ${n.type === 'error' ? 'var(--loss)' : n.type === 'success' ? 'var(--gain)' : 'var(--accent)'}`,
+                    }}>
+                      <div style={{ fontSize: '13px', color: 'var(--ink)', marginBottom: '4px' }}>{n.message}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--muted)' }}>
+                        {new Date(n.time).toLocaleString()}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

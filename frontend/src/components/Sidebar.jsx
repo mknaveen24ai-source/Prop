@@ -85,10 +85,11 @@ export default function Sidebar({
   kycStatus,
   pendingPayouts = 0,
   unreadNotifications = 0,
+  onLogout,
   collapsed = false,
   onToggleCollapse,
 }) {
-  useTheme()
+  const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const [collapsedGroups, setCollapsedGroups] = useState(loadCollapsedGroups)
 
@@ -367,8 +368,46 @@ export default function Sidebar({
         </nav>
 
 
-        {/* Footer — click through to the Profile tab */}
-        <div className="sidebar-footer" style={{ borderTop: '1px solid var(--border)', padding: collapsed ? '16px 8px' : '20px 16px', transition: 'padding 0.25s' }}>
+        {/* Footer — theme toggle + profile (click through to Profile tab) */}
+        <div className="sidebar-footer" style={{ borderTop: '1px solid var(--border)', padding: collapsed ? '16px 8px' : '20px 16px', transition: 'padding 0.25s', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {!collapsed && (
+            <div style={{ display: 'flex', gap: '6px', padding: '3px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper)' }}>
+              <button
+                type="button"
+                onClick={() => theme !== 'dark' && toggleTheme()}
+                style={{
+                  flex: 1, padding: '6px 0', border: 'none', borderRadius: '3px', cursor: 'pointer',
+                  fontFamily: 'var(--font-mono)', fontSize: '10.5px', letterSpacing: '.08em', textTransform: 'uppercase',
+                  background: theme === 'dark' ? 'var(--accent)' : 'transparent',
+                  color: theme === 'dark' ? 'var(--paper)' : 'var(--muted)',
+                }}
+              >
+                Night
+              </button>
+              <button
+                type="button"
+                onClick={() => theme !== 'light' && toggleTheme()}
+                style={{
+                  flex: 1, padding: '6px 0', border: 'none', borderRadius: '3px', cursor: 'pointer',
+                  fontFamily: 'var(--font-mono)', fontSize: '10.5px', letterSpacing: '.08em', textTransform: 'uppercase',
+                  background: theme === 'light' ? 'var(--accent)' : 'transparent',
+                  color: theme === 'light' ? 'var(--paper)' : 'var(--muted)',
+                }}
+              >
+                Day
+              </button>
+              {onLogout && (
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  title="Log out"
+                  style={{ padding: '6px 9px', border: 'none', borderRadius: '3px', cursor: 'pointer', background: 'transparent', color: 'var(--muted)', display: 'inline-flex', alignItems: 'center' }}
+                >
+                  {renderIcon('logout', { size: 13, color: 'currentColor' })}
+                </button>
+              )}
+            </div>
+          )}
           <button
             type="button"
             onClick={() => setActivePage('profile')}
