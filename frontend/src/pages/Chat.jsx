@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import io from 'socket.io-client'
-import { renderIcon } from '../utils/iconMap'
+import { getStatusToneColor } from '../utils/statusTone'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
@@ -9,6 +9,19 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 // when component mounts/unmounts rapidly during navigation.
 let socketInstance = null
 let socketRefCount = 0
+
+const FAQS = [
+  'How long does a payout usually take to process?',
+  'What documents do I need for identity verification?',
+  'Why was my account flagged for a violation?',
+  'Can I trade over the weekend on a funded account?',
+]
+
+function initialsOf(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return 'SD'
+  return parts.slice(0, 2).map((p) => p[0].toUpperCase()).join('')
+}
 
 function Chat() {
   const socketRef = useRef(null) // Track this component's socket reference
@@ -26,7 +39,6 @@ function Chat() {
   const typingTimeoutRef = useRef(null)
   const [supportTyping, setSupportTyping] = useState(false)
   const supportTypingTimeoutRef = useRef(null)
-  const [chatStats, setChatStats] = useState(null)
   const messagesEndRef = useRef(null)
 
   // Initialize socket connection
@@ -37,9 +49,6 @@ function Chat() {
       socketInstance = io(API_URL, {
         withCredentials: true,
         transports: ['websocket', 'polling']
-      })
-      socketInstance.on('connect', () => {
-        console.log('Chat socket connected:', socketInstance.id)
       })
     }
     socketRef.current = socketInstance
@@ -122,7 +131,6 @@ function Chat() {
   // Load conversations on mount
   useEffect(() => {
     loadConversations()
-    loadChatStats()
   }, [])
 
   const loadConversations = async () => {
@@ -136,24 +144,6 @@ function Chat() {
     }
   }
 
-  // User chat stats (not admin stats)
-  const loadChatStats = async () => {
-    try {
-      // Count open conversations and unread messages from user's own data
-      const res = await axios.get(`${API_URL}/api/chat/conversations`)
-      const conversations = res.data || []
-      const openCount = conversations.filter(c => c.status === 'open').length
-      const unreadCount = conversations.reduce((sum, c) => sum + (c.unread_user_count || 0), 0)
-      setChatStats({
-        open_count: openCount,
-        unread_count: unreadCount,
-        total_conversations: conversations.length
-      })
-    } catch (error) {
-      // Stats are optional, don't show error
-    }
-  }
-
   const createConversation = async (e) => {
     e.preventDefault()
     if (!newSubject.trim()) return
@@ -163,13 +153,12 @@ function Chat() {
       const res = await axios.post(`${API_URL}/api/chat/conversations`, {
         subject: newSubject.trim()
       })
-      
+
       setNewSubject('')
       setShowNewChat(false)
       setSelectedConversation(res.data.conversation)
       setMessages([])
       await loadConversations()
-      await loadChatStats()
     } catch (error) {
       console.error('Failed to create conversation:', error)
       if (error.response?.data?.conversationId) {
@@ -204,11 +193,11 @@ function Chat() {
     if (!newMessage.trim() || !selectedConversation) return
 
     let optimisticId = null
-    
+
     try {
       setSending(true)
       optimisticId = Date.now()
-      
+
       const optimisticMessage = {
         id: optimisticId,
         message: newMessage.trim(),
@@ -244,7 +233,6 @@ function Chat() {
     try {
       await axios.patch(`${API_URL}/api/chat/conversations/${selectedConversation.id}/close`)
       await loadConversations()
-      await loadChatStats()
       setSelectedConversation(null)
       setMessages([])
     } catch (error) {
@@ -289,7 +277,7 @@ function Chat() {
     const date = new Date(dateString)
     const now = new Date()
     const diff = now - date
-    
+
     if (diff < 24 * 60 * 60 * 1000) {
       return 'Today'
     } else if (diff < 48 * 60 * 60 * 1000) {
@@ -299,618 +287,210 @@ function Chat() {
     }
   }
 
+  function sendFaq(question) {
+    setNewMessage(question)
+  }
+
+  const ticketMeta = selectedConversation ? [
+    { label: 'Status', value: selectedConversation.status, tone: getStatusToneColor(selectedConversation.status) },
+    { label: 'Assigned to', value: selectedConversation.assigned_to || 'Unassigned', tone: 'var(--ink)' },
+    { label: 'Messages', value: String(messages.length), tone: 'var(--ink)' },
+    { label: 'Opened', value: formatDate(selectedConversation.created_at), tone: 'var(--muted)' },
+    { label: 'Last activity', value: selectedConversation.last_message_at ? formatDate(selectedConversation.last_message_at) : '—', tone: 'var(--muted)' },
+  ] : []
+
   return (
-    <div className="chat-container">
-      <div className="chat-header">
-        <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {renderIcon('message', { size: 20, color: 'var(--accent)' })}
-          <span>Live Chat Support</span>
-        </h2>
-        {chatStats && (
-          <div className="chat-stats-badge">
-            {chatStats.open_count} active
-            {chatStats.unread_count > 0 && (
-              <span className="unread-badge">{chatStats.unread_count}</span>
+    <div style={{ display: 'grid', gridTemplateColumns: '240px minmax(0,1fr) 300px', gap: '16px', alignItems: 'start', height: 'calc(100vh - 150px)' }}>
+      {/* Conversations rail — real functionality (multiple threads over
+          time) beyond the prototype's single-ticket isChat block; kept
+          alongside it per the "keep real, add spec pieces" pattern used
+          on Trade/Competitions. */}
+      <div style={{ background: 'var(--glass)', backdropFilter: 'blur(16px)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--rule)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontFamily: 'var(--font-display)', fontSize: '15px' }}>Conversations</span>
+          <button
+            onClick={() => setShowNewChat((v) => !v)}
+            style={{ padding: '5px 10px', border: '1px solid var(--accent)', borderRadius: '4px', background: 'transparent', color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.08em', textTransform: 'uppercase', cursor: 'pointer' }}
+          >
+            + New
+          </button>
+        </div>
+
+        {showNewChat && (
+          <form onSubmit={createConversation} style={{ padding: '12px 16px', borderBottom: '1px solid var(--rule-soft)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <input
+              type="text"
+              placeholder="What do you need help with?"
+              value={newSubject}
+              onChange={(e) => setNewSubject(e.target.value)}
+              disabled={sending}
+              autoFocus
+              style={{ padding: '9px 10px', border: '1px solid var(--rule)', borderRadius: '4px', background: 'var(--paper)', color: 'var(--ink)', fontSize: '13px' }}
+            />
+            <button type="submit" disabled={sending || !newSubject.trim()} className="lx-btn lx-btn--sm lx-btn--primary">
+              {sending ? 'Creating…' : 'Start Chat'}
+            </button>
+          </form>
+        )}
+
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {loading ? (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: '13px' }}>Loading…</div>
+          ) : conversations.length === 0 ? (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: '13px' }}>No conversations yet.</div>
+          ) : (
+            conversations.map((conv) => {
+              const active = selectedConversation?.id === conv.id
+              return (
+                <div
+                  key={conv.id}
+                  onClick={() => loadConversation(conv.id)}
+                  style={{
+                    padding: '11px 16px', cursor: 'pointer', borderBottom: '1px solid var(--rule-soft)',
+                    borderLeft: active ? '3px solid var(--accent)' : '3px solid transparent',
+                    background: active ? 'var(--glass-2)' : 'transparent',
+                    opacity: conv.status === 'closed' ? 0.6 : 1,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.subject}</span>
+                    {conv.unread_user_count > 0 && (
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', color: 'var(--paper)', background: 'var(--accent)', borderRadius: '99px', padding: '1px 6px', flex: '0 0 auto' }}>{conv.unread_user_count}</span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                    <span className="lx-badge" style={{ color: getStatusToneColor(conv.status) }}>{conv.status}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>{conv.last_message_at ? formatTime(conv.last_message_at) : ''}</span>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Chat panel — matches the prototype's isChat block */}
+      <div style={{ background: 'var(--glass)', backdropFilter: 'blur(16px) saturate(140%)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', display: 'flex', flexDirection: 'column', height: '100%' }}>
+        {selectedConversation ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '15px 18px', borderBottom: '3px double var(--rule)' }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--accent)', flex: '0 0 auto' }}>
+                {initialsOf(selectedConversation.assigned_to)}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '18px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedConversation.assigned_to || 'Support Desk'}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.13em', textTransform: 'uppercase', color: getStatusToneColor(selectedConversation.status), marginTop: '2px' }}>
+                  ● {selectedConversation.status}
+                </div>
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)', border: '1px solid var(--rule)', borderRadius: '99px', padding: '4px 10px', flex: '0 0 auto' }}>
+                Ticket #{selectedConversation.id}
+              </div>
+              {selectedConversation.status !== 'closed' && (
+                <button onClick={closeConversation} className="lx-btn lx-btn--sm" style={{ border: '1px solid var(--loss)', color: 'var(--loss)' }}>
+                  Close
+                </button>
+              )}
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {messages.map((msg, index) => {
+                const showDate = index === 0 || formatDate(messages[index - 1]?.created_at) !== formatDate(msg.created_at)
+                return (
+                  <React.Fragment key={msg.id}>
+                    {showDate && (
+                      <div style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--muted)' }}>
+                        — {formatDate(msg.created_at)} —
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: msg.is_admin ? 'flex-start' : 'flex-end' }}>
+                      <div style={{
+                        maxWidth: '70%', padding: '11px 14px', borderRadius: '4px',
+                        background: msg.is_admin ? 'var(--paper-2)' : 'var(--accent)',
+                        border: `1px solid ${msg.is_admin ? 'var(--rule)' : 'var(--accent)'}`,
+                        color: msg.is_admin ? 'var(--ink)' : 'var(--paper)',
+                      }}>
+                        <div style={{ fontSize: '13.5px', lineHeight: 1.55 }}>{msg.message}</div>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', marginTop: '7px', textAlign: 'right', opacity: 0.75 }}>{formatTime(msg.created_at)}</div>
+                      </div>
+                    </div>
+                  </React.Fragment>
+                )
+              })}
+              {supportTyping && (
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>Support is typing…</div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {selectedConversation.status === 'closed' ? (
+              <div style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', color: 'var(--muted)', borderTop: '1px solid var(--rule)' }}>
+                This conversation is closed. Start a new chat if you need further assistance.
+              </div>
+            ) : (
+              <form onSubmit={sendMessage} style={{ borderTop: '1px solid var(--rule)', padding: '12px 16px', display: 'flex', alignItems: 'flex-end', gap: '10px' }}>
+                <textarea
+                  value={newMessage}
+                  onChange={handleTyping}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(e) } }}
+                  placeholder="Write to the desk… (Enter to send)"
+                  rows={2}
+                  disabled={sending}
+                  style={{ flex: 1, resize: 'none', padding: '11px 13px', border: '1px solid var(--rule)', borderRadius: '4px', background: 'var(--paper)', color: 'var(--ink)', fontSize: '13.5px', lineHeight: 1.5 }}
+                />
+                <button
+                  type="submit"
+                  disabled={sending || !newMessage.trim()}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 18px', border: '1px solid var(--accent)', borderRadius: '4px', background: 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer' }}
+                >
+                  {sending ? 'Sending…' : 'Send'}
+                </button>
+              </form>
             )}
+          </>
+        ) : (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ textAlign: 'center', padding: '40px' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '20px', marginBottom: '10px' }}>Welcome to Live Chat Support</div>
+              <p style={{ color: 'var(--muted)', fontSize: '13px', margin: '6px 0' }}>Start a conversation and the desk will pick it up here.</p>
+              <button
+                onClick={() => setShowNewChat(true)}
+                style={{ marginTop: '16px', padding: '11px 24px', border: '1px solid var(--accent)', borderRadius: '4px', background: 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer' }}
+              >
+                Start a New Conversation
+              </button>
+            </div>
           </div>
         )}
       </div>
 
-      <div className="chat-main">
-        {/* Sidebar - Conversations List */}
-        <div className="chat-sidebar">
-          <div className="chat-sidebar-header">
-            <h3>Conversations</h3>
-            <button 
-              className="btn-new-chat"
-              onClick={() => setShowNewChat(!showNewChat)}
-            >
-              + New Chat
-            </button>
+      {/* Right rail — ticket meta + FAQs, matches the prototype */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {selectedConversation && (
+          <div style={{ background: 'var(--glass)', backdropFilter: 'blur(16px) saturate(140%)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', padding: '16px 18px' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px', borderBottom: '1px solid var(--rule)', paddingBottom: '10px', marginBottom: '4px' }}>This Ticket</div>
+            {ticketMeta.map((r) => (
+              <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', padding: '9px 0', borderBottom: '1px solid var(--rule-soft)', fontSize: '12.5px' }}>
+                <span style={{ color: 'var(--muted)' }}>{r.label}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: r.tone, textAlign: 'right', textTransform: r.label === 'Status' ? 'capitalize' : 'none' }}>{r.value}</span>
+              </div>
+            ))}
           </div>
-
-          {showNewChat && (
-            <form className="new-chat-form" onSubmit={createConversation}>
-              <input
-                type="text"
-                placeholder="What do you need help with?"
-                value={newSubject}
-                onChange={(e) => setNewSubject(e.target.value)}
-                disabled={sending}
-                autoFocus
-              />
-              <button type="submit" disabled={sending || !newSubject.trim()}>
-                {sending ? 'Creating...' : 'Start Chat'}
-              </button>
-            </form>
-          )}
-
-          {loading ? (
-            <div className="loading">Loading conversations...</div>
-          ) : conversations.length === 0 ? (
-            <div className="no-conversations">
-              <p>No conversations yet</p>
-              <p className="hint">Start a new chat to contact support</p>
-            </div>
-          ) : (
-            <div className="conversations-list">
-              {conversations.map(conv => (
-                <div
-                  key={conv.id}
-                  className={`conversation-item ${
-                    selectedConversation?.id === conv.id ? 'active' : ''
-                  } ${conv.status === 'closed' ? 'closed' : ''}`}
-                  onClick={() => loadConversation(conv.id)}
-                >
-                  <div className="conv-header">
-                    <span className="conv-subject">{conv.subject}</span>
-                    <span className={`conv-status status-${conv.status}`}>
-                      {conv.status}
-                    </span>
-                  </div>
-                  <div className="conv-preview">
-                    {conv.last_message && (
-                      <span className="last-message">{conv.last_message}</span>
-                    )}
-                    <span className="conv-time">
-                      {conv.last_message_at ? formatTime(conv.last_message_at) : ''}
-                    </span>
-                  </div>
-                  {conv.unread_user_count > 0 && (
-                    <span className="unread-count">{conv.unread_user_count}</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Main Chat Area */}
-        <div className="chat-area">
-          {selectedConversation ? (
-            <>
-              <div className="chat-area-header">
-                <div>
-                  <h3>{selectedConversation.subject}</h3>
-                  <span className={`status-indicator status-${selectedConversation.status}`}>
-                    {selectedConversation.status}
-                  </span>
-                </div>
-                {selectedConversation.status !== 'closed' && (
-                  <button className="btn-close-chat" onClick={closeConversation}>
-                    Close Conversation
-                  </button>
-                )}
-              </div>
-
-              <div className="messages-container">
-                {messages.map((msg, index) => {
-                  const showDate = index === 0 || 
-                    formatDate(messages[index - 1]?.created_at) !== formatDate(msg.created_at)
-                  
-                  return (
-                    <React.Fragment key={msg.id}>
-                      {showDate && (
-                        <div className="message-date-separator">
-                          {formatDate(msg.created_at)}
-                        </div>
-                      )}
-                      <div className={`message ${msg.is_admin ? 'admin' : 'user'}`}>
-                        <div className="message-header">
-                          <span className="sender-name">
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                              {renderIcon(msg.is_admin ? 'support' : 'profile', {
-                                size: 12,
-                                color: msg.is_admin ? 'var(--accent)' : 'var(--text-secondary)'
-                              })}
-                              <span>{msg.is_admin ? 'Support' : 'You'}</span>
-                            </span>
-                          </span>
-                          <span className="message-time">{formatTime(msg.created_at)}</span>
-                        </div>
-                        <div className="message-body">
-                          {msg.message}
-                        </div>
-                      </div>
-                    </React.Fragment>
-                  )
-                })}
-                <div ref={messagesEndRef} />
-              </div>
-
-              {supportTyping && (
-                <div className="typing-indicator" style={{ padding: '4px 16px', fontSize: '12px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                  Support is typing…
-                </div>
-              )}
-
-              <form className="message-input-form" onSubmit={sendMessage}>
-                <input
-                  type="text"
-                  placeholder="Type your message..."
-                  value={newMessage}
-                  onChange={handleTyping}
-                  disabled={sending || selectedConversation.status === 'closed'}
-                  autoFocus
-                />
-                <button 
-                  type="submit" 
-                  disabled={sending || !newMessage.trim() || selectedConversation.status === 'closed'}
-                >
-                  {sending ? 'Sending...' : 'Send'}
-                </button>
-              </form>
-
-              {selectedConversation.status === 'closed' && (
-                <div className="closed-notice">
-                  This conversation is closed. Start a new chat if you need further assistance.
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="no-chat-selected">
-              <div className="welcome-chat">
-                <h3>Welcome to Live Chat Support</h3>
-                <p style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                  {renderIcon('message', { size: 14, color: 'var(--accent)' })}
-                  <span>Real-time support from our team</span>
-                </p>
-                <p style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                  {renderIcon('activity', { size: 14, color: 'var(--accent-green)' })}
-                  <span>Average response time: &lt; 5 minutes</span>
-                </p>
-                <p style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                  {renderIcon('timer', { size: 14, color: 'var(--text-secondary)' })}
-                  <span>Available 24/7</span>
-                </p>
-                <button onClick={() => setShowNewChat(true)}>
-                  Start a New Conversation
-                </button>
-              </div>
-            </div>
-          )}
+        )}
+        <div style={{ background: 'var(--glass)', backdropFilter: 'blur(16px) saturate(140%)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', padding: '16px 18px' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px', borderBottom: '1px solid var(--rule)', paddingBottom: '10px', marginBottom: '12px' }}>Common Answers</div>
+          {FAQS.map((q) => (
+            <button
+              key={q}
+              onClick={() => sendFaq(q)}
+              disabled={!selectedConversation || selectedConversation.status === 'closed'}
+              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 10px', marginBottom: '6px', border: '1px solid var(--rule)', borderRadius: '4px', background: 'transparent', color: 'var(--ink)', fontSize: '12.5px', cursor: 'pointer' }}
+            >
+              {q}
+            </button>
+          ))}
         </div>
       </div>
-
-      <style jsx>{`
-        .chat-container {
-          display: flex;
-          flex-direction: column;
-          height: calc(100vh - 80px);
-          max-width: 1400px;
-          margin: 0 auto;
-          padding: 20px;
-        }
-
-        .chat-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 20px;
-          padding-bottom: 15px;
-          border-bottom: 1px solid var(--border);
-        }
-
-        .chat-header h2 {
-          margin: 0;
-          font-size: 24px;
-          color: var(--text-primary);
-        }
-
-        .chat-stats-badge {
-          background: var(--success-bg);
-          color: var(--success);
-          border: 1px solid var(--success);
-          padding: 6px 12px;
-          border-radius: 20px;
-          font-size: 14px;
-          position: relative;
-          font-weight: 600;
-        }
-
-        .unread-badge {
-          background: var(--danger);
-          color: var(--paper);
-          border-radius: 50%;
-          padding: 2px 6px;
-          font-size: 11px;
-          margin-left: 6px;
-        }
-
-        .chat-main {
-          display: flex;
-          flex: 1;
-          gap: 20px;
-          overflow: hidden;
-          background: var(--bg-surface);
-          border-radius: 12px;
-          border: 1px solid var(--border);
-          box-shadow: var(--shadow-md);
-        }
-
-        .chat-sidebar {
-          width: 320px;
-          border-right: 1px solid var(--border);
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-        }
-
-        .chat-sidebar-header {
-          padding: 15px;
-          border-bottom: 1px solid var(--border);
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        .chat-sidebar-header h3 {
-          margin: 0;
-          font-size: 16px;
-          color: var(--text-primary);
-        }
-
-        .btn-new-chat {
-          background: var(--accent);
-          color: var(--paper);
-          border: none;
-          padding: 8px 16px;
-          border-radius: 6px;
-          cursor: pointer;
-          font-size: 13px;
-          transition: background 0.2s;
-        }
-
-        .btn-new-chat:hover {
-          background: var(--accent-hover);
-        }
-
-        .new-chat-form {
-          padding: 15px;
-          border-bottom: 1px solid var(--border);
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-
-        .new-chat-form input {
-          padding: 10px;
-          border: 1px solid var(--border);
-          border-radius: 6px;
-          font-size: 14px;
-          background: var(--input-bg);
-          color: var(--text-primary);
-        }
-
-        .new-chat-form button {
-          background: var(--accent);
-          color: var(--paper);
-          border: none;
-          padding: 10px;
-          border-radius: 6px;
-          cursor: pointer;
-          font-size: 14px;
-        }
-
-        .new-chat-form button:disabled {
-          background: var(--text-disabled);
-          cursor: not-allowed;
-        }
-
-        .loading, .no-conversations {
-          padding: 30px;
-          text-align: center;
-          color: var(--text-secondary);
-        }
-
-        .no-conversations .hint {
-          font-size: 13px;
-          color: var(--text-muted);
-          margin-top: 10px;
-        }
-
-        .conversations-list {
-          flex: 1;
-          overflow-y: auto;
-        }
-
-        .conversation-item {
-          padding: 12px 15px;
-          border-bottom: 1px solid var(--border);
-          cursor: pointer;
-          transition: background 0.2s;
-        }
-
-        .conversation-item:hover {
-          background: var(--bg-hover);
-        }
-
-        .conversation-item.active {
-          background: rgba(var(--brand-primary-rgb), 0.14);
-          border-left: 3px solid var(--accent);
-        }
-
-        .conversation-item.closed {
-          opacity: 0.6;
-        }
-
-        .conv-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 5px;
-        }
-
-        .conv-subject {
-          font-weight: 500;
-          font-size: 14px;
-          color: var(--text-primary);
-        }
-
-        .conv-status {
-          font-size: 10px;
-          padding: 2px 6px;
-          border-radius: 4px;
-          text-transform: uppercase;
-        }
-
-        .status-open { background: rgba(var(--brand-primary-rgb), 0.14); color: var(--accent-hover); }
-        .status-pending { background: var(--warning-bg); color: var(--warning); }
-        .status-resolved { background: var(--success-bg); color: var(--success); }
-        .status-closed { background: var(--bg-hover); color: var(--text-secondary); }
-
-        .conv-preview {
-          display: flex;
-          justify-content: space-between;
-          font-size: 12px;
-          color: var(--text-secondary);
-        }
-
-        .last-message {
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          max-width: 200px;
-        }
-
-        .conv-time {
-          margin-left: 10px;
-          flex-shrink: 0;
-        }
-
-        .unread-count {
-          background: var(--danger);
-          color: var(--paper);
-          border-radius: 50%;
-          padding: 2px 8px;
-          font-size: 11px;
-          float: right;
-          margin-top: 5px;
-        }
-
-        .chat-area {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-        }
-
-        .chat-area-header {
-          padding: 15px 20px;
-          border-bottom: 1px solid var(--border);
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        .chat-area-header h3 {
-          margin: 0;
-          font-size: 18px;
-          color: var(--text-primary);
-        }
-
-        .status-indicator {
-          font-size: 12px;
-          padding: 3px 8px;
-          border-radius: 4px;
-          margin-left: 10px;
-        }
-
-        .btn-close-chat {
-          background: var(--danger-bg);
-          color: var(--danger);
-          border: 1px solid var(--danger);
-          padding: 8px 16px;
-          border-radius: 6px;
-          cursor: pointer;
-          font-size: 13px;
-        }
-
-        .messages-container {
-          flex: 1;
-          overflow-y: auto;
-          padding: 20px;
-          background: var(--paper);
-        }
-
-        .message-date-separator {
-          text-align: center;
-          color: var(--text-muted);
-          font-size: 12px;
-          margin: 15px 0;
-          position: relative;
-        }
-
-        .message-date-separator::before,
-        .message-date-separator::after {
-          content: '';
-          position: absolute;
-          top: 50%;
-          width: 30%;
-          height: 1px;
-          background: var(--border);
-        }
-
-        .message-date-separator::before { left: 0; }
-        .message-date-separator::after { right: 0; }
-
-        .message {
-          margin-bottom: 15px;
-          max-width: 70%;
-        }
-
-        .message.user {
-          margin-left: auto;
-        }
-
-        .message.admin {
-          margin-right: auto;
-        }
-
-        .message-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 5px;
-          font-size: 12px;
-        }
-
-        .sender-name {
-          font-weight: 500;
-        }
-
-        .message-time {
-          color: var(--text-muted);
-          margin-left: 10px;
-        }
-
-        .message-body {
-          background: var(--bg-elevated);
-          padding: 12px;
-          border-radius: 8px;
-          border: 1px solid var(--border);
-          color: var(--text-primary);
-          word-wrap: break-word;
-        }
-
-        .message.admin .message-body {
-          background: var(--paper-2);
-          border-color: var(--rule);
-        }
-
-        .message.user .message-body {
-          background: var(--accent);
-          color: var(--paper);
-          border-color: var(--accent);
-        }
-
-        .message-input-form {
-          padding: 15px 20px;
-          border-top: 1px solid var(--border);
-          display: flex;
-          gap: 10px;
-        }
-
-        .message-input-form input {
-          flex: 1;
-          padding: 12px;
-          border: 1px solid var(--border);
-          border-radius: 8px;
-          font-size: 14px;
-          background: var(--input-bg);
-          color: var(--text-primary);
-        }
-
-        .message-input-form button {
-          background: var(--accent);
-          color: var(--paper);
-          border: none;
-          padding: 12px 24px;
-          border-radius: 8px;
-          cursor: pointer;
-          font-size: 14px;
-          font-weight: 500;
-        }
-
-        .message-input-form button:disabled {
-          background: var(--text-disabled);
-          cursor: not-allowed;
-        }
-
-        .closed-notice {
-          background: var(--warning-bg);
-          color: var(--warning);
-          padding: 10px 20px;
-          text-align: center;
-          font-size: 13px;
-          border-top: 1px solid var(--warning);
-        }
-
-        .no-chat-selected {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: var(--paper);
-        }
-
-        .welcome-chat {
-          text-align: center;
-          padding: 40px;
-        }
-
-        .welcome-chat h3 {
-          font-size: 22px;
-          margin-bottom: 20px;
-          color: var(--text-primary);
-        }
-
-        .welcome-chat p {
-          color: var(--text-secondary);
-          margin: 10px 0;
-        }
-
-        .welcome-chat button {
-          margin-top: 20px;
-          background: var(--accent);
-          color: var(--paper);
-          border: none;
-          padding: 12px 30px;
-          border-radius: 8px;
-          cursor: pointer;
-          font-size: 15px;
-        }
-
-        @media (max-width: 768px) {
-          .chat-sidebar {
-            width: 280px;
-          }
-          
-          .message {
-            max-width: 85%;
-          }
-        }
-      `}</style>
     </div>
   )
 }
