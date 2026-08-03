@@ -201,11 +201,30 @@ function buildTradeScreenshotAbsolutePath(relativePath) {
   return resolved.startsWith(TRADE_JOURNAL_UPLOAD_ROOT) ? resolved : null
 }
 
+// R-multiple = realized P&L expressed as a multiple of the dollar risk the
+// stop-loss defined at entry. Computed on read (no migration, no backfill
+// problem) — trades placed without a stop-loss have no defined risk unit,
+// so they get r_multiple: null rather than a fabricated one; a muted "—"
+// in the UI is itself useful risk-discipline signal, not a gap to paper over.
+function computeRMultiple(trade) {
+  const stopLoss = parseFloat(trade.stop_loss)
+  const openPrice = parseFloat(trade.open_price)
+  const lots = parseFloat(trade.lot_size)
+  const pnl = parseFloat(trade.demo_pnl)
+  if (!Number.isFinite(stopLoss) || !Number.isFinite(openPrice) || !Number.isFinite(lots) || !Number.isFinite(pnl)) return null
+  const contractSize = CONTRACT_SIZES[trade.instrument]
+  if (!contractSize) return null
+  const riskAmount = Math.abs(openPrice - stopLoss) * lots * contractSize
+  if (riskAmount <= 0) return null
+  return parseFloat((pnl / riskAmount).toFixed(2))
+}
+
 function mapTradeRow(row) {
   if (!row || typeof row !== 'object') return row
 
   return {
     ...row,
+    r_multiple: ['closed', 'cancelled'].includes(row.status) ? computeRMultiple(row) : null,
     open_screenshot_url: row.open_screenshot_path ? `/api/trades/${row.id}/screenshot/open` : null,
     close_screenshot_url: row.close_screenshot_path ? `/api/trades/${row.id}/screenshot/close` : null
   }
@@ -3302,6 +3321,8 @@ router.get('/analytics', authenticateToken, async function(req, res) {
           avg_loss: 0,
           profit_factor: 0,
           avg_rr: 0,
+          avg_r_multiple: null,
+          r_distribution: [],
           best_trade: 0,
           worst_trade: 0,
           avg_trade_duration_mins: 0,
@@ -3345,6 +3366,14 @@ router.get('/analytics', authenticateToken, async function(req, res) {
     const avg_loss      = losers.length  ? parseFloat((gross_loss   / losers.length).toFixed(2))  : 0
     const profit_factor = gross_loss > 0 ? parseFloat((gross_profit / gross_loss).toFixed(2)) : gross_profit > 0 ? 999 : 0
     const avg_rr        = avg_loss > 0   ? parseFloat((avg_win / avg_loss).toFixed(2)) : 0
+
+    // R-multiple — a different metric from avg_rr above (that's a win/loss
+    // dollar ratio; this is realized P&L against the stop-loss-defined risk
+    // per trade). Only trades with a stop-loss have a defined R; the rest
+    // are excluded from the average rather than counted as 0.
+    const rMultiples = trades.map((t) => computeRMultiple(t)).filter((r) => r != null)
+    const avg_r_multiple = rMultiples.length ? parseFloat((rMultiples.reduce((a, b) => a + b, 0) / rMultiples.length).toFixed(2)) : null
+    const r_distribution = rMultiples.map((r) => parseFloat(r.toFixed(2)))
 
     const pnlValues   = trades.map(t => parseFloat(t.demo_pnl))
     const best_trade  = parseFloat(pnlValues.reduce((a, b) => Math.max(a, b), -Infinity).toFixed(2))
@@ -3422,6 +3451,7 @@ router.get('/analytics', authenticateToken, async function(req, res) {
         win_rate,
         total_pnl: parseFloat(total_pnl.toFixed(2)),
         avg_win, avg_loss, profit_factor, avg_rr,
+        avg_r_multiple, r_distribution,
         best_trade, worst_trade, avg_trade_duration_mins,
         drawdown_curve,
         equity_curve_ranges: equityCurveRanges,

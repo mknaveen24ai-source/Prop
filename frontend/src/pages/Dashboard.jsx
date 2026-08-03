@@ -28,6 +28,7 @@ import DashboardPayoutsPage from './DashboardPayoutsPage'
 import DashboardAffiliatePage from './DashboardAffiliatePage'
 import DashboardCompetitionsPage from './DashboardCompetitionsPage'
 import DashboardProfilePage from './DashboardProfilePage'
+import DashboardTradeHistoryPage from './DashboardTradeHistoryPage'
 import GetChallenge from './GetChallenge'
 import ErrorBoundary from '../ErrorBoundary'
 
@@ -1097,84 +1098,7 @@ function Dashboard({ user, onLogout }) {
       </div>
         {/* Account History Page */}
         {activePage === 'history' && (
-          <div>
-            <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: '24px', fontSize: '22px' }}>Account History</h2>
-            {accountHistory.length === 0 ? (
-              <Card style={{ textAlign: 'center', padding: '48px', maxWidth: '500px' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-                  {renderIcon('file', { size: 48, color: 'var(--accent)' })}
-                </div>
-                <h3 style={{ color: 'var(--accent)', marginBottom: '12px' }}>No History Yet</h3>
-                <p style={{ color: 'var(--text-muted)' }}>Your challenge history will appear here once you complete or start a challenge.</p>
-              </Card>
-            ) : (() => {
-              const totalHistPages = Math.ceil(accountHistory.length / HISTORY_PAGE_SIZE)
-              const pagedHistory = accountHistory.slice(
-                (historyPage - 1) * HISTORY_PAGE_SIZE,
-                historyPage * HISTORY_PAGE_SIZE
-              )
-              return (
-                <>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {pagedHistory.map(acc => {
-                      const pnl = parseFloat(acc.total_pnl || 0)
-                      const trades = parseInt(acc.total_trades || 0)
-                      const wins = parseInt(acc.winning_trades || 0)
-                      const winRate = trades > 0 ? ((wins / trades) * 100).toFixed(0) : 0
-                      const statusColor = getStatusColor(acc.status)
-                      return (
-                        <Card key={acc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderLeft: `3px solid ${statusColor}` }}>
-                          <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-                            <div>
-                              <div style={{ fontWeight: '700', fontSize: '15px', color: 'var(--accent)', marginBottom: '4px' }}>
-                                {acc.account_type.toUpperCase()} — ${parseFloat(acc.account_size).toLocaleString('en-US')}
-                              </div>
-                              <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
-                                Started {acc.phase_start_date ? new Date(acc.phase_start_date).toLocaleDateString() : '—'}
-                                {acc.phase_end_date && acc.status !== 'active' && ` · Ended ${new Date(acc.phase_end_date).toLocaleDateString()}`}
-                              </div>
-                            </div>
-                            <span style={{ padding: '3px 10px', borderRadius: 'var(--radius-pill)', fontSize: '11px', fontWeight: '700', color: statusColor, border: `1px solid ${statusColor}`, background: `color-mix(in srgb, ${statusColor} 10%, transparent)` }}>
-                              {acc.status.toUpperCase()}
-                            </span>
-                          </div>
-                          <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
-                            <div style={{ textAlign: 'center' }}>
-                              <div style={{ fontSize: '15px', fontWeight: '700', color: pnl >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                                {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
-                              </div>
-                              <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Total P&L</div>
-                            </div>
-                            <div style={{ textAlign: 'center' }}>
-                              <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text)' }}>{trades}</div>
-                              <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Trades</div>
-                            </div>
-                            <div style={{ textAlign: 'center' }}>
-                              <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text)' }}>{winRate}%</div>
-                              <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Win Rate</div>
-                            </div>
-                            <div style={{ textAlign: 'center' }}>
-                              <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text)' }}>
-                                ${parseFloat(acc.current_balance).toFixed(0)}
-                              </div>
-                              <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Final Balance</div>
-                            </div>
-                          </div>
-                        </Card>
-                      )
-                    })}
-                  </div>
-                  <Pagination
-                    page={historyPage}
-                    totalPages={totalHistPages}
-                    onPageChange={p => { setHistoryPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
-                    pageSize={HISTORY_PAGE_SIZE}
-                    total={accountHistory.length}
-                  />
-                </>
-              )
-            })()}
-          </div>
+          <DashboardTradeHistoryPage selectedAccount={selectedAccount} accountHistory={accountHistory} />
         )}
 
         {/* Support Page */}

@@ -1,0 +1,281 @@
+import React, { useEffect, useMemo, useState } from 'react'
+import axios from 'axios'
+import Card from '../components/ui/Card'
+import Sparkline from '../components/ui/Sparkline'
+import ListToolbar from '../components/ui/ListToolbar'
+import FilterChips from '../components/ui/FilterChips'
+import Drawer from '../components/ui/Drawer'
+import Pagination from '../components/Pagination'
+import { renderIcon } from '../utils/iconMap'
+import { formatCurrency } from '../utils/finance'
+import { getStatusColor } from '../utils/constants'
+import { formatPrice } from '../utils/instruments'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+const PAGE_SIZE = 15
+
+function formatSigned(value) {
+  return formatCurrency(value, { signed: true })
+}
+
+// Relocated from TradingPanel.jsx — this screen is where "export the closed
+// trade log" actually belongs now (Trade screen no longer hosts one).
+function exportTradesToCSV(trades, accountType, accountSize) {
+  if (!trades || trades.length === 0) return
+  const headers = ['ID', 'Instrument', 'Direction', 'Lots', 'Open Price', 'Close Price', 'Open Time', 'Close Time', 'R-Multiple', 'P&L', 'Close Reason']
+  const rows = trades.map((t) => [
+    t.id,
+    t.instrument,
+    t.direction,
+    parseFloat(t.lot_size).toFixed(2),
+    t.open_price ? formatPrice(t.open_price, t.instrument) : '',
+    t.close_price ? formatPrice(t.close_price, t.instrument) : '',
+    t.open_time ? new Date(t.open_time).toISOString() : '',
+    t.close_time ? new Date(t.close_time).toISOString() : '',
+    t.r_multiple != null ? t.r_multiple.toFixed(2) : '',
+    t.demo_pnl ? parseFloat(t.demo_pnl).toFixed(2) : '0.00',
+    t.close_reason || 'Manual',
+  ])
+  function csvSafeValue(val) {
+    let str = String(val).replace(/"/g, '""')
+    if (/^[=+\-@\t\r]/.test(str)) str = "'" + str
+    return `"${str}"`
+  }
+  const csvContent = [headers, ...rows].map((row) => row.map(csvSafeValue).join(',')).join('\n')
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  const safeAccountType = String(accountType || 'account').replace(/[^a-zA-Z0-9_-]/g, '_')
+  const safeAccountSize = String(accountSize || '').replace(/[^a-zA-Z0-9_.]/g, '_')
+  link.href = url
+  link.download = `trade_history_${safeAccountType}_${safeAccountSize}_${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+const OUTCOME_CHIPS = [
+  { id: '', label: 'All' },
+  { id: 'win', label: 'Wins' },
+  { id: 'loss', label: 'Losses' },
+]
+
+/**
+ * Trade History — the "closed trade log, list pattern" screen (Modern
+ * Gazette handoff spec). The prototype never actually designed this screen
+ * (its own STUBS/"Not in this cut" fallback covers it) — built from the
+ * shared list/table pattern contract instead: KPI strip, search, filter
+ * chips, table, row-click drawer, pagination.
+ */
+export default function DashboardTradeHistoryPage({ selectedAccount, accountHistory = [] }) {
+  const [trades, setTrades] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [instrumentFilter, setInstrumentFilter] = useState('')
+  const [outcomeFilter, setOutcomeFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const [drawerTrade, setDrawerTrade] = useState(null)
+
+  useEffect(() => {
+    if (!selectedAccount?.id) { setTrades([]); setLoading(false); return }
+    let cancelled = false
+    setLoading(true)
+    axios.get(`${API_URL}/api/trades/history`, { params: { account_id: selectedAccount.id } })
+      .then((res) => { if (!cancelled) setTrades(Array.isArray(res.data) ? res.data : []) })
+      .catch(() => { if (!cancelled) setTrades([]) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [selectedAccount?.id])
+
+  useEffect(() => { setPage(1) }, [search, instrumentFilter, outcomeFilter])
+
+  const closedTrades = useMemo(() => trades.filter((t) => t.status === 'closed'), [trades])
+
+  const instrumentChips = useMemo(() => {
+    const unique = [...new Set(closedTrades.map((t) => t.instrument))].sort()
+    return [{ id: '', label: 'All Instruments' }, ...unique.map((sym) => ({ id: sym, label: sym }))]
+  }, [closedTrades])
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return closedTrades.filter((t) => {
+      if (instrumentFilter && t.instrument !== instrumentFilter) return false
+      const pnl = parseFloat(t.demo_pnl || 0)
+      if (outcomeFilter === 'win' && pnl <= 0) return false
+      if (outcomeFilter === 'loss' && pnl >= 0) return false
+      if (q && !`${t.instrument} ${t.direction} ${t.close_reason || ''}`.toLowerCase().includes(q)) return false
+      return true
+    })
+  }, [closedTrades, search, instrumentFilter, outcomeFilter])
+
+  const kpis = useMemo(() => {
+    const total = closedTrades.length
+    const wins = closedTrades.filter((t) => parseFloat(t.demo_pnl || 0) > 0).length
+    const winRate = total > 0 ? (wins / total) * 100 : 0
+    const totalPnl = closedTrades.reduce((sum, t) => sum + parseFloat(t.demo_pnl || 0), 0)
+    const rValues = closedTrades.map((t) => t.r_multiple).filter((r) => r != null)
+    const avgR = rValues.length ? rValues.reduce((a, b) => a + b, 0) / rValues.length : null
+    // Decorative trend only — cumulative P&L walk in close order, oldest first.
+    let running = 0
+    const spark = [...closedTrades].reverse().map((t) => {
+      running += parseFloat(t.demo_pnl || 0)
+      return { value: running }
+    })
+    return { total, winRate, totalPnl, avgR, spark }
+  }, [closedTrades])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  return (
+    <div>
+      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '23px', fontWeight: 500, marginBottom: '20px' }}>Trade History</h2>
+
+      {!selectedAccount ? (
+        <Card style={{ padding: '40px', textAlign: 'center' }}>
+          <p style={{ color: 'var(--text-muted)' }}>Select an account to see its closed trades.</p>
+        </Card>
+      ) : loading ? (
+        <Card style={{ padding: '40px', textAlign: 'center' }}>
+          <p style={{ color: 'var(--text-muted)' }}>Loading trade history…</p>
+        </Card>
+      ) : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: '14px', marginBottom: '20px' }}>
+            <Card stat tone="var(--accent)">
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Win Rate</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', marginTop: '8px', color: 'var(--accent)' }}>{kpis.winRate.toFixed(1)}%</div>
+              <Sparkline data={kpis.spark} tone="var(--accent)" width={74} height={26} />
+            </Card>
+            <Card stat tone="var(--muted)">
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Total Trades</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', marginTop: '8px' }}>{kpis.total}</div>
+            </Card>
+            <Card stat tone="var(--accent)">
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Avg R-Multiple</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', marginTop: '8px', color: 'var(--accent)' }}>{kpis.avgR != null ? `${kpis.avgR.toFixed(2)}R` : '—'}</div>
+            </Card>
+            <Card stat tone={kpis.totalPnl >= 0 ? 'var(--gain)' : 'var(--loss)'}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Total P&amp;L</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', marginTop: '8px', color: kpis.totalPnl >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{formatSigned(kpis.totalPnl)}</div>
+              <Sparkline data={kpis.spark} tone={kpis.totalPnl >= 0 ? 'var(--gain)' : 'var(--loss)'} width={74} height={26} />
+            </Card>
+          </div>
+
+          <ListToolbar
+            searchValue={search}
+            onSearchChange={setSearch}
+            placeholder="Search closed trades…"
+            actions={(
+              <button
+                onClick={() => exportTradesToCSV(filtered, selectedAccount?.account_type, selectedAccount?.account_size)}
+                className="lx-btn"
+                style={{ padding: '8px 12px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                {renderIcon('download', { size: 13 })} Export CSV
+              </button>
+            )}
+          />
+          <FilterChips options={instrumentChips} activeId={instrumentFilter} onChange={setInstrumentFilter} />
+          <FilterChips options={OUTCOME_CHIPS} activeId={outcomeFilter} onChange={setOutcomeFilter} />
+
+          <Card ruled flush title="Closed Trades">
+            <div className="lx-table-wrap">
+              <table className="lx-table">
+                <thead>
+                  <tr>
+                    <th>Instrument</th><th>Side</th><th>Lots</th><th>Entry</th><th>Exit</th><th>R</th><th>Closed</th><th>P&amp;L</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paged.length === 0 ? (
+                    <tr><td colSpan={8} className="lx-table__empty">No closed trades match your filters</td></tr>
+                  ) : paged.map((t) => {
+                    const pnl = parseFloat(t.demo_pnl || 0)
+                    return (
+                      <tr key={t.id} onClick={() => setDrawerTrade(t)} style={{ cursor: 'pointer' }}>
+                        <td>{t.instrument}</td>
+                        <td><span className="lx-badge" style={{ color: t.direction === 'buy' ? 'var(--gain)' : 'var(--loss)' }}>{t.direction === 'buy' ? 'BUY' : 'SELL'}</span></td>
+                        <td className="lx-num">{parseFloat(t.lot_size).toFixed(2)}</td>
+                        <td className="lx-num">{parseFloat(t.open_price).toFixed(t.instrument?.includes('JPY') ? 3 : 5)}</td>
+                        <td className="lx-num">{t.close_price != null ? parseFloat(t.close_price).toFixed(t.instrument?.includes('JPY') ? 3 : 5) : '—'}</td>
+                        <td className="lx-num" style={{ color: 'var(--muted)' }}>{t.r_multiple != null ? `${t.r_multiple.toFixed(2)}R` : '—'}</td>
+                        <td className="lx-num">{t.close_time ? new Date(t.close_time).toLocaleDateString() : '—'}</td>
+                        <td className="lx-num" style={{ color: pnl >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{formatSigned(pnl)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} pageSize={PAGE_SIZE} total={filtered.length} />
+        </>
+      )}
+
+      {accountHistory.length > 0 && (
+        <div style={{ marginTop: '32px' }}>
+          <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '12px' }}>
+            Past Challenge Accounts
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {accountHistory.map((acc) => {
+              const pnl = parseFloat(acc.total_pnl || 0)
+              const statusColor = getStatusColor(acc.status)
+              return (
+                <Card key={acc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                  <div style={{ fontSize: '13px' }}>
+                    {String(acc.account_type).toUpperCase()} — ${parseFloat(acc.account_size).toLocaleString('en-US')}
+                    <span style={{ color: statusColor, marginLeft: '10px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>{String(acc.status).toUpperCase()}</span>
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: pnl >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{formatSigned(pnl)}</div>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      <Drawer open={!!drawerTrade} onClose={() => setDrawerTrade(null)} title={drawerTrade?.instrument} subtitle={drawerTrade ? `Trade #${drawerTrade.id}` : ''}>
+        {drawerTrade && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {[
+              ['Direction', drawerTrade.direction?.toUpperCase()],
+              ['Lots', parseFloat(drawerTrade.lot_size).toFixed(2)],
+              ['Open Price', drawerTrade.open_price],
+              ['Close Price', drawerTrade.close_price],
+              ['Stop Loss', drawerTrade.stop_loss || '—'],
+              ['Take Profit', drawerTrade.take_profit || '—'],
+              ['R-Multiple', drawerTrade.r_multiple != null ? `${drawerTrade.r_multiple.toFixed(2)}R` : 'No stop-loss set'],
+              ['Close Reason', drawerTrade.close_reason || '—'],
+              ['Opened', drawerTrade.open_time ? new Date(drawerTrade.open_time).toLocaleString() : '—'],
+              ['Closed', drawerTrade.close_time ? new Date(drawerTrade.close_time).toLocaleString() : '—'],
+              ['P&L', formatSigned(parseFloat(drawerTrade.demo_pnl || 0))],
+            ].map(([label, value]) => (
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--rule-soft)', paddingBottom: '8px' }}>
+                <span style={{ color: 'var(--muted)', fontSize: '12.5px' }}>{label}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12.5px' }}>{value}</span>
+              </div>
+            ))}
+            {(drawerTrade.open_screenshot_url || drawerTrade.close_screenshot_url) && (
+              <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                {drawerTrade.open_screenshot_url && (
+                  <a href={`${API_URL}${drawerTrade.open_screenshot_url}`} target="_blank" rel="noreferrer" className="lx-btn" style={{ padding: '8px 12px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)' }}>
+                    {renderIcon('file', { size: 13 })} Open screenshot
+                  </a>
+                )}
+                {drawerTrade.close_screenshot_url && (
+                  <a href={`${API_URL}${drawerTrade.close_screenshot_url}`} target="_blank" rel="noreferrer" className="lx-btn" style={{ padding: '8px 12px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)' }}>
+                    {renderIcon('file', { size: 13 })} Close screenshot
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </Drawer>
+    </div>
+  )
+}

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Card from './ui/Card'
 import OrderPanel from './OrderPanel'
 import TradingViewWidget from './TradingViewWidget'
 import SimulatedTradingDisclaimer from './SimulatedTradingDisclaimer'
@@ -49,46 +50,6 @@ function getTimeRemaining(endDateStr) {
       : `${hours}h ${minutes}m ${seconds}s`,
     urgent: diff < 3 * 24 * 60 * 60 * 1000  // less than 3 days
   }
-}
-
-// ── CSV export helper ──────────────────────────────────────────────────────────
-function exportTradesToCSV(trades, accountType, accountSize) {
-  if (!trades || trades.length === 0) return
-  const headers = ['ID','Instrument','Direction','Lots','Open Price','Close Price','Open Time','Close Time','P&L','Close Reason','Order Type']
-  const rows = trades.map(t => [
-    t.id,
-    t.instrument,
-    t.direction,
-    parseFloat(t.lot_size).toFixed(2),
-    t.open_price  ? formatPrice(t.open_price, t.instrument)  : '',
-    t.close_price ? formatPrice(t.close_price, t.instrument) : '',
-    t.open_time   ? new Date(t.open_time).toISOString()  : '',
-    t.close_time  ? new Date(t.close_time).toISOString() : '',
-    t.demo_pnl    ? parseFloat(t.demo_pnl).toFixed(2)    : '0.00',
-    t.close_reason || 'Manual',
-    t.order_type  || 'market'
-  ])
-  // Fix CSV formula injection vulnerability
-  function csvSafeValue(val) {
-    let str = String(val).replace(/"/g, '""')
-    if (/^[=+\-@\t\r]/.test(str)) str = "'" + str
-    return `"${str}"`
-  }
-  const csvContent = [headers, ...rows]
-    .map(row => row.map(v => csvSafeValue(v)).join(','))
-    .join('\n')
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-  const url  = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  // FIX (MEDIUM #15): Sanitize filename components to prevent injection
-  const safeAccountType = String(accountType || 'account').replace(/[^a-zA-Z0-9_-]/g, '_')
-  const safeAccountSize = String(accountSize || '').replace(/[^a-zA-Z0-9_.]/g, '_')
-  link.href     = url
-  link.download = `trade_history_${safeAccountType}_${safeAccountSize}_${new Date().toISOString().slice(0,10)}.csv`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
 }
 
 function formatBatchActionLabel(actionType) {
@@ -598,19 +559,9 @@ export default function TradingPanel({
   const targetRemaining = calculateTargetRemaining(profitTargetAmount, realizedProfit)
   const openPositions = openTrades.filter(trade => trade.status === 'open')
   const pendingOrders = openTrades.filter(trade => trade.status === 'pending')
-  const closedTrades = tradeHistory.filter(trade => trade.status === 'closed')
-  const cancelledTrades = tradeHistory.filter(trade => trade.status === 'cancelled')
-  const realizedHistoryPnl = closedTrades.reduce((sum, trade) => sum + parseFloat(trade.demo_pnl || 0), 0)
-  const [tradeHistoryPage, setTradeHistoryPage] = useState(1)
-  const TRADE_HIST_PAGE_SIZE = 20
-
-  // FIX (AUDIT): tradeHistoryPage was never reset on account switch — a
-  // trader on page 3 of Account A's history would land on Account B with
-  // fewer trades and slice past the array end, showing a silently blank
-  // table with no visible pagination controls to explain why.
-  useEffect(() => {
-    setTradeHistoryPage(1)
-  }, [selectedAccount?.id])
+  // Closed-trade log moved to the dedicated Trade History screen
+  // (pages/DashboardTradeHistoryPage.jsx) — the prototype's Trade screen
+  // itself only ever shows open positions alongside the order ticket.
   const visibleOpenTrades = positionView === 'open'
     ? openPositions
     : positionView === 'pending'
@@ -760,24 +711,24 @@ export default function TradingPanel({
 
       {/* No account yet */}
       {accounts.length === 0 && (
-        <div className="card" style={{ textAlign: 'center', padding: '48px' }}>
+        <Card style={{ textAlign: 'center', padding: '48px' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
             {renderIcon('trade', { size: 48, color: 'var(--accent)' })}
           </div>
           <h3 style={{ color: 'var(--accent)', marginBottom: '12px' }}>No Trading Account</h3>
           <p style={{ color: 'var(--text-muted)' }}>Go to Dashboard to create your challenge account first.</p>
-        </div>
+        </Card>
       )}
 
       {/* Locked account */}
       {selectedAccount?.status === 'locked' && (
-        <div className="card" style={{ textAlign: 'center', padding: '32px', border: '1px solid var(--muted)', marginBottom: '20px' }}>
+        <Card style={{ textAlign: 'center', padding: '32px', border: '1px solid var(--muted)', marginBottom: '20px' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
             {renderIcon('lock', { size: 40, color: 'var(--text-secondary)' })}
           </div>
           <h3 style={{ color: 'var(--muted)', marginBottom: '8px' }}>Account Locked</h3>
           <p style={{ color: 'var(--text-muted)' }}>This account has been locked by admin. Contact support.</p>
-        </div>
+        </Card>
       )}
 
       {/* Loading state */}
@@ -990,7 +941,7 @@ export default function TradingPanel({
             )}
             <div className="trade-desk-stack">
             {openTrades.length > 0 && (
-              <div className="card trade-section-card">
+              <Card className="trade-section-card">
                 <div className="trade-section-pills" style={{ marginBottom: '14px' }}>
                   <span className="trade-summary-pill">{openPositions.length} Open</span>
                   <span className="trade-summary-pill">{pendingOrders.length} Pending</span>
@@ -1294,149 +1245,9 @@ export default function TradingPanel({
                     </tbody>
                   </table>
                 </div>
-              </div>
+              </Card>
             )}
 
-            {/* Trade History */}
-            {tradeHistory.length > 0 && (
-              <div className="card trade-section-card trade-history-card">
-                <div className="trade-section-pills" style={{ marginBottom: '14px' }}>
-                  <span className="trade-summary-pill">{closedTrades.length} Closed</span>
-                  <span className="trade-summary-pill">{cancelledTrades.length} Cancelled</span>
-                  <span className="trade-summary-pill" style={{ color: realizedHistoryPnl >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                    {realizedHistoryPnl >= 0 ? '+' : ''}${realizedHistoryPnl.toFixed(2)} Realized
-                  </span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
-                  <h3 style={{ color: 'var(--accent)', fontSize: '15px', margin: 0 }}>
-                    Closed Trades & History ({tradeHistory.length})
-                  </h3>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    {/* ── Repeat Last Trade ── */}
-                    {(() => {
-                      const lastClosed = tradeHistory.find(t => t.status === 'closed')
-                      if (!lastClosed) return null
-                      return (
-                        <button
-                          onClick={() => {
-                            setOrderForm(f => ({
-                              ...f,
-                              instrument: lastClosed.instrument,
-                              lots:       parseFloat(lastClosed.lot_size).toFixed(2),
-                              stop_loss:  lastClosed.stop_loss  ? parseFloat(lastClosed.stop_loss).toString()  : '',
-                              take_profit: lastClosed.take_profit ? parseFloat(lastClosed.take_profit).toString() : '',
-                            }))
-                          }}
-                          style={{
-                            background: 'transparent',
-                            border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)',
-                            borderRadius: '0',
-                            padding: '6px 12px',
-                            fontSize: '11px',
-                            color: 'var(--accent)',
-                            cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', gap: '5px',
-                            transition: 'all 0.15s'
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'color-mix(in srgb, var(--muted) 8%, transparent)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                          title={`Repeat: ${lastClosed.instrument} ${lastClosed.direction?.toUpperCase()} ${parseFloat(lastClosed.lot_size).toFixed(2)} lots`}
-                        >
-                          {renderIcon('repeat', { size: 12, color: 'currentColor' })}
-                          <span>Repeat Last</span>
-                        </button>
-                      )
-                    })()}
-                    <button
-                      onClick={() => exportTradesToCSV(
-                        tradeHistory,
-                        selectedAccount?.account_type || 'account',
-                        selectedAccount?.account_size || ''
-                      )}
-                      style={{
-                        background: 'transparent',
-                        border: '1px solid var(--navy-border)',
-                        borderRadius: '0',
-                        padding: '6px 12px',
-                        fontSize: '11px',
-                        color: 'var(--text-muted)',
-                        cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', gap: '5px',
-                        transition: 'all 0.15s'
-                      }}
-                      onMouseEnter={e => { e.target.style.borderColor = 'var(--accent)'; e.target.style.color = 'var(--accent)' }}
-                      onMouseLeave={e => { e.target.style.borderColor = 'var(--navy-border)'; e.target.style.color = 'var(--text-muted)' }}
-                      title="Download trade history as CSV"
-                    >
-                      {renderIcon('download', { size: 12, color: 'currentColor' })}
-                      <span>Export CSV</span>
-                    </button>
-                  </div>
-                </div>
-                <div className="table-wrapper trading-table-wrapper">
-                  <table className="data-table trading-table">
-                    <thead>
-                      <tr>
-                        <th>Symbol</th><th>Type</th><th>Lots</th>
-                        <th>Open Price</th><th>Close Price</th><th>Reason</th><th>P&L</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tradeHistory.slice(
-                        (tradeHistoryPage - 1) * TRADE_HIST_PAGE_SIZE,
-                        tradeHistoryPage * TRADE_HIST_PAGE_SIZE
-                      ).map(trade => {
-                        const dec = getPriceDecimals(trade.instrument)
-                        const isCancelled = trade.status === 'cancelled'
-                        return (
-                          <React.Fragment key={trade.id}>
-                            <tr style={{ opacity: isCancelled ? 0.6 : 1 }}>
-                              <td style={{ fontWeight: '600' }}>
-                                {trade.instrument}
-                              </td>
-                              <td style={{ color: trade.direction === 'buy' ? 'var(--green)' : 'var(--red)', fontWeight: '600' }}>
-                                {trade.order_type && trade.order_type !== 'market'
-                                  ? trade.order_type.replace(/_/g, ' ').toUpperCase()
-                                  : trade.direction.toUpperCase()
-                                }
-                              </td>
-                              <td>{parseFloat(trade.lot_size).toFixed(2)}</td>
-                              <td>
-                                {trade.open_price != null
-                                  ? parseFloat(trade.open_price).toFixed(dec)
-                                  : trade.pending_price != null
-                                    ? `${parseFloat(trade.pending_price).toFixed(dec)} (pending)`
-                                    : '—'
-                                }
-                              </td>
-                              <td>{trade.close_price ? parseFloat(trade.close_price).toFixed(dec) : '—'}</td>
-                              <td style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                {trade.close_reason || 'Manual'}
-                              </td>
-                              <td style={{
-                                color: isCancelled
-                                  ? 'var(--text-muted)'
-                                  : (parseFloat(trade.demo_pnl || 0) >= 0 ? 'var(--green)' : 'var(--red)'),
-                                fontWeight: '600'
-                              }}>
-                                {isCancelled ? '—' : `${parseFloat(trade.demo_pnl || 0) >= 0 ? '+' : ''}$${parseFloat(trade.demo_pnl || 0).toFixed(2)}`}
-                              </td>
-                            </tr>
-                          </React.Fragment>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <Pagination
-                  page={tradeHistoryPage}
-                  totalPages={Math.ceil(tradeHistory.length / TRADE_HIST_PAGE_SIZE)}
-                  onPageChange={p => setTradeHistoryPage(p)}
-                  pageSize={TRADE_HIST_PAGE_SIZE}
-                  total={tradeHistory.length}
-                />
-              </div>
-            )}
             </div>
           </div>
 
@@ -1470,7 +1281,7 @@ export default function TradingPanel({
 
       {/* Passed / Failed / Expired account message */}
       {!accountLoading && selectedAccount && ['passed', 'failed', 'expired'].includes(selectedAccount.status) && (
-        <div className="card" style={{
+        <Card style={{
           textAlign: 'center', padding: '48px',
           border: `1px solid ${selectedAccount.status === 'passed' ? 'var(--green)' : 'var(--red)'}`
         }}>
@@ -1497,7 +1308,7 @@ export default function TradingPanel({
             {selectedAccount.status === 'failed'  && 'You have breached the drawdown limit. Start a new challenge from the Dashboard.'}
             {selectedAccount.status === 'expired' && 'You did not reach the profit target within 30 days. Start a new challenge from the Dashboard.'}
           </p>
-        </div>
+        </Card>
       )}
     </div>
   )
