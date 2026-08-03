@@ -499,11 +499,17 @@ export default function DashboardHome({
 
   const realizedProfit = Math.max(0, (stats.account.current_balance || 0) - (stats.account.starting_balance || 0))
   const kpiSparkData = equityCurve.slice(-14)
+  // Nullish-guarded: today_pnl / today_pnl_pct / daily_drawdown / payout_cycle
+  // are new fields on GET /accounts/stats — fall back gracefully for a
+  // backend that hasn't picked up the change yet rather than crashing.
+  const equityProfitPct = stats.stats.equity_profit_pct ?? 0
+  const todayPnl = stats.stats.today_pnl ?? 0
+  const todayPnlPct = stats.stats.today_pnl_pct ?? 0
   const kpis = [
     {
       key: 'equity', label: 'Equity', icon: 'balance', tone: 'var(--gain)',
       value: formatMoney(liveEquity),
-      delta: `${stats.stats.equity_profit_pct >= 0 ? '+' : ''}${stats.stats.equity_profit_pct.toFixed(2)}%`, sub: 'since start',
+      delta: `${equityProfitPct >= 0 ? '+' : ''}${equityProfitPct.toFixed(2)}%`, sub: 'since start',
     },
     {
       key: 'balance', label: 'Balance', icon: 'wallet', tone: 'var(--accent)',
@@ -511,10 +517,10 @@ export default function DashboardHome({
       delta: formatSigned(realizedProfit), sub: 'realised',
     },
     {
-      key: 'today_pnl', label: "Today's P&L", icon: stats.stats.today_pnl >= 0 ? 'floating_up' : 'floating_down',
-      tone: stats.stats.today_pnl >= 0 ? 'var(--gain)' : 'var(--loss)',
-      value: formatSigned(stats.stats.today_pnl),
-      delta: `${stats.stats.today_pnl_pct >= 0 ? '+' : ''}${stats.stats.today_pnl_pct.toFixed(2)}%`, sub: 'vs yesterday',
+      key: 'today_pnl', label: "Today's P&L", icon: todayPnl >= 0 ? 'floating_up' : 'floating_down',
+      tone: todayPnl >= 0 ? 'var(--gain)' : 'var(--loss)',
+      value: formatSigned(todayPnl),
+      delta: `${todayPnlPct >= 0 ? '+' : ''}${todayPnlPct.toFixed(2)}%`, sub: 'vs yesterday',
     },
     {
       key: 'win_rate', label: 'Win Rate', icon: 'target', tone: 'var(--accent)',
@@ -582,8 +588,8 @@ export default function DashboardHome({
       <ConsistencyRiskBlock
         consistency={stats.stats.consistency}
         dailyDrawdown={stats.stats.daily_drawdown}
-        totalDrawdownUsedPct={stats.stats.total_drawdown_used_pct}
-        totalDrawdownRemainingPct={stats.stats.total_drawdown_remaining_pct}
+        totalDrawdownUsedPct={stats.stats.total_drawdown_used_pct ?? 0}
+        totalDrawdownRemainingPct={stats.stats.total_drawdown_remaining_pct ?? 0}
         maxDrawdownPct={stats.rules?.max_drawdown_pct || 0}
         profitProgressPct={stats.rules?.profit_target_amount > 0 ? Math.min(100, (realizedProfit / stats.rules.profit_target_amount) * 100) : 0}
         profitTargetAmount={stats.rules?.profit_target_amount || 0}
