@@ -155,12 +155,21 @@ function ConsistencyDonut({ score }) {
 
 function ConsistencyRiskBlock({ consistency, dailyDrawdown, totalDrawdownUsedPct, totalDrawdownRemainingPct, maxDrawdownPct, profitProgressPct, profitTargetAmount, realizedProfit }) {
   const risks = [
-    dailyDrawdown && {
+    dailyDrawdown ? {
       label: 'Daily drawdown',
       usedLabel: `${dailyDrawdown.used_pct.toFixed(1)}% used`,
       pct: dailyDrawdown.used_pct,
       tone: dailyDrawdown.used_pct >= 75 ? 'var(--loss)' : 'var(--gain)',
       foot: `${formatMoney(dailyDrawdown.amount_used)} of ${formatMoney(dailyDrawdown.limit_amount)} · resets 00:00 UTC`,
+    } : {
+      // No daily_drawdown_pct configured on this account — show the row
+      // honestly as "not configured" rather than silently hiding it (a
+      // missing row reads as a bug, not as "no limit").
+      label: 'Daily drawdown',
+      usedLabel: 'Not configured',
+      pct: 0,
+      tone: 'var(--muted)',
+      foot: 'No daily loss limit set on this account',
     },
     {
       label: 'Overall drawdown',

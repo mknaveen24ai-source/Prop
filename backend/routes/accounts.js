@@ -4,7 +4,6 @@ const pool = require('../db')
 const { authenticateToken } = require('./middleware')
 const rateLimit = require('express-rate-limit')
 const { ipKeyGenerator } = require('express-rate-limit')
-const { v4: uuidv4 } = require('uuid')
 const logger = require('../utils/logger')
 const { CONTRACT_SIZES } = require('../constants')
 const {
@@ -29,6 +28,7 @@ const {
   assertSlotAvailable
 } = require('../utils/stepModels')
 const { validateCouponForCheckout, recordCouponRedemption } = require('../utils/coupons')
+const { generateAccountUid } = require('../utils/accountIds')
 
 const createAccountLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,     // 1 hour
@@ -142,7 +142,8 @@ router.get('/rules/:account_id', authenticateToken, async function(req, res) {
 
     const accountResult = await pool.query(
       `SELECT id, user_id, account_type, account_size, current_balance, starting_balance,
-              peak_balance, status, profit_target, max_drawdown_pct, phase_start_date, phase_end_date, created_at
+              peak_balance, status, profit_target, max_drawdown_pct, phase_start_date, phase_end_date, created_at,
+              challenge_model_slug, step_number
        FROM accounts
        WHERE id = $1 AND user_id = $2`,
       [accountIdStr, req.user.userId]
@@ -431,7 +432,7 @@ router.post('/create', authenticateToken, createAccountLimiter, async function(r
       ? parseFloat(stepModel.consistency_max_day_pct_by_phase[0])
       : parseFloat(stepModel.consistency_max_day_pct)
     const profit_target  = account_size * (profitTargetPct / 100)
-    const account_uid    = uuidv4()
+    const account_uid    = await generateAccountUid(client, { accountType: 'phase1', challengeModelSlug: stepModel.slug })
 
     // Phase end date in UTC to avoid timezone off-by-one
     const phase_end_date = new Date()
