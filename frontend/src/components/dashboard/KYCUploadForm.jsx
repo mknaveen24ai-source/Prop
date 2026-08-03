@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import Card from '../ui/Card';
 
 const ALLOWED_ID_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
 const ALLOWED_SELFIE_TYPES = ['image/jpeg', 'image/jpg', 'image/png'];
@@ -325,10 +326,10 @@ export default function KYCUploadForm({
         />
       )}
 
-      <div className="card" style={{ maxWidth: '720px' }}>
-        <h3 style={{ color: 'var(--accent)', marginBottom: '8px' }}>Identity Verification</h3>
+      <Card>
+        <h3 style={{ color: 'var(--accent)', marginBottom: '8px' }}>Submit your documents</h3>
         <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '24px' }}>
-          Submit your country, government ID details, ID document, and a live photo for admin review.
+          Country, government ID details, ID document, and a live photo — all reviewed by admin.
         </p>
 
         <form onSubmit={onSubmit}>
@@ -480,7 +481,7 @@ export default function KYCUploadForm({
             {uploading ? 'Uploading...' : 'Submit for Verification'}
           </button>
         </form>
-      </div>
+      </Card>
     </>
   );
 }

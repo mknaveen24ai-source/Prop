@@ -9251,8 +9251,8 @@ router.get('/kyc/document/:userId/:type', authenticateAdmin, requireAdminCapabil
     const { userId, type } = req.params;
 
     // FIX: kyc.js saves file paths into the `users` table (not `user_kyc`).
-    // Column mapping: type='id' -> id_document_path | type='selfie' -> selfie_path
-    const columnName = type === 'selfie' ? 'selfie_path' : 'id_document_path';
+    // Column mapping: type='id' -> id_document_path | type='id_back' -> id_document_back_path | type='selfie' -> selfie_path
+    const columnName = type === 'selfie' ? 'selfie_path' : type === 'id_back' ? 'id_document_back_path' : 'id_document_path';
 
     const userRow = await pool.query(
       `SELECT ${columnName} AS doc_path

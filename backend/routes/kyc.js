@@ -9,6 +9,7 @@ const pool = require('../db')
 const { authenticateToken } = require('./middleware')
 const logger = require('../utils/logger')
 const { encryptFileAtRest } = require('../utils/secureKycStorage')
+const { sanitizeString } = require('../utils/validation')
 
 // Ensure upload directory exists
 const uploadDir = path.join(__dirname, '../uploads/kyc')
@@ -34,7 +35,7 @@ const storage = multer.diskStorage({
 // cannot bypass the filter by sending a fake Content-Type header.
 // ─────────────────────────────────────────────────────────────────────────────
 const idDocFilter = (req, file, cb) => {
-  if (file.fieldname === 'id_document') {
+  if (file.fieldname === 'id_document' || file.fieldname === 'id_document_back') {
     const allowedTypes = /jpeg|jpg|png|pdf/
     const ext    = allowedTypes.test(path.extname(file.originalname).toLowerCase())
     const mimeOk = /image\/(jpeg|jpg|png)|application\/pdf/.test(file.mimetype)
@@ -137,6 +138,7 @@ router.post('/upload',
   function(req, res, next) {
     upload.fields([
       { name: 'id_document', maxCount: 1 },
+      { name: 'id_document_back', maxCount: 1 },
       { name: 'selfie', maxCount: 1 }
     ])(req, res, function(err) {
       if (err instanceof multer.MulterError) {
@@ -155,22 +157,26 @@ router.post('/upload',
     const uploadedFiles = []
     try {
       const files = req.files
-      if (!files || !files.id_document || !files.selfie) {
-        return res.status(400).json({ error: 'Both ID document and selfie are required' })
+      if (!files || !files.id_document || !files.id_document_back || !files.selfie) {
+        return res.status(400).json({ error: 'ID document (front and back) and a selfie are required' })
       }
 
-      const idDoc  = files.id_document[0]
-      const selfie = files.selfie[0]
-      uploadedFiles.push(idDoc.path, selfie.path)
+      const idDoc     = files.id_document[0]
+      const idDocBack = files.id_document_back[0]
+      const selfie    = files.selfie[0]
+      uploadedFiles.push(idDoc.path, idDocBack.path, selfie.path)
 
       // ── FIX (Bug 13): Magic byte validation ────────────────────────────────
       // Check actual file contents, not just the header/extension.
       // Normalize 'jpeg' → 'jpg' so .jpeg files are accepted.
-      const idDocExt  = path.extname(idDoc.originalname).toLowerCase().replace('.', '').replace('jpeg', 'jpg')
-      const selfieExt = path.extname(selfie.originalname).toLowerCase().replace('.', '').replace('jpeg', 'jpg')
+      const idDocExt     = path.extname(idDoc.originalname).toLowerCase().replace('.', '').replace('jpeg', 'jpg')
+      const idDocBackExt = path.extname(idDocBack.originalname).toLowerCase().replace('.', '').replace('jpeg', 'jpg')
+      const selfieExt    = path.extname(selfie.originalname).toLowerCase().replace('.', '').replace('jpeg', 'jpg')
 
-      const idAllowed  = ['jpg', 'png', 'pdf'].includes(idDocExt) ? [idDocExt === 'jpg' ? 'jpg' : idDocExt] : []
-      const idMagicOk  = idAllowed.length > 0 && validateMagicBytes(idDoc.path, ['jpg', 'png', 'pdf'])
+      const idAllowed      = ['jpg', 'png', 'pdf'].includes(idDocExt)
+      const idMagicOk      = idAllowed && validateMagicBytes(idDoc.path, ['jpg', 'png', 'pdf'])
+      const idBackAllowed  = ['jpg', 'png', 'pdf'].includes(idDocBackExt)
+      const idBackMagicOk  = idBackAllowed && validateMagicBytes(idDocBack.path, ['jpg', 'png', 'pdf'])
 
       const selfieAllowed = ['jpg', 'png'].includes(selfieExt)
       const selfieMagicOk = selfieAllowed && validateMagicBytes(selfie.path, ['jpg', 'png'])
@@ -181,50 +187,69 @@ router.post('/upload',
         return res.status(400).json({ error: 'ID document file content does not match declared type' })
       }
 
+      if (!idBackMagicOk) {
+        uploadedFiles.forEach(f => { try { fs.unlinkSync(f) } catch (_) {} })
+        return res.status(400).json({ error: 'ID document back file content does not match declared type' })
+      }
+
       if (!selfieMagicOk) {
         uploadedFiles.forEach(f => { try { fs.unlinkSync(f) } catch (_) {} })
         return res.status(400).json({ error: 'Selfie file content does not match declared type' })
       }
 
-      // Encrypt both files at rest before persisting their paths. encryptFileAtRest
+      // Encrypt all three files at rest before persisting their paths. encryptFileAtRest
       // writes a sibling `.enc` file and removes the plaintext original, so from here
       // on the tracked paths (for cleanup and for the DB) must be the `.enc` ones.
       let idDocStoragePath
+      let idDocBackStoragePath
       let selfieStoragePath
       try {
-        idDocStoragePath  = encryptFileAtRest(idDoc.path)
-        selfieStoragePath = encryptFileAtRest(selfie.path)
+        idDocStoragePath     = encryptFileAtRest(idDoc.path)
+        idDocBackStoragePath = encryptFileAtRest(idDocBack.path)
+        selfieStoragePath    = encryptFileAtRest(selfie.path)
       } catch (encError) {
         logger.error('[kyc] Failed to encrypt uploaded documents:', { error: encError.message })
         uploadedFiles.forEach(f => { try { fs.unlinkSync(f) } catch (_) {} })
         return res.status(500).json({ error: 'Document storage is temporarily unavailable. Please try again later.' })
       }
       uploadedFiles.length = 0
-      uploadedFiles.push(idDocStoragePath, selfieStoragePath)
+      uploadedFiles.push(idDocStoragePath, idDocBackStoragePath, selfieStoragePath)
 
       // Fetch existing paths before overwriting (for cleanup)
       const existingResult = await pool.query(
-        'SELECT id_document_path, selfie_path FROM users WHERE id = $1',
+        'SELECT id_document_path, id_document_back_path, selfie_path FROM users WHERE id = $1',
         [req.user.userId]
       )
       const existing = existingResult.rows[0] || {}
 
-      const idDocRelPath  = toRelativePath(idDocStoragePath)
-      const selfieRelPath = toRelativePath(selfieStoragePath)
+      const idDocRelPath     = toRelativePath(idDocStoragePath)
+      const idDocBackRelPath = toRelativePath(idDocBackStoragePath)
+      const selfieRelPath    = toRelativePath(selfieStoragePath)
+
+      const country        = sanitizeString(String(req.body.country || ''), 100) || null
+      const documentType   = sanitizeString(String(req.body.document_type || ''), 40) || null
+      const documentNumber = sanitizeString(String(req.body.document_number || ''), 64) || null
 
       await pool.query(
         `UPDATE users SET
          kyc_status = 'pending',
          id_document_path = $1,
-         selfie_path = $2,
+         id_document_back_path = $2,
+         selfie_path = $3,
+         kyc_document_country = $4,
+         kyc_document_type = $5,
+         kyc_document_number = $6,
          kyc_submitted_at = NOW()
-         WHERE id = $3`,
-        [idDocRelPath, selfieRelPath, req.user.userId]
+         WHERE id = $7`,
+        [idDocRelPath, idDocBackRelPath, selfieRelPath, country, documentType, documentNumber, req.user.userId]
       )
 
       // Delete old files AFTER successful DB update
       if (existing.id_document_path && existing.id_document_path !== idDocRelPath) {
         deleteOldKycFile(existing.id_document_path)
+      }
+      if (existing.id_document_back_path && existing.id_document_back_path !== idDocBackRelPath) {
+        deleteOldKycFile(existing.id_document_back_path)
       }
       if (existing.selfie_path && existing.selfie_path !== selfieRelPath) {
         deleteOldKycFile(existing.selfie_path)
@@ -244,7 +269,12 @@ router.post('/upload',
 router.get('/status', authenticateToken, async function(req, res) {
   try {
     const result = await pool.query(
-      'SELECT kyc_status, kyc_submitted_at FROM users WHERE id = $1',
+      `SELECT kyc_status, kyc_submitted_at, kyc_rejection_reason,
+              kyc_document_country, kyc_document_type, kyc_document_number,
+              (id_document_path IS NOT NULL) AS has_id_document,
+              (id_document_back_path IS NOT NULL) AS has_id_document_back,
+              (selfie_path IS NOT NULL) AS has_selfie
+         FROM users WHERE id = $1`,
       [req.user.userId]
     )
     res.json(result.rows[0])
