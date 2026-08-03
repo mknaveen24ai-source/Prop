@@ -817,8 +817,14 @@ function Dashboard({ user, onLogout }) {
         })))}
       />
 
-      {/* Main Content */}
-      <div className="dashboard-main animate-fade-up" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* Main Content — .sidebar is position:fixed (stays pinned, only its
+          own nav list scrolls internally), so main content needs an
+          explicit offset instead of relying on flex to push it over.
+          Class-based (not inline) so the mobile media query can still
+          override it — see .dashboard-main rules in App.css. */}
+      <div
+        className={`dashboard-main animate-fade-up ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
+        style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         {/* Top Nav */}
       <div className="nav dashboard-topbar" style={{
         margin: '16px 24px',

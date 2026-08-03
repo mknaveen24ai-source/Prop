@@ -245,8 +245,7 @@ export default function Sidebar({
           width: sidebarWidth,
           minWidth: sidebarWidth,
           transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)',
-          overflow: 'hidden',
-          position: 'relative',
+          overflowX: 'hidden',
         }}
       >
         {/* Header */}

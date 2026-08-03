@@ -68,15 +68,8 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ── 5. Reusable Components ── */
 
-/* Cards */
-.card {
-  background: var(--bg-surface);
-  border: 1px solid var(--rule-soft);
-  padding: clamp(20px, 2vw, 32px);
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  transition: var(--transition);
-}
+/* Cards — the legacy .card class is retired; every former .card surface now
+   uses .lx-card / <Card> (components/ui/Card.jsx, components/ui/ui.css). */
 
 .card-hover:hover {
   border-color: var(--border-strong);
@@ -320,6 +313,65 @@ h1, h2, h3, h4, h5, h6 {
 .auth-consent-panel {
   background: var(--paper-2);
   border: 1px solid var(--border);
+}
+
+/* ── Auth masthead — broadsheet header above the login/register card ── */
+.auth-masthead {
+  width: 100%;
+  margin: 0 auto clamp(16px, 3vw, 28px);
+  position: relative;
+  z-index: 10;
+}
+.auth-masthead-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+.auth-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.auth-masthead-ticker {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+.auth-masthead-divider {
+  color: var(--rule);
+  font-size: 11px;
+}
+.auth-masthead-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.auth-masthead-change.is-up { color: var(--gain); }
+.auth-masthead-change.is-down { color: var(--loss); }
+.auth-masthead-name {
+  font-family: var(--font-display);
+  font-size: clamp(22px, 4vw, 30px);
+  font-weight: 900;
+  letter-spacing: 0.01em;
+  text-align: center;
+  color: var(--text-primary);
+  padding-bottom: 14px;
+  border-bottom: 3px double var(--ink);
 }
 
 .input-group { margin-bottom: 20px; position: relative; }
@@ -569,7 +621,14 @@ h1, h2, h3, h4, h5, h6 {
   flex: 1;
   padding: 24px 32px;
   min-width: 0;
+  /* .sidebar is position:fixed (pinned, internally-scrolling nav — not part
+     of this flex row), so main content needs an explicit left offset
+     matching the sidebar's own width/collapsed states instead of relying
+     on flex to push it over. */
+  margin-left: 220px;
+  transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
+.dashboard-main.sidebar-collapsed { margin-left: 64px; }
 .dashboard-page-content {
   width: 100%;
   max-width: 1440px;
@@ -1258,7 +1317,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @media (max-width: 1024px) {
-  .dashboard-main { margin-left: 0; padding: 80px 16px 88px; }
+  .dashboard-main, .dashboard-main.sidebar-collapsed { margin-left: 0; padding: 80px 16px 88px; }
   .dashboard-page-content { padding: 0 4px 24px; }
   .sidebar { transform: translateX(-100%); }
   .sidebar.mobile-open { transform: translateX(0); box-shadow: var(--shadow-lg); }
@@ -1354,9 +1413,6 @@ h1, h2, h3, h4, h5, h6 {
     width: 100%;
   }
   .page-header { flex-direction: column; align-items: flex-start; gap: 12px; }
-  .card {
-    border-radius: 18px;
-  }
   .dashboard-topbar {
     gap: 12px;
   }
