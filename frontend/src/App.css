@@ -770,6 +770,7 @@ h1, h2, h3, h4, h5, h6 {
   display: flex; align-items: center; gap: 11px;
   padding: 8px 10px; border-radius: var(--radius-sm);
   border: 1px solid transparent;
+  background: transparent;
   color: var(--muted); cursor: pointer;
   transition: background .16s ease, color .16s ease, border-color .16s ease;
   margin-bottom: 2px; font-weight: 400; font-size: 13.5px;
