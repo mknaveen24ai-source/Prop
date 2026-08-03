@@ -1,25 +1,82 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../ThemeContext'
-import { Headset, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Headset, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 import { renderIcon } from '../utils/iconMap'
 
-const NAV_ITEMS = [
-  { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
-  { id: 'get-challenge', icon: 'target', label: 'New Challenge' },
-  { id: 'rules', icon: 'journal', label: 'Rules' },
-  { id: 'trade', icon: 'trade', label: 'Trade' },
-  { id: 'analytics', icon: 'analytics', label: 'Analytics' },
-  { id: 'history', icon: 'history', label: 'History' },
-  { id: 'competitions', icon: 'leaderboard', label: 'Competitions' },
-  { id: 'kyc', icon: 'kyc', label: 'KYC' },
-  { id: 'payouts', icon: 'payouts', label: 'Payouts' },
-  { id: 'affiliate', icon: 'affiliate', label: 'Affiliate' },
-  { id: 'chat', icon: 'chat', label: 'Live Chat' },
-  { id: 'dispute', icon: 'dispute', label: 'Appeal' },
-  { id: 'support', icon: 'support', label: 'Support' },
+// Grouped nav (Modern Gazette handoff spec: "grouped, collapsible sections
+// — Desk, Programme, Account, Help, Reference"), mirroring AdminSidebar's
+// NavGroup pattern on the trader side.
+const NAV_GROUPS = [
+  {
+    id: 'desk',
+    label: 'Desk',
+    items: [
+      { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
+      { id: 'trade', icon: 'trade', label: 'Trade' },
+      { id: 'analytics', icon: 'analytics', label: 'Analytics' },
+    ],
+  },
+  {
+    id: 'programme',
+    label: 'Programme',
+    items: [
+      // Order matches the prototype's NAV.trader Programme group exactly
+      // (Competitions, Rules, History). "New Challenge" isn't in the
+      // prototype's nav — real product functionality outside the 26-screen
+      // spec, kept but placed after the spec'd items so it doesn't reorder
+      // them (Modern Gazette handoff spec ground truth, see plan).
+      { id: 'competitions', icon: 'leaderboard', label: 'Competitions' },
+      { id: 'rules', icon: 'journal', label: 'Rules' },
+      { id: 'history', icon: 'history', label: 'History' },
+      { id: 'get-challenge', icon: 'target', label: 'New Challenge' },
+    ],
+  },
+  {
+    id: 'account',
+    label: 'Account',
+    items: [
+      { id: 'kyc', icon: 'kyc', label: 'KYC' },
+      { id: 'payouts', icon: 'payouts', label: 'Payouts' },
+      { id: 'affiliate', icon: 'affiliate', label: 'Affiliate' },
+    ],
+  },
+  {
+    id: 'help',
+    label: 'Help',
+    items: [
+      { id: 'chat', icon: 'chat', label: 'Live Chat' },
+      { id: 'dispute', icon: 'dispute', label: 'Appeal' },
+      { id: 'support', icon: 'support', label: 'Support' },
+    ],
+  },
+  {
+    id: 'reference',
+    label: 'Reference',
+    items: [
+      // Prototype's Reference group also has a "Handoff Spec" item (the
+      // design doc rendered live inside the prototype) — no real-app
+      // equivalent, omitted rather than repointed (decided). New tab so a
+      // logged-in trader actually sees the marketing site instead of "/"
+      // redirecting them straight back to /dashboard.
+      { id: 'landing', icon: 'globe', label: 'Public Site', externalPath: '/', openInNewTab: true },
+    ],
+  },
 ]
+const NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items)
+
+export { NAV_GROUPS }
+
+const NAV_GROUP_STORAGE_KEY = 'trader-nav-collapsed-groups'
+
+function loadCollapsedGroups() {
+  try {
+    return JSON.parse(localStorage.getItem(NAV_GROUP_STORAGE_KEY)) || {}
+  } catch {
+    return {}
+  }
+}
 
 export default function Sidebar({
   user,
@@ -33,8 +90,25 @@ export default function Sidebar({
 }) {
   useTheme()
   const navigate = useNavigate()
+  const [collapsedGroups, setCollapsedGroups] = useState(loadCollapsedGroups)
+
+  function toggleGroup(id) {
+    setCollapsedGroups((prev) => {
+      const next = { ...prev, [id]: !prev[id] }
+      try {
+        localStorage.setItem(NAV_GROUP_STORAGE_KEY, JSON.stringify(next))
+      } catch {
+        // ignore storage failures (private browsing, quota, etc.)
+      }
+      return next
+    })
+  }
 
   function handleNavClick(item) {
+    if (item.openInNewTab) {
+      window.open(item.externalPath, '_blank', 'noopener')
+      return
+    }
     if (item.externalPath) {
       navigate(item.externalPath)
       return
@@ -51,6 +125,113 @@ export default function Sidebar({
     .join('') || 'TR'
 
   const sidebarWidth = collapsed ? '64px' : '220px'
+
+  function renderNavItem(item) {
+    const isActive = activePage === item.id
+
+    // Badge count for this item
+    let badge = null
+    if (item.id === 'kyc' && (kycStatus === 'pending' || kycStatus === 'not_submitted' || kycStatus === 'rejected')) {
+      badge = (
+        <span style={{
+          width: '8px', height: '8px', borderRadius: '50%',
+          background: kycStatus === 'pending' ? 'var(--warning)' : 'var(--danger)',
+          flexShrink: 0, boxShadow: kycStatus === 'pending' ? '0 0 8px var(--warning)' : '0 0 8px var(--danger)',
+          marginLeft: collapsed ? 0 : 'auto',
+          position: collapsed ? 'absolute' : 'static',
+          top: collapsed ? '4px' : undefined,
+          right: collapsed ? '4px' : undefined,
+        }} />
+      )
+    }
+    if (item.id === 'payouts' && pendingPayouts > 0) {
+      badge = (
+        <span className="badge badge-danger" style={{
+          marginLeft: collapsed ? 0 : 'auto', flexShrink: 0,
+          padding: '2px 6px', fontSize: '10px', borderRadius: 'var(--radius-pill)',
+          position: collapsed ? 'absolute' : 'static',
+          top: collapsed ? '2px' : undefined, right: collapsed ? '2px' : undefined,
+        }}>
+          {pendingPayouts}
+        </span>
+      )
+    }
+    if (item.id === 'dashboard' && unreadNotifications > 0) {
+      badge = (
+        <span className="badge badge-danger" style={{
+          marginLeft: collapsed ? 0 : 'auto', flexShrink: 0,
+          padding: '2px 6px', fontSize: '10px', borderRadius: 'var(--radius-pill)',
+          position: collapsed ? 'absolute' : 'static',
+          top: collapsed ? '2px' : undefined, right: collapsed ? '2px' : undefined,
+        }}>
+          {unreadNotifications}
+        </span>
+      )
+    }
+
+    return (
+      <motion.div
+        key={item.id}
+        whileHover={{ x: collapsed ? 0 : 3 }}
+        transition={{ duration: 0.15 }}
+        style={{ position: 'relative' }}
+      >
+        <button
+          onClick={() => handleNavClick(item)}
+          title={collapsed ? item.label : undefined}
+          className={`sidebar-item ${isActive ? 'active' : ''}`}
+          style={{
+            width: '100%',
+            border: 'none',
+            background: isActive ? 'var(--accent-glow)' : 'transparent',
+            color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
+            textAlign: 'left',
+            borderRadius: '0',
+            padding: collapsed ? '12px 0' : '12px 14px',
+            marginBottom: '4px',
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            transition: 'padding 0.25s, background 0.15s, color 0.15s',
+          }}
+        >
+          {isActive && (
+            <div style={{
+              position: 'absolute', left: '-8px', top: '10%',
+              height: '80%', width: '4px',
+              background: 'var(--accent)'
+            }} />
+          )}
+
+          <span style={{ display: 'inline-flex', alignItems: 'center', marginRight: collapsed ? 0 : '12px', flexShrink: 0 }}>
+            {item.id === 'support'
+              ? <Headset size={16} color={isActive ? 'var(--accent)' : 'var(--text-secondary)'} />
+              : renderIcon(item.icon, { size: 16, color: isActive ? 'var(--accent)' : 'var(--text-secondary)' })}
+          </span>
+
+          <AnimatePresence>
+            {!collapsed && (
+              <motion.span
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: 'auto' }}
+                exit={{ opacity: 0, width: 0 }}
+                transition={{ duration: 0.2 }}
+                style={{ fontWeight: isActive ? 600 : 500, overflow: 'hidden', whiteSpace: 'nowrap', flex: 1 }}
+              >
+                {item.label}
+              </motion.span>
+            )}
+          </AnimatePresence>
+
+          {!collapsed && badge}
+        </button>
+
+        {/* In collapsed mode, show badge outside the button */}
+        {collapsed && badge}
+      </motion.div>
+    )
+  }
 
   return (
     <>
@@ -146,130 +327,46 @@ export default function Sidebar({
 
         {/* Navigation */}
         <nav className="sidebar-nav" style={{ padding: collapsed ? '16px 8px' : '24px 12px', transition: 'padding 0.25s' }}>
-          <AnimatePresence>
-            {!collapsed && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                style={{
-                  fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)',
-                  textTransform: 'uppercase', letterSpacing: '0.1em',
-                  marginBottom: '12px', paddingLeft: '12px',
-                }}
-              >
-                Menu
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {NAV_ITEMS.map(item => {
-            const isActive = activePage === item.id
-
-            // Badge count for this item
-            let badge = null
-            if (item.id === 'kyc' && (kycStatus === 'pending' || kycStatus === 'not_submitted' || kycStatus === 'rejected')) {
-              badge = (
-                <span style={{
-                  width: '8px', height: '8px', borderRadius: '50%',
-                  background: kycStatus === 'pending' ? 'var(--warning)' : 'var(--danger)',
-                  flexShrink: 0, boxShadow: kycStatus === 'pending' ? '0 0 8px var(--warning)' : '0 0 8px var(--danger)',
-                  marginLeft: collapsed ? 0 : 'auto',
-                  position: collapsed ? 'absolute' : 'static',
-                  top: collapsed ? '4px' : undefined,
-                  right: collapsed ? '4px' : undefined,
-                }} />
-              )
-            }
-            if (item.id === 'payouts' && pendingPayouts > 0) {
-              badge = (
-                <span className="badge badge-danger" style={{
-                  marginLeft: collapsed ? 0 : 'auto', flexShrink: 0,
-                  padding: '2px 6px', fontSize: '10px', borderRadius: 'var(--radius-pill)',
-                  position: collapsed ? 'absolute' : 'static',
-                  top: collapsed ? '2px' : undefined, right: collapsed ? '2px' : undefined,
-                }}>
-                  {pendingPayouts}
-                </span>
-              )
-            }
-            if (item.id === 'dashboard' && unreadNotifications > 0) {
-              badge = (
-                <span className="badge badge-danger" style={{
-                  marginLeft: collapsed ? 0 : 'auto', flexShrink: 0,
-                  padding: '2px 6px', fontSize: '10px', borderRadius: 'var(--radius-pill)',
-                  position: collapsed ? 'absolute' : 'static',
-                  top: collapsed ? '2px' : undefined, right: collapsed ? '2px' : undefined,
-                }}>
-                  {unreadNotifications}
-                </span>
-              )
-            }
-
+          {NAV_GROUPS.map((group) => {
+            const isGroupCollapsed = !collapsed && !!collapsedGroups[group.id]
             return (
-              <motion.div
-                key={item.id}
-                whileHover={{ x: collapsed ? 0 : 3 }}
-                transition={{ duration: 0.15 }}
-                style={{ position: 'relative' }}
-              >
-                <button
-                  onClick={() => handleNavClick(item)}
-                  title={collapsed ? item.label : undefined}
-                  className={`sidebar-item ${isActive ? 'active' : ''}`}
-                  style={{
-                    width: '100%',
-                    border: 'none',
-                    background: isActive ? 'var(--accent-glow)' : 'transparent',
-                    color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
-                    textAlign: 'left',
-                    borderRadius: '0',
-                    padding: collapsed ? '12px 0' : '12px 14px',
-                    marginBottom: '4px',
-                    position: 'relative',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: collapsed ? 'center' : 'flex-start',
-                    transition: 'padding 0.25s, background 0.15s, color 0.15s',
-                  }}
-                >
-                  {isActive && (
-                    <div style={{
-                      position: 'absolute', left: '-8px', top: '10%',
-                      height: '80%', width: '4px',
-                      background: 'var(--accent)'
-                    }} />
+              <div key={group.id} style={{ marginBottom: '14px' }}>
+                <AnimatePresence>
+                  {!collapsed && (
+                    <motion.button
+                      type="button"
+                      onClick={() => toggleGroup(group.id)}
+                      aria-expanded={!isGroupCollapsed}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '6px', width: '100%',
+                        border: 'none', background: 'transparent', cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)',
+                        textTransform: 'uppercase', letterSpacing: '0.1em',
+                        marginBottom: '8px', padding: '0 12px',
+                      }}
+                    >
+                      <span style={{ flex: 1, textAlign: 'left' }}>{group.label}</span>
+                      <ChevronDown
+                        size={12}
+                        style={{
+                          transform: isGroupCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.18s',
+                          flexShrink: 0,
+                        }}
+                      />
+                    </motion.button>
                   )}
-
-                  <span style={{ display: 'inline-flex', alignItems: 'center', marginRight: collapsed ? 0 : '12px', flexShrink: 0 }}>
-                    {item.id === 'support'
-                      ? <Headset size={16} color={isActive ? 'var(--accent)' : 'var(--text-secondary)'} />
-                      : renderIcon(item.icon, { size: 16, color: isActive ? 'var(--accent)' : 'var(--text-secondary)' })}
-                  </span>
-
-                  <AnimatePresence>
-                    {!collapsed && (
-                      <motion.span
-                        initial={{ opacity: 0, width: 0 }}
-                        animate={{ opacity: 1, width: 'auto' }}
-                        exit={{ opacity: 0, width: 0 }}
-                        transition={{ duration: 0.2 }}
-                        style={{ fontWeight: isActive ? 600 : 500, overflow: 'hidden', whiteSpace: 'nowrap', flex: 1 }}
-                      >
-                        {item.label}
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-
-                  {!collapsed && badge}
-                </button>
-
-                {/* In collapsed mode, show badge outside the button */}
-                {collapsed && badge}
-              </motion.div>
+                </AnimatePresence>
+                {!isGroupCollapsed && group.items.map(renderNavItem)}
+              </div>
             )
           })}
         </nav>
+
 
         {/* Footer — click through to the Profile tab */}
         <div className="sidebar-footer" style={{ borderTop: '1px solid var(--border)', padding: collapsed ? '16px 8px' : '20px 16px', transition: 'padding 0.25s' }}>

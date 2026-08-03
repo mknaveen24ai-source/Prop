@@ -1,7 +1,17 @@
 import React, { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, Shield } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, Shield } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { renderIcon } from '../../utils/iconMap'
+
+const NAV_GROUP_STORAGE_KEY = 'admin-nav-collapsed-groups'
+
+function loadCollapsedGroups() {
+  try {
+    return JSON.parse(localStorage.getItem(NAV_GROUP_STORAGE_KEY)) || {}
+  } catch {
+    return {}
+  }
+}
 
 export default function AdminSidebar({
   adminAxios,
@@ -13,6 +23,7 @@ export default function AdminSidebar({
   socket
 }) {
   const navigate = useNavigate()
+  const [collapsedGroups, setCollapsedGroups] = useState(loadCollapsedGroups)
   const [counts, setCounts] = useState({
     users: 0,
     kyc: 0,
@@ -78,6 +89,14 @@ export default function AdminSidebar({
     return () => socket.off('admin_alert', handleCountUpdate)
   }, [socket])
 
+  const toggleGroup = (id) => {
+    setCollapsedGroups((current) => {
+      const next = { ...current, [id]: !current[id] }
+      try { localStorage.setItem(NAV_GROUP_STORAGE_KEY, JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
+
   const profileName = session?.full_name || session?.email || 'Administrator'
   const profileRole = isSuperAdmin ? 'Platform Owner' : 'Administrator'
   const initials = profileName
@@ -99,55 +118,54 @@ export default function AdminSidebar({
         </div>
 
         <div className="admin-sidebar-scroll">
-          <div className="admin-nav-group">
-            <div className="admin-nav-label">Overview</div>
+          <NavGroup id="overview" label="Overview" isCollapsed={isCollapsed} collapsedGroups={collapsedGroups} onToggle={toggleGroup}>
             <NavItem to="/admin" icon="dashboard" label="Dashboard" end />
-          </div>
+          </NavGroup>
 
-          <div className="admin-nav-group">
-            <div className="admin-nav-label">Traders</div>
+          <NavGroup id="traders" label="Traders" isCollapsed={isCollapsed} collapsedGroups={collapsedGroups} onToggle={toggleGroup}>
             <NavItem to="/admin/users" icon="users" label="All Users" badge={counts.users > 0 ? { val: counts.users, color: 'neutral' } : null} />
             <NavItem to="/admin/kyc" icon="kyc" label="KYC Approvals" badge={counts.kyc > 0 ? { val: counts.kyc, color: 'amber' } : null} />
             <NavItem to="/admin/challenges" icon="challenges" label="Challenges" badge={counts.challenges > 0 ? { val: counts.challenges, color: 'neutral' } : null} />
             <NavItem to="/admin/promotion-reviews" icon="approve" label="Promotion Review" />
             <NavItem to="/admin/funded" icon="funded" label="Funded Accounts" badge={counts.funded > 0 ? { val: counts.funded, color: 'gold' } : null} />
-          </div>
+          </NavGroup>
 
-          <div className="admin-nav-group">
-            <div className="admin-nav-label">Trading</div>
+          <NavGroup id="trading" label="Trading" isCollapsed={isCollapsed} collapsedGroups={collapsedGroups} onToggle={toggleGroup}>
             <NavItem to="/admin/trades" icon="trades" label="All Trades" />
             <NavItem to="/admin/competitions" icon="leaderboard" label="Competitions" />
-          </div>
+          </NavGroup>
 
-          <div className="admin-nav-group">
-            <div className="admin-nav-label">Analytics</div>
+          <NavGroup id="analytics" label="Analytics" isCollapsed={isCollapsed} collapsedGroups={collapsedGroups} onToggle={toggleGroup}>
             <NavItem to="/admin/analytics" icon="analytics" label="Analytics" />
-          </div>
+          </NavGroup>
 
-          <div className="admin-nav-group">
-            <div className="admin-nav-label">Support</div>
+          <NavGroup id="support" label="Support" isCollapsed={isCollapsed} collapsedGroups={collapsedGroups} onToggle={toggleGroup}>
             <NavItem to="/admin/chat" icon="chat" label="Chat" />
             <NavItem to="/admin/disputes" icon="dispute" label="Disputes" />
-          </div>
+          </NavGroup>
 
-          <div className="admin-nav-group">
-            <div className="admin-nav-label">Finance</div>
+          <NavGroup id="finance" label="Finance" isCollapsed={isCollapsed} collapsedGroups={collapsedGroups} onToggle={toggleGroup}>
             <NavItem to="/admin/payouts" icon="payouts" label="Payouts" badge={counts.payouts > 0 ? { val: counts.payouts, color: 'amber' } : null} />
             <NavItem to="/admin/affiliates" icon="affiliate" label="Affiliates" />
             <NavItem to="/admin/affiliates/payouts" icon="affiliate" label="Affiliate Payouts" />
             {isSuperAdmin && <NavItem to="/admin/pnl" icon="pnl" label="Platform P&L" />}
-          </div>
+          </NavGroup>
 
-          <div className="admin-nav-group">
-            <div className="admin-nav-label">Platform</div>
+          <NavGroup id="platform" label="Platform" isCollapsed={isCollapsed} collapsedGroups={collapsedGroups} onToggle={toggleGroup}>
             {isSuperAdmin && <NavItem to="/admin/command-center" icon="command" label="Command Center" />}
             <NavItem to="/admin/access" icon="key" label="Access & Security" />
             <NavItem to="/admin/settings" icon="settings" label="Settings" />
             <NavItem to="/admin/trading-economics" icon="settings" label="Trading Economics" />
             {isSuperAdmin && <NavItem to="/admin/step-models" icon="challenges" label="Challenge Models" />}
+          </NavGroup>
+
+          {/* Risk (Modern Gazette handoff spec — NAV.admin ground truth):
+              Violations + Leaderboard, previously buried in the Platform
+              catch-all. */}
+          <NavGroup id="risk" label="Risk" isCollapsed={isCollapsed} collapsedGroups={collapsedGroups} onToggle={toggleGroup}>
             <NavItem to="/admin/violations" icon="violations" label="Violations" badge={counts.violations > 0 ? { val: counts.violations, color: 'red' } : null} />
             <NavItem to="/admin/leaderboard" icon="leaderboard" label="Leaderboard" />
-          </div>
+          </NavGroup>
         </div>
 
         <div className="admin-sidebar-footer">
@@ -168,6 +186,32 @@ export default function AdminSidebar({
         </div>
       </aside>
     </>
+  )
+}
+
+// Collapsible nav section (v2 "Modern Gazette" handoff spec: "grouped admin
+// shell"). When the whole sidebar is collapsed to icons, the group header
+// is hidden anyway, so we skip the collapse toggle and always show items.
+function NavGroup({ id, label, isCollapsed, collapsedGroups, onToggle, children }) {
+  const isGroupCollapsed = !isCollapsed && !!collapsedGroups[id]
+
+  return (
+    <div className="admin-nav-group">
+      {isCollapsed ? (
+        <div className="admin-nav-label">{label}</div>
+      ) : (
+        <button
+          type="button"
+          className="admin-nav-label admin-nav-label--toggle"
+          onClick={() => onToggle(id)}
+          aria-expanded={!isGroupCollapsed}
+        >
+          <span>{label}</span>
+          <ChevronDown size={12} className={`admin-nav-label-chevron ${isGroupCollapsed ? 'collapsed' : ''}`} />
+        </button>
+      )}
+      {!isGroupCollapsed && children}
+    </div>
   )
 }
 
