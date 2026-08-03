@@ -296,34 +296,6 @@ export default function Sidebar({
           </AnimatePresence>
         </div>
 
-        {/* Collapse toggle button */}
-        {onToggleCollapse && (
-          <button
-            onClick={onToggleCollapse}
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            style={{
-              position: 'absolute',
-              top: '72px',
-              right: '-12px',
-              width: '24px',
-              height: '24px',
-              borderRadius: '50%',
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              zIndex: 10,
-              color: 'var(--text-secondary)',
-              transition: 'background 0.15s, color 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--paper)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-surface)'; e.currentTarget.style.color = 'var(--text-secondary)' }}
-          >
-            {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
-          </button>
-        )}
 
         {/* Navigation */}
         <nav className="sidebar-nav" style={{ padding: collapsed ? '16px 8px' : '24px 12px', transition: 'padding 0.25s' }}>
@@ -455,6 +427,39 @@ export default function Sidebar({
           </button>
         </div>
       </div>
+
+      {/* Collapse toggle — a sibling of .sidebar, not a child, so it isn't
+          clipped by the sidebar's own overflow-x:hidden (needed for the
+          collapse-width transition). position:fixed + left tracks the
+          sidebar's own dynamic width instead of using right:-Npx relative
+          to a box that clips anything sitting outside it. */}
+      {onToggleCollapse && (
+        <button
+          onClick={onToggleCollapse}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          style={{
+            position: 'fixed',
+            top: '72px',
+            left: `calc(${sidebarWidth} - 12px)`,
+            width: '24px',
+            height: '24px',
+            borderRadius: '50%',
+            background: 'var(--paper-2)',
+            border: '1px solid var(--rule)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            zIndex: 101,
+            color: 'var(--muted)',
+            transition: 'left 0.25s cubic-bezier(0.4,0,0.2,1), background 0.15s, color 0.15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'var(--paper)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'var(--paper-2)'; e.currentTarget.style.color = 'var(--muted)' }}
+        >
+          {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
+        </button>
+      )}
 
       {/* Mobile bottom nav — unchanged */}
       <nav className="sidebar-mobile-bottom">
