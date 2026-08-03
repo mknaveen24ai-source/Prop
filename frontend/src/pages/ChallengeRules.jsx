@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 import Card from '../components/ui/Card'
+import { renderIcon } from '../utils/iconMap'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
@@ -27,32 +28,58 @@ function RuleRow({ label, value, accent = false }) {
   )
 }
 
-function ProgressCard({ title, used, remaining, limit, fill, tone = 'var(--accent)' }) {
-  return (
-    <Card style={{ padding: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', marginBottom: '10px' }}>
-        <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)' }}>{title}</div>
-      <div style={{ fontSize: '12px', color: fill >= 80 ? 'var(--red)' : tone, fontFamily: 'var(--font-mono)' }}>{fill.toFixed(1)}%</div>
-      </div>
-      <div style={{ height: '10px', background: 'var(--navy-border)', overflow: 'hidden', marginBottom: '12px' }}>
-        <div style={{ height: '100%', width: `${Math.min(fill, 100)}%`, background: fill >= 80 ? 'var(--red)' : tone, transition: 'width 0.4s ease' }} />
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '10px' }}>
-        <div>
-          <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>Used</div>
-          <div style={{ fontSize: '13px', color: 'var(--text)' }}>{used}</div>
-        </div>
-        <div>
-          <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>Remaining</div>
-          <div style={{ fontSize: '13px', color: 'var(--text)' }}>{remaining}</div>
-        </div>
-        <div>
-          <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>Limit</div>
-          <div style={{ fontSize: '13px', color: 'var(--text)' }}>{limit}</div>
-        </div>
-      </div>
-    </Card>
-  )
+// ── "What ends the account" / "What is expressly allowed" ─────────────────
+// Deliberately conservative — every item here maps to an actual enforcement
+// path already confirmed in the backend (drawdownService.js, trades.js's
+// breach-monitor job, tenant settings), not the prototype's placeholder
+// copy verbatim. No "latency arbitrage" / "copy trading" / "one free
+// reset" claims — none of that is actually enforced or offered by this
+// platform today, and this page shouldn't promise rules that don't exist.
+function buildRuleColumns(rules) {
+  return [
+    {
+      title: 'What ends the account',
+      items: [
+        {
+          title: 'Daily loss cap breached',
+          body: `Measured on today's realized + floating P&L against your starting balance. ${rules.daily_drawdown_pct > 0 ? `Currently ${rules.daily_drawdown_pct}% of starting balance.` : 'No daily limit configured on this account.'} Resets 00:00 UTC.`,
+          tone: 'var(--loss)', icon: 'warning',
+        },
+        {
+          title: 'Overall drawdown breached',
+          body: `A trailing floor from your peak equity — it only ever rises as you profit, never drops. Currently ${rules.max_drawdown_pct}% of peak equity.`,
+          tone: 'var(--loss)', icon: 'warning',
+        },
+        {
+          title: 'Inactivity',
+          body: rules.inactivity_auto_fail_enabled
+            ? `No trades placed for ${rules.inactivity_fail_days} consecutive days auto-fails the account.`
+            : 'Inactivity auto-fail is currently disabled on this account.',
+          tone: 'var(--loss)', icon: 'timer',
+        },
+      ],
+    },
+    {
+      title: 'What is expressly allowed',
+      items: [
+        {
+          title: 'Holding overnight and over weekends',
+          body: rules.weekend_holding_enabled ? 'Permitted — positions may be held through the weekend close.' : 'Currently disabled on this account — positions are force-closed before the weekend.',
+          tone: 'var(--gain)', icon: 'approve',
+        },
+        {
+          title: 'Any hold time above the minimum',
+          body: `No maximum hold time. Minimum hold is ${rules.min_hold_seconds} seconds, to discourage latency-only scalps.`,
+          tone: 'var(--gain)', icon: 'approve',
+        },
+        {
+          title: 'Trading every instrument on the desk',
+          body: `Up to ${parseFloat(rules.forex_lots_per_1k || 0).toFixed(2)} forex lots and ${parseFloat(rules.commodity_lots_per_1k || 0).toFixed(2)} commodity lots per $1k of account size, minimum lot size ${parseFloat(rules.min_lot_size || 0).toFixed(2)}.`,
+          tone: 'var(--gain)', icon: 'approve',
+        },
+      ],
+    },
+  ]
 }
 
 function PhaseTable({ model, currentStepNumber, isFundedAccount, isCurrentModel }) {
@@ -92,7 +119,7 @@ function PhaseTable({ model, currentStepNumber, isFundedAccount, isCurrentModel 
   ]
 
   return (
-    <Card style={{ marginBottom: '20px', border: isCurrentModel ? '1px solid var(--accent)' : undefined }}>
+    <Card style={{ marginBottom: '16px', border: isCurrentModel ? '1px solid var(--accent)' : undefined }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '4px', flexWrap: 'wrap' }}>
         <h3 style={{ color: 'var(--accent)', fontSize: '16px', margin: 0 }}>{model.name || 'Phase Table'}</h3>
         {isCurrentModel && <span className="badge badge-success" style={{ fontSize: '10px' }}>Your model</span>}
@@ -159,7 +186,7 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
   if (!selectedAccount) {
     return (
       <Card style={{ padding: '48px', textAlign: 'center' }}>
-        <h2 className="page-title" style={{ marginBottom: '10px' }}>Challenge Rules</h2>
+        <h2 className="page-title" style={{ marginBottom: '10px' }}>The Rulebook, in full</h2>
         <p style={{ color: 'var(--text-muted)' }}>Select an account to see the exact rules for that phase.</p>
       </Card>
     )
@@ -181,36 +208,45 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
     ? [...stepModels].sort((a, b) => (a.slug === currentModelSlug ? -1 : b.slug === currentModelSlug ? 1 : 0))
     : stepModels
 
+  const phaseLabel = isFundedAccount
+    ? 'Funded'
+    : selectedAccount.account_type === 'competition'
+      ? 'Competition'
+      : `Phase ${currentStepNumber || 1}`
+  const kicker = `$${parseFloat(selectedAccount.account_size || 0).toLocaleString('en-US')} · Account ${selectedAccount.account_uid || selectedAccount.id} · ${phaseLabel}`
+
+  const ruleLimits = rules ? [
+    { label: 'Profit target', value: rules.profit_target_amount > 0 ? formatMoney(rules.profit_target_amount) : 'No target', tone: 'var(--accent)', note: rules.profit_target_pct > 0 ? `${rules.profit_target_pct.toFixed(2)}% of starting balance` : 'Funded stage — no target' },
+    { label: 'Daily loss cap', value: rules.daily_drawdown_pct > 0 ? formatMoney((selectedAccount.starting_balance || selectedAccount.account_size) * (rules.daily_drawdown_pct / 100)) : 'Not set', tone: 'var(--warn)', note: rules.daily_drawdown_pct > 0 ? `${rules.daily_drawdown_pct}% from 00:00 UTC equity` : 'No daily limit on this account' },
+    { label: 'Overall loss cap', value: formatMoney((selectedAccount.starting_balance || selectedAccount.account_size) * (rules.max_drawdown_pct / 100)), tone: 'var(--loss)', note: `${rules.max_drawdown_pct}% trailing from peak equity` },
+    { label: 'Time limit', value: rules.time_limit_days ? `${rules.time_limit_days} days` : 'No expiry', tone: 'var(--gain)', note: 'No minimum trading days' },
+  ] : []
+
+  const ruleColumns = rules ? buildRuleColumns(rules) : []
+
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: '24px' }}>
-        <div>
-          <h2 className="page-title">Challenge Rules</h2>
-          <p style={{ color: 'var(--text-muted)', marginTop: '8px', maxWidth: '760px' }}>
-            Everything for this account is listed here in one place so you do not need to guess what applies to your current phase.
+    <div style={{ maxWidth: '1080px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div style={{ borderBottom: '3px double var(--ink)', paddingBottom: '16px', display: 'flex', alignItems: 'flex-end', gap: '20px', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: '280px' }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--accent)' }}>{kicker}</div>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '38px', fontWeight: 400, margin: '10px 0 0' }}>The Rulebook, in full</h2>
+          <p style={{ fontSize: '14px', lineHeight: 1.7, color: 'var(--muted)', maxWidth: '64ch', margin: '10px 0 0' }}>
+            Everything that can end this account is printed on this page. Nothing is held in a separate schedule, and nothing changes while a challenge is running.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={onTradeNow} style={{ padding: '10px 18px' }}>
-          Open Trading Desk
-        </button>
-      </div>
-
-      {sortedModels.length > 0 && (
-        <div style={{ marginBottom: '24px' }}>
-          <h3 style={{ fontSize: '14px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '12px' }}>
-            Step 1 / Step 2 / Step 3 &amp; Funded — Phase Table
-          </h3>
-          {sortedModels.map((model) => (
-            <PhaseTable
-              key={model.slug}
-              model={model}
-              currentStepNumber={currentStepNumber}
-              isFundedAccount={isFundedAccount}
-              isCurrentModel={model.slug === currentModelSlug}
-            />
-          ))}
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={() => window.print()}
+            className="lx-btn"
+            style={{ padding: '11px 18px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--glass)', color: 'var(--ink)' }}
+          >
+            Download PDF
+          </button>
+          <button className="btn btn-primary" onClick={onTradeNow} style={{ padding: '11px 18px' }}>
+            Open Trading Desk
+          </button>
         </div>
-      )}
+      </div>
 
       {!rules ? (
         <Card style={{ padding: '40px', textAlign: 'center' }}>
@@ -218,71 +254,69 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
         </Card>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-            <div className="card-stat">
-              <div className="card-stat-title">Account Type</div>
-              <div className="card-stat-value" style={{ fontSize: '24px' }}>{selectedAccount.account_type.toUpperCase()}</div>
-            </div>
-            <div className="card-stat">
-              <div className="card-stat-title">Account Size</div>
-              <div className="card-stat-value" style={{ fontSize: '24px' }}>${parseFloat(selectedAccount.account_size || 0).toLocaleString('en-US')}</div>
-            </div>
-            <div className="card-stat">
-              <div className="card-stat-title">Live Equity</div>
-              <div className="card-stat-value" style={{ fontSize: '24px', color: floatingPnl >= 0 ? 'var(--green)' : 'var(--red)' }}>{formatMoney(liveEquity)}</div>
-            </div>
-            <div className="card-stat">
-              <div className="card-stat-title">Last Trade Activity</div>
-              <div className="card-stat-value" style={{ fontSize: '18px' }}>{formatDateTime(ruleMeta.last_trade_at)}</div>
-            </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+            {ruleLimits.map((r) => (
+              <Card key={r.label} stat tone={r.tone}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>{r.label}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'clamp(19px,1.7vw,24px)', whiteSpace: 'nowrap', marginTop: '8px', color: r.tone }}>{r.value}</div>
+                <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '5px', lineHeight: 1.5 }}>{r.note}</div>
+              </Card>
+            ))}
           </div>
 
-          {stats && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-              <ProgressCard
-                title="Total Drawdown Remaining"
-                used={`${parseFloat(stats.stats.total_drawdown_pct || 0).toFixed(2)}%`}
-                remaining={`${parseFloat(stats.stats.total_drawdown_remaining_pct || 0).toFixed(2)}%`}
-                limit={`${parseFloat(rules.max_drawdown_pct || 0).toFixed(2)}%`}
-                fill={parseFloat(stats.stats.total_drawdown_used_pct || 0)}
-              />
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--glass)', boxShadow: 'var(--elev)' }}>
+            {ruleColumns.map((col, colIndex) => (
+              <div key={col.title} style={{ padding: '18px 20px 8px', borderRight: colIndex === 0 ? '1px solid var(--rule)' : 'none' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '21px', borderBottom: '1px solid var(--rule)', paddingBottom: '11px', marginBottom: '4px' }}>{col.title}</div>
+                {col.items.map((item) => (
+                  <div key={item.title} style={{ display: 'flex', gap: '12px', padding: '13px 0', borderBottom: '1px solid var(--rule-soft)' }}>
+                    <span style={{ display: 'inline-flex', color: item.tone, marginTop: '3px' }}>
+                      {renderIcon(item.icon, { size: 15, color: item.tone })}
+                    </span>
+                    <div>
+                      <div style={{ fontSize: '13.5px' }}>{item.title}</div>
+                      <div style={{ fontSize: '12.5px', lineHeight: 1.62, color: 'var(--muted)', marginTop: '4px' }}>{item.body}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+
+          {sortedModels.length > 0 && (
+            <div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '19px', borderBottom: '3px double var(--rule)', paddingBottom: '12px', marginBottom: '16px' }}>
+                Targets by phase
+              </div>
+              {sortedModels.map((model) => (
+                <PhaseTable
+                  key={model.slug}
+                  model={model}
+                  currentStepNumber={currentStepNumber}
+                  isFundedAccount={isFundedAccount}
+                  isCurrentModel={model.slug === currentModelSlug}
+                />
+              ))}
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-            <Card>
-              <h3 style={{ color: 'var(--accent)', marginBottom: '14px', fontSize: '16px' }}>Phase Rules</h3>
-              <RuleRow label="Profit Target" value={rules.profit_target_pct > 0 ? `${rules.profit_target_pct.toFixed(2)}% (${formatMoney(rules.profit_target_amount)})` : 'No target'} accent />
-              <RuleRow label="Max Drawdown" value={`${parseFloat(rules.max_drawdown_pct || 0).toFixed(2)}%`} />
-              <RuleRow label="Time Limit" value={rules.time_limit_days ? `${rules.time_limit_days} days` : 'No expiry'} />
-              <RuleRow label="Days Remaining" value={ruleMeta.days_remaining ?? '—'} />
-              <RuleRow label="Phase End Date" value={formatDateTime(ruleMeta.phase_end_date)} />
-              <RuleRow label="Profit Split" value={`${parseFloat(rules.profit_share_pct || 0).toFixed(0)}%`} />
-            </Card>
-
-            <Card>
-              <h3 style={{ color: 'var(--accent)', marginBottom: '14px', fontSize: '16px' }}>Trading Restrictions</h3>
-              <RuleRow label="Max Daily Trades" value={`${rules.max_daily_trades} per UTC day`} />
-              <RuleRow label="Min Hold Time" value={`${rules.min_hold_seconds} seconds`} />
-              <RuleRow label="Minimum Lot Size" value={parseFloat(rules.min_lot_size || 0).toFixed(2)} />
-              <RuleRow label="Max Open Trades per $1k" value={parseFloat(rules.max_trades_per_1k || 0).toFixed(2)} />
-              <RuleRow label="Forex Lots per $1k" value={parseFloat(rules.forex_lots_per_1k || 0).toFixed(2)} />
-              <RuleRow label="Commodity Lots per $1k" value={parseFloat(rules.commodity_lots_per_1k || 0).toFixed(2)} />
-              <RuleRow label="Weekend Holding" value={rules.weekend_holding_enabled ? 'Allowed' : 'Disabled'} />
-            </Card>
-
-            <Card>
-              <h3 style={{ color: 'var(--accent)', marginBottom: '14px', fontSize: '16px' }}>Automation & Status</h3>
-              <RuleRow label="Status" value={String(selectedAccount.status || '—').toUpperCase()} />
-              <RuleRow label="Trades Open Now" value={String(openTrades.filter(trade => trade.status === 'open').length)} />
-              <RuleRow label="Pending Orders" value={String(openTrades.filter(trade => trade.status === 'pending').length)} />
-              <RuleRow label="Trades Placed Today" value={String(stats?.stats?.trades_today ?? '0')} />
-              <RuleRow label="Floating P&L" value={formatMoney(floatingPnl)} />
-              <RuleRow label="Inactivity Auto-Fail" value={rules.inactivity_auto_fail_enabled ? `After ${rules.inactivity_fail_days} days` : 'Disabled'} />
-              <RuleRow label="Forex Leverage" value={rules.leverage?.forex || '1:30'} />
-              <RuleRow label="Commodity Leverage" value={rules.leverage?.commodities || '1:10'} />
-            </Card>
-          </div>
+          <Card>
+            <h3 style={{ color: 'var(--accent)', marginBottom: '14px', fontSize: '16px' }}>Live Status</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 32px' }}>
+              <div>
+                <RuleRow label="Status" value={String(selectedAccount.status || '—').toUpperCase()} />
+                <RuleRow label="Live Equity" value={formatMoney(liveEquity)} accent />
+                <RuleRow label="Days Remaining" value={ruleMeta.days_remaining ?? '—'} />
+                <RuleRow label="Phase End Date" value={formatDateTime(ruleMeta.phase_end_date)} />
+              </div>
+              <div>
+                <RuleRow label="Trades Open Now" value={String(openTrades.filter(trade => trade.status === 'open').length)} />
+                <RuleRow label="Pending Orders" value={String(openTrades.filter(trade => trade.status === 'pending').length)} />
+                <RuleRow label="Trades Placed Today" value={String(stats?.stats?.trades_today ?? '0')} />
+                <RuleRow label="Last Trade Activity" value={formatDateTime(ruleMeta.last_trade_at)} />
+              </div>
+            </div>
+          </Card>
         </>
       )}
     </div>

@@ -143,7 +143,7 @@ router.get('/rules/:account_id', authenticateToken, async function(req, res) {
     const accountResult = await pool.query(
       `SELECT id, user_id, account_type, account_size, current_balance, starting_balance,
               peak_balance, status, profit_target, max_drawdown_pct, phase_start_date, phase_end_date, created_at,
-              challenge_model_slug, step_number
+              challenge_model_slug, step_number, daily_drawdown_pct
        FROM accounts
        WHERE id = $1 AND user_id = $2`,
       [accountIdStr, req.user.userId]
@@ -163,6 +163,20 @@ router.get('/rules/:account_id', authenticateToken, async function(req, res) {
 
     const account = accountResult.rows[0]
     const rules = buildResolvedRules(account, settings)
+
+    // Daily drawdown limit isn't in buildResolvedRules (that's shared with
+    // /step-models pricing display) — resolve it the same way /stats does:
+    // funded accounts pull from their step model, challenge accounts use
+    // their own column.
+    let resolvedDailyDrawdownPct = parseFloat(account.daily_drawdown_pct || 0)
+    if (account.account_type === 'funded' && account.challenge_model_slug) {
+      const fundedModel = await fetchStepModelBySlug(account.challenge_model_slug)
+      if (fundedModel && Number.isFinite(parseFloat(fundedModel.funded_daily_drawdown_pct))) {
+        resolvedDailyDrawdownPct = parseFloat(fundedModel.funded_daily_drawdown_pct)
+      }
+    }
+    rules.daily_drawdown_pct = resolvedDailyDrawdownPct
+
     const lastTradeResult = await pool.query(
       `SELECT NULLIF(MAX(GREATEST(COALESCE(open_time, '-infinity'::timestamptz), COALESCE(close_time, '-infinity'::timestamptz))), '-infinity'::timestamptz) AS last_trade_at
        FROM trades
