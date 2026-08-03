@@ -3,6 +3,8 @@ import axios from 'axios'
 import CountUp from 'react-countup'
 import { PageWrapper } from '../App'
 import { renderIcon } from '../utils/iconMap'
+import { formatPrice } from '../utils/instruments'
+import Card from '../components/ui/Card'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
@@ -73,6 +75,37 @@ function getScoreColor(score) {
   return 'var(--red)'
 }
 
+function exportExecutionsToCSV(trades) {
+  if (!trades || trades.length === 0) return
+  const headers = ['ID', 'Instrument', 'Direction', 'Lots', 'Open Price', 'Close Price', 'Close Time', 'R-Multiple', 'P&L']
+  const rows = trades.map((t) => [
+    t.id,
+    t.instrument,
+    t.direction,
+    parseFloat(t.lot_size).toFixed(2),
+    t.open_price ? formatPrice(t.open_price, t.instrument) : '',
+    t.close_price ? formatPrice(t.close_price, t.instrument) : '',
+    t.close_time ? new Date(t.close_time).toISOString() : '',
+    t.r_multiple != null ? t.r_multiple.toFixed(2) : '',
+    t.demo_pnl ? parseFloat(t.demo_pnl).toFixed(2) : '0.00',
+  ])
+  function csvSafeValue(val) {
+    let str = String(val).replace(/"/g, '""')
+    if (/^[=+\-@\t\r]/.test(str)) str = "'" + str
+    return `"${str}"`
+  }
+  const csvContent = [headers, ...rows].map((row) => row.map(csvSafeValue).join(',')).join('\n')
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `best_worst_executions_${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
 function getCellBackground(slot, maxAbsPnl, maxTrades) {
   const pnl = Number(slot?.pnl || 0)
   const trades = Number(slot?.trades || 0)
@@ -114,7 +147,7 @@ function BreakdownCard({ title, subtitle, rows }) {
   const items = Array.isArray(rows) ? rows.slice(0, 6) : []
 
   return (
-    <div className="card">
+    <Card>
       <SectionHeader title={title} subtitle={subtitle} />
       {items.length === 0 ? (
         <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Not enough trades yet.</div>
@@ -155,7 +188,7 @@ function BreakdownCard({ title, subtitle, rows }) {
           ))}
         </div>
       )}
-    </div>
+    </Card>
   )
 }
 
@@ -164,7 +197,7 @@ function ScorePanel({ title, score, grade, summary, components, metrics }) {
   const metricRows = Object.entries(metrics || {})
 
   return (
-    <div className="card">
+    <Card>
       <SectionHeader
         title={title}
         subtitle={summary}
@@ -213,7 +246,7 @@ function ScorePanel({ title, score, grade, summary, components, metrics }) {
           ))}
         </div>
       )}
-    </div>
+    </Card>
   )
 }
 
@@ -223,6 +256,7 @@ export default function Analytics({ selectedAccount }) {
   const [error, setError] = useState('')
   const [replayIndex, setReplayIndex] = useState(100)
   const [curveRange, setCurveRange] = useState('full')
+  const [hoveredHeatCell, setHoveredHeatCell] = useState(null)
   const canvasRef = useRef(null)
   const dataRef = useRef(data)
 
@@ -351,6 +385,22 @@ export default function Analytics({ selectedAccount }) {
     fetchAnalytics()
   }, [fetchAnalytics])
 
+  // Raw closed trades, for the "Best & Worst Executions" table — /analytics
+  // only returns aggregates, so this is a separate light fetch. /history
+  // returns a plain array (all non-open/pending trades, incl. cancelled).
+  const [closedTrades, setClosedTrades] = useState([])
+  useEffect(() => {
+    if (!selectedAccount?.id) { setClosedTrades([]); return }
+    let cancelled = false
+    axios.get(`${API_URL}/api/trades/history`, {
+      params: { account_id: selectedAccount.id }
+    }).then((res) => {
+      const rows = Array.isArray(res.data) ? res.data : []
+      if (!cancelled) setClosedTrades(rows.filter((t) => t.status === 'closed'))
+    }).catch(() => { if (!cancelled) setClosedTrades([]) })
+    return () => { cancelled = true }
+  }, [selectedAccount?.id])
+
   useEffect(() => {
     if (data?.analytics) {
       drawChart()
@@ -366,13 +416,13 @@ export default function Analytics({ selectedAccount }) {
   if (!selectedAccount) {
     return (
       <PageWrapper>
-        <div className="analytics-page card" style={{ textAlign: 'center', padding: '48px' }}>
+        <Card className="analytics-page" style={{ textAlign: 'center', padding: '48px' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
             {renderIcon('analytics', { size: 48, color: 'var(--accent)' })}
           </div>
           <h3 style={{ color: 'var(--accent)', marginBottom: '12px' }}>No Account Selected</h3>
           <p style={{ color: 'var(--text-muted)' }}>Select an account from the Dashboard to view analytics.</p>
-        </div>
+        </Card>
       </PageWrapper>
     )
   }
@@ -412,7 +462,7 @@ export default function Analytics({ selectedAccount }) {
           <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '24px' }}>
             {selectedAccount.account_type.toUpperCase()} - ${parseFloat(selectedAccount.account_size).toLocaleString('en-US')}
           </p>
-          <div className="card" style={{ textAlign: 'center', padding: '48px' }}>
+          <Card style={{ textAlign: 'center', padding: '48px' }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
               {renderIcon('file', { size: 48, color: 'var(--text-secondary)' })}
             </div>
@@ -420,7 +470,7 @@ export default function Analytics({ selectedAccount }) {
             <p style={{ color: 'var(--text-muted)' }}>
               Close some trades to unlock the performance dashboard, behavior scoring, and payout readiness forecast.
             </p>
-          </div>
+          </Card>
         </div>
       </PageWrapper>
     )
@@ -450,6 +500,175 @@ export default function Analytics({ selectedAccount }) {
         <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '24px' }}>
           {selectedAccount.account_type.toUpperCase()} - ${parseFloat(selectedAccount.account_size).toLocaleString('en-US')}
         </p>
+
+        {/* ── Prototype-matched headline strip (Modern Gazette handoff spec,
+            isAnalytics block) — kept alongside, not replacing, the richer
+            stat grids/breakdowns below per explicit decision. ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(186px,1fr))', gap: '12px', marginBottom: '16px' }}>
+          {[
+            { label: 'Profit factor', value: Number.isFinite(analytics.profit_factor) ? analytics.profit_factor.toFixed(2) : '—', tone: 'var(--gain)', sub: 'Gross win ÷ gross loss' },
+            { label: 'Expectancy', value: formatSignedCurrency(analytics.expectancy || 0), tone: (analytics.expectancy || 0) >= 0 ? 'var(--gain)' : 'var(--loss)', sub: `Per trade, ${analytics.total_trades || 0} trades` },
+            { label: 'Avg win / loss', value: analytics.avg_rr ? `${analytics.avg_rr.toFixed(1)} : 1` : '—', tone: 'var(--ink)', sub: `${formatCurrency(analytics.avg_win || 0)} vs ${formatCurrency(analytics.avg_loss || 0)}` },
+            { label: 'Sharpe (30d)', value: analytics.sharpe_30d != null ? analytics.sharpe_30d.toFixed(2) : '—', tone: 'var(--accent)', sub: 'Daily, unannualised' },
+            { label: 'Best streak', value: `${analytics.best_win_streak || 0} wins`, tone: 'var(--warn)', sub: 'Consecutive closed trades' },
+          ].map((k) => (
+            <Card key={k.label} stat tone={k.tone}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>{k.label}</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '23px', marginTop: '8px', color: k.tone }}>{k.value}</div>
+              <div style={{ fontSize: '11.5px', color: 'var(--muted)', marginTop: '4px' }}>{k.sub}</div>
+            </Card>
+          ))}
+        </div>
+
+        {(breakdowns.weekday?.length > 0 || breakdowns.symbol?.length > 0) && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr)', gap: '16px', marginBottom: '20px', alignItems: 'start' }}>
+            <Card ruled eyebrow="Realised P&L" title="By Day of Week">
+              {(() => {
+                const rows = [...(breakdowns.weekday || [])].sort((a, b) => a.order - b.order)
+                const maxAbs = rows.reduce((best, r) => Math.max(best, Math.abs(r.total_pnl || 0)), 1)
+                return (
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', height: '200px', paddingTop: '10px' }}>
+                    {rows.map((r) => {
+                      const pnl = r.total_pnl || 0
+                      const heightPct = Math.max(4, (Math.abs(pnl) / maxAbs) * 100)
+                      const tone = pnl > 0 ? 'var(--gain)' : pnl < 0 ? 'var(--loss)' : 'var(--muted)'
+                      return (
+                        <div key={r.key} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
+                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: tone, marginBottom: '6px' }}>{formatSignedCurrency(pnl)}</div>
+                          <div style={{ width: '100%', height: `${heightPct}%`, background: tone, borderRadius: '2px 2px 0 0', minHeight: '3px' }} />
+                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: '8px' }}>{r.label.slice(0, 3)}</div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+            </Card>
+
+            <Card title="Instrument Mix" eyebrow={`Share of volume · ${analytics.total_trades || 0} trades`}>
+              {(() => {
+                const tones = ['var(--accent)', 'var(--gain)', 'var(--warn)', 'var(--loss)', 'var(--muted)']
+                const rows = [...(breakdowns.symbol || [])].sort((a, b) => b.trades - a.trades).slice(0, 5)
+                const total = rows.reduce((sum, r) => sum + r.trades, 0) || 1
+                return (
+                  <div>
+                    {rows.map((r, i) => {
+                      const share = (r.trades / total) * 100
+                      const tone = tones[i % tones.length]
+                      return (
+                        <div key={r.key} style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 0', borderBottom: '1px solid var(--rule-soft)' }}>
+                          <span style={{ width: '9px', height: '9px', background: tone, flex: '0 0 auto' }} />
+                          <span style={{ flex: 1, fontSize: '12.5px' }}>{r.label}</span>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--muted)' }}>{share.toFixed(0)}%</span>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: (r.total_pnl || 0) >= 0 ? 'var(--gain)' : 'var(--loss)', minWidth: '64px', textAlign: 'right' }}>{formatSignedCurrency(r.total_pnl || 0)}</span>
+                        </div>
+                      )
+                    })}
+                    {rows.length === 0 && <div style={{ color: 'var(--muted)', fontSize: '12px' }}>Not enough trades yet.</div>}
+                  </div>
+                )
+              })()}
+            </Card>
+          </div>
+        )}
+
+        {Array.isArray(analytics.r_distribution) && analytics.r_distribution.length > 0 && (
+          <Card title="R-Multiple Distribution" eyebrow="Closed trades · risk-normalised" style={{ marginBottom: '20px' }}>
+            {(() => {
+              const buckets = [
+                { label: '< -2R', test: (r) => r < -2 },
+                { label: '-2 to -1R', test: (r) => r >= -2 && r < -1 },
+                { label: '-1 to 0R', test: (r) => r >= -1 && r < 0 },
+                { label: '0 to 1R', test: (r) => r >= 0 && r < 1 },
+                { label: '1 to 2R', test: (r) => r >= 1 && r < 2 },
+                { label: '> 2R', test: (r) => r >= 2 },
+              ].map((b) => ({ ...b, count: analytics.r_distribution.filter(b.test).length }))
+              const maxCount = buckets.reduce((best, b) => Math.max(best, b.count), 1)
+              return (
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', height: '180px', paddingTop: '10px' }}>
+                  {buckets.map((b) => {
+                    const heightPct = Math.max(4, (b.count / maxCount) * 100)
+                    const tone = b.label.includes('-') ? 'var(--loss)' : 'var(--gain)'
+                    return (
+                      <div key={b.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: tone, marginBottom: '6px' }}>{b.count}</div>
+                        <div style={{ width: '100%', height: `${heightPct}%`, background: tone, borderRadius: '2px 2px 0 0', minHeight: '3px' }} />
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '.06em', color: 'var(--muted)', marginTop: '8px', textAlign: 'center' }}>{b.label}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+          </Card>
+        )}
+
+        {closedTrades.length > 0 && (() => {
+          const sorted = [...closedTrades].sort((a, b) => parseFloat(b.demo_pnl || 0) - parseFloat(a.demo_pnl || 0))
+          const best = sorted.slice(0, 5)
+          const worst = sorted.slice(-5).reverse()
+          const executions = [...best, ...worst]
+          return (
+            <Card
+              ruled
+              eyebrow="Closed trades"
+              title="Best & Worst Executions"
+              actions={
+                <button
+                  type="button"
+                  className="lx-btn"
+                  onClick={() => exportExecutionsToCSV(executions)}
+                  style={{ padding: '8px 12px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                >
+                  Export CSV
+                </button>
+              }
+              flush
+              style={{ marginBottom: '20px' }}
+            >
+              <table className="lx-table">
+                <thead>
+                  <tr>
+                    <th>Instrument</th>
+                    <th>Direction</th>
+                    <th>Lots</th>
+                    <th>Open</th>
+                    <th>Close</th>
+                    <th>Closed</th>
+                    <th>R-Multiple</th>
+                    <th>P&amp;L</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {best.map((t) => (
+                    <tr key={`best-${t.id}`}>
+                      <td>{t.instrument}</td>
+                      <td><span className="lx-badge" style={{ color: 'var(--gain)' }}>{t.direction}</span></td>
+                      <td style={{ fontFamily: 'var(--font-mono)' }}>{parseFloat(t.lot_size).toFixed(2)}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)' }}>{t.open_price ? formatPrice(t.open_price, t.instrument) : '—'}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)' }}>{t.close_price ? formatPrice(t.close_price, t.instrument) : '—'}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '11.5px', color: 'var(--muted)' }}>{formatHistoryDate(t.close_time)}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)' }}>{t.r_multiple != null ? `${t.r_multiple.toFixed(2)}R` : '—'}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--gain)' }}>{formatSignedCurrency(t.demo_pnl)}</td>
+                    </tr>
+                  ))}
+                  {worst.map((t) => (
+                    <tr key={`worst-${t.id}`}>
+                      <td>{t.instrument}</td>
+                      <td><span className="lx-badge" style={{ color: 'var(--loss)' }}>{t.direction}</span></td>
+                      <td style={{ fontFamily: 'var(--font-mono)' }}>{parseFloat(t.lot_size).toFixed(2)}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)' }}>{t.open_price ? formatPrice(t.open_price, t.instrument) : '—'}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)' }}>{t.close_price ? formatPrice(t.close_price, t.instrument) : '—'}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '11.5px', color: 'var(--muted)' }}>{formatHistoryDate(t.close_time)}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)' }}>{t.r_multiple != null ? `${t.r_multiple.toFixed(2)}R` : '—'}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--loss)' }}>{formatSignedCurrency(t.demo_pnl)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Card>
+          )
+        })()}
 
         <div className="grid-4" style={{ marginBottom: '16px' }}>
           <StatCard label="Total Trades">
@@ -490,7 +709,7 @@ export default function Analytics({ selectedAccount }) {
           </StatCard>
         </div>
 
-        <div className="card" style={{ marginBottom: '20px', padding: '20px' }}>
+        <Card style={{ marginBottom: '20px', padding: '20px' }}>
           <SectionHeader
             title="Equity Curve"
             subtitle={`Zoom across the latest ${activeCurve.length} closed-trade points. Replay keeps working inside each range.`}
@@ -536,7 +755,7 @@ export default function Analytics({ selectedAccount }) {
               <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{replayIndex}%</span>
             </div>
           </div>
-        </div>
+        </Card>
 
         <div className="grid-2" style={{ marginBottom: '20px' }}>
           <BreakdownCard
@@ -560,7 +779,7 @@ export default function Analytics({ selectedAccount }) {
         </div>
 
         <div className="grid-2" style={{ marginBottom: '20px' }}>
-          <div className="card">
+          <Card>
             <SectionHeader
               title="Hold-Time Analytics"
               subtitle={holdTime.bias_label}
@@ -603,9 +822,9 @@ export default function Analytics({ selectedAccount }) {
                 </div>
               </div>
             </div>
-          </div>
+          </Card>
 
-          <div className="card">
+          <Card>
             <SectionHeader
               title="Best and Worst Setups"
               subtitle="A quick report on the strongest and weakest recurring patterns."
@@ -651,10 +870,10 @@ export default function Analytics({ selectedAccount }) {
                 </div>
               </div>
             </div>
-          </div>
+          </Card>
         </div>
 
-        <div className="card" style={{ marginBottom: '20px' }}>
+        <Card style={{ marginBottom: '20px' }}>
           <SectionHeader
             title="Hour and Day Heatmap"
             subtitle="Trading activity and profitability concentration across the week."
@@ -689,32 +908,60 @@ export default function Analytics({ selectedAccount }) {
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                       {row.day_label} ({row.total_trades})
                     </div>
-                    {(row.slots || []).map((slot) => (
-                      <div
-                        key={`${row.day_label}-${slot.hour}`}
-                        title={`${row.day_label} ${slot.hour}:00 | ${slot.trades} trades | ${formatSignedCurrency(slot.pnl)}`}
-                        style={{
-                          height: '28px',
-                          borderRadius: '0',
-                          border: '1px solid var(--rule-soft)',
-                          background: getCellBackground(slot, maxAbsPnl, maxTrades),
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: 'var(--text)',
-                          fontSize: '10px',
-                          fontWeight: '700'
-                        }}
-                      >
-                        {slot.trades > 0 ? slot.trades : ''}
-                      </div>
-                    ))}
+                    {(row.slots || []).map((slot) => {
+                      const isHovered = hoveredHeatCell?.day === row.day_label && hoveredHeatCell?.hour === slot.hour
+                      return (
+                        <div
+                          key={`${row.day_label}-${slot.hour}`}
+                          onMouseEnter={() => setHoveredHeatCell({ day: row.day_label, hour: slot.hour, trades: slot.trades, pnl: slot.pnl })}
+                          onMouseLeave={() => setHoveredHeatCell(null)}
+                          style={{
+                            height: '28px',
+                            borderRadius: '0',
+                            border: isHovered ? '1px solid var(--ink, var(--text))' : '1px solid var(--rule-soft)',
+                            background: getCellBackground(slot, maxAbsPnl, maxTrades),
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'var(--text)',
+                            fontSize: '10px',
+                            fontWeight: '700',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {slot.trades > 0 ? slot.trades : ''}
+                        </div>
+                      )
+                    })}
                   </div>
                 ))}
               </div>
             </div>
           </div>
-        </div>
+
+          {/* Read-out line — never a floating tooltip; the hovered cell's
+              detail always renders here, pinned to the last-hovered cell's
+              info when nothing is currently under the cursor. */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px',
+            borderTop: '1px solid var(--rule-soft)', paddingTop: '10px',
+            fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-muted)'
+          }}>
+            {hoveredHeatCell ? (
+              <>
+                <span style={{ color: 'var(--text)' }}>{hoveredHeatCell.day} {String(hoveredHeatCell.hour).padStart(2, '0')}:00</span>
+                <span>·</span>
+                <span>{hoveredHeatCell.trades} trade{hoveredHeatCell.trades === 1 ? '' : 's'}</span>
+                <span>·</span>
+                <span style={{ color: Number(hoveredHeatCell.pnl || 0) >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                  {formatSignedCurrency(hoveredHeatCell.pnl)}
+                </span>
+              </>
+            ) : (
+              <span>Hover a cell for detail</span>
+            )}
+          </div>
+        </Card>
 
         <div className="grid-2" style={{ marginBottom: '20px' }}>
           <ScorePanel
@@ -736,7 +983,7 @@ export default function Analytics({ selectedAccount }) {
         </div>
 
         <div className="grid-2" style={{ marginBottom: '20px' }}>
-          <div className="card">
+          <Card>
             <SectionHeader
               title={breachAnalysis.title || 'Breach Analysis'}
               subtitle={breachAnalysis.explanation || 'No breach analysis available yet.'}
@@ -789,9 +1036,9 @@ export default function Analytics({ selectedAccount }) {
                 </div>
               </div>
             )}
-          </div>
+          </Card>
 
-          <div className="card">
+          <Card>
             <SectionHeader
               title="Payout Readiness Forecast"
               subtitle={payoutForecast.next_status || 'No payout forecast available.'}
@@ -871,10 +1118,10 @@ export default function Analytics({ selectedAccount }) {
                 ))}
               </div>
             )}
-          </div>
+          </Card>
         </div>
 
-        <div className="card" style={{ marginBottom: '20px' }}>
+        <Card style={{ marginBottom: '20px' }}>
           <SectionHeader
             title="AI-Style Improvement Suggestions"
             subtitle="Heuristic coaching based on your actual results, behavior, and payout readiness."
@@ -911,10 +1158,10 @@ export default function Analytics({ selectedAccount }) {
               </div>
             ))}
           </div>
-        </div>
+        </Card>
 
         {Array.isArray(analytics.drawdown_curve) && analytics.drawdown_curve.length > 0 && (
-          <div className="card">
+          <Card>
             <SectionHeader
               title={`Trade-by-Trade History (${analytics.drawdown_curve.length} trades)`}
               subtitle="Closed-trade balance progression and drawdown pressure over time."
@@ -976,7 +1223,7 @@ export default function Analytics({ selectedAccount }) {
                 </tbody>
               </table>
             </div>
-          </div>
+          </Card>
         )}
       </div>
     </PageWrapper>
