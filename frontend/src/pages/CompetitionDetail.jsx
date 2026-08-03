@@ -1,19 +1,55 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { PieChart, Pie, Cell } from 'recharts'
 import api from '../services/api'
 import ThemeToggle from '../components/ThemeToggle'
 import { PageWrapper } from '../App'
-import { renderIcon } from '../utils/iconMap'
 import { useAuth } from '../providers/AuthProvider'
+import Card from '../components/ui/Card'
+import Sparkline from '../components/ui/Sparkline'
+import { renderActiveDonutArc, dimUnlessActive } from '../components/admin/AdminChart'
 
 const LEADERBOARD_POLL_MS = 15000
+const PODIUM_TONES = ['var(--accent)', 'var(--ink)', 'var(--warn)']
+const PRIZE_TONES = ['var(--accent)', 'var(--gain)', 'var(--warn)', 'var(--muted)', 'var(--loss)']
+
+const STATUS_LABELS = { upcoming: 'Upcoming', active: 'Live now', completed: 'Completed', cancelled: 'Cancelled' }
+const TYPE_LABELS = { weekly: 'Weekly Competition', monthly: 'Monthly Competition', custom: 'Competition' }
 
 function formatDate(value) {
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return '—'
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' ' +
     d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
+
+function formatTime(value) {
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
+
+// Parses a leading dollar figure out of a free-text prize label ("$500",
+// "$1,200 cash") for the donut's proportional sizing — prize_pool_json is
+// informational display text, not guaranteed numeric (e.g. "Free $50k
+// challenge account voucher"), so this can legitimately come back null.
+function parsePrizeAmount(label) {
+  const match = String(label || '').match(/\$\s?([\d,]+(?:\.\d+)?)/)
+  return match ? parseFloat(match[1].replace(/,/g, '')) : null
+}
+
+function timeStatusLabel(competition) {
+  const now = Date.now()
+  if (competition.status === 'upcoming') {
+    const days = Math.max(0, Math.ceil((new Date(competition.start_at) - now) / 86400000))
+    return days > 0 ? `Starts in ${days}d` : 'Starting soon'
+  }
+  if (competition.status === 'active') {
+    const days = Math.max(0, Math.ceil((new Date(competition.end_at) - now) / 86400000))
+    return days > 0 ? `${days}d left` : 'Ending today'
+  }
+  return `Ended ${formatDate(competition.end_at)}`
 }
 
 // Pure content — no page chrome, so it can be embedded inside the dashboard
@@ -26,6 +62,9 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
   const [loading, setLoading] = useState(true)
   const [joining, setJoining] = useState(false)
   const [myVoucher, setMyVoucher] = useState(null)
+  const [lastUpdated, setLastUpdated] = useState(null)
+  const [showTerms, setShowTerms] = useState(false)
+  const [hoveredPrize, setHoveredPrize] = useState(null)
 
   const loadCompetition = useCallback(async () => {
     try {
@@ -42,6 +81,7 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
     try {
       const res = await api.get(`/api/competitions/${slug}/leaderboard`)
       setLeaders(Array.isArray(res.data) ? res.data : [])
+      setLastUpdated(new Date())
     } catch {
       // keep last known leaderboard on transient failure
     }
@@ -93,159 +133,245 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
   }
 
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: '80px', color: 'var(--text-muted)' }}>Loading...</div>
+    return <div style={{ textAlign: 'center', padding: '80px', color: 'var(--muted)' }}>Loading...</div>
   }
 
   if (!competition) {
-    return <div style={{ textAlign: 'center', padding: '80px', color: 'var(--text-muted)' }}>Competition not found.</div>
+    return <div style={{ textAlign: 'center', padding: '80px', color: 'var(--muted)' }}>Competition not found.</div>
   }
 
   const myEntry = competition.my_entry
   const canJoin = ['upcoming', 'active'].includes(competition.status) && !myEntry
+  const prizePool = Array.isArray(competition.prize_pool) ? competition.prize_pool : []
+  const prizeAmounts = prizePool.map((p) => parsePrizeAmount(p.label))
+  const allPrizesNumeric = prizeAmounts.length > 0 && prizeAmounts.every((a) => a != null)
+  const prizeTotal = allPrizesNumeric ? prizeAmounts.reduce((a, b) => a + b, 0) : null
+  const podium = leaders.slice(0, 3)
+
+  const compStats = [
+    { label: 'Entry', value: competition.entry_fee > 0 ? `$${competition.entry_fee}` : 'Free', tone: 'var(--accent)' },
+    { label: 'Participants', value: `${competition.participant_count ?? 0}${competition.max_participants ? ` / ${competition.max_participants}` : ''}`, tone: 'var(--gain)' },
+    { label: 'Max Drawdown', value: `${competition.max_drawdown_pct}%`, tone: 'var(--warn)' },
+    { label: 'Status', value: timeStatusLabel(competition), tone: 'var(--muted)' },
+  ]
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
       <button
         onClick={goBack}
         style={{
-          background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: '13px',
-          cursor: 'pointer', padding: 0, marginBottom: '20px', display: 'inline-flex', alignItems: 'center', gap: '6px'
+          background: 'none', border: 'none', color: 'var(--muted)', fontSize: '12.5px',
+          fontFamily: 'var(--font-mono)', letterSpacing: '.06em', textTransform: 'uppercase',
+          cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', gap: '6px'
         }}
       >
         ← Back to Competitions
       </button>
 
-      <div style={{ marginBottom: '32px' }}>
-        <h1 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', fontSize: '26px', marginBottom: '8px' }}>
-          {competition.title}
-        </h1>
-        {competition.description && (
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '12px' }}>{competition.description}</p>
-        )}
-        <div style={{ fontSize: '13px', color: 'var(--text-dim)' }}>
-          {formatDate(competition.start_at)} → {formatDate(competition.end_at)}
-        </div>
-      </div>
-
-      {/* Rules card */}
-      <div className="card" style={{ padding: '20px 24px', marginBottom: '24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
-        <div>
-          <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>STARTING BALANCE</div>
-          <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>${competition.starting_balance.toLocaleString('en-US')}</div>
-        </div>
-        <div>
-          <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>MAX DRAWDOWN</div>
-          <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>{competition.max_drawdown_pct}%</div>
-        </div>
-        <div>
-          <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>ENTRY FEE</div>
-          <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>{competition.entry_fee > 0 ? `$${competition.entry_fee}` : 'Free'}</div>
-        </div>
-        <div>
-          <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>PARTICIPANTS</div>
-          <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>
-            {competition.participant_count}{competition.max_participants ? ` / ${competition.max_participants}` : ''}
+      {/* Hero + Prize Pool — Modern Gazette handoff spec, isComps block */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: '16px', alignItems: 'stretch' }}>
+        <div style={{ position: 'relative', overflow: 'hidden', background: 'var(--glass-2)', backdropFilter: 'blur(18px) saturate(150%)', border: '1px solid var(--accent)', borderRadius: '4px', boxShadow: 'var(--elev-lg)', padding: '22px 24px' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(420px 220px at 88% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%)', pointerEvents: 'none' }} />
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--accent)' }}>
+            {TYPE_LABELS[competition.type] || 'Competition'} · {STATUS_LABELS[competition.status] || competition.status}
           </div>
-        </div>
-      </div>
-
-      {Array.isArray(competition.prize_pool) && competition.prize_pool.length > 0 && (
-        <div className="card" style={{ padding: '16px 24px', marginBottom: '24px' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '10px' }}>PRIZES</div>
-          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-            {competition.prize_pool.map((p, idx) => (
-              <div key={idx} style={{ fontSize: '13px', color: 'var(--text-primary)' }}>
-                <strong>#{p.rank}</strong> — {p.label}
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '34px', lineHeight: 1.08, marginTop: '8px', letterSpacing: '-.015em' }}>{competition.title}</div>
+          {competition.description && (
+            <div style={{ fontSize: '13.5px', color: 'var(--muted)', marginTop: '10px', maxWidth: '52ch' }}>{competition.description}</div>
+          )}
+          <div style={{ display: 'flex', gap: '26px', marginTop: '20px', flexWrap: 'wrap' }}>
+            {compStats.map((c) => (
+              <div key={c.label}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>{c.label}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '19px', marginTop: '4px', color: c.tone }}>{c.value}</div>
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      {myVoucher && (
-        <div className="card" style={{ padding: '20px 24px', marginBottom: '24px', border: '1px solid var(--accent-gold)' }}>
-          <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: '6px' }}>
-            🏆 You won a free ${Number(myVoucher.account_size).toLocaleString('en-US')} challenge account!
+          <div style={{ display: 'flex', gap: '10px', marginTop: '22px', flexWrap: 'wrap' }}>
+            {myEntry ? (
+              <div style={{ padding: '11px 18px', border: '1px solid var(--rule)', borderRadius: '4px', fontSize: '12.5px', color: 'var(--ink)' }}>
+                You're entered — status: <strong>{myEntry.status}</strong>{myEntry.final_rank && ` · finished #${myEntry.final_rank}`}
+              </div>
+            ) : canJoin ? (
+              <button
+                disabled={joining}
+                onClick={handleJoin}
+                style={{ padding: '11px 22px', border: '1px solid var(--accent)', borderRadius: '4px', background: 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: '11.5px', letterSpacing: '.12em', textTransform: 'uppercase', cursor: joining ? 'default' : 'pointer', opacity: joining ? 0.6 : 1 }}
+              >
+                {joining ? 'Joining…' : `Enter — ${competition.entry_fee > 0 ? `$${competition.entry_fee}` : 'Free'}`}
+              </button>
+            ) : (
+              <div style={{ padding: '11px 18px', border: '1px solid var(--rule)', borderRadius: '4px', fontSize: '12.5px', color: 'var(--muted)' }}>
+                {competition.status === 'completed' || competition.status === 'cancelled' ? `This competition is ${competition.status}.` : 'Not accepting entries right now.'}
+              </div>
+            )}
+            <button
+              onClick={() => setShowTerms((v) => !v)}
+              style={{ padding: '11px 20px', border: '1px solid var(--rule)', borderRadius: '4px', background: 'transparent', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: '11.5px', letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer' }}
+            >
+              {showTerms ? 'Hide the terms' : 'Read the terms'}
+            </button>
           </div>
-          <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-            Redeem your prize before it expires{myVoucher.expires_at ? ` on ${formatDate(myVoucher.expires_at)}` : ''}.
-          </div>
-          <button className="btn btn-primary" onClick={() => navigate(`/checkout?voucher=${myVoucher.code}`)}>
-            Claim Your Prize
-          </button>
         </div>
-      )}
 
-      {/* Join / status */}
-      <div style={{ marginBottom: '32px' }}>
-        {myEntry ? (
-          <div className="card" style={{ padding: '16px 24px' }}>
-            <div style={{ fontSize: '14px', color: 'var(--text-primary)' }}>
-              You're entered — status: <strong>{myEntry.status}</strong>
-              {myEntry.final_rank && ` · finished #${myEntry.final_rank}`}
+        {prizePool.length > 0 && (
+          <Card title="Prize Pool">
+            <div style={{ padding: '0 8px', display: 'flex', justifyContent: 'center' }}>
+              <PieChart width={180} height={140}>
+                <Pie
+                  data={prizePool}
+                  dataKey={(p) => (allPrizesNumeric ? parsePrizeAmount(p.label) : 1)}
+                  nameKey="rank"
+                  innerRadius={40}
+                  outerRadius={60}
+                  activeIndex={hoveredPrize}
+                  activeShape={renderActiveDonutArc}
+                  onMouseEnter={(_, idx) => setHoveredPrize(idx)}
+                  onMouseLeave={() => setHoveredPrize(null)}
+                >
+                  {prizePool.map((p, idx) => (
+                    <Cell key={p.rank} fill={PRIZE_TONES[idx % PRIZE_TONES.length]} fillOpacity={dimUnlessActive(hoveredPrize, idx)} />
+                  ))}
+                </Pie>
+              </PieChart>
             </div>
-          </div>
-        ) : canJoin ? (
-          <button className="btn btn-primary" disabled={joining} onClick={handleJoin} style={{ width: '100%', padding: '14px' }}>
-            {joining ? 'Joining...' : 'Join Competition'}
-          </button>
-        ) : (
-          <div className="card" style={{ padding: '16px 24px', textAlign: 'center', color: 'var(--text-dim)', fontSize: '13px' }}>
-            This competition is {competition.status} and no longer accepting entries.
-          </div>
+            {hoveredPrize != null && prizePool[hoveredPrize] && (
+              <div style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--ink)', marginTop: '-8px', marginBottom: '8px' }}>
+                #{prizePool[hoveredPrize].rank} · {prizePool[hoveredPrize].label}
+              </div>
+            )}
+            {prizeTotal != null && hoveredPrize == null && (
+              <div style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--muted)', marginTop: '-8px', marginBottom: '8px' }}>
+                ${prizeTotal.toLocaleString('en-US')} total
+              </div>
+            )}
+            {prizePool.map((p, idx) => (
+              <div key={p.rank} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid var(--rule-soft)' }}>
+                <span style={{ width: '9px', height: '9px', background: PRIZE_TONES[idx % PRIZE_TONES.length], flex: '0 0 auto' }} />
+                <span style={{ flex: 1, fontSize: '12.5px' }}>#{p.rank} place</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12.5px' }}>{p.label}</span>
+              </div>
+            ))}
+          </Card>
         )}
       </div>
 
-      {/* Leaderboard */}
-      <div style={{ marginBottom: '16px' }}>
-        <h2 style={{ fontSize: '18px', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {renderIcon('leaderboard', { size: 20, color: 'var(--accent-gold)' })}
-          Leaderboard
-        </h2>
-      </div>
-
-      {leaders.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>
-          No entries yet. Be the first to join!
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '40px' }}>
-          {leaders.map((row, idx) => (
-            <div
-              key={row.entry_id}
-              className="card"
-              onClick={() => (onSelectTrader ? onSelectTrader(row.user_id) : navigate(`/trader/${row.user_id}`))}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '20px',
-                padding: '18px 24px', cursor: 'pointer',
-                borderLeft: idx < 3 ? '3px solid var(--rule)' : 'none'
-              }}
-            >
-              <div style={{ minWidth: '32px', textAlign: 'center' }}>
-                {idx < 3
-                  ? renderIcon('leaderboard', { size: 16, color: idx === 0 ? 'var(--accent-gold)' : 'var(--text-secondary)' })
-                  : <span style={{ color: 'var(--text-dim)', fontSize: '13px', fontWeight: 700 }}>#{row.rank}</span>}
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--accent)' }}>
-                  {row.full_name}
-
-                  {row.status === 'disqualified' && <span style={{ color: 'var(--red, #d33)', fontSize: '11px', marginLeft: '8px' }}>DISQUALIFIED</span>}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{row.country || 'Unknown'}</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: row.profit_pct >= 0 ? 'var(--green)' : 'var(--red, #d33)', fontFamily: 'var(--font-mono)' }}>
-                  {row.profit_pct >= 0 ? '+' : ''}{row.profit_pct.toFixed(2)}%
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>
-                  {row.profit_usd >= 0 ? '+' : ''}${row.profit_usd.toFixed(2)}
-                </div>
-              </div>
+      {showTerms && (
+        <Card ruled title="Rules & Terms">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px,1fr))', gap: '14px', fontSize: '13px' }}>
+            <div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Starting Balance</div>
+              <div style={{ marginTop: '4px' }}>${competition.starting_balance.toLocaleString('en-US')}</div>
             </div>
+            <div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Ranking Metric</div>
+              <div style={{ marginTop: '4px' }}>{competition.ranking_metric === 'profit_usd' ? 'Realized P&L ($)' : 'Return (%)'}</div>
+            </div>
+            {competition.daily_drawdown_pct != null && (
+              <div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Daily Drawdown Limit</div>
+                <div style={{ marginTop: '4px' }}>{competition.daily_drawdown_pct}%</div>
+              </div>
+            )}
+            <div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Window</div>
+              <div style={{ marginTop: '4px' }}>{formatDate(competition.start_at)} → {formatDate(competition.end_at)}</div>
+            </div>
+          </div>
+          {competition.rules && Object.keys(competition.rules).length > 0 && (
+            <pre style={{ marginTop: '14px', fontFamily: 'var(--font-mono)', fontSize: '11.5px', color: 'var(--muted)', whiteSpace: 'pre-wrap', overflowWrap: 'break-word' }}>
+              {JSON.stringify(competition.rules, null, 2)}
+            </pre>
+          )}
+        </Card>
+      )}
+
+      {myVoucher && (
+        <Card style={{ border: '1px solid var(--accent)' }}>
+          <div style={{ fontSize: '15px', color: 'var(--accent)', marginBottom: '6px' }}>
+            You won a free ${Number(myVoucher.account_size).toLocaleString('en-US')} challenge account
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '12px' }}>
+            Redeem your prize before it expires{myVoucher.expires_at ? ` on ${formatDate(myVoucher.expires_at)}` : ''}.
+          </div>
+          <button className="lx-btn lx-btn--md lx-btn--primary" onClick={() => navigate(`/checkout?voucher=${myVoucher.code}`)}>
+            Claim Your Prize
+          </button>
+        </Card>
+      )}
+
+      {/* Podium */}
+      {podium.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: '14px' }}>
+          {podium.map((p, idx) => (
+            <Card key={p.entry_id} interactive onClick={() => (onSelectTrader ? onSelectTrader(p.user_id) : navigate(`/trader/${p.user_id}`))}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '40px', lineHeight: 1, color: PODIUM_TONES[idx], minWidth: '44px' }}>{p.rank}</div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: '15px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.full_name}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: '3px' }}>
+                    {p.country || 'Unknown'} · {p.days_traded != null ? `${p.days_traded}d traded` : '—'}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '12px', marginTop: '16px' }}>
+                <div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Return</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', color: p.profit_pct >= 0 ? 'var(--gain)' : 'var(--loss)', marginTop: '3px' }}>
+                    {p.profit_pct >= 0 ? '+' : ''}{p.profit_pct.toFixed(2)}%
+                  </div>
+                </div>
+                <div style={{ width: '96px', height: '34px' }}>
+                  <Sparkline data={p.spark} tone={p.profit_pct >= 0 ? 'var(--gain)' : 'var(--loss)'} width={96} />
+                </div>
+              </div>
+            </Card>
           ))}
         </div>
       )}
+
+      {/* Standings */}
+      <Card ruled flush title="Standings" actions={<span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--muted)' }}>Updated {lastUpdated ? formatTime(lastUpdated) : '—'}</span>}>
+        {leaders.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '48px', color: 'var(--muted)' }}>No entries yet. Be the first to join!</div>
+        ) : (
+          <table className="lx-table">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Trader</th>
+                <th>Country</th>
+                <th>Return</th>
+                <th>P&amp;L</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leaders.map((row) => (
+                <tr
+                  key={row.entry_id}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => (onSelectTrader ? onSelectTrader(row.user_id) : navigate(`/trader/${row.user_id}`))}
+                >
+                  <td style={{ fontFamily: 'var(--font-mono)' }}>#{row.rank}</td>
+                  <td>
+                    {row.full_name}
+                    {row.status === 'disqualified' && (
+                      <span className="lx-badge" style={{ color: 'var(--loss)', marginLeft: '8px' }}>Disqualified</span>
+                    )}
+                  </td>
+                  <td style={{ color: 'var(--muted)' }}>{row.country || 'Unknown'}</td>
+                  <td style={{ fontFamily: 'var(--font-mono)', color: row.profit_pct >= 0 ? 'var(--gain)' : 'var(--loss)' }}>
+                    {row.profit_pct >= 0 ? '+' : ''}{row.profit_pct.toFixed(2)}%
+                  </td>
+                  <td style={{ fontFamily: 'var(--font-mono)', color: row.profit_usd >= 0 ? 'var(--gain)' : 'var(--loss)' }}>
+                    {row.profit_usd >= 0 ? '+' : ''}${row.profit_usd.toFixed(2)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
     </div>
   )
 }
@@ -257,13 +383,13 @@ export default function CompetitionDetail() {
 
   return (
     <PageWrapper>
-      <div style={{ minHeight: '100vh', background: 'var(--navy)' }}>
+      <div style={{ minHeight: '100vh', background: 'var(--paper)' }}>
         <div className="nav">
           <span className="nav-logo" onClick={() => navigate('/competitions')} style={{ cursor: 'pointer' }}>PROP FIRM</span>
           <ThemeToggle />
         </div>
 
-        <div style={{ maxWidth: '800px', margin: '48px auto 0', padding: '0 24px' }}>
+        <div style={{ maxWidth: '1040px', margin: '48px auto 0', padding: '0 24px 48px' }}>
           <CompetitionDetailContent slug={slug} />
         </div>
       </div>

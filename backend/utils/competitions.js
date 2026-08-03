@@ -1,5 +1,5 @@
 const pool = require('../db')
-const { v4: uuidv4 } = require('uuid')
+const { generateAccountUid } = require('./accountIds')
 
 // Generalizes tradingDaysService.getTodayRealizedPnl's batch-by-account-ids
 // pattern, swapping its "today" window for an arbitrary [startAt, endAt).
@@ -43,7 +43,7 @@ async function fetchCompetitionBySlugOrId(idOrSlug) {
 async function fetchCompetitionLeaderboard(competitionId, { limit = 100 } = {}) {
   const result = await pool.query(
     `SELECT
-       ce.id AS entry_id, ce.user_id, ce.status, ce.final_rank,
+       ce.id AS entry_id, ce.user_id, ce.status, ce.final_rank, ce.joined_at, ce.account_id,
        u.full_name, u.country, u.trader_uid, u.is_bot,
        a.account_uid, a.current_balance, a.starting_balance,
        COALESCE(ce.final_profit_usd,
@@ -74,6 +74,34 @@ async function fetchCompetitionLeaderboard(competitionId, { limit = 100 } = {}) 
     profit_pct: parseFloat(row.profit_pct || 0),
     profit_usd: parseFloat(row.profit_usd || 0)
   }))
+}
+
+// Podium sparklines — cumulative realized P&L per day, per account, over the
+// competition window. Batched (one query for all requested accounts) rather
+// than N calls, mirroring computeCompetitionAnalytics's pattern below.
+async function fetchCompetitionPodiumSparklines(accountIds, startAt, endAt) {
+  if (!accountIds || accountIds.length === 0) return new Map()
+  const result = await pool.query(
+    `SELECT account_id, DATE(close_time) AS d, COALESCE(SUM(demo_pnl), 0) AS pnl
+       FROM trades
+      WHERE account_id = ANY($1::uuid[])
+        AND status = 'closed'
+        AND close_time >= $2
+        AND close_time <= $3
+      GROUP BY account_id, DATE(close_time)
+      ORDER BY account_id, d`,
+    [accountIds, startAt, endAt]
+  )
+  const running = new Map()
+  const byAccount = new Map()
+  for (const row of result.rows) {
+    const total = (running.get(row.account_id) || 0) + parseFloat(row.pnl || 0)
+    running.set(row.account_id, total)
+    const list = byAccount.get(row.account_id) || []
+    list.push({ value: parseFloat(total.toFixed(2)) })
+    byAccount.set(row.account_id, list)
+  }
+  return byAccount
 }
 
 // Per-participant trade-performance breakdown for the admin analytics page —
@@ -192,7 +220,7 @@ async function createCompetitionEntry(client, competition, userId) {
   }
 
   const startingBalance = parseFloat(competition.starting_balance)
-  const account_uid = uuidv4()
+  const account_uid = await generateAccountUid(client, { accountType: 'competition' })
 
   const accountResult = await client.query(
     `INSERT INTO accounts
@@ -219,5 +247,6 @@ module.exports = {
   computeCompetitionAnalytics,
   createCompetitionEntry,
   fetchCompetitionBySlugOrId,
-  fetchCompetitionLeaderboard
+  fetchCompetitionLeaderboard,
+  fetchCompetitionPodiumSparklines
 }

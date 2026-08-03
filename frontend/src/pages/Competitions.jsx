@@ -4,22 +4,16 @@ import api from '../services/api'
 import ThemeToggle from '../components/ThemeToggle'
 import { PageWrapper } from '../App'
 import { renderIcon } from '../utils/iconMap'
+import Card from '../components/ui/Card'
+import { getStatusToneColor } from '../utils/statusTone'
+
+const STATUS_LABELS = { upcoming: 'Upcoming', active: 'Live', completed: 'Completed', cancelled: 'Cancelled' }
 
 function statusBadge(status) {
-  const map = {
-    upcoming: { label: 'Upcoming', color: 'var(--text-secondary)' },
-    active: { label: 'Live', color: 'var(--green)' },
-    completed: { label: 'Completed', color: 'var(--text-dim)' },
-    cancelled: { label: 'Cancelled', color: 'var(--text-dim)' }
-  }
-  const info = map[status] || map.upcoming
+  const color = getStatusToneColor(status)
   return (
-    <span style={{
-      display: 'inline-block', padding: '3px 10px', borderRadius: 'var(--radius-pill)',
-      fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
-      color: info.color, border: `1px solid ${info.color}`, background: `color-mix(in srgb, ${info.color} 15%, transparent)`
-    }}>
-      {info.label}
+    <span className="lx-badge" style={{ color }}>
+      {STATUS_LABELS[status] || status}
     </span>
   )
 }
@@ -54,56 +48,51 @@ export function CompetitionsListContent({ onSelectSlug }) {
     <div>
       <div style={{ textAlign: 'center', marginBottom: '40px' }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
-          {renderIcon('leaderboard', { size: 48, color: 'var(--accent-gold)' })}
+          {renderIcon('leaderboard', { size: 48, color: 'var(--accent)' })}
         </div>
-        <h1 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', fontSize: '28px', marginBottom: '8px' }}>
+        <h1 style={{ fontFamily: 'var(--font-display)', color: 'var(--ink)', fontSize: '28px', marginBottom: '8px' }}>
           Trading Competitions
         </h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+        <p style={{ color: 'var(--muted)', fontSize: '14px' }}>
           Join a weekly or monthly contest, trade a dedicated account, and climb the leaderboard
         </p>
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '80px', color: 'var(--text-muted)' }}>Loading...</div>
+        <div style={{ textAlign: 'center', padding: '80px', color: 'var(--muted)' }}>Loading...</div>
       ) : competitions.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: '64px' }}>
+        <Card style={{ textAlign: 'center', padding: '64px' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
             {renderIcon('analytics', { size: 40, color: 'var(--accent)' })}
           </div>
-          <p style={{ color: 'var(--text-muted)' }}>No competitions scheduled right now. Check back soon!</p>
-        </div>
+          <p style={{ color: 'var(--muted)' }}>No competitions scheduled right now. Check back soon!</p>
+        </Card>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {competitions.map((c) => (
-            <div
+            <Card
               key={c.slug}
-              className="card"
+              interactive
               onClick={() => openCompetition(c.slug)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '20px',
-                padding: '20px 24px', cursor: 'pointer', transition: 'background 0.15s'
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = 'color-mix(in srgb, var(--muted) 6%, transparent)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'var(--navy-card)'}
+              style={{ display: 'flex', alignItems: 'center', gap: '20px', padding: '20px 24px' }}
             >
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                  <span style={{ fontWeight: 700, fontSize: '15px', color: 'var(--accent)' }}>{c.title}</span>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '16px', color: 'var(--ink)' }}>{c.title}</span>
                   {statusBadge(c.status)}
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
+                <div style={{ fontSize: '12px', color: 'var(--muted)' }}>
                   {formatDate(c.start_at)} → {formatDate(c.end_at)} · ${c.starting_balance.toLocaleString('en-US')} account
                   {c.entry_fee > 0 ? ` · $${c.entry_fee} entry` : ' · Free entry'}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+                <div style={{ fontSize: '18px', fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>
                   {c.participant_count ?? 0}{c.max_participants ? ` / ${c.max_participants}` : ''}
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>participants</div>
+                <div style={{ fontSize: '11px', color: 'var(--muted)' }}>participants</div>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}
@@ -117,7 +106,7 @@ export default function Competitions() {
 
   return (
     <PageWrapper>
-      <div style={{ minHeight: '100vh', background: 'var(--navy)' }}>
+      <div style={{ minHeight: '100vh', background: 'var(--paper)' }}>
         <div className="nav">
           <span className="nav-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>PROP FIRM</span>
           <ThemeToggle />

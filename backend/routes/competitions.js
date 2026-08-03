@@ -5,7 +5,7 @@ const pool = require('../db')
 const logger = require('../utils/logger')
 const { authenticateToken } = require('./middleware')
 const { sanitizeString } = require('../utils/validation')
-const { fetchCompetitionBySlugOrId, fetchCompetitionLeaderboard, createCompetitionEntry } = require('../utils/competitions')
+const { fetchCompetitionBySlugOrId, fetchCompetitionLeaderboard, fetchCompetitionPodiumSparklines, createCompetitionEntry } = require('../utils/competitions')
 
 // Best-effort auth: populates req.user if a valid token is present, but never
 // blocks the request — competition listings/detail/leaderboard are public.
@@ -113,7 +113,31 @@ router.get('/:slug/leaderboard', async function (req, res) {
     const competition = await fetchCompetitionBySlugOrId(req.params.slug)
     if (!competition) return res.status(404).json({ error: 'Competition not found' })
     const rows = await fetchCompetitionLeaderboard(competition.id)
-    res.json(rows)
+
+    // days_traded: how long each entry has been in the competition, capped
+    // to the competition window (running competitions cap at "now", ended
+    // ones at end_at) — a real figure, not a placeholder.
+    const now = new Date()
+    const windowEnd = competition.status === 'completed' || competition.status === 'cancelled'
+      ? new Date(competition.end_at)
+      : now
+    const msPerDay = 24 * 60 * 60 * 1000
+
+    // Podium sparklines — top 3 only, batched in one query.
+    const podiumAccountIds = rows.slice(0, 3).map((r) => r.account_id).filter(Boolean)
+    const sparkByAccount = await fetchCompetitionPodiumSparklines(podiumAccountIds, competition.start_at, windowEnd)
+
+    const enriched = rows.map((row) => {
+      const joined = row.joined_at ? new Date(row.joined_at) : null
+      const days_traded = joined ? Math.max(1, Math.ceil((windowEnd - joined) / msPerDay)) : null
+      return {
+        ...row,
+        days_traded,
+        spark: row.account_id && sparkByAccount.has(row.account_id) ? sparkByAccount.get(row.account_id) : []
+      }
+    })
+
+    res.json(enriched)
   } catch (err) {
     logger.error('[competitions] Failed to load leaderboard:', { error: err.message })
     res.status(500).json({ error: 'Could not load leaderboard' })
