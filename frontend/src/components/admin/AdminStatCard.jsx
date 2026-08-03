@@ -1,4 +1,6 @@
 import React from 'react';
+import Card from '../ui/Card';
+import Sparkline from '../ui/Sparkline';
 import { renderIcon } from '../../utils/iconMap';
 
 export default function AdminStatCard({
@@ -9,7 +11,8 @@ export default function AdminStatCard({
   trendDirection = 'neutral',
   onClick,
   alert = false,
-  alertColor = 'var(--admin-danger)'
+  alertColor = 'var(--admin-danger)',
+  spark
 }) {
   const trendIcon = trendDirection === 'up'
     ? renderIcon('trade', { size: 12, color: 'var(--admin-success)' })
@@ -17,12 +20,21 @@ export default function AdminStatCard({
       ? renderIcon('floating_down', { size: 12, color: 'var(--admin-danger)' })
       : renderIcon('arrow', { size: 12, color: 'var(--admin-text-faint)' });
 
+  const tone = alert
+    ? alertColor
+    : trendDirection === 'up'
+      ? 'var(--gain)'
+      : trendDirection === 'down'
+        ? 'var(--loss)'
+        : undefined;
+
   return (
-    <div
-      className="admin-stat-card"
+    <Card
+      stat
+      interactive={!!onClick}
+      tone={tone}
       onClick={onClick}
       style={{
-        cursor: onClick ? 'pointer' : 'default',
         border: alert ? `1px solid ${alertColor}` : undefined,
         background: alert ? 'var(--glass-2)' : undefined
       }}
@@ -40,8 +52,15 @@ export default function AdminStatCard({
       </div>
       <div>
         <div className="admin-stat-value" style={alert ? { color: alertColor } : undefined}>{value}</div>
-        <div className="admin-stat-label">{label}</div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '8px', marginTop: '3px' }}>
+          <div className="admin-stat-label">{label}</div>
+          {Array.isArray(spark) && spark.length > 1 && (
+            <span style={{ width: '52px', height: '20px', flex: '0 0 auto' }}>
+              <Sparkline data={spark} tone={tone || 'var(--admin-accent)'} width={52} height={20} />
+            </span>
+          )}
+        </div>
       </div>
-    </div>
+    </Card>
   );
 }

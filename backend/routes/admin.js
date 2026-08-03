@@ -2781,6 +2781,9 @@ router.post('/admin-users/:id/disable', authenticateAdmin, requireSuperAdmin, as
 router.get('/overview', authenticateAdmin, async function(req, res) {
 
   try {
+    await ensureViolationTables()
+    await ensureDisputesInfrastructure()
+
     const accounts = await pool.query(
       `SELECT
         COUNT(*) FILTER (WHERE status = 'active' AND account_type = 'phase1') AS phase1_active,
@@ -2832,6 +2835,98 @@ router.get('/overview', authenticateAdmin, async function(req, res) {
 
     const { exposureData } = await getExposureData(pool);
 
+    // ── Command Center additions (Modern Gazette handoff spec) ──────────
+    // Gross revenue by month — challenge_orders is the only real revenue
+    // source in this app; there's no separate "reset fee" product, so this
+    // is a single "Challenge Fees" series (the prototype's copy mentions
+    // resets, but that's not a real feature here — omitted rather than
+    // fabricated).
+    const revenueByMonth = await pool.query(
+      `SELECT to_char(date_trunc('month', paid_at), 'Mon') AS month,
+              date_trunc('month', paid_at) AS month_start,
+              COALESCE(SUM(amount), 0) AS revenue
+         FROM challenge_orders
+        WHERE status = 'paid' AND paid_at >= NOW() - INTERVAL '6 months'
+        GROUP BY date_trunc('month', paid_at)
+        ORDER BY month_start ASC`
+    )
+
+    // Daily event counts for KPI sparklines/deltas — only for metrics with
+    // a real timestamped event stream (point-in-time counts like "active
+    // challenges" or "pending KYC" have no historical series to draw from,
+    // so those KPI cards render without a sparkline/delta rather than a
+    // fabricated one).
+    const [dailySignups, dailyFunded, dailyPayouts, dailyPnl] = await Promise.all([
+      pool.query(`SELECT date_trunc('day', created_at) AS day, COUNT(*)::int AS n
+                    FROM users WHERE created_at >= NOW() - INTERVAL '14 days'
+                    GROUP BY day ORDER BY day ASC`),
+      pool.query(`SELECT date_trunc('day', phase_start_date) AS day, COUNT(*)::int AS n
+                    FROM accounts WHERE account_type = 'funded' AND phase_start_date >= NOW() - INTERVAL '14 days'
+                    GROUP BY day ORDER BY day ASC`),
+      pool.query(`SELECT date_trunc('day', paid_at) AS day, COALESCE(SUM(amount_payable), 0) AS n
+                    FROM payouts WHERE status = 'paid' AND paid_at >= NOW() - INTERVAL '14 days'
+                    GROUP BY day ORDER BY day ASC`),
+      pool.query(`SELECT date_trunc('day', close_time) AS day, COALESCE(SUM(demo_pnl), 0) AS n
+                    FROM trades WHERE status = 'closed' AND close_time >= NOW() - INTERVAL '14 days'
+                    GROUP BY day ORDER BY day ASC`),
+    ])
+
+    function buildDailySeries(rows, days = 14) {
+      const byDay = new Map(rows.map((r) => [new Date(r.day).toISOString().slice(0, 10), parseFloat(r.n) || 0]))
+      const series = []
+      for (let i = days - 1; i >= 0; i -= 1) {
+        const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10)
+        series.push({ value: byDay.get(d) || 0 })
+      }
+      return series
+    }
+    function trendDelta(series) {
+      const last7 = series.slice(-7).reduce((a, b) => a + b.value, 0)
+      const prev7 = series.slice(-14, -7).reduce((a, b) => a + b.value, 0)
+      if (prev7 === 0) return last7 > 0 ? { pct: null, label: `+${last7} (7d)` } : { pct: 0, label: '0 (7d)' }
+      const pct = Math.round(((last7 - prev7) / prev7) * 100)
+      return { pct, label: `${pct >= 0 ? '+' : ''}${pct}% (7d)` }
+    }
+
+    const signupsSeries = buildDailySeries(dailySignups.rows)
+    const fundedSeries = buildDailySeries(dailyFunded.rows)
+    const payoutsSeries = buildDailySeries(dailyPayouts.rows)
+    const pnlSeries = buildDailySeries(dailyPnl.rows)
+
+    // Needs Attention — a real, sorted queue (not just a stat grid): pending
+    // KYC, pending/flagged payouts, open critical violations, open disputes.
+    const [violationCounts, disputeCounts] = await Promise.all([
+      pool.query(`SELECT COUNT(*) FILTER (WHERE status = 'open' AND severity = 'critical')::int AS critical_open,
+                         COUNT(*) FILTER (WHERE status = 'open')::int AS all_open
+                    FROM admin_rule_violations`),
+      pool.query(`SELECT COUNT(*) FILTER (WHERE status IN ('open', 'under_review'))::int AS open_count
+                    FROM disputes`)
+    ])
+
+    const attentionQueue = [
+      { key: 'kyc', label: 'Pending KYC reviews', meta: 'Identity verification', n: parseInt(users.rows[0].kyc_pending || 0) },
+      { key: 'payouts', label: 'Pending payout requests', meta: 'Awaiting review', n: parseInt(payouts.rows[0].pending_payouts || 0) },
+      { key: 'flagged', label: 'Flagged payouts', meta: 'Risk-flagged, needs decision', n: parseInt(flaggedPayouts.rows[0].flagged || 0) },
+      { key: 'violations', label: 'Critical violations', meta: 'System-flagged breaches', n: violationCounts.rows[0].critical_open },
+      { key: 'disputes', label: 'Open appeals', meta: 'Trader-filed disputes', n: disputeCounts.rows[0].open_count },
+      { key: 'banned', label: 'Banned users', meta: 'Under enforcement', n: parseInt(bannedUsers.rows[0].banned || 0) },
+    ].filter((item) => item.n > 0).sort((a, b) => b.n - a.n)
+
+    const totalAttention = attentionQueue.reduce((sum, item) => sum + item.n, 0)
+
+    // Alerts — the top 1-3 most urgent conditions only (never fabricated
+    // filler if fewer than 3 exist).
+    const alerts = []
+    if (violationCounts.rows[0].critical_open > 0) {
+      alerts.push({ tone: 'loss', kicker: 'Critical', text: `${violationCounts.rows[0].critical_open} critical violation${violationCounts.rows[0].critical_open === 1 ? '' : 's'} awaiting review`, cta: 'Review', go: 'violations' })
+    }
+    if (parseInt(flaggedPayouts.rows[0].flagged || 0) > 0) {
+      alerts.push({ tone: 'warn', kicker: 'Flagged', text: `${flaggedPayouts.rows[0].flagged} payout${parseInt(flaggedPayouts.rows[0].flagged) === 1 ? '' : 's'} flagged for risk review`, cta: 'Review', go: 'payouts' })
+    }
+    if (disputeCounts.rows[0].open_count > 0) {
+      alerts.push({ tone: 'accent', kicker: 'Open', text: `${disputeCounts.rows[0].open_count} trader appeal${disputeCounts.rows[0].open_count === 1 ? '' : 's'} awaiting a decision`, cta: 'Review', go: 'disputes' })
+    }
+
     res.json({
       accounts: {
         phase1: parseInt(accounts.rows[0].phase1_active || 0),
@@ -2857,7 +2952,17 @@ router.get('/overview', authenticateAdmin, async function(req, res) {
         flagged_count: parseInt(flaggedPayouts.rows[0].flagged || 0)
       },
       exposure: exposureData,
-      settings: {}
+      settings: {},
+      revenue_by_month: revenueByMonth.rows.map((r) => ({ month: r.month, revenue: parseFloat(r.revenue) })),
+      kpi_trends: {
+        users: { spark: signupsSeries, delta: trendDelta(signupsSeries) },
+        funded: { spark: fundedSeries, delta: trendDelta(fundedSeries) },
+        payouts_paid: { spark: payoutsSeries, delta: trendDelta(payoutsSeries) },
+        pnl: { spark: pnlSeries, delta: trendDelta(pnlSeries) },
+      },
+      attention_queue: attentionQueue,
+      attention_total: totalAttention,
+      alerts
     })
 
   } catch (error) {

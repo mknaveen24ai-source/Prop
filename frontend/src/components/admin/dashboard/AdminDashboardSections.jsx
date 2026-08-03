@@ -4,9 +4,8 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   Legend,
-  Line,
-  LineChart,
   Pie,
   PieChart,
   Tooltip,
@@ -15,9 +14,11 @@ import {
 } from 'recharts';
 import AdminStatCard from '../AdminStatCard';
 import AdminStatGrid from '../AdminStatGrid';
-import AdminChart, { chartThemeProps } from '../AdminChart';
+import AdminChart, { chartThemeProps, renderActiveDonutArc, dimUnlessActive } from '../AdminChart';
 import AdminDataTable from '../AdminDataTable';
 import { ChartSkeleton } from './AdminDashboardFeedback';
+import Card from '../../ui/Card';
+import { renderIcon } from '../../../utils/iconMap';
 
 function EmptyChartState({ height, message }) {
   return (
@@ -36,30 +37,86 @@ function EmptyChartState({ height, message }) {
   );
 }
 
-export function AdminDashboardStats({ loading, error, overview, navigate }) {
+// Alerts row — Modern Gazette handoff spec: the top 1-3 most urgent
+// conditions only, distinct from the fuller "Needs Attention" queue below.
+// Renders nothing when there's nothing urgent (no fabricated filler cards).
+const ALERT_ROUTES = {
+  violations: '/admin/violations',
+  payouts: '/admin/payouts',
+  disputes: '/admin/support-appeals-center',
+};
+
+export function AdminDashboardAlerts({ loading, error, alerts, navigate }) {
+  if (loading || error || !alerts?.length) return null;
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${alerts.length}, minmax(0,1fr))`, gap: '12px', marginBottom: '24px' }}>
+      {alerts.map((a) => (
+        <div
+          key={a.kicker}
+          style={{
+            display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '14px 16px',
+            border: `1px solid var(--${a.tone})`, borderRadius: '4px',
+            background: 'var(--glass-2)', backdropFilter: 'blur(16px) saturate(140%)',
+          }}
+        >
+          <span style={{ display: 'inline-flex', color: `var(--${a.tone})`, marginTop: '2px' }}>
+            {renderIcon('warning', { size: 16, color: `var(--${a.tone})` })}
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.15em', textTransform: 'uppercase', color: `var(--${a.tone})` }}>{a.kicker}</div>
+            <div style={{ fontSize: '13.5px', marginTop: '4px', lineHeight: 1.45 }}>{a.text}</div>
+          </div>
+          <button
+            onClick={() => navigate(ALERT_ROUTES[a.go] ? ALERT_ROUTES[a.go] : `/admin/${a.go}`)}
+            style={{ alignSelf: 'center', padding: '6px 11px', border: `1px solid var(--${a.tone})`, borderRadius: '4px', background: 'transparent', color: `var(--${a.tone})`, fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.1em', textTransform: 'uppercase', whiteSpace: 'nowrap', cursor: 'pointer' }}
+          >
+            {a.cta}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function AdminDashboardStats({ loading, error, overview, kpiTrends, navigate }) {
   if (loading || error || !overview) return null;
 
   return (
     <AdminStatGrid gap={20}>
-      <AdminStatCard icon="users" label="Total Users" value={(overview.users?.total || 0).toLocaleString()} onClick={() => navigate('/admin/users')} />
+      <AdminStatCard
+        icon="users" label="Total Users" value={(overview.users?.total || 0).toLocaleString()}
+        onClick={() => navigate('/admin/users')}
+        trend={kpiTrends?.users?.delta?.label} trendDirection={kpiTrends?.users?.delta?.pct > 0 ? 'up' : kpiTrends?.users?.delta?.pct < 0 ? 'down' : 'neutral'}
+        spark={kpiTrends?.users?.spark}
+      />
       <AdminStatCard
         icon="challenges"
         label="Active Challenges"
         value={((overview.accounts?.phase1 || 0) + (overview.accounts?.phase2 || 0)).toLocaleString()}
         onClick={() => navigate('/admin/challenges')}
       />
-      <AdminStatCard icon="funded" label="Funded Traders" value={(overview.accounts?.funded || 0).toLocaleString()} onClick={() => navigate('/admin/funded')} />
+      <AdminStatCard
+        icon="funded" label="Funded Traders" value={(overview.accounts?.funded || 0).toLocaleString()}
+        onClick={() => navigate('/admin/funded')}
+        trend={kpiTrends?.funded?.delta?.label} trendDirection={kpiTrends?.funded?.delta?.pct > 0 ? 'up' : kpiTrends?.funded?.delta?.pct < 0 ? 'down' : 'neutral'}
+        spark={kpiTrends?.funded?.spark}
+      />
       <AdminStatCard
         icon="payouts"
         label="Total Paid Out"
         value={`$${(overview.payouts?.total_paid || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
         onClick={() => navigate('/admin/payouts')}
+        trend={kpiTrends?.payouts_paid?.delta?.label} trendDirection={kpiTrends?.payouts_paid?.delta?.pct > 0 ? 'up' : kpiTrends?.payouts_paid?.delta?.pct < 0 ? 'down' : 'neutral'}
+        spark={kpiTrends?.payouts_paid?.spark}
       />
       <AdminStatCard
         icon="pnl"
         label="Platform PnL (all trades)"
         value={`$${(overview.trades?.total_pnl || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
         onClick={() => navigate('/admin/pnl')}
+        trend={kpiTrends?.pnl?.delta?.label} trendDirection={kpiTrends?.pnl?.delta?.pct > 0 ? 'up' : kpiTrends?.pnl?.delta?.pct < 0 ? 'down' : 'neutral'}
+        spark={kpiTrends?.pnl?.spark}
       />
       <AdminStatCard icon="kyc" label="Pending KYC" value={overview.users?.pending_kyc || 0} onClick={() => navigate('/admin/kyc')} />
     </AdminStatGrid>
@@ -71,31 +128,35 @@ export function AdminDashboardCharts({
   trendsLoading,
   error,
   overview,
-  signupTrend,
+  revenueByMonth,
   accountStatusData,
-  funnelData,
 }) {
+  const [statusActiveIndex, setStatusActiveIndex] = React.useState(null);
+  const [revenueActiveIndex, setRevenueActiveIndex] = React.useState(null);
+
   if (error) return null;
 
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px', marginBottom: '24px' }}>
-        {trendsLoading ? (
+        {loading ? (
           <ChartSkeleton height={220} />
         ) : (
-          <AdminChart title="New Signups + Phase 1 Challenges (30D)">
-            {signupTrend.length > 0 ? (
-              <LineChart data={signupTrend}>
+          <AdminChart title="Gross Revenue by Month — Challenge Fees">
+            {revenueByMonth?.length > 0 ? (
+              <BarChart data={revenueByMonth} onMouseMove={(state) => setRevenueActiveIndex(state?.isTooltipActive ? state.activeTooltipIndex : null)} onMouseLeave={() => setRevenueActiveIndex(null)}>
                 <CartesianGrid {...chartThemeProps.grid} />
-                <XAxis dataKey="label" {...chartThemeProps.xAxis} interval={4} />
-                <YAxis {...chartThemeProps.yAxis} allowDecimals={false} />
-                <Tooltip {...chartThemeProps.tooltip} />
-                <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-                <Line type="monotone" dataKey="signups" stroke="var(--admin-accent)" strokeWidth={3} dot={false} activeDot={{ r: 6 }} name="Signups" />
-                <Line type="monotone" dataKey="challenges" stroke="var(--admin-info)" strokeWidth={3} dot={false} name="Challenges" />
-              </LineChart>
+                <XAxis dataKey="month" {...chartThemeProps.xAxis} />
+                <YAxis {...chartThemeProps.yAxis} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                <Tooltip {...chartThemeProps.tooltip} formatter={(value) => [`$${Number(value).toLocaleString()}`, 'Challenge Fees']} />
+                <Bar dataKey="revenue" fill="var(--admin-accent)" radius={[4, 4, 0, 0]} name="Challenge Fees">
+                  {revenueByMonth.map((_, index) => (
+                    <Cell key={index} fill="var(--admin-accent)" fillOpacity={dimUnlessActive(revenueActiveIndex, index)} />
+                  ))}
+                </Bar>
+              </BarChart>
             ) : (
-              <EmptyChartState height="220px" message="No signup data in the last 30 days" />
+              <EmptyChartState height="220px" message="No paid challenge orders in the last 6 months" />
             )}
           </AdminChart>
         )}
@@ -103,7 +164,7 @@ export function AdminDashboardCharts({
         {loading ? (
           <ChartSkeleton height={220} />
         ) : accountStatusData.length > 0 ? (
-          <AdminChart title="Account Status Breakdown">
+          <AdminChart title={`Account Status · ${accountStatusData.reduce((sum, e) => sum + e.value, 0).toLocaleString()} accounts`}>
             <PieChart>
               <Tooltip {...chartThemeProps.tooltip} />
               <Legend wrapperStyle={{ fontSize: '12px' }} />
@@ -117,9 +178,18 @@ export function AdminDashboardCharts({
                 dataKey="value"
                 stroke="var(--admin-surface)"
                 strokeWidth={2}
+                activeIndex={statusActiveIndex}
+                activeShape={renderActiveDonutArc}
+                onMouseEnter={(_, index) => setStatusActiveIndex(index)}
+                onMouseLeave={() => setStatusActiveIndex(null)}
               >
                 {accountStatusData.map((entry, index) => (
-                  <Cell key={entry.name || index} fill={entry.color} />
+                  <Cell
+                    key={entry.name || index}
+                    fill={entry.color}
+                    fillOpacity={dimUnlessActive(statusActiveIndex, index)}
+                    style={{ transition: 'fill-opacity 160ms ease' }}
+                  />
                 ))}
               </Pie>
             </PieChart>
@@ -130,60 +200,89 @@ export function AdminDashboardCharts({
           </AdminChart>
         )}
       </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '32px' }}>
-        {loading ? (
-          <>
-            <ChartSkeleton height={180} />
-            <ChartSkeleton height={180} />
-          </>
-        ) : overview ? (
-          <>
-            <AdminChart title="Challenge Pass-Rate Funnel">
-              <BarChart data={funnelData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} stroke="var(--rule)" />
-                <XAxis type="number" {...chartThemeProps.xAxis} allowDecimals={false} />
-                <YAxis dataKey="phase" type="category" {...chartThemeProps.yAxis} />
-                <Tooltip {...chartThemeProps.tooltip} />
-                <Bar dataKey="count" fill="var(--admin-success)" radius={[0, 4, 4, 0]} barSize={30} name="Accounts" />
-              </BarChart>
-            </AdminChart>
-
-            <AdminChart title="Platform Risk Exposure (Open Trades)">
-              {overview.exposure && overview.exposure.length > 0 ? (
-                <BarChart data={overview.exposure.slice(0, 6)}>
-                  <CartesianGrid {...chartThemeProps.grid} />
-                  <XAxis dataKey="instrument" {...chartThemeProps.xAxis} />
-                  <YAxis {...chartThemeProps.yAxis} />
-                  <Tooltip {...chartThemeProps.tooltip} formatter={(value) => `${value} lots`} />
-                  <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-                  <Bar dataKey="buy_lots" fill="var(--admin-success)" name="Buy Lots" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="sell_lots" fill="var(--admin-danger)" name="Sell Lots" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              ) : (
-                <EmptyChartState height="180px" message="No open trades" />
-              )}
-            </AdminChart>
-          </>
-        ) : null}
-      </div>
     </>
   );
 }
 
-export function AdminDashboardAttention({ loading, error, overview, quickCounts, navigate }) {
+const ATTENTION_ICONS = { kyc: 'kyc', payouts: 'payouts', flagged: 'payouts', violations: 'violations', disputes: 'dispute', banned: 'users' };
+const ATTENTION_ROUTES = { kyc: '/admin/kyc', payouts: '/admin/payouts', flagged: '/admin/payouts', violations: '/admin/violations', disputes: '/admin/support-appeals-center', banned: '/admin/users' };
+
+// Challenge Pipeline funnel + Needs Attention queue — paired in one row per
+// the prototype (isAdminDash: minmax(0,1fr) minmax(0,1.2fr)). The queue is a
+// real sorted list (busiest first), not a static stat grid — each row is
+// clickable and only appears when its count is > 0 (no fabricated zero rows).
+export function AdminDashboardAttention({ loading, error, overview, funnelData, attentionQueue, attentionTotal, navigate }) {
+  const [funnelActiveIndex, setFunnelActiveIndex] = React.useState(null);
   if (loading || error || !overview) return null;
 
   return (
-    <>
-      <h2 className="admin-h2" style={{ marginBottom: '16px' }}>Requires Attention</h2>
-      <AdminStatGrid minColumnWidth={190} style={{ marginBottom: '32px' }}>
-        <AdminStatCard icon="kyc" label="Pending KYC" value={quickCounts.kyc} alert={quickCounts.kyc > 0} alertColor="var(--admin-warning)" onClick={() => navigate('/admin/kyc')} />
-        <AdminStatCard icon="payouts" label="Pending Payouts" value={quickCounts.payouts} alert={quickCounts.payouts > 0} alertColor="var(--admin-gold)" onClick={() => navigate('/admin/payouts')} />
-        <AdminStatCard icon="payouts" label="Flagged Payouts" value={quickCounts.flagged} alert={quickCounts.flagged > 0} alertColor="var(--admin-danger)" onClick={() => navigate('/admin/payouts')} />
-        <AdminStatCard icon="users" label="Banned Users" value={quickCounts.banned} alert={quickCounts.banned > 0} alertColor="var(--admin-text-faint)" onClick={() => navigate('/admin/users')} />
-      </AdminStatGrid>
-    </>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.2fr)', gap: '16px', alignItems: 'start', marginBottom: '32px' }}>
+      <Card title="Challenge Pipeline" eyebrow="Last 90 days · conversion at each gate">
+        <AdminChart>
+          <BarChart data={funnelData} layout="vertical">
+            <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} stroke="var(--rule)" />
+            <XAxis type="number" {...chartThemeProps.xAxis} allowDecimals={false} />
+            <YAxis dataKey="phase" type="category" {...chartThemeProps.yAxis} />
+            <Tooltip {...chartThemeProps.tooltip} formatter={(value, name, item) => [`${value} (${item?.payload?.pct ?? 0}%)`, 'Accounts']} cursor={{ fill: 'var(--admin-success)', fillOpacity: 0.08 }} />
+            <Bar
+              dataKey="count"
+              fill="var(--admin-success)"
+              radius={[0, 4, 4, 0]}
+              barSize={30}
+              name="Accounts"
+              onMouseEnter={(_, index) => setFunnelActiveIndex(index)}
+              onMouseLeave={() => setFunnelActiveIndex(null)}
+            >
+              <LabelList
+                dataKey="pct"
+                position="right"
+                formatter={(pct) => `${pct}%`}
+                style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 700, fill: 'var(--admin-text-muted)' }}
+              />
+              {funnelData.map((_, index) => (
+                <Cell
+                  key={index}
+                  fill="var(--admin-success)"
+                  style={{
+                    filter: index === funnelActiveIndex ? 'drop-shadow(0 0 6px var(--admin-success))' : 'none',
+                    transition: 'filter 160ms ease',
+                    cursor: 'pointer',
+                  }}
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        </AdminChart>
+      </Card>
+
+      <Card
+        title="Needs Attention"
+        actions={attentionTotal > 0 && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--loss)', border: '1px solid var(--loss)', borderRadius: '99px', padding: '3px 9px' }}>
+            {attentionTotal} open
+          </span>
+        )}
+      >
+        {attentionQueue.length === 0 ? (
+          <div style={{ padding: '24px 4px', textAlign: 'center', color: 'var(--muted)', fontSize: '13px' }}>Nothing needs attention right now.</div>
+        ) : (
+          attentionQueue.map((q) => (
+            <button
+              key={q.key}
+              onClick={() => navigate(ATTENTION_ROUTES[q.key] || '/admin')}
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '11px 6px', border: 'none', borderBottom: '1px solid var(--rule-soft)', background: 'transparent', color: 'var(--ink)', textAlign: 'left', cursor: 'pointer' }}
+            >
+              <span style={{ display: 'inline-flex', color: 'var(--warn)' }}>{renderIcon(ATTENTION_ICONS[q.key] || 'flag', { size: 16, color: 'var(--warn)' })}</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: '13px' }}>{q.label}</span>
+                <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: '3px' }}>{q.meta}</span>
+              </span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '16px', color: 'var(--warn)' }}>{q.n}</span>
+            </button>
+          ))
+        )}
+      </Card>
+    </div>
   );
 }
 
@@ -229,15 +328,15 @@ const EXPOSURE_COLUMNS = [
   { header: 'Open Trades', key: 'trade_count' }
 ];
 
-export function AdminDashboardExposureTable({ loading, error, exposure }) {
+export function AdminDashboardExposureTable({ loading, error, exposure, totalActiveAccounts }) {
   if (loading || error || !exposure?.length) return null;
 
   return (
-    <div className="admin-card" style={{ padding: 0, overflow: 'hidden' }}>
-      <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--admin-border)' }}>
-        <h2 className="admin-h2" style={{ margin: 0 }}>Live Hedge Exposure</h2>
-      </div>
+    <Card
+      ruled flush title="Aggregate Exposure"
+      actions={<span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--muted)' }}>Net across {totalActiveAccounts.toLocaleString()} accounts · refreshes 30s</span>}
+    >
       <AdminDataTable columns={EXPOSURE_COLUMNS} data={exposure} emptyMessage="No open trades" />
-    </div>
+    </Card>
   );
 }

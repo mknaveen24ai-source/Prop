@@ -1,20 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-
-const STATUS_COLORS = {
-  'Phase 1': 'var(--admin-info)',
-  'Phase 2': 'var(--admin-accent)',
-  Funded: 'var(--admin-gold)',
-  Failed: 'var(--admin-danger)',
-  Passed: 'var(--admin-success)',
-  Expired: 'var(--admin-text-faint)',
-};
+import { getAdminStatusColor } from '../adminStatusTone';
 
 export default function useAdminDashboardData(adminAxios) {
   const [loading, setLoading] = useState(true);
-  const [trendsLoading, setTrendsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [overview, setOverview] = useState(null);
-  const [signupTrend, setSignupTrend] = useState([]);
 
   const fetchOverview = useCallback(async () => {
     setLoading(true);
@@ -31,65 +21,58 @@ export default function useAdminDashboardData(adminAxios) {
     }
   }, [adminAxios]);
 
-  const fetchSignupTrend = useCallback(async () => {
-    setTrendsLoading(true);
-    try {
-      const res = await adminAxios.get('/api/admin/signup-trends?days=30');
-      setSignupTrend(res.data || []);
-    } catch {
-      setSignupTrend([]);
-    } finally {
-      setTrendsLoading(false);
-    }
-  }, [adminAxios]);
-
   useEffect(() => {
     fetchOverview();
-    fetchSignupTrend();
-  }, [fetchOverview, fetchSignupTrend]);
+  }, [fetchOverview]);
 
   const accountStatusData = useMemo(() => {
     if (!overview) return [];
 
     return [
-      { name: 'Phase 1', value: overview.accounts?.phase1 || 0, color: STATUS_COLORS['Phase 1'] },
-      { name: 'Phase 2', value: overview.accounts?.phase2 || 0, color: STATUS_COLORS['Phase 2'] },
-      { name: 'Funded', value: overview.accounts?.funded || 0, color: STATUS_COLORS.Funded },
-      { name: 'Failed', value: overview.accounts?.failed || 0, color: STATUS_COLORS.Failed },
-      { name: 'Passed', value: overview.accounts?.passed || 0, color: STATUS_COLORS.Passed },
-      { name: 'Expired', value: overview.accounts?.expired || 0, color: STATUS_COLORS.Expired },
+      { name: 'Phase 1', value: overview.accounts?.phase1 || 0, color: getAdminStatusColor('phase 1') },
+      { name: 'Phase 2', value: overview.accounts?.phase2 || 0, color: getAdminStatusColor('phase 2') },
+      { name: 'Funded', value: overview.accounts?.funded || 0, color: getAdminStatusColor('funded') },
+      { name: 'Failed', value: overview.accounts?.failed || 0, color: getAdminStatusColor('failed') },
+      { name: 'Passed', value: overview.accounts?.passed || 0, color: getAdminStatusColor('passed') },
+      { name: 'Expired', value: overview.accounts?.expired || 0, color: getAdminStatusColor('expired') },
     ].filter((item) => item.value > 0);
   }, [overview]);
 
   const funnelData = useMemo(() => {
     if (!overview) return [];
 
-    return [
+    const stages = [
       { phase: 'Phase 1', count: overview.accounts?.phase1 || 0 },
       { phase: 'Phase 2', count: overview.accounts?.phase2 || 0 },
       { phase: 'Funded', count: overview.accounts?.funded || 0 },
     ];
+    // Conversion % relative to the first stage (Modern Gazette handoff
+    // spec: "horizontal bars sized relative to first stage, conversion %
+    // printed per row").
+    const firstCount = stages[0]?.count || 0;
+    return stages.map((stage) => ({
+      ...stage,
+      pct: firstCount > 0 ? Math.round((stage.count / firstCount) * 100) : 0,
+    }));
   }, [overview]);
 
-  const quickCounts = useMemo(() => ({
-    kyc: overview?.users?.pending_kyc || 0,
-    payouts: overview?.payouts?.pending || 0,
-    flagged: overview?.payouts?.flagged_count || 0,
-    banned: overview?.users?.banned || 0,
-  }), [overview]);
+  const revenueByMonth = useMemo(() => overview?.revenue_by_month || [], [overview]);
+  const kpiTrends = useMemo(() => overview?.kpi_trends || {}, [overview]);
+  const attentionQueue = useMemo(() => overview?.attention_queue || [], [overview]);
+  const attentionTotal = overview?.attention_total || 0;
+  const alerts = useMemo(() => overview?.alerts || [], [overview]);
 
   return {
     loading,
-    trendsLoading,
     error,
     overview,
-    signupTrend,
     accountStatusData,
     funnelData,
-    quickCounts,
-    retry: () => {
-      fetchOverview();
-      fetchSignupTrend();
-    },
+    revenueByMonth,
+    kpiTrends,
+    attentionQueue,
+    attentionTotal,
+    alerts,
+    retry: fetchOverview,
   };
 }
