@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Card from './ui/Card'
+import Sparkline from './ui/Sparkline'
 import OrderPanel from './OrderPanel'
 import TradingViewWidget from './TradingViewWidget'
 import SimulatedTradingDisclaimer from './SimulatedTradingDisclaimer'
@@ -292,6 +293,29 @@ export default function TradingPanel({
   }, [])
 
   const prices = Object.keys(storePrices || {}).length > 0 ? storePrices : (propPrices || {})
+
+  // Rolling per-instrument price history for the Watchlist rail's sparklines
+  // (Modern Gazette handoff spec: every stat/table row gets one). Buffered in
+  // a ref so a price tick doesn't force a re-render on its own — only the
+  // periodic tick below does, capped well under the sparkline's own 100x34
+  // resolution.
+  const priceHistoryRef = useRef({})
+  const [historyTick, setHistoryTick] = useState(0)
+  useEffect(() => {
+    const entries = Object.entries(prices || {})
+    if (entries.length === 0) return
+    for (const [instrument, data] of entries) {
+      const mid = data?.bid != null && data?.ask != null ? (parseFloat(data.bid) + parseFloat(data.ask)) / 2 : parseFloat(data?.bid ?? data?.ask)
+      if (!Number.isFinite(mid)) continue
+      const history = priceHistoryRef.current[instrument] || (priceHistoryRef.current[instrument] = [])
+      history.push({ value: mid })
+      if (history.length > 30) history.shift()
+    }
+  }, [prices])
+  useEffect(() => {
+    const iv = setInterval(() => setHistoryTick((t) => t + 1), 4000)
+    return () => clearInterval(iv)
+  }, [])
   const liveAvailableInstruments = useMemo(() => getAvailableInstrumentList(prices), [prices])
   const closingTradeSet = useMemo(() => new Set(closingTradeIds), [closingTradeIds])
   const availableInstruments = knownAvailableInstruments.length > 0
@@ -741,6 +765,55 @@ export default function TradingPanel({
 
       {/* Main Trading Layout — active accounts only */}
       {!accountLoading && selectedAccount && selectedAccount.status === 'active' && (
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+          {/* Watchlist rail (Modern Gazette handoff spec, isTrade block): pinned
+              instruments with live price + sparkline. Added alongside the
+              existing resizable chart/order-panel split, not replacing it —
+              the ⭐ toggle on the symbol ticker below already pins instruments
+              here. */}
+          <div style={{ width: '212px', flex: '0 0 212px', position: 'sticky', top: '84px' }}>
+            <Card ruled flush title="Watchlist">
+              {pinnedInstruments.length === 0 ? (
+                <div style={{ padding: '14px 16px', fontSize: '11.5px', color: 'var(--muted)', lineHeight: 1.5 }}>
+                  Star an instrument below to pin it here.
+                </div>
+              ) : pinnedInstruments.map((instrument) => {
+                const data = prices[instrument]
+                const isSelected = orderForm.instrument === instrument
+                const history = priceHistoryRef.current[instrument] || []
+                const first = history[0]?.value
+                const last = history[history.length - 1]?.value
+                const changePct = first ? ((last - first) / first) * 100 : 0
+                const tone = changePct >= 0 ? 'var(--gain)' : 'var(--loss)'
+                return (
+                  <button
+                    key={instrument}
+                    onClick={() => setOrderForm((f) => ({ ...f, instrument, stop_loss: '', take_profit: '' }))}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%',
+                      padding: '9px 14px', border: 'none', borderBottom: '1px solid var(--rule-soft)',
+                      background: isSelected ? 'var(--accent-dim)' : 'transparent', cursor: 'pointer', textAlign: 'left',
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '13px', color: 'var(--ink)' }}>{instrument}</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11.5px', color: 'var(--muted)', marginTop: '2px' }}>
+                        {data ? formatPrice(data.bid, instrument) : '—'}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11.5px', color: tone }}>{changePct >= 0 ? '+' : ''}{changePct.toFixed(2)}%</div>
+                      <div style={{ width: '52px', height: '18px', marginTop: '3px' }}>
+                        <Sparkline data={history} tone={tone} width={52} height={18} />
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </Card>
+          </div>
+
+          <div style={{ flex: 1, minWidth: 0 }}>
         <div className='trading-layout' ref={tradingLayoutRef} style={{ '--trading-split': `${splitPct}%` }}>
 
           {/* Left — Chart + Positions */}
@@ -749,196 +822,17 @@ export default function TradingPanel({
             {/* FIX Step 3: SimulatedTradingDisclaimer — shown above the chart on active accounts */}
             <SimulatedTradingDisclaimer />
 
-            {/* Balance Bar */}
-            {stats && (
-              <div className='trading-stats-grid' style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '16px', alignItems: 'stretch' }}>
-                {[
-                  { label: 'Balance', value: `$${currentBalance.toFixed(2)}` },
-                  { label: 'Floating P&L', value: `${floatingProfit >= 0 ? '+' : ''}$${floatingProfit.toFixed(2)}`, color: floatingProfit >= 0 ? 'var(--green)' : 'var(--red)' },
-                  { label: 'Floating Balance', value: `$${floatingBalance.toFixed(2)}`, color: floatingBalance >= currentBalance ? 'var(--green)' : 'var(--red)' },
-                  { label: 'Profit',   value: `${stats.stats.profit_pct >= 0 ? '+' : ''}${stats.stats.profit_pct}%`, color: stats.stats.profit_pct >= 0 ? 'var(--green)' : 'var(--red)' },
-                  { label: 'Drawdown', value: `-${stats.stats.drawdown_pct}%`, color: stats.stats.drawdown_pct > 7 ? 'var(--red)' : 'var(--accent)' },
-                  { label: 'Days Left',value: stats.stats.days_remaining ?? '∞' },
-                ].map(s => (
-                  <div key={s.label} className="stat-card" style={{ padding: '14px 18px' }}>
-                    <div className="stat-value" style={{ fontSize: '22px', fontWeight: '800', color: s.color || 'var(--accent)' }}>{s.value}</div>
-                    <div className="stat-label">{s.label}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* ── Live Drawdown Warning Gauge ── */}
-
-            {stats && profitTargetAmount > 0 && (
-              <div style={{
-                background: 'color-mix(in srgb, var(--muted) 6%, transparent)',
-                border: '1px solid color-mix(in srgb, var(--muted) 24%, transparent)',
-                padding: '10px 14px',
-                marginBottom: '16px'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text)' }}>
-                    Profit Target Progress
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                    {targetProgressPct.toFixed(1)}%
-                  </div>
-                </div>
-                <div style={{ height: '8px', background: 'var(--navy-border)', overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%',
-                    width: `${targetProgressPct}%`,
-                    transition: 'width 0.5s ease',
-                    background: targetProgressPct >= 100
-                      ? 'var(--green)'
-                      : targetProgressPct >= 75
-                        ? 'var(--warn)'
-                        : targetProgressPct >= 50
-                          ? 'var(--accent)'
-                          : 'var(--muted)'
-                  }} />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '11px' }}>
-                  <span style={{ color: realizedProfit >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                    Realized: {realizedProfit >= 0 ? '+' : ''}${realizedProfit.toFixed(2)}
-                  </span>
-                  <span style={{ color: equityProfit >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                    Equity: {equityProfit >= 0 ? '+' : ''}${equityProfit.toFixed(2)}
-                  </span>
-                  <span style={{ color: 'var(--text-muted)' }}>
-                    Remaining: ${targetRemaining.toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {stats && (() => {
-              const drawdownPct    = parseFloat(stats.stats.drawdown_pct || 0)
-              const maxDrawdownPct = parseFloat(stats.account.max_drawdown_pct || 10)
-              const usedPct        = Math.min((drawdownPct / maxDrawdownPct) * 100, 100)
-              const remaining      = Math.max(0, maxDrawdownPct - drawdownPct).toFixed(2)
-
-              // Only show when drawdown > 0
-              if (drawdownPct <= 0) return null
-
-              const level = usedPct >= 90 ? 'critical' : usedPct >= 75 ? 'high' : usedPct >= 50 ? 'medium' : 'low'
-              const levelColors = {
-                critical: { bg: 'color-mix(in srgb, var(--loss) 15%, transparent)', border: 'var(--loss)', bar: 'var(--loss)', text: 'var(--loss)', icon: 'risk-alerts' },
-                high:     { bg: 'color-mix(in srgb, var(--loss) 8%, transparent)', border: 'color-mix(in srgb, var(--warn) 40%, var(--loss) 60%)', bar: 'color-mix(in srgb, var(--warn) 40%, var(--loss) 60%)', text: 'color-mix(in srgb, var(--warn) 40%, var(--loss) 60%)', icon: 'warning' },
-                medium:   { bg: 'color-mix(in srgb, var(--warn) 10%, transparent)', border: 'var(--warn)', bar: 'var(--warn)', text: 'var(--warn)', icon: 'analytics' },
-                low:      { bg: 'color-mix(in srgb, var(--accent) 6%, transparent)', border: 'color-mix(in srgb, var(--accent) 30%, transparent)', bar: 'var(--accent)', text: 'var(--text-muted)', icon: 'floating_down' },
-              }
-              const c = levelColors[level]
-
-              return (
-                <div style={{
-                  background: c.bg, border: `1px solid ${c.border}`,
-                  padding: '10px 14px',
-                  marginBottom: '16px'
-                }}>
-                  {/* Header row */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ display: 'inline-flex' }}>
-                        {renderIcon(c.icon, { size: 14, color: c.text })}
-                      </span>
-                      <span style={{ fontSize: '12px', fontWeight: '600', color: c.text }}>
-                        Drawdown {level === 'critical' ? '— CRITICAL' : level === 'high' ? '— HIGH' : level === 'medium' ? '— WARNING' : ''}
-                      </span>
-                    </div>
-                <div style={{ display: 'flex', gap: '16px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>
-                      <span style={{ color: c.text }}>Used: {drawdownPct.toFixed(2)}%</span>
-                      <span style={{ color: 'var(--text-muted)' }}>Remaining: {remaining}%</span>
-                      <span style={{ color: 'var(--text-dim)' }}>Limit: {maxDrawdownPct}%</span>
-                    </div>
-                  </div>
-
-                  {/* Drawdown gauge bar */}
-                  <div style={{ height: '6px', background: 'var(--navy-border)', overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%',
-                      width: `${usedPct}%`,
-                      background: `linear-gradient(90deg, var(--accent), ${c.bar})`,
-                      transition: 'width 0.5s ease',
-                      boxShadow: level === 'critical' ? `0 0 8px ${c.bar}` : 'none'
-                    }} />
-                  </div>
-
-                  {/* Critical message */}
-                  {level === 'critical' && (
-                    <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--red)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      {renderIcon('warning', { size: 12, color: 'var(--accent-red)' })}
-                      <span>Account will fail if drawdown reaches {maxDrawdownPct}%. Close losing trades immediately.</span>
-                    </div>
-                  )}
-                </div>
-              )
-            })()}
-
-
+            {/* Balance grid, profit-target progress, drawdown gauge, and phase
+                countdown timer were removed here (Modern Gazette handoff
+                spec: the prototype's Trade screen is watchlist + chart +
+                open positions + order ticket only — no risk dashboard).
+                This same information lives on the Dashboard's Risk Budget
+                block and Rules' Live Status card instead of being
+                duplicated here. */}
               <div style={{ width: '100%', height: '500px', marginBottom: '16px' }}>
                 <TradingViewWidget symbol={orderForm.instrument} theme={theme} />
               </div>
 
-            {/* ── Phase Countdown Timer ── */}
-            {timeRemaining && (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '12px',
-                padding: '10px 16px', marginBottom: '16px',
-                background: timeRemaining.urgent
-                  ? 'color-mix(in srgb, var(--muted) 12%, transparent)'
-                  : 'color-mix(in srgb, var(--muted) 6%, transparent)',
-                border: `1px solid ${timeRemaining.urgent ? 'var(--red)' : 'color-mix(in srgb, var(--muted) 25%, transparent)'}`
-              }}>
-                <span style={{ display: 'inline-flex' }}>
-                  {renderIcon(
-                    timeRemaining.expired ? 'timer' : timeRemaining.urgent ? 'warning' : 'timer',
-                    {
-                      size: 18,
-                      color: timeRemaining.expired || timeRemaining.urgent ? 'var(--accent-red)' : 'var(--accent)'
-                    }
-                  )}
-                </span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                    {selectedAccount.account_type.toUpperCase()} Phase Time Remaining
-                  </div>
-                  <div style={{
-                    fontSize: '16px', fontWeight: '700',
-                      fontFamily: 'var(--font-mono)',
-                    color: timeRemaining.expired ? 'var(--red)'
-                      : timeRemaining.urgent ? 'var(--red)'
-                      : 'var(--accent)'
-                  }}>
-                    {timeRemaining.display}
-                  </div>
-                </div>
-                {/* Mini progress bar for time used */}
-                {!timeRemaining.expired && selectedAccount.phase_start_date && (
-                  <div style={{ width: '80px' }}>
-                    <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '4px', textAlign: 'right' }}>
-                      {timeRemaining.days}d left
-                    </div>
-                    {(() => {
-                      const total = new Date(selectedAccount.phase_end_date) - new Date(selectedAccount.phase_start_date)
-                      const used  = new Date() - new Date(selectedAccount.phase_start_date)
-                      const pct   = Math.min(Math.max((used / total) * 100, 0), 100)
-                      return (
-                        <div style={{ height: '4px', background: 'var(--navy-border)' }}>
-                          <div style={{
-                            height: '100%',
-                            width: `${pct}%`,
-                            background: pct > 80 ? 'var(--red)' : pct > 60 ? 'var(--muted)' : 'var(--accent)',
-                            transition: 'width 1s linear'
-                          }} />
-                        </div>
-                      )
-                    })()}
-                  </div>
-                )}
-              </div>
-            )}
             <div className="trade-desk-stack">
             {openTrades.length > 0 && (
               <Card className="trade-section-card">
@@ -1275,6 +1169,8 @@ export default function TradingPanel({
               orderForm={orderForm}
               setOrderForm={setOrderForm}
             />
+          </div>
+        </div>
           </div>
         </div>
       )}
