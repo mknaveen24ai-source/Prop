@@ -3323,6 +3323,9 @@ router.get('/analytics', authenticateToken, async function(req, res) {
           avg_rr: 0,
           avg_r_multiple: null,
           r_distribution: [],
+          expectancy: 0,
+          best_win_streak: 0,
+          sharpe_30d: null,
           best_trade: 0,
           worst_trade: 0,
           avg_trade_duration_mins: 0,
@@ -3374,6 +3377,50 @@ router.get('/analytics', authenticateToken, async function(req, res) {
     const rMultiples = trades.map((t) => computeRMultiple(t)).filter((r) => r != null)
     const avg_r_multiple = rMultiples.length ? parseFloat((rMultiples.reduce((a, b) => a + b, 0) / rMultiples.length).toFixed(2)) : null
     const r_distribution = rMultiples.map((r) => parseFloat(r.toFixed(2)))
+
+    // Expectancy — average realized P&L per trade, over the whole set.
+    const expectancy = parseFloat((total_pnl / trades.length).toFixed(2))
+
+    // Best win streak — longest run of consecutive winning trades in close
+    // order. Breakeven trades (pnl === 0) break a streak without starting a
+    // losing one.
+    const chronological = [...trades].sort((a, b) => new Date(a.close_time) - new Date(b.close_time))
+    let best_win_streak = 0
+    let currentStreak = 0
+    for (const t of chronological) {
+      if (parseFloat(t.demo_pnl) > 0) {
+        currentStreak += 1
+        best_win_streak = Math.max(best_win_streak, currentStreak)
+      } else {
+        currentStreak = 0
+      }
+    }
+
+    // Sharpe (30d) — mean/stddev of daily realized P&L over the last 30
+    // calendar days ending on the most recent close, unannualized (days
+    // with no trades count as a 0 return, standard for a return-series
+    // Sharpe rather than only-active-days).
+    let sharpe_30d = null
+    if (chronological.length > 0) {
+      const lastClose = new Date(chronological[chronological.length - 1].close_time)
+      const dailyPnl = new Map()
+      for (const t of chronological) {
+        const closeDate = new Date(t.close_time)
+        const daysAgo = Math.floor((lastClose - closeDate) / (1000 * 60 * 60 * 24))
+        if (daysAgo < 0 || daysAgo >= 30) continue
+        const dayKey = closeDate.toISOString().slice(0, 10)
+        dailyPnl.set(dayKey, (dailyPnl.get(dayKey) || 0) + parseFloat(t.demo_pnl))
+      }
+      const returns = []
+      for (let i = 0; i < 30; i++) {
+        const d = new Date(lastClose.getTime() - i * 24 * 60 * 60 * 1000)
+        returns.push(dailyPnl.get(d.toISOString().slice(0, 10)) || 0)
+      }
+      const mean = returns.reduce((a, b) => a + b, 0) / returns.length
+      const variance = returns.reduce((sum, r) => sum + (r - mean) ** 2, 0) / returns.length
+      const stddev = Math.sqrt(variance)
+      sharpe_30d = stddev > 0 ? parseFloat((mean / stddev).toFixed(2)) : null
+    }
 
     const pnlValues   = trades.map(t => parseFloat(t.demo_pnl))
     const best_trade  = parseFloat(pnlValues.reduce((a, b) => Math.max(a, b), -Infinity).toFixed(2))
@@ -3452,6 +3499,7 @@ router.get('/analytics', authenticateToken, async function(req, res) {
         total_pnl: parseFloat(total_pnl.toFixed(2)),
         avg_win, avg_loss, profit_factor, avg_rr,
         avg_r_multiple, r_distribution,
+        expectancy, best_win_streak, sharpe_30d,
         best_trade, worst_trade, avg_trade_duration_mins,
         drawdown_curve,
         equity_curve_ranges: equityCurveRanges,
