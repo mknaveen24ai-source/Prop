@@ -619,8 +619,12 @@ h1, h2, h3, h4, h5, h6 {
 .dashboard-layout { display: flex; min-height: 100vh; background: var(--bg-base); }
 .dashboard-main {
   flex: 1;
-  padding: 24px 32px;
+  padding: 0;
   min-width: 0;
+  /* No padding here — the topbar is a flush, full-bleed header (border-bottom
+     only, no card/margin) and must sit flat against the sidebar and the top
+     of the viewport with zero gap on every page. .dashboard-page-content
+     (below) carries the padding for everything under the header instead. */
   /* .sidebar is position:fixed (pinned, internally-scrolling nav — not part
      of this flex row), so main content needs an explicit left offset
      matching the sidebar's own width/collapsed states instead of relying
@@ -633,7 +637,7 @@ h1, h2, h3, h4, h5, h6 {
   width: 100%;
   max-width: 1440px;
   margin: 0 auto;
-  padding: 0 24px 32px;
+  padding: 22px 24px 32px;
 }
 
 .dashboard-page-stack {
