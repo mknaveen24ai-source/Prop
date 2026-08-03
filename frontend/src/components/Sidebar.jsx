@@ -183,32 +183,15 @@ export default function Sidebar({
           className={`sidebar-item ${isActive ? 'active' : ''}`}
           style={{
             width: '100%',
-            border: 'none',
-            background: isActive ? 'var(--accent-glow)' : 'transparent',
-            color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
             textAlign: 'left',
-            borderRadius: '0',
-            padding: collapsed ? '12px 0' : '12px 14px',
-            marginBottom: '4px',
-            position: 'relative',
-            display: 'flex',
-            alignItems: 'center',
             justifyContent: collapsed ? 'center' : 'flex-start',
-            transition: 'padding 0.25s, background 0.15s, color 0.15s',
+            padding: collapsed ? '8px 0' : undefined,
           }}
         >
-          {isActive && (
-            <div style={{
-              position: 'absolute', left: '-8px', top: '10%',
-              height: '80%', width: '4px',
-              background: 'var(--accent)'
-            }} />
-          )}
-
-          <span style={{ display: 'inline-flex', alignItems: 'center', marginRight: collapsed ? 0 : '12px', flexShrink: 0 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, opacity: 0.9 }}>
             {item.id === 'support'
-              ? <Headset size={16} color={isActive ? 'var(--accent)' : 'var(--text-secondary)'} />
-              : renderIcon(item.icon, { size: 16, color: isActive ? 'var(--accent)' : 'var(--text-secondary)' })}
+              ? <Headset size={15} color={isActive ? 'var(--accent)' : 'var(--muted)'} />
+              : renderIcon(item.icon, { size: 15, color: isActive ? 'var(--accent)' : 'var(--muted)' })}
           </span>
 
           <AnimatePresence>
@@ -218,7 +201,7 @@ export default function Sidebar({
                 animate={{ opacity: 1, width: 'auto' }}
                 exit={{ opacity: 0, width: 0 }}
                 transition={{ duration: 0.2 }}
-                style={{ fontWeight: isActive ? 600 : 500, overflow: 'hidden', whiteSpace: 'nowrap', flex: 1 }}
+                style={{ overflow: 'hidden', whiteSpace: 'nowrap', flex: 1 }}
               >
                 {item.label}
               </motion.span>
