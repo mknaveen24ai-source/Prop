@@ -634,9 +634,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 .dashboard-main.sidebar-collapsed { margin-left: 64px; }
 .dashboard-page-content {
+  /* Full-bleed, no width cap — matches the prototype's content wrapper
+     exactly (flex:1, no max-width, fills whatever space the sidebar
+     leaves). The old 1440px cap + margin:auto centering doesn't exist
+     in the prototype and was leaving visible empty space on wide
+     screens instead of stretching to the right edge. */
   width: 100%;
-  max-width: 1440px;
-  margin: 0 auto;
   padding: 22px 24px 32px;
 }
 

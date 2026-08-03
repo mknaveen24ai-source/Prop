@@ -937,7 +937,7 @@ function Dashboard({ user, onLogout }) {
         </div>
       </div>
 
-      <div className="dashboard-page-content dashboard-page-stack ui-shell-section">
+      <div className="dashboard-page-content dashboard-page-stack">
         {error && <div className="error">{error}</div>}
         {success && <div className="success">{success}</div>}
 
