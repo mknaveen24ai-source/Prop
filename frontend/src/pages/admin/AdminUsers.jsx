@@ -10,6 +10,7 @@ import { useToast } from '../../components/admin/AdminToast';
 import AdminListToolbar from '../../components/admin/AdminListToolbar';
 import AdminEntityDrawer from '../../components/admin/AdminEntityDrawer';
 import { exportAdminResource, normalizeAdminListResponse } from '../../utils/adminList';
+import Card from '../../components/ui/Card';
 
 const DEFAULT_FILTERS = {
   kycStatus: 'all',
@@ -216,6 +217,17 @@ export default function AdminUsers() {
     setPage(1);
   };
 
+  const inviteTrader = async () => {
+    const email = window.prompt('Send an invite email to which address?');
+    if (!email) return;
+    try {
+      await adminAxios.post('/api/admin/traders/invite', { email: email.trim() });
+      toast.success(`Invite sent to ${email.trim()}`);
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Could not send invite');
+    }
+  };
+
   const applyTagToSelection = async () => {
     if (selectedIds.length === 0) return;
     const tag = window.prompt(`Tag ${selectedIds.length} selected traders`, 'manual-review');
@@ -318,7 +330,7 @@ export default function AdminUsers() {
         </div>
       )
     },
-    { header: 'UID', key: 'uid', isMono: true, sortKey: 'created_at', render: (u) => String(u.id).padStart(5, '0') },
+    { header: 'UID', key: 'uid', isMono: true, sortKey: 'created_at', render: (u) => u.trader_uid || String(u.id).padStart(5, '0') },
     { header: 'Country', key: 'country', sortKey: 'country', render: (u) => u.country || '—' },
     { header: 'KYC', key: 'kyc', sortKey: 'kyc_status', render: (u) => <AdminBadge status={u.kyc_status || 'pending'} /> },
     {
@@ -446,14 +458,21 @@ export default function AdminUsers() {
             }
           })}
           selectionLabel={selectedIds.length > 0 ? `${selectedIds.length} selected` : ''}
-          extraActions={selectedIds.length > 0 ? (
-            <button className="admin-btn admin-btn-ghost" onClick={applyTagToSelection}>
-              Tag Selected
-            </button>
-          ) : null}
+          extraActions={(
+            <>
+              {selectedIds.length > 0 && (
+                <button className="admin-btn admin-btn-ghost" onClick={applyTagToSelection}>
+                  Tag Selected
+                </button>
+              )}
+              <button className="admin-btn admin-btn-primary" onClick={inviteTrader}>
+                + Invite
+              </button>
+            </>
+          )}
         />
 
-        <div className="admin-card" style={{ padding: 0 }}>
+        <Card flush>
           <AdminDataTable
             columns={visibleColumns}
             data={rows}
@@ -479,7 +498,7 @@ export default function AdminUsers() {
               }
             }}
           />
-        </div>
+        </Card>
 
         <AdminEntityDrawer
           open={!!drawerRow}

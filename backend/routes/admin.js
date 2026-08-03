@@ -37,12 +37,13 @@ const {
   enqueuePayoutApprovedEmail,
   enqueuePayoutRejectedEmail
 } = require('../utils/emailQueue')
-const { sanitizeString } = require('../utils/validation')
+const { sanitizeString, isValidEmail } = require('../utils/validation')
 const { fetchProgressionSettings, promotePassedAccount } = require('../services/progressionService')
 const { fetchStepModels, fetchStepModelBySlug, toggleStepModel } = require('../utils/stepModels')
 const { CURRENT_TOS_VERSION } = require('../utils/tosVersion')
 const { readKycFileBuffer, getKycContentType, getOriginalKycExtension } = require('../utils/secureKycStorage')
 const { ensureViolationTables } = require('../services/violationEngine')
+const { sendEmailMessage, htmlWrap, resolveMailContext } = require('../mailer')
 const { getTenantSettings } = require('../services/tenantPolicyService')
 const { getPriceForTenant } = require('../priceFeed')
 const { ensureDisputesInfrastructure } = require('./disputes')
@@ -4456,6 +4457,65 @@ router.post('/kyc/reject', authenticateAdmin, requireAdminCapability('kyc:review
   } catch (error) {
     logger.error('KYC reject error:', { error: error.message })
     res.status(500).json({ error: 'Could not reject KYC' })
+  }
+})
+
+// Trader invites — the prototype's isAdminUsers block has a "+ Invite"
+// button with no real backend capability behind it anywhere in this app
+// (registration is already open/public, so an "invite" is a nudge email +
+// an audit trail, not an access-gated flow). Built for real rather than
+// left as a dead button: sends a real email, tracked in a lightweight table.
+let traderInvitesTablePromise = null
+async function ensureTraderInvitesTable() {
+  if (traderInvitesTablePromise) return traderInvitesTablePromise
+  traderInvitesTablePromise = pool.query(`
+    CREATE TABLE IF NOT EXISTS admin_trader_invites (
+      id BIGSERIAL PRIMARY KEY,
+      email TEXT NOT NULL,
+      invited_by TEXT NOT NULL,
+      invited_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `).catch((err) => { traderInvitesTablePromise = null; throw err })
+  return traderInvitesTablePromise
+}
+
+router.post('/traders/invite', authenticateAdmin, requireAdminCapability('trader:write:scoped'), async function(req, res) {
+  try {
+    await ensureTraderInvitesTable()
+    const email = String(req.body?.email || '').trim().toLowerCase()
+    if (!isValidEmail(email)) return res.status(400).json({ error: 'A valid email address is required' })
+
+    const existing = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1', [email])
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'This email already has an account' })
+    }
+
+    const context = resolveMailContext()
+    const signupUrl = `${context.baseUrl}/register`
+    const result = await sendEmailMessage({
+      to: email,
+      subject: `You're invited to trade with ${context.firmName}`,
+      html: htmlWrap('You have been invited', `
+        <p style="color:#e8e0d0;font-size:14px;line-height:1.6;">
+          An admin at ${context.firmName} invited you to start a funded trading challenge.
+        </p>
+        <p style="margin:24px 0;">
+          <a href="${signupUrl}" style="background:#c9a84c;color:#0d1b2a;padding:12px 24px;border-radius:4px;text-decoration:none;font-weight:700;">Create your account</a>
+        </p>
+      `),
+      text: `You've been invited to trade with ${context.firmName}. Create your account: ${signupUrl}`
+    })
+    if (!result.ok) return res.status(502).json({ error: 'Could not send the invite email' })
+
+    await pool.query(
+      `INSERT INTO admin_trader_invites (email, invited_by) VALUES ($1, $2)`,
+      [email, getAdminActorLabel(req.admin)]
+    )
+
+    res.json({ message: 'Invite sent', email })
+  } catch (error) {
+    logger.error('Trader invite error:', { error: error.message })
+    res.status(500).json({ error: 'Could not send invite' })
   }
 })
 

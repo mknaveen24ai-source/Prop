@@ -43,7 +43,7 @@ function EmptyChartState({ height, message }) {
 const ALERT_ROUTES = {
   violations: '/admin/violations',
   payouts: '/admin/payouts',
-  disputes: '/admin/support-appeals-center',
+  disputes: '/admin/disputes',
 };
 
 export function AdminDashboardAlerts({ loading, error, alerts, navigate }) {
@@ -125,7 +125,6 @@ export function AdminDashboardStats({ loading, error, overview, kpiTrends, navig
 
 export function AdminDashboardCharts({
   loading,
-  trendsLoading,
   error,
   overview,
   revenueByMonth,
@@ -205,7 +204,7 @@ export function AdminDashboardCharts({
 }
 
 const ATTENTION_ICONS = { kyc: 'kyc', payouts: 'payouts', flagged: 'payouts', violations: 'violations', disputes: 'dispute', banned: 'users' };
-const ATTENTION_ROUTES = { kyc: '/admin/kyc', payouts: '/admin/payouts', flagged: '/admin/payouts', violations: '/admin/violations', disputes: '/admin/support-appeals-center', banned: '/admin/users' };
+const ATTENTION_ROUTES = { kyc: '/admin/kyc', payouts: '/admin/payouts', flagged: '/admin/payouts', violations: '/admin/violations', disputes: '/admin/disputes', banned: '/admin/users' };
 
 // Challenge Pipeline funnel + Needs Attention queue — paired in one row per
 // the prototype (isAdminDash: minmax(0,1fr) minmax(0,1.2fr)). The queue is a
@@ -217,9 +216,8 @@ export function AdminDashboardAttention({ loading, error, overview, funnelData, 
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.2fr)', gap: '16px', alignItems: 'start', marginBottom: '32px' }}>
-      <Card title="Challenge Pipeline" eyebrow="Last 90 days · conversion at each gate">
-        <AdminChart>
-          <BarChart data={funnelData} layout="vertical">
+      <AdminChart title="Challenge Pipeline" eyebrow="Last 90 days · conversion at each gate">
+        <BarChart data={funnelData} layout="vertical">
             <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} stroke="var(--rule)" />
             <XAxis type="number" {...chartThemeProps.xAxis} allowDecimals={false} />
             <YAxis dataKey="phase" type="category" {...chartThemeProps.yAxis} />
@@ -252,8 +250,7 @@ export function AdminDashboardAttention({ loading, error, overview, funnelData, 
               ))}
             </Bar>
           </BarChart>
-        </AdminChart>
-      </Card>
+      </AdminChart>
 
       <Card
         title="Needs Attention"
