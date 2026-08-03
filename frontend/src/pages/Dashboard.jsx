@@ -3,8 +3,12 @@ import axios from 'axios'
 import { io } from 'socket.io-client'
 import toast from 'react-hot-toast'
 import ThemeToggle from '../components/ThemeToggle'
-import Sidebar from '../components/Sidebar'
+import MarketStatusPill from '../components/MarketStatusPill'
+import CommandPaletteTrigger from '../components/CommandPaletteTrigger'
+import Sidebar, { NAV_GROUPS } from '../components/Sidebar'
+import CommandPalette from '../components/CommandPalette'
 import KYCUploadForm from '../components/dashboard/KYCUploadForm'
+import Card from '../components/ui/Card'
 import DashboardHome from './DashboardHome'
 import ChallengeRules from './ChallengeRules'
 import Onboarding, { shouldShowOnboarding } from './Onboarding'
@@ -18,6 +22,7 @@ import useStore from '../store/useStore'
 import { renderIcon } from '../utils/iconMap'
 import { calculatePayoutPreview, calculateRealizedProfit, formatCurrency, toMoneyNumber } from '../utils/finance'
 import { filterVisibleTraderAccounts, isTraderAccountVisible } from '../utils/accountVisibility'
+import { getStatusColor } from '../utils/constants'
 import Pagination from '../components/Pagination'
 import DashboardKYCPage from './DashboardKYCPage'
 import DashboardPayoutsPage from './DashboardPayoutsPage'
@@ -30,15 +35,6 @@ import ErrorBoundary from '../ErrorBoundary'
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 const TradingPanel = lazy(() => import('../components/TradingPanel'))
 const Analytics = lazy(() => import('./Analytics'))
-
-function getStatusColor(status) {
-  const c = {
-    active: 'var(--accent)', passed: 'var(--green)', failed: 'var(--red)',
-    funded: 'var(--cyan)', pending: 'var(--accent)', approved: 'var(--green)',
-    paid: 'var(--green)', rejected: 'var(--red)', locked: 'var(--muted)'
-  }
-  return c[status] || 'var(--text-muted)'
-}
 
 function enrichTradesWithPrices(trades = [], currentPrices = {}) {
   return trades.map(trade => {
@@ -74,7 +70,7 @@ function formatMoney(value) {
 function DashboardSectionFallback({ label = 'Loading module...' }) {
   return (
     <div
-      className="card ui-surface ui-empty-state"
+      className="lx-card ui-surface ui-empty-state"
       style={{
         padding: '32px',
         minHeight: '220px',
@@ -813,6 +809,14 @@ function Dashboard({ user, onLogout }) {
         onToggleCollapse={handleToggleSidebar}
       />
 
+      <CommandPalette
+        results={NAV_GROUPS.flatMap((group) => group.items.map((item) => ({
+          label: item.label,
+          group: group.label,
+          action: () => setActivePage(item.id),
+        })))}
+      />
+
       {/* Main Content */}
       <div className="dashboard-main animate-fade-up" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         {/* Top Nav */}
@@ -834,8 +838,10 @@ function Dashboard({ user, onLogout }) {
               <span>{connected ? 'LIVE SYNC' : 'OFFLINE'}</span>
             </span>
           </span>
+          <MarketStatusPill />
         </div>
         <div className="dashboard-topbar-right" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <CommandPaletteTrigger />
           <span className="dashboard-user-name" style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500' }}>{user?.full_name || 'Trader'}</span>
           {kycStatus !== 'approved' && (
             <span className={`badge ${kycStatus === 'pending' ? 'badge-warning' : 'badge-danger'}`} onClick={() => setActivePage('kyc')} style={{ cursor: 'pointer' }}>
@@ -940,6 +946,7 @@ function Dashboard({ user, onLogout }) {
             quotaNextOpen={quotaNextOpen}
             onOpenRulesPage={() => setActivePage('rules')}
             onStartChallenge={() => setActivePage('get-challenge')}
+            onOpenPayoutsPage={() => setActivePage('payouts')}
           />
         )}
 
@@ -975,14 +982,14 @@ function Dashboard({ user, onLogout }) {
         {/* Trade Page */}
         {activePage === 'trade' && (
           kycStatus !== 'approved' ? (
-            <div className="card" style={{ textAlign: 'center', padding: '48px' }}>
+            <Card style={{ textAlign: 'center', padding: '48px' }}>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
                 {renderIcon('kyc', { size: 48, color: 'var(--accent)' })}
               </div>
               <h3 className="page-title" style={{ marginBottom: '12px', fontSize: '20px' }}>KYC Required</h3>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>Complete your identity verification to start trading.</p>
               <button className="btn btn-primary" onClick={() => setActivePage('kyc')} style={{ padding: '12px 32px' }}>Complete KYC</button>
-            </div>
+            </Card>
           ) : (
             // FIX (AUDIT): TradingPanel is a ~1700-line component with its own
             // chart/order-form/batch-action state — a rendering crash in it
@@ -1083,13 +1090,13 @@ function Dashboard({ user, onLogout }) {
           <div>
             <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: '24px', fontSize: '22px' }}>Account History</h2>
             {accountHistory.length === 0 ? (
-              <div className="card" style={{ textAlign: 'center', padding: '48px', maxWidth: '500px' }}>
+              <Card style={{ textAlign: 'center', padding: '48px', maxWidth: '500px' }}>
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
                   {renderIcon('file', { size: 48, color: 'var(--accent)' })}
                 </div>
                 <h3 style={{ color: 'var(--accent)', marginBottom: '12px' }}>No History Yet</h3>
                 <p style={{ color: 'var(--text-muted)' }}>Your challenge history will appear here once you complete or start a challenge.</p>
-              </div>
+              </Card>
             ) : (() => {
               const totalHistPages = Math.ceil(accountHistory.length / HISTORY_PAGE_SIZE)
               const pagedHistory = accountHistory.slice(
@@ -1104,13 +1111,9 @@ function Dashboard({ user, onLogout }) {
                       const trades = parseInt(acc.total_trades || 0)
                       const wins = parseInt(acc.winning_trades || 0)
                       const winRate = trades > 0 ? ((wins / trades) * 100).toFixed(0) : 0
-                      const statusColors = {
-                        active: 'var(--accent)', passed: 'var(--green)', failed: 'var(--red)',
-                        funded: 'var(--cyan)', expired: 'var(--muted)', locked: 'var(--muted)'
-                      }
-                      const statusColor = statusColors[acc.status] || 'var(--text-muted)'
+                      const statusColor = getStatusColor(acc.status)
                       return (
-                        <div key={acc.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderLeft: `3px solid ${statusColor}` }}>
+                        <Card key={acc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderLeft: `3px solid ${statusColor}` }}>
                           <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
                             <div>
                               <div style={{ fontWeight: '700', fontSize: '15px', color: 'var(--accent)', marginBottom: '4px' }}>
@@ -1147,7 +1150,7 @@ function Dashboard({ user, onLogout }) {
                               <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Final Balance</div>
                             </div>
                           </div>
-                        </div>
+                        </Card>
                       )
                     })}
                   </div>

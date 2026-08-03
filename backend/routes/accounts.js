@@ -8,21 +8,12 @@ const { v4: uuidv4 } = require('uuid')
 const logger = require('../utils/logger')
 const { CONTRACT_SIZES } = require('../constants')
 const {
-  VALID_ACCOUNT_SIZES,
-  buildAvailabilityPeriodMeta,
-  buildAccountAvailability,
-  countUsedQuotaSlots,
-  parseQuotaSetting,
-  quotaKey
-} = require('../utils/accountAvailability')
-const {
   abandonIdempotentRequest,
   beginIdempotentRequest,
   completeIdempotentRequest,
   getIdempotencyKey
 } = require('../utils/idempotency')
 const {
-  DEFAULT_TENANT_SETTINGS,
   ensureTenantSettingsInfrastructure,
   getTenantSettingsMap,
   parseBooleanSetting: parseTenantBoolean
@@ -34,8 +25,10 @@ const {
   ensureStepModelInfrastructure,
   fetchStepModels,
   fetchStepModelBySlug,
-  fetchStepModelPrice
+  fetchStepModelPrice,
+  assertSlotAvailable
 } = require('../utils/stepModels')
+const { validateCouponForCheckout, recordCouponRedemption } = require('../utils/coupons')
 
 const createAccountLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,     // 1 hour
@@ -51,35 +44,6 @@ const createAccountLimiter = rateLimit({
 function parseBooleanSetting(value, fallback = false) {
   if (value === undefined || value === null || value === '') return fallback
   return value === true || value === 'true'
-}
-
-function buildPublicAvailabilityFallback(settings = DEFAULT_TENANT_SETTINGS) {
-  const periodMeta = buildAvailabilityPeriodMeta(settings)
-  return VALID_ACCOUNT_SIZES.map((size) => {
-    const quota = parseQuotaSetting(settings, size)
-    const unlimited = quota >= 999999
-
-    return {
-      size,
-      quota: unlimited ? 999999 : quota,
-      configured_quota: unlimited ? null : quota,
-      used: 0,
-      remaining: unlimited ? null : quota,
-      locked: quota === 0,
-      is_unlimited: unlimited,
-      reason: quota === 0 ? 'This account size is currently unavailable.' : null,
-      ...periodMeta
-    }
-  })
-}
-
-async function loadTenantAvailability() {
-  const settings = await loadTenantSettings()
-  const sizes = await buildAccountAvailability(pool, settings)
-  return {
-    settings,
-    sizes
-  }
 }
 
 async function loadTenantSettings(keys = []) {
@@ -169,22 +133,6 @@ function buildResolvedRules(account, settings = {}) {
   }
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// GET /api/accounts/available-sizes
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// FIX: Added authenticateToken — this endpoint reveals slot quotas, usage
-// counts and lock status for all account sizes. Unauthenticated access lets
-// competitors or bots scrape capacity data indefinitely.
-router.get('/available-sizes', authenticateToken, async function(req, res) {
-  try {
-    const { sizes } = await loadTenantAvailability()
-    res.json(sizes)
-  } catch (error) {
-    logger.error('Available sizes error:', { error: error.message })
-    res.status(500).json({ error: 'Could not fetch available sizes' })
-  }
-})
-
 router.get('/rules/:account_id', authenticateToken, async function(req, res) {
   try {
     const accountIdStr = String(req.params.account_id || '').trim()
@@ -233,27 +181,6 @@ router.get('/rules/:account_id', authenticateToken, async function(req, res) {
   } catch (error) {
     logger.error('Account rules error:', { error: error.message })
     res.status(500).json({ error: 'Could not fetch account rules' })
-  }
-})
-
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// GET /api/accounts/platform-rules
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Public quota view for landing (no auth).
-// Returns live usage statistics to match the private endpoint.
-router.get('/available-sizes-public', async function(req, res) {
-  try {
-    const { sizes } = await loadTenantAvailability()
-    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-    res.set('Pragma', 'no-cache')
-    res.set('Expires', '0')
-    res.json(sizes)
-  } catch (error) {
-    logger.error('Public available sizes error:', { error: error.message })
-    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-    res.set('Pragma', 'no-cache')
-    res.set('Expires', '0')
-    res.json(buildPublicAvailabilityFallback())
   }
 })
 
@@ -383,9 +310,9 @@ router.post('/create', authenticateToken, createAccountLimiter, async function(r
     }
     idempotencyClaim = idempotencyResult.claimId || null
 
-    if (isNaN(account_size) || !VALID_ACCOUNT_SIZES.includes(account_size)) {
+    if (isNaN(account_size) || !STEP_MODEL_ACCOUNT_SIZES.includes(account_size)) {
       return res.status(400).json({
-        error: `Invalid account size. Choose one of: $${VALID_ACCOUNT_SIZES.map(s => s.toLocaleString()).join(', $')}`
+        error: `Invalid account size. Choose one of: $${STEP_MODEL_ACCOUNT_SIZES.map(s => s.toLocaleString()).join(', $')}`
       })
     }
 
@@ -417,36 +344,6 @@ router.post('/create', authenticateToken, createAccountLimiter, async function(r
     const settings = await loadTenantSettings()
 
     const maxPerUser = parseInt(settings.max_accounts_per_user || '999999')
-
-    // ——— Quota check ——————————————————————————————————————————————————————————
-    const key   = quotaKey(account_size)
-    const quota = settings[key] !== undefined ? parseInt(settings[key]) : null
-
-    if (quota === null || quota === 0) {
-      await client.query('ROLLBACK')
-      return res.status(403).json({
-        error: `The $${account_size.toLocaleString()} account size is currently locked by the administrator.`,
-        locked: true
-      })
-    }
-
-    if (quota < 999999) {
-      const usedCount = await countUsedQuotaSlots(client, account_size, settings)
-
-      if (usedCount >= quota) {
-        await client.query('ROLLBACK')
-        const nextMonth = new Date()
-        nextMonth.setDate(1)
-        nextMonth.setMonth(nextMonth.getMonth() + 1)
-        const nextMonthStr = nextMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-
-        return res.status(403).json({
-          error: `All ${quota} slots for the $${account_size.toLocaleString()} account are filled for this period. New slots open ${nextMonthStr}.`,
-          quota_full: true,
-          next_open:  nextMonth.toISOString().split('T')[0]
-        })
-      }
-    }
 
     // â”€â”€ Per-user active account limit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // This check is now inside the transaction + advisory lock, so two
@@ -508,6 +405,23 @@ router.post('/create', authenticateToken, createAccountLimiter, async function(r
     if (!stepModel) {
       await client.query('ROLLBACK')
       return res.status(400).json({ error: 'The challenge model for this order is no longer available.' })
+    }
+
+    // â”€â”€ Slot quota â”€â”€ Fixed lifetime pool per (step model, account size), globally
+    // lock-serialized so two users racing for the last slot can't both pass.
+    const slotCheck = await assertSlotAvailable(client, stepModel.id, account_size)
+    if (!slotCheck.ok) {
+      await client.query('ROLLBACK')
+      if (slotCheck.reason === 'full') {
+        return res.status(403).json({
+          error: `All ${slotCheck.limit} slots for the ${stepModel.name} $${account_size.toLocaleString()} account have been claimed.`,
+          quota_full: true
+        })
+      }
+      return res.status(403).json({
+        error: `The $${account_size.toLocaleString()} ${stepModel.name} account size is currently locked by the administrator.`,
+        locked: true
+      })
     }
 
     // â”€â”€ Create the account â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -647,7 +561,7 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
     const result = await pool.query(
       `SELECT id, user_id, account_type, account_size, current_balance, starting_balance,
               peak_balance, status, profit_target, max_drawdown_pct, phase_end_date,
-              consistency_max_day_pct
+              consistency_max_day_pct, daily_drawdown_pct, challenge_model_slug, created_at
        FROM accounts WHERE id = $1 AND user_id = $2`,
       [accountIdStr, req.user.userId]
     )
@@ -663,7 +577,8 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
       'funded_max_drawdown_pct', 'profit_share_pct',
       'max_daily_trades', 'min_hold_seconds', 'min_lot_size',
       'forex_lots_per_1k', 'commodity_lots_per_1k', 'max_trades_per_1k',
-      'weekend_holding_enabled', 'inactivity_auto_fail_enabled', 'inactivity_fail_days'
+      'weekend_holding_enabled', 'inactivity_auto_fail_enabled', 'inactivity_fail_days',
+      'payout_cycle_days'
     ])
 
     const rules = buildResolvedRules(account, settings)
@@ -747,6 +662,59 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
       }
     }
 
+    // Today's realized+floating P&L — used by both the daily-drawdown %
+    // below and the Dashboard's "Today's P&L" KPI, so compute it once
+    // regardless of whether a daily drawdown limit is even configured.
+    const todayRealizedMap = await tradingDaysService.getTodayRealizedPnl(pool, [accountIdStr])
+    const todayRealized = todayRealizedMap.get(accountIdStr) || todayRealizedMap.get(Number(accountIdStr)) || 0
+    const today_pnl = parseFloat((todayRealized + floatingPnl).toFixed(2))
+    const yesterdayEquity = parseFloat((equity - today_pnl).toFixed(2))
+    const today_pnl_pct = yesterdayEquity > 0 ? parseFloat(((today_pnl / yesterdayEquity) * 100).toFixed(2)) : 0
+
+    // Daily drawdown "% used" — mirrors the exact formula the live breach
+    // monitor uses (trades.js periodic job): today's realized+floating loss
+    // as a % of starting balance, divided by the daily limit %. Funded
+    // accounts resolve their daily limit from the step model, same as the
+    // breach job; challenge accounts use the account's own column.
+    let resolvedDailyDrawdownPct = parseFloat(account.daily_drawdown_pct || 0)
+    if (account.account_type === 'funded' && account.challenge_model_slug) {
+      const fundedModel = await fetchStepModelBySlug(account.challenge_model_slug)
+      if (fundedModel && Number.isFinite(parseFloat(fundedModel.funded_daily_drawdown_pct))) {
+        resolvedDailyDrawdownPct = parseFloat(fundedModel.funded_daily_drawdown_pct)
+      }
+    }
+    let daily_drawdown = null
+    if (resolvedDailyDrawdownPct > 0 && starting > 0) {
+      const todayLossAmount = today_pnl < 0 ? Math.abs(today_pnl) : 0
+      const todayLossPct = parseFloat(((todayLossAmount / starting) * 100).toFixed(2))
+      daily_drawdown = {
+        used_pct: Math.min(parseFloat(((todayLossPct / resolvedDailyDrawdownPct) * 100).toFixed(1)), 100),
+        limit_pct: resolvedDailyDrawdownPct,
+        amount_used: parseFloat(todayLossAmount.toFixed(2)),
+        limit_amount: parseFloat((starting * (resolvedDailyDrawdownPct / 100)).toFixed(2))
+      }
+    }
+
+    // Payout cycle — informational only (doesn't gate payout requests, which
+    // remain governed purely by the on-demand eligibility checks in
+    // payouts.js). Cycle length is a platform setting; each account's own
+    // cycle clock starts from when that funded account row was created.
+    let payout_cycle = null
+    if (account.account_type === 'funded') {
+      const cycleDays = parseInt(settings.payout_cycle_days || 14, 10)
+      const anchor = new Date(account.created_at).getTime()
+      const msPerCycle = cycleDays * 24 * 60 * 60 * 1000
+      const elapsed = Math.max(0, Date.now() - anchor)
+      const cyclesElapsed = Math.floor(elapsed / msPerCycle) + 1
+      const nextDate = new Date(anchor + cyclesElapsed * msPerCycle)
+      const availableProfit = Math.max(0, current - starting)
+      payout_cycle = {
+        cycle_days: cycleDays,
+        next_date: nextDate.toISOString(),
+        estimated_share: parseFloat((availableProfit * (rules.profit_share_pct / 100)).toFixed(2))
+      }
+    }
+
     res.json({
       account,
       rules,
@@ -757,12 +725,16 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
         total_drawdown_pct,
         total_drawdown_used_pct,
         total_drawdown_remaining_pct,
+        daily_drawdown,
+        today_pnl,
+        today_pnl_pct,
         floating_pnl: parseFloat(floatingPnl.toFixed(2)),
         equity,
         days_remaining,
         trades_today,
         last_trade_at,
-        consistency
+        consistency,
+        payout_cycle
       }
     })
 
@@ -875,6 +847,15 @@ router.post('/orders', authenticateToken, async function(req, res) {
     if (!priceRow || !priceRow.is_active) {
       return res.status(400).json({ error: 'This account size is not available for the selected challenge model.' })
     }
+    // Fail-fast UX guard only — not locking, not authoritative. The real,
+    // race-safe gate is assertSlotAvailable() inside POST /create, which runs
+    // right before the account is actually provisioned.
+    if (priceRow.locked) {
+      return res.status(400).json({
+        error: `All slots for the ${stepModel.name} $${accountSize.toLocaleString()} challenge have been claimed.`,
+        quota_full: true
+      })
+    }
 
     const settings = await loadTenantSettings([
       'payment_provider',
@@ -908,24 +889,56 @@ router.post('/orders', authenticateToken, async function(req, res) {
         }
       }
     }
-    const metadataJson = discountApplied
-      ? JSON.stringify({
-          affiliate_discount_applied: true,
-          affiliate_discount_pct: discountApplied.pct,
-          original_amount: discountApplied.original_amount
-        })
-      : '{}'
-
     await client.query('BEGIN')
 
-    // Every challenge requires payment now — the order stays 'pending'
-    // until Stripe confirms payment via webhook.
+    // Admin-created coupon code (routes/adminCoupons.js) — stacks on top of
+    // the referral discount above. GET /coupons/validate/:code is a preview
+    // only; this is the authoritative check, done under an advisory lock so
+    // concurrent redemptions of a code near its max_redemptions can't both pass.
+    let couponApplied = null
+    const couponCode = String(req.body?.coupon_code || '').trim()
+    if (couponCode) {
+      await client.query(`SELECT pg_advisory_xact_lock(hashtext('coupon_code'), hashtext($1))`, [couponCode.toUpperCase()])
+      const couponCheck = await validateCouponForCheckout(client, { code: couponCode, userId: req.user.userId, amount })
+      if (!couponCheck.valid) {
+        await client.query('ROLLBACK')
+        return res.status(400).json({ error: couponCheck.error })
+      }
+      couponApplied = {
+        coupon_id: couponCheck.coupon.id,
+        code: couponCheck.coupon.code,
+        discount_type: couponCheck.coupon.discount_type,
+        discount_value: couponCheck.coupon.discount_value,
+        discount_amount: couponCheck.discount_amount,
+        original_amount: amount
+      }
+      amount = couponCheck.final_amount
+    }
+
+    const metadata = {}
+    if (discountApplied) {
+      metadata.affiliate_discount_applied = true
+      metadata.affiliate_discount_pct = discountApplied.pct
+      metadata.original_amount = discountApplied.original_amount
+    }
+    if (couponApplied) {
+      metadata.coupon_code = couponApplied.code
+      metadata.coupon_discount_amount = couponApplied.discount_amount
+    }
+    const metadataJson = JSON.stringify(metadata)
+
+    // A referral discount and/or coupon can bring the price to $0 — treat that
+    // exactly like a competition-voucher redemption (see above): the order is
+    // already fully paid, so there's nothing for Stripe to charge. Creating a
+    // $0 Checkout Session isn't just pointless, Stripe rejects it outright.
+    const isFreeOrder = amount <= 0
+
     const orderInsert = await client.query(
       `INSERT INTO challenge_orders (
          user_id, account_size, amount, currency, status, checkout_mode, payment_provider, paid_via, paid_at,
          challenge_model_id, challenge_model_slug, metadata_json
        ) VALUES (
-         $1, $2, $3, $4, 'pending', 'paid', $5, NULL, NULL, $6, $7, $8::jsonb
+         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb
        )
        RETURNING *`,
       [
@@ -933,17 +946,30 @@ router.post('/orders', authenticateToken, async function(req, res) {
         accountSize,
         amount,
         currency,
-        paymentProvider || null,
+        isFreeOrder ? 'paid' : 'pending',
+        isFreeOrder ? 'coupon' : 'paid',
+        isFreeOrder ? null : (paymentProvider || null),
+        isFreeOrder ? 'coupon' : null,
+        isFreeOrder ? new Date() : null,
         stepModel.id,
         stepModelSlug,
         metadataJson
       ]
     )
 
+    if (couponApplied) {
+      await recordCouponRedemption(client, {
+        couponId: couponApplied.coupon_id,
+        userId: req.user.userId,
+        orderId: orderInsert.rows[0].id,
+        discountAmount: couponApplied.discount_amount
+      })
+    }
+
     await client.query('COMMIT')
 
     let checkout = null
-    if (paymentProvider.toLowerCase() === 'stripe') {
+    if (!isFreeOrder && paymentProvider.toLowerCase() === 'stripe') {
       checkout = await createChallengePaymentSession({
         req,
         orderId: orderInsert.rows[0].id,
@@ -953,11 +979,12 @@ router.post('/orders', authenticateToken, async function(req, res) {
 
     res.status(201).json({
       order: orderInsert.rows[0],
-      requires_payment: true,
-      payment_configured: !!paymentProvider,
+      requires_payment: !isFreeOrder,
+      payment_configured: isFreeOrder ? true : !!paymentProvider,
       checkout_url: checkout?.checkout_url || null,
       checkout_session_id: checkout?.checkout_session_id || null,
-      discount_applied: discountApplied
+      discount_applied: discountApplied,
+      coupon_applied: couponApplied
     })
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {})
@@ -965,6 +992,56 @@ router.post('/orders', authenticateToken, async function(req, res) {
     res.status(500).json({ error: 'Could not create challenge order' })
   } finally {
     client.release()
+  }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/accounts/coupons/validate/:code
+// Preview only — shown on the Checkout page before the order is created. The
+// authoritative check happens again (with a row lock) inside POST /orders.
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/coupons/validate/:code', authenticateToken, async function(req, res) {
+  try {
+    const accountSize = parseInt(req.query.account_size, 10)
+    const stepModelSlug = String(req.query.step_model || '').trim().toLowerCase()
+    if (!Number.isFinite(accountSize) || !stepModelSlug) {
+      return res.status(400).json({ valid: false, error: 'account_size and step_model are required' })
+    }
+
+    const priceRow = await fetchStepModelPrice(stepModelSlug, accountSize)
+    if (!priceRow || !priceRow.is_active) {
+      return res.status(400).json({ valid: false, error: 'This account size is not available for the selected challenge model.' })
+    }
+
+    // base_amount lets the Checkout page preview against the price it's
+    // already showing (which may include an active referral discount) —
+    // purely cosmetic since POST /orders recomputes the real amount from
+    // scratch, so it's fine to trust the caller here. Clamped to the real
+    // price so a tampered value can't make a coupon look bigger than it is.
+    const requestedBase = parseFloat(req.query.base_amount)
+    const basePrice = parseFloat(priceRow.price)
+    const amount = Number.isFinite(requestedBase) && requestedBase >= 0 && requestedBase <= basePrice
+      ? requestedBase
+      : basePrice
+
+    const check = await validateCouponForCheckout(pool, {
+      code: req.params.code,
+      userId: req.user.userId,
+      amount
+    })
+    if (!check.valid) return res.json({ valid: false, error: check.error })
+
+    res.json({
+      valid: true,
+      code: check.coupon.code,
+      discount_type: check.coupon.discount_type,
+      discount_value: check.coupon.discount_value,
+      discount_amount: check.discount_amount,
+      final_amount: check.final_amount
+    })
+  } catch (error) {
+    logger.error('Coupon validation error:', { error: error.message })
+    res.status(500).json({ error: 'Could not validate coupon' })
   }
 })
 

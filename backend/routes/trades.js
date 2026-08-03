@@ -2721,7 +2721,7 @@ function buildActivityHeatmap(trades) {
 
 function buildEquityCurveRanges(curve) {
   if (!Array.isArray(curve) || curve.length === 0) {
-    return { day: [], week: [], month: [], full: [] }
+    return { day: [], week: [], month: [], ytd: [], full: [] }
   }
 
   const lastPointDate = toSafeDate(curve[curve.length - 1]?.date) || new Date()
@@ -2730,11 +2730,17 @@ function buildEquityCurveRanges(curve) {
     if (!pointDate) return false
     return (lastPointDate.getTime() - pointDate.getTime()) <= (days * 24 * 60 * 60 * 1000)
   })
+  const yearStart = new Date(Date.UTC(lastPointDate.getUTCFullYear(), 0, 1)).getTime()
+  const filterYtd = () => curve.filter((point) => {
+    const pointDate = toSafeDate(point.date)
+    return pointDate && pointDate.getTime() >= yearStart
+  })
 
   return {
     day: filterByDays(1),
     week: filterByDays(7),
     month: filterByDays(30),
+    ytd: filterYtd(),
     full: curve
   }
 }
@@ -3300,7 +3306,7 @@ router.get('/analytics', authenticateToken, async function(req, res) {
           worst_trade: 0,
           avg_trade_duration_mins: 0,
           drawdown_curve: [],
-          equity_curve_ranges: { day: [], week: [], month: [], full: [] },
+          equity_curve_ranges: { day: [], week: [], month: [], ytd: [], full: [] },
           heatmap: {},
           activity_heatmap: buildActivityHeatmap([]),
           breakdowns: {

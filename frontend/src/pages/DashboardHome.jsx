@@ -1,164 +1,372 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import CountUp from 'react-countup'
+import axios from 'axios'
 import { PageWrapper } from '../App'
+import Card from '../components/ui/Card'
+import Sparkline from '../components/ui/Sparkline'
+import EquityCurveChart from '../components/EquityCurveChart'
 import useStore from '../store/useStore'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 import { renderIcon } from '../utils/iconMap'
 import { filterVisibleTraderAccounts, isTraderAccountVisible } from '../utils/accountVisibility'
-import {
-  calculateEquity,
-  calculatePercent,
-  calculateRealizedProfit,
-  calculateTargetRemaining,
-  formatCurrency,
-  sumMoney,
-} from '../utils/finance'
+import { calculateEquity, formatCurrency, sumMoney } from '../utils/finance'
 
 function formatMoney(value) {
   return formatCurrency(value)
 }
-
-function formatAnimatedCurrency(value) {
-  return formatCurrency(value)
-}
-
-function formatAnimatedSignedCurrency(value) {
+function formatSigned(value) {
   return formatCurrency(value, { signed: true })
 }
 
-function formatDate(value) {
-  if (!value) return 'the next period'
-  try {
-    return new Date(value).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-  } catch {
-    return 'the next period'
+// Timeframe tab -> equity_curve_ranges key (backend/routes/trades.js buildEquityCurveRanges).
+const TF_TABS = [
+  { label: '1D', key: 'day' },
+  { label: '1W', key: 'week' },
+  { label: '1M', key: 'month' },
+  { label: 'YTD', key: 'ytd' },
+]
+
+function computeMaxDrawdownPct(curve) {
+  if (!Array.isArray(curve) || curve.length === 0) return 0
+  let peak = curve[0].value
+  let worst = 0
+  for (const point of curve) {
+    peak = Math.max(peak, point.value)
+    if (peak > 0) worst = Math.max(worst, ((peak - point.value) / peak) * 100)
   }
+  return worst
 }
 
-function CountdownBoxes({ countdown, accent = 'var(--accent)' }) {
+// ── Account chips + Rules/New Challenge row ─────────────────────────────────
+function accountKind(account) {
+  if (account.account_type === 'funded') return `Funded · ${String(account.status || 'live').toUpperCase()}`
+  const phaseLabel = { phase1: 'Phase 1', phase2: 'Phase 2', phase3: 'Phase 3' }[account.account_type] || account.account_type
+  return phaseLabel.toUpperCase()
+}
+
+function accountPhaseText(account, isSelected, stats) {
+  if (account.account_type === 'funded') {
+    const available = stats && isSelected ? Math.max(0, (stats.account.current_balance || 0) - (stats.account.starting_balance || 0)) : null
+    return available != null && available >= 50 ? 'Payout eligible' : 'Active'
+  }
+  if (isSelected && stats?.stats?.days_remaining != null && stats.rules?.time_limit_days) {
+    const elapsed = Math.max(0, stats.rules.time_limit_days - stats.stats.days_remaining)
+    return `Day ${elapsed} / ${stats.rules.time_limit_days}`
+  }
+  return String(account.status || 'Active').replace(/^\w/, (c) => c.toUpperCase())
+}
+
+function AccountChipsRow({ accounts, selectedAccount, onSelect, stats, onOpenRulesPage, onStartChallenge }) {
   return (
-    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-      {[
-        { label: 'Days', value: countdown.days },
-        { label: 'Hours', value: countdown.hours },
-        { label: 'Min', value: countdown.minutes },
-        { label: 'Sec', value: countdown.seconds },
-      ].map(item => (
-        <div key={item.label} style={{ minWidth: '72px', padding: '12px 14px', border: '1px solid var(--navy-border)', background: 'var(--bg-hover)', textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', fontWeight: 800, color: accent, fontFamily: 'var(--font-mono)' }}>
-            {String(item.value).padStart(2, '0')}
-          </div>
-          <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            {item.label}
-          </div>
+    <div style={{ display: 'flex', alignItems: 'stretch', gap: '12px', flexWrap: 'wrap' }}>
+      {accounts.map((account) => {
+        const isSelected = selectedAccount?.id === account.id
+        return (
+          <button
+            key={account.id}
+            onClick={() => onSelect(account)}
+            style={{
+              textAlign: 'left', padding: '11px 15px', minWidth: '160px',
+              border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--rule)'}`,
+              borderRadius: 'var(--radius-sm)',
+              background: isSelected ? 'var(--soft, color-mix(in srgb, var(--accent) 9%, transparent))' : 'var(--glass)',
+              backdropFilter: 'blur(14px)', color: 'var(--ink)',
+              boxShadow: isSelected ? 'var(--elev)' : 'none',
+              transition: 'border-color .18s, background .18s', cursor: 'pointer',
+            }}
+          >
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', color: 'var(--muted)', textTransform: 'uppercase' }}>
+              {accountKind(account)}
+            </div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px', marginTop: '3px' }}>
+              ${parseFloat(account.account_size || 0).toLocaleString('en-US')}
+            </div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)', marginTop: '2px' }}>
+              {account.account_uid || account.id} · {accountPhaseText(account, isSelected, stats)}
+            </div>
+          </button>
+        )
+      })}
+      <div style={{ flex: 1, minWidth: '180px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', flexWrap: 'wrap' }}>
+        <button
+          onClick={onOpenRulesPage}
+          className="lx-btn"
+          style={{ padding: '9px 16px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--glass)', color: 'var(--ink)' }}
+        >
+          Rules
+        </button>
+        <button
+          onClick={onStartChallenge}
+          className="lx-btn"
+          style={{ padding: '9px 16px', border: '1px solid var(--accent)', borderRadius: 'var(--radius-sm)', background: 'var(--soft, color-mix(in srgb, var(--accent) 9%, transparent))', color: 'var(--accent)' }}
+        >
+          New Challenge
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── KPI strip (static — not draggable; only the 4 big blocks below are) ────
+function KpiCard({ icon, label, value, delta, sub, tone, sparkData }) {
+  return (
+    <Card stat tone={tone}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--muted)' }}>
+        <span style={{ display: 'inline-flex', color: tone }}>{renderIcon(icon, { size: 13, color: tone })}</span>
+        {label}
+      </div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: 'clamp(20px,1.9vw,26px)', fontWeight: 600, marginTop: '9px', whiteSpace: 'nowrap', letterSpacing: '-.02em' }}>
+        {value}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '10px', marginTop: '6px' }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: tone }}>
+          {delta}<span style={{ color: 'var(--muted)' }}> {sub}</span>
         </div>
-      ))}
-    </div>
+        <Sparkline data={sparkData} tone={tone} width={74} height={26} />
+      </div>
+    </Card>
   )
 }
 
-function RuleRow({ label, value, accent = false }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '11px 0', borderBottom: '1px solid var(--navy-border)' }}>
-      <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{label}</span>
-      <span style={{ color: accent ? 'var(--accent)' : 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-mono)', textAlign: 'right' }}>{value}</span>
-    </div>
-  )
-}
-
-function ConsistencyGauge({ consistency }) {
-  const size = 120
-  const strokeWidth = 12
+// ── Consistency donut (small progress ring, Score vs Gap) ──────────────────
+function ConsistencyDonut({ score }) {
+  const size = 110, strokeWidth = 11
   const radius = (size - strokeWidth) / 2
   const circumference = 2 * Math.PI * radius
+  const safeScore = Math.max(0, Math.min(100, score ?? 0))
+  const offset = circumference * (1 - safeScore / 100)
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
+      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="var(--rule-soft)" strokeWidth={strokeWidth} />
+      <circle
+        cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="var(--gain)" strokeWidth={strokeWidth}
+        strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset}
+        transform={`rotate(-90 ${size / 2} ${size / 2})`} style={{ transition: 'stroke-dashoffset .6s ease' }}
+      />
+      <text x="50%" y="47%" textAnchor="middle" dominantBaseline="central" style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '22px', fill: 'var(--gain)' }}>
+        {score != null ? Math.round(score) : '—'}
+      </text>
+      <text x="50%" y="66%" textAnchor="middle" dominantBaseline="central" style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '.1em', textTransform: 'uppercase', fill: 'var(--muted)' }}>
+        Consistency
+      </text>
+    </svg>
+  )
+}
 
-  if (!consistency || consistency.score == null) {
-    return (
-      <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-        <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', alignSelf: 'flex-start', marginBottom: '10px' }}>Consistency Score</div>
-        <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '20px 0' }}>
-          Not enough closed-trade history yet to calculate a consistency score.
-        </div>
-      </div>
-    )
-  }
-
-  const { score, best_day_pct, best_day_profit, threshold_pct, realized_profit } = consistency
-  const color = score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--warn)' : 'var(--red)'
-  const offset = circumference * (1 - Math.max(0, Math.min(100, score)) / 100)
+function ConsistencyRiskBlock({ consistency, dailyDrawdown, totalDrawdownUsedPct, totalDrawdownRemainingPct, maxDrawdownPct, profitProgressPct, profitTargetAmount, realizedProfit }) {
+  const risks = [
+    dailyDrawdown && {
+      label: 'Daily drawdown',
+      usedLabel: `${dailyDrawdown.used_pct.toFixed(1)}% used`,
+      pct: dailyDrawdown.used_pct,
+      tone: dailyDrawdown.used_pct >= 75 ? 'var(--loss)' : 'var(--gain)',
+      foot: `${formatMoney(dailyDrawdown.amount_used)} of ${formatMoney(dailyDrawdown.limit_amount)} · resets 00:00 UTC`,
+    },
+    {
+      label: 'Overall drawdown',
+      usedLabel: `${totalDrawdownUsedPct.toFixed(1)}% used`,
+      pct: totalDrawdownUsedPct,
+      tone: totalDrawdownUsedPct >= 75 ? 'var(--loss)' : 'var(--warn)',
+      foot: `${totalDrawdownRemainingPct.toFixed(2)}% remaining of ${maxDrawdownPct.toFixed(2)}% · static`,
+    },
+    profitTargetAmount > 0 && {
+      label: 'Profit target',
+      usedLabel: `${profitProgressPct.toFixed(1)}% reached`,
+      pct: profitProgressPct,
+      tone: 'var(--accent)',
+      foot: `${formatMoney(realizedProfit)} of ${formatMoney(profitTargetAmount)}`,
+    },
+  ].filter(Boolean)
 
   return (
-    <div className="card">
-      <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', marginBottom: '10px' }}>
-        Consistency Score
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke="var(--navy-border)"
-            strokeWidth={strokeWidth}
-          />
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke={color}
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={offset}
-            transform={`rotate(-90 ${size / 2} ${size / 2})`}
-            style={{ transition: 'stroke-dashoffset 0.6s ease' }}
-          />
-          <text
-            x="50%"
-            y="50%"
-            textAnchor="middle"
-            dominantBaseline="central"
-            style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: '22px', fill: color }}
-          >
-            <CountUp end={score} decimals={0} duration={1.2} preserveValue={true} useEasing={true} />
-          </text>
-        </svg>
-        <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.7 }}>
-          <div>Best day: <strong style={{ color: 'var(--text)' }}>{formatMoney(best_day_profit)}</strong> ({best_day_pct}% of profit)</div>
-          <div>Total profit: <strong style={{ color: 'var(--text)' }}>{formatMoney(realized_profit)}</strong></div>
-          <div>Firm limit: <strong style={{ color: 'var(--text)' }}>{threshold_pct}%</strong> per day</div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <Card>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--rule-soft)', paddingBottom: '10px', marginBottom: '14px' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px' }}>Consistency</div>
         </div>
+        {consistency ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ width: '110px', flex: '0 0 110px' }}>
+              <ConsistencyDonut score={consistency.score} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '9px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '12.5px', borderBottom: '1px solid var(--rule-soft)', paddingBottom: '7px' }}>
+                <span style={{ color: 'var(--muted)' }}>Best day</span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>{formatMoney(consistency.best_day_profit)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '12.5px', borderBottom: '1px solid var(--rule-soft)', paddingBottom: '7px' }}>
+                <span style={{ color: 'var(--muted)' }}>Share of profit</span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--gain)' }}>{consistency.best_day_pct.toFixed(1)}%</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '12.5px' }}>
+                <span style={{ color: 'var(--muted)' }}>Firm limit</span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)' }}>{consistency.threshold_pct.toFixed(1)}%</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ color: 'var(--muted)', fontSize: '13px', padding: '8px 0' }}>Not enough closed-trade history yet.</div>
+        )}
+      </Card>
+
+      <Card>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--rule-soft)', paddingBottom: '10px', marginBottom: '6px' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px' }}>Risk Budget</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)' }}>Live</div>
+        </div>
+        {risks.map((r) => (
+          <div key={r.label} style={{ padding: '12px 0', borderBottom: '1px solid var(--rule-soft)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'baseline' }}>
+              <span style={{ fontSize: '13px' }}>{r.label}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: r.tone }}>{r.usedLabel}</span>
+            </div>
+            <div style={{ height: '7px', marginTop: '9px', border: '1px solid var(--rule)', borderRadius: '99px', background: 'var(--paper)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${Math.min(100, Math.max(0, r.pct))}%`, background: r.tone, boxShadow: `0 0 12px ${r.tone}`, transition: 'width .5s cubic-bezier(.16,1,.3,1)' }} />
+            </div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)', marginTop: '7px' }}>{r.foot}</div>
+          </div>
+        ))}
+      </Card>
+    </div>
+  )
+}
+
+// ── Open Positions table ────────────────────────────────────────────────────
+function OpenPositionsTable({ positions }) {
+  const openOnly = positions.filter((t) => t.status === 'open')
+  const floatingTotal = openOnly.reduce((sum, t) => sumMoney([sum, t.floating_pnl || 0]), 0)
+
+  return (
+    <Card ruled title="Open Positions" actions={(
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>Floating</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '14px', color: floatingTotal >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{formatSigned(floatingTotal)}</span>
+      </div>
+    )} flush>
+      <div className="lx-table-wrap">
+        <table className="lx-table">
+          <thead>
+            <tr>
+              <th>Instrument</th><th>Side</th><th>Lots</th><th>Entry</th><th>Market</th><th>Age</th><th>P&amp;L</th>
+            </tr>
+          </thead>
+          <tbody>
+            {openOnly.length === 0 ? (
+              <tr><td colSpan={7} className="lx-table__empty">No open positions</td></tr>
+            ) : openOnly.map((t) => {
+              const ageMs = Date.now() - new Date(t.open_time).getTime()
+              const ageH = Math.floor(ageMs / 3600000)
+              const ageM = Math.floor((ageMs % 3600000) / 60000)
+              const ageLabel = ageH >= 24 ? `${Math.floor(ageH / 24)}d ${ageH % 24}h` : ageH > 0 ? `${ageH}h ${ageM.toString().padStart(2, '0')}m` : `${ageM}m`
+              const pnl = t.floating_pnl || 0
+              return (
+                <tr key={t.id}>
+                  <td>{t.instrument}</td>
+                  <td><span className="lx-badge" style={{ color: t.direction === 'buy' ? 'var(--gain)' : 'var(--loss)' }}>{t.direction === 'buy' ? 'BUY' : 'SELL'}</span></td>
+                  <td className="lx-num">{parseFloat(t.lot_size).toFixed(2)}</td>
+                  <td className="lx-num">{parseFloat(t.open_price).toFixed(t.instrument?.includes('JPY') ? 3 : 5)}</td>
+                  <td className="lx-num">{t.current_price != null ? parseFloat(t.current_price).toFixed(t.instrument?.includes('JPY') ? 3 : 5) : '—'}</td>
+                  <td className="lx-num">{ageLabel}</td>
+                  <td className="lx-num" style={{ color: pnl >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{formatSigned(pnl)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}
+
+// ── Session Heat (dashboard-scoped compact heatmap; never-blank read-out
+//    line, matches the Analytics screen's contract — Modern Gazette spec) ──
+function SessionHeat({ matrix, hours }) {
+  const [hovered, setHovered] = useState(null)
+  const maxAbsPnl = matrix.reduce((best, row) => Math.max(best, ...(row.slots || []).map((s) => Math.abs(Number(s.pnl || 0)))), 0) || 1
+  const shownHours = hours.filter((h) => h % 6 === 0)
+
+  function cellColor(slot) {
+    if (!slot || slot.trades === 0) return 'var(--rule-soft)'
+    const intensity = Math.min(1, Math.abs(slot.pnl) / maxAbsPnl)
+    const tone = slot.pnl >= 0 ? '79,190,110' : '224,90,90' // --gain / --loss rgb
+    return `rgba(${tone},${0.18 + intensity * 0.65})`
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: '32px repeat(24, 1fr)', gap: '2px', marginBottom: '4px' }}>
+        <div />
+        {hours.map((h) => (
+          <div key={h} style={{ fontSize: '8px', textAlign: 'center', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
+            {shownHours.includes(h) ? String(h).padStart(2, '0') : ''}
+          </div>
+        ))}
+      </div>
+      {matrix.map((row) => (
+        <div key={row.day_label} style={{ display: 'grid', gridTemplateColumns: '32px repeat(24, 1fr)', gap: '2px', marginBottom: '2px', alignItems: 'center' }}>
+          <div style={{ fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>{row.day_label.slice(0, 3).toUpperCase()}</div>
+          {(row.slots || []).map((slot) => (
+            <div
+              key={slot.hour}
+              onMouseEnter={() => setHovered({ day: row.day_label, ...slot })}
+              onMouseLeave={() => setHovered(null)}
+              style={{ height: '12px', borderRadius: '1px', background: cellColor(slot), cursor: slot.trades > 0 ? 'pointer' : 'default' }}
+            />
+          ))}
+        </div>
+      ))}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', borderTop: '1px solid var(--rule-soft)', paddingTop: '8px', fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)' }}>
+        <span style={{ color: 'var(--loss)' }}>Loss</span>
+        <span style={{ flex: '0 0 60px', height: '4px', background: 'linear-gradient(90deg, var(--loss), var(--rule-soft), var(--gain))', borderRadius: '2px' }} />
+        <span style={{ color: 'var(--gain)' }}>Gain</span>
+        <span style={{ flex: 1 }} />
+        <span>
+          {hovered
+            ? `${hovered.day.slice(0, 3)} ${String(hovered.hour).padStart(2, '0')}:00 · ${hovered.trades} trade${hovered.trades === 1 ? '' : 's'} · ${formatSigned(hovered.pnl || 0)}`
+            : 'Hover a cell'}
+        </span>
       </div>
     </div>
   )
 }
 
-function DrawdownCard({ title, usedPct, remainingPct, limitPct, tone = 'var(--accent)' }) {
-  const fill = Math.min(parseFloat(usedPct || 0), 100)
-  const color = fill >= 80 ? 'var(--red)' : tone
+// ── Payout cycle banner (funded accounts only) ──────────────────────────────
+function PayoutCycleBanner({ payoutCycle, onRequestPayout }) {
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    const iv = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(iv)
+  }, [])
+  const target = new Date(payoutCycle.next_date).getTime()
+  const diff = Math.max(0, target - now)
+  const d = Math.floor(diff / 86400000)
+  const h = Math.floor((diff % 86400000) / 3600000)
+  const m = Math.floor((diff % 3600000) / 60000)
+  const s = Math.floor((diff % 60000) / 1000)
+  const boxes = [{ v: String(d).padStart(2, '0'), l: 'Days' }, { v: String(h).padStart(2, '0'), l: 'Hours' }, { v: String(m).padStart(2, '0'), l: 'Min' }, { v: String(s).padStart(2, '0'), l: 'Sec' }]
+
   return (
-    <div className="card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', marginBottom: '10px' }}>
-        <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)' }}>{title}</div>
-        <div style={{ fontSize: '12px', color, fontFamily: 'var(--font-mono)' }}>
-          <CountUp
-            end={fill}
-            decimals={1}
-            duration={1.2}
-            preserveValue={true}
-            useEasing={true}
-          />
-          % used
+    <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap', background: 'var(--glass-2)', border: '1px solid var(--accent)', borderRadius: 'var(--radius-sm)', boxShadow: 'var(--elev)', padding: '16px 20px' }}>
+      <div style={{ flex: 1, minWidth: '220px' }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--accent)' }}>Next payout window</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '21px', marginTop: '4px' }}>Eligible for a profit share payout</div>
+        <div style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '4px' }}>
+          Cycle closes {new Date(payoutCycle.next_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} · estimated share {formatMoney(payoutCycle.estimated_share)}
         </div>
       </div>
-      <div style={{ height: '10px', background: 'var(--navy-border)', overflow: 'hidden', marginBottom: '10px' }}>
-        <div style={{ height: '100%', width: `${fill}%`, background: color, transition: 'width 0.4s ease' }} />
-      </div>
-      <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-        Remaining: {parseFloat(remainingPct || 0).toFixed(2)}% of {parseFloat(limitPct || 0).toFixed(2)}%
-      </div>
+      {boxes.map((b) => (
+        <div key={b.l} style={{ minWidth: '70px', textAlign: 'center', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper)', padding: '10px 12px' }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '22px', color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>{b.v}</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: '4px' }}>{b.l}</div>
+        </div>
+      ))}
+      <button
+        onClick={onRequestPayout}
+        className="lx-btn"
+        style={{ padding: '11px 20px', border: '1px solid var(--accent)', borderRadius: 'var(--radius-sm)', background: 'var(--accent)', color: 'var(--paper)', fontSize: '11.5px', letterSpacing: '.12em' }}
+      >
+        Request Payout
+      </button>
     </div>
   )
 }
@@ -170,12 +378,9 @@ export default function DashboardHome({
   accounts: propAccounts,
   selectedAccount: propSelectedAccount,
   setSelectedAccount: propSetSelectedAccount,
-  getStatusColor,
-  profitSharePct = 80,
-  quotaFull = false,
-  quotaNextOpen = null,
   onOpenRulesPage,
-  onStartChallenge
+  onStartChallenge,
+  onOpenPayoutsPage,
 }) {
   const {
     prices,
@@ -185,8 +390,32 @@ export default function DashboardHome({
     allAccounts,
     setActiveAccount,
   } = useStore()
-  const [quotaTimeLeft, setQuotaTimeLeft] = useState(null)
   const [nowTick, setNowTick] = useState(Date.now())
+
+  // Draggable block order (Modern Gazette handoff spec: the 4 big widgets —
+  // equity chart / consistency+risk / open positions / session heat — are
+  // the draggable units, not the small KPI cards). Two independent grid
+  // rows, so only equity<->risk and positions<->heat ever swap in practice,
+  // but the order map itself is generic (matches the prototype's `ord`).
+  const [blockOrder, setBlockOrder] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('dashboard-block-order'))
+      if (saved && ['equity', 'risk', 'positions', 'heat'].every((k) => typeof saved[k] === 'number')) return saved
+    } catch {}
+    return { equity: 1, risk: 2, positions: 3, heat: 4 }
+  })
+  const dragBlockRef = useRef(null)
+  const handleBlockDragStart = (key) => () => { dragBlockRef.current = key }
+  const handleBlockDrop = (key) => () => {
+    const from = dragBlockRef.current
+    dragBlockRef.current = null
+    if (!from || from === key) return
+    setBlockOrder((prev) => {
+      const next = { ...prev, [from]: prev[key], [key]: prev[from] }
+      try { localStorage.setItem('dashboard-block-order', JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
 
   const rawAccounts = allAccounts.length > 0 ? allAccounts : (propAccounts || [])
   const accounts = useMemo(() => filterVisibleTraderAccounts(rawAccounts, nowTick), [rawAccounts, nowTick])
@@ -208,398 +437,210 @@ export default function DashboardHome({
     setSelectedAccount(accounts[0] || null)
   }, [accounts, nowTick, selectedAccountCandidate, setSelectedAccount])
 
-  const activeChallengeCount = accounts.filter(
-    account => account.status === 'active' && ['phase1', 'phase2', 'phase3', 'funded'].includes(account.account_type)
-  ).length
-  const hasFailedOrExpired = accounts.some(account => ['failed', 'expired'].includes(account.status))
-  const isFunded = selectedAccount?.account_type === 'funded'
-  const startChallengeTitle = hasFailedOrExpired
-    ? 'Start a New Challenge'
-    : activeChallengeCount > 0
-      ? 'Start Another Challenge'
-      : 'Start Your Challenge'
-  const challengeAvailabilityMessage = activeChallengeCount > 0
-    ? `You currently have ${activeChallengeCount} active account${activeChallengeCount === 1 ? '' : 's'}. New accounts are controlled by the monthly allocation for each account size.`
-    : 'Pick a 1-step, 2-step, or 3-step challenge and an account size to get started.'
-
-  useEffect(() => {
-    if (!quotaFull || !quotaNextOpen) {
-      setQuotaTimeLeft(null)
-      return
-    }
-
-    function calcTimeLeft() {
-      const diff = new Date(quotaNextOpen).getTime() - Date.now()
-      if (diff <= 0) {
-        setQuotaTimeLeft({ expired: true, days: 0, hours: 0, minutes: 0, seconds: 0 })
-        return
-      }
-      setQuotaTimeLeft({
-        expired: false,
-        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
-        hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
-        minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
-        seconds: Math.floor((diff % (1000 * 60)) / 1000),
-      })
-    }
-
-    calcTimeLeft()
-    const iv = setInterval(calcTimeLeft, 1000)
-    return () => clearInterval(iv)
-  }, [quotaFull, quotaNextOpen])
-
   useEffect(() => {
     const iv = setInterval(() => setNowTick(Date.now()), 1000)
     return () => clearInterval(iv)
   }, [])
 
-  const daysRemainingDisplay = isFunded
-    ? '∞'
-    : (stats?.stats?.days_remaining != null ? stats.stats.days_remaining : '—')
+  // Single analytics fetch powers the equity curve (all 4 timeframe ranges
+  // come back in one response), the Win Rate KPI, and Session Heat — same
+  // /api/trades/analytics endpoint the Analytics screen uses.
+  const [analytics, setAnalytics] = useState(null)
+  const [tf, setTf] = useState('1M')
+  useEffect(() => {
+    if (!selectedAccount?.id) { setAnalytics(null); return }
+    let cancelled = false
+    axios.get(`${API_URL}/api/trades/analytics`, { params: { account_id: selectedAccount.id } })
+      .then((res) => { if (!cancelled) setAnalytics(res.data?.analytics || null) })
+      .catch(() => { if (!cancelled) setAnalytics(null) })
+    return () => { cancelled = true }
+  }, [selectedAccount?.id])
+
+  const equityCurve = useMemo(() => {
+    const rangeKey = TF_TABS.find((t) => t.label === tf)?.key || 'month'
+    const ranges = analytics?.equity_curve_ranges || {}
+    const raw = (ranges[rangeKey] && ranges[rangeKey].length ? ranges[rangeKey] : ranges.full) || []
+    return raw.map((point) => ({
+      label: point.date ? new Date(point.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '',
+      value: Number(point.balance || 0),
+    }))
+  }, [analytics, tf])
 
   const hasLivePrices = Object.keys(prices || {}).length > 0
   const floatingPnl = hasLivePrices && openPositions.length > 0
     ? totalFloatingPnL
     : openTrades
-      .filter(trade => trade.status === 'open')
+      .filter((trade) => trade.status === 'open')
       .map((trade) => trade.floating_pnl || 0)
       .reduce((sum, tradePnl) => sumMoney([sum, tradePnl]), 0)
-  const liveEquity = stats
-    ? calculateEquity(stats.account.current_balance || 0, floatingPnl)
-    : 0
-  const previousFloatingPnlRef = useRef(floatingPnl)
-  const floatingPnlPreviousValue = previousFloatingPnlRef.current
+  const liveEquity = stats ? calculateEquity(stats.account.current_balance || 0, floatingPnl) : 0
+  const isFunded = selectedAccount?.account_type === 'funded'
 
-  useEffect(() => {
-    previousFloatingPnlRef.current = floatingPnl
-  }, [floatingPnl])
+  if (!stats || !selectedAccount) {
+    return (
+      <PageWrapper>
+        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
+          {selectedAccount ? 'Loading account stats…' : 'No accounts yet.'}
+        </div>
+      </PageWrapper>
+    )
+  }
 
-  const phaseCountdown = (() => {
-    if (!selectedAccount?.phase_end_date || isFunded) return null
-    const diff = new Date(selectedAccount.phase_end_date).getTime() - nowTick
-    if (diff <= 0) return { expired: true, days: 0, hours: 0, minutes: 0, seconds: 0 }
-    return {
-      expired: false,
-      days: Math.floor(diff / (1000 * 60 * 60 * 24)),
-      hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
-      minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
-      seconds: Math.floor((diff % (1000 * 60)) / 1000),
-    }
-  })()
+  if (selectedAccount.status === 'locked') {
+    return (
+      <PageWrapper>
+        <Card style={{ textAlign: 'center', padding: '32px' }}>
+          <h3 style={{ color: 'var(--muted)', marginBottom: '8px' }}>Account Locked</h3>
+          <p style={{ color: 'var(--text-muted)' }}>This account has been locked by admin. Contact support for assistance.</p>
+        </Card>
+      </PageWrapper>
+    )
+  }
 
-  const topCards = stats ? [
+  const realizedProfit = Math.max(0, (stats.account.current_balance || 0) - (stats.account.starting_balance || 0))
+  const kpiSparkData = equityCurve.slice(-14)
+  const kpis = [
     {
-      label: 'Current Balance',
-      valueNode: (
-        <CountUp
-          end={parseFloat(stats.account.current_balance || 0)}
-          decimals={2}
-          duration={1.2}
-          separator=","
-          preserveValue={true}
-          useEasing={true}
-          formattingFn={formatAnimatedCurrency}
-        />
-      ),
-      color: 'var(--text-primary)',
-      icon: 'balance',
-      iconColor: 'var(--accent)'
+      key: 'equity', label: 'Equity', icon: 'balance', tone: 'var(--gain)',
+      value: formatMoney(liveEquity),
+      delta: `${stats.stats.equity_profit_pct >= 0 ? '+' : ''}${stats.stats.equity_profit_pct.toFixed(2)}%`, sub: 'since start',
     },
-    { label: 'Live Equity', value: formatMoney(liveEquity), color: floatingPnl >= 0 ? 'var(--green)' : 'var(--red)', icon: floatingPnl >= 0 ? 'floating_up' : 'floating_down', iconColor: floatingPnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)' },
     {
-      label: 'Floating P&L',
-      valueNode: (
-        <CountUp
-          start={floatingPnlPreviousValue}
-          end={floatingPnl}
-          decimals={2}
-          duration={1.2}
-          separator=","
-          preserveValue={true}
-          useEasing={true}
-          formattingFn={formatAnimatedSignedCurrency}
-        />
-      ),
-      color: floatingPnl >= 0 ? 'var(--green)' : 'var(--red)',
-      icon: floatingPnl >= 0 ? 'floating_up' : 'floating_down',
-      iconColor: floatingPnl >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'
+      key: 'balance', label: 'Balance', icon: 'wallet', tone: 'var(--accent)',
+      value: formatMoney(stats.account.current_balance),
+      delta: formatSigned(realizedProfit), sub: 'realised',
     },
-    { label: 'Profit', value: `${parseFloat(stats.stats.profit_pct || 0) >= 0 ? '+' : ''}${parseFloat(stats.stats.profit_pct || 0).toFixed(2)}%`, color: parseFloat(stats.stats.profit_pct || 0) >= 0 ? 'var(--green)' : 'var(--red)', icon: 'target', iconColor: 'var(--accent)' },
-    { label: 'Trades Today', value: String(stats.stats.trades_today ?? 0), color: 'var(--accent)', icon: 'activity', iconColor: 'var(--accent)' },
-    { label: 'Days Remaining', value: String(daysRemainingDisplay), color: 'var(--text-primary)', icon: 'calendar', iconColor: 'var(--accent)' },
-  ] : []
+    {
+      key: 'today_pnl', label: "Today's P&L", icon: stats.stats.today_pnl >= 0 ? 'floating_up' : 'floating_down',
+      tone: stats.stats.today_pnl >= 0 ? 'var(--gain)' : 'var(--loss)',
+      value: formatSigned(stats.stats.today_pnl),
+      delta: `${stats.stats.today_pnl_pct >= 0 ? '+' : ''}${stats.stats.today_pnl_pct.toFixed(2)}%`, sub: 'vs yesterday',
+    },
+    {
+      key: 'win_rate', label: 'Win Rate', icon: 'target', tone: 'var(--accent)',
+      value: `${(analytics?.win_rate ?? 0).toFixed(1)}%`,
+      delta: `${analytics?.total_trades ?? 0} trades`, sub: 'last 30 days',
+    },
+  ]
 
-  const profitTargetAmount = stats ? Number(stats.account.profit_target || 0) : 0
-  const startingBalance = stats ? Number(stats.account.starting_balance || 0) : 0
-  const realizedProfit = stats
-    ? calculateRealizedProfit(stats.account.current_balance || 0, startingBalance)
-    : 0
-  const profitProgressPct = calculatePercent(realizedProfit, profitTargetAmount, {
-    clampMin: 0,
-    clampMax: 100,
-    decimalPlaces: 1
-  })
-  const drawdownUsedPct = parseFloat(stats?.stats?.total_drawdown_used_pct || 0)
-  const showWarning = Boolean(stats && !isFunded && drawdownUsedPct >= 75)
-  const warningTone = drawdownUsedPct >= 90 ? 'var(--red)' : 'var(--accent)'
-  const warningMessage = drawdownUsedPct >= 90
-    ? `Critical warning: ${drawdownUsedPct.toFixed(1)}% of your total drawdown limit is already used.`
-    : `Drawdown warning: ${drawdownUsedPct.toFixed(1)}% of your total drawdown limit is already used.`
+  const activityHeatmap = analytics?.activity_heatmap || { hours: [], matrix: [] }
+
+  const equityBlock = (
+    <div
+      key="equity" draggable onDragStart={handleBlockDragStart('equity')} onDragOver={(e) => e.preventDefault()} onDrop={handleBlockDrop('equity')}
+      style={{ order: blockOrder.equity, cursor: 'grab' }}
+    >
+      <Card
+        ruled
+        eyebrow={`Account ${selectedAccount.account_uid || selectedAccount.id} · equity curve`}
+        title="Balance & Equity"
+        actions={(
+          <div style={{ display: 'flex', gap: '2px', padding: '3px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)' }}>
+            {TF_TABS.map((t) => (
+              <button
+                key={t.label}
+                onClick={() => setTf(t.label)}
+                style={{
+                  padding: '5px 10px', border: 'none', borderRadius: '3px', fontFamily: 'var(--font-mono)', fontSize: '10.5px', letterSpacing: '.06em', cursor: 'pointer',
+                  background: tf === t.label ? 'var(--accent)' : 'transparent', color: tf === t.label ? 'var(--paper)' : 'var(--muted)',
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
+      >
+        {equityCurve.length > 1 ? <EquityCurveChart data={equityCurve} height={250} /> : (
+          <div style={{ height: 250, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: '13px' }}>Not enough data for this range yet</div>
+        )}
+        {equityCurve.length > 1 && (
+          <div style={{ display: 'flex', gap: '22px', borderTop: '1px solid var(--rule-soft)', marginTop: '8px', padding: '11px 2px 6px', flexWrap: 'wrap' }}>
+            {[
+              { label: 'Opening', value: formatMoney(equityCurve[0].value), tone: 'var(--muted)' },
+              { label: 'Current', value: formatMoney(equityCurve[equityCurve.length - 1].value), tone: 'var(--ink)' },
+              { label: 'Change', value: formatSigned(equityCurve[equityCurve.length - 1].value - equityCurve[0].value), tone: equityCurve[equityCurve.length - 1].value >= equityCurve[0].value ? 'var(--gain)' : 'var(--loss)' },
+              { label: 'Peak', value: formatMoney(Math.max(...equityCurve.map((p) => p.value))), tone: 'var(--accent)' },
+              { label: 'Max DD', value: `-${computeMaxDrawdownPct(equityCurve).toFixed(2)}%`, tone: 'var(--loss)' },
+            ].map((l) => (
+              <div key={l.label}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--muted)' }}>{l.label}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '14px', color: l.tone, marginTop: '3px' }}>{l.value}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  )
+
+  const riskBlock = (
+    <div
+      key="risk" draggable onDragStart={handleBlockDragStart('risk')} onDragOver={(e) => e.preventDefault()} onDrop={handleBlockDrop('risk')}
+      style={{ order: blockOrder.risk, cursor: 'grab' }}
+    >
+      <ConsistencyRiskBlock
+        consistency={stats.stats.consistency}
+        dailyDrawdown={stats.stats.daily_drawdown}
+        totalDrawdownUsedPct={stats.stats.total_drawdown_used_pct}
+        totalDrawdownRemainingPct={stats.stats.total_drawdown_remaining_pct}
+        maxDrawdownPct={stats.rules?.max_drawdown_pct || 0}
+        profitProgressPct={stats.rules?.profit_target_amount > 0 ? Math.min(100, (realizedProfit / stats.rules.profit_target_amount) * 100) : 0}
+        profitTargetAmount={stats.rules?.profit_target_amount || 0}
+        realizedProfit={realizedProfit}
+      />
+    </div>
+  )
+
+  const positionsBlock = (
+    <div
+      key="positions" draggable onDragStart={handleBlockDragStart('positions')} onDragOver={(e) => e.preventDefault()} onDrop={handleBlockDrop('positions')}
+      style={{ order: blockOrder.positions, cursor: 'grab' }}
+    >
+      <OpenPositionsTable positions={openTrades} />
+    </div>
+  )
+
+  const heatBlock = (
+    <div
+      key="heat" draggable onDragStart={handleBlockDragStart('heat')} onDragOver={(e) => e.preventDefault()} onDrop={handleBlockDrop('heat')}
+      style={{ order: blockOrder.heat, cursor: 'grab' }}
+    >
+      <Card eyebrow="P&L by day × hour · 30d" title="Session Heat">
+        <SessionHeat matrix={activityHeatmap.matrix || []} hours={activityHeatmap.hours || []} />
+      </Card>
+    </div>
+  )
 
   return (
     <PageWrapper>
-      <div className="dashboard-home">
-      <h2 className="page-title">Account Overview</h2>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        <AccountChipsRow
+          accounts={accounts}
+          selectedAccount={selectedAccount}
+          onSelect={setSelectedAccount}
+          stats={stats}
+          onOpenRulesPage={onOpenRulesPage}
+          onStartChallenge={onStartChallenge}
+        />
 
-      {accounts.length > 0 && (
-        <div className="account-switcher-row" style={{ display: 'flex', gap: '16px', marginBottom: '28px', flexWrap: 'wrap' }}>
-          {accounts.map(account => {
-            const isSelected = selectedAccount?.id === account.id
-            return (
-              <button
-                key={account.id}
-                className="account-switcher-card"
-                onClick={() => setSelectedAccount(account)}
-                style={{
-                  background: isSelected ? 'var(--accent)' : 'var(--bg-elevated)',
-                  color: isSelected ? 'var(--paper)' : 'var(--text-primary)',
-                  border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
-                  padding: '16px 20px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'flex-start',
-                  gap: '6px',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s',
-                  boxShadow: isSelected ? '0 8px 24px var(--accent-glow)' : 'none',
-                  minWidth: '190px'
-                }}
-              >
-                <div style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '0.02em' }}>
-                  {account.account_type.toUpperCase()} ${parseFloat(account.account_size).toLocaleString('en-US')}
-                </div>
-                <div style={{ fontSize: '12px', fontFamily: 'var(--font-mono)', color: isSelected ? 'color-mix(in srgb, var(--paper) 72%, transparent)' : 'var(--text-muted)' }}>
-                  #{account.account_uid ? account.account_uid.slice(0, 8) : account.id}
-                </div>
-                <span style={{
-                  marginTop: '6px',
-                  fontSize: '10px',
-                  fontWeight: 800,
-                  letterSpacing: '0.1em',
-                  color: isSelected ? 'var(--paper)' : getStatusColor(account.status),
-                  background: isSelected ? 'color-mix(in srgb, var(--paper) 18%, transparent)' : 'var(--bg-hover)',
-                  padding: '4px 8px'
-                }}>
-                  • {account.status.toUpperCase()}
-                </span>
-              </button>
-            )
-          })}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px,1fr))', gap: '14px' }}>
+          {kpis.map((k) => <KpiCard key={k.key} {...k} sparkData={kpiSparkData} />)}
         </div>
-      )}
 
-      {quotaFull && (
-        <div className="card" style={{ marginBottom: '24px', border: '1px solid color-mix(in srgb, var(--muted) 40%, transparent)', background: 'color-mix(in srgb, var(--muted) 4%, transparent)' }}>
-          <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
-            <h3 style={{ color: 'var(--red)', marginBottom: '8px' }}>Account Creation Closed</h3>
-            <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '18px' }}>
-              The monthly account allocation has been reached. New account creation reopens when the month resets.
-            </p>
-            {quotaTimeLeft && !quotaTimeLeft.expired && (
-              <>
-                <div style={{ fontSize: '11px', color: 'var(--text-dim)', letterSpacing: '0.1em', marginBottom: '12px' }}>
-                  NEW ACCOUNTS OPEN IN
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'center' }}>
-                  <CountdownBoxes countdown={quotaTimeLeft} accent="var(--accent)" />
-                </div>
-                <div style={{ marginTop: '14px', fontSize: '12px', color: 'var(--text-dim)' }}>
-                  Next open: {formatDate(quotaNextOpen)}
-                </div>
-              </>
-            )}
-            {quotaTimeLeft?.expired && (
-              <div style={{ color: 'var(--green)', fontSize: '13px' }}>
-                Quota has reset. Refresh the page to start a new challenge.
-              </div>
-            )}
-          </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,2.1fr) minmax(0,1fr)', gap: '16px', alignItems: 'start' }}>
+          {equityBlock}
+          {riskBlock}
         </div>
-      )}
 
-      {!quotaFull && (
-        <div className="card" style={{ marginBottom: '24px', border: hasFailedOrExpired ? '1px solid var(--accent)' : undefined }}>
-          <h3 style={{ marginBottom: '12px', color: hasFailedOrExpired ? 'var(--accent)' : 'var(--text-primary)' }}>
-            {startChallengeTitle}
-          </h3>
-          <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>
-            {challengeAvailabilityMessage}
-          </p>
-          <button
-            className="btn btn-primary"
-            onClick={() => (typeof onStartChallenge === 'function') && onStartChallenge()}
-            style={{ padding: '12px 28px' }}
-          >
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-              {renderIcon('target', { size: 16, color: 'currentColor' })}
-              <span>Choose a Challenge</span>
-              {renderIcon('arrow', { size: 14, color: 'currentColor' })}
-            </span>
-          </button>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,2.1fr) minmax(0,1fr)', gap: '16px', alignItems: 'start' }}>
+          {positionsBlock}
+          {heatBlock}
         </div>
-      )}
 
-      {selectedAccount && selectedAccount.status === 'active' && !stats && (
-        <div className="card" style={{ textAlign: 'center', padding: '40px' }}>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Loading account stats...</p>
-        </div>
-      )}
-
-      {stats && selectedAccount && (
-        <div>
-          <AnimatePresence>
-            {showWarning && (
-              <motion.div
-                initial={{ opacity: 0, y: -16, height: 0 }}
-                animate={{ opacity: 1, y: 0, height: 'auto' }}
-                exit={{ opacity: 0, y: -16, height: 0 }}
-                transition={{ duration: 0.3 }}
-                style={{ overflow: 'hidden' }}
-              >
-                <div
-                  className="card"
-                  style={{
-                    marginBottom: '24px',
-                    border: `1px solid ${warningTone}`,
-                    background: 'var(--paper-2)'
-                  }}
-                >
-                  <h3 style={{ color: warningTone, marginBottom: '8px' }}>Drawdown Warning</h3>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: 0 }}>
-                    {warningMessage}
-                  </p>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <div className="dashboard-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-            {topCards.map((card, index) => (
-              <motion.div
-                key={card.label}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.08, duration: 0.3 }}
-              >
-                <div className="card-stat" style={{ position: 'relative', overflow: 'hidden' }}>
-                  <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '4px', background: card.color }} />
-                  <div className="card-stat-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ display: 'inline-flex', opacity: 0.8 }}>
-                      {renderIcon(card.icon, { size: 14, color: card.iconColor || 'var(--accent)' })}
-                    </span>
-                    <span>{card.label}</span>
-                  </div>
-                  <div className="card-stat-value" style={{ marginTop: '8px', color: card.color }}>
-                    {card.valueNode || card.value}
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-
-          {phaseCountdown && (
-            <div className="card" style={{ marginBottom: '24px', border: phaseCountdown.expired ? '1px solid var(--red)' : '1px solid var(--navy-border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ fontSize: '11px', letterSpacing: '0.1em', color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: '8px' }}>
-                    Challenge Expiry Countdown
-                  </div>
-                  <div style={{ fontSize: '14px', color: 'var(--text-muted)' }}>
-                    {phaseCountdown.expired ? 'This phase has reached its end time.' : 'This timer updates every second so you can see the exact time left.'}
-                  </div>
-                </div>
-                <CountdownBoxes countdown={phaseCountdown} accent={phaseCountdown.expired ? 'var(--red)' : 'var(--accent)'} />
-              </div>
-            </div>
-          )}
-
-          {!isFunded && (
-            <div className="card" style={{ marginBottom: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 600 }}>Profit Target Progress</span>
-                <span style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
-                  <CountUp
-                    end={profitProgressPct}
-                    decimals={1}
-                    duration={1.2}
-                    preserveValue={true}
-                    useEasing={true}
-                  />
-                  % complete
-                </span>
-              </div>
-              <div style={{ height: '10px', background: 'var(--navy-border)', overflow: 'hidden', marginBottom: '10px' }}>
-                <div style={{ height: '100%', width: `${profitProgressPct}%`, background: 'linear-gradient(90deg, var(--green), var(--accent))', transition: 'width 0.4s ease' }} />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', fontSize: '12px', color: 'var(--text-muted)' }}>
-                <span>Earned: <strong style={{ color: realizedProfit >= 0 ? 'var(--green)' : 'var(--red)' }}>{formatMoney(realizedProfit)}</strong></span>
-                <span>Target: <strong style={{ color: 'var(--accent)' }}>{formatMoney(profitTargetAmount)}</strong></span>
-                <span>Remaining: <strong style={{ color: 'var(--text)' }}>{formatMoney(Math.max(0, profitTargetAmount - realizedProfit))}</strong></span>
-              </div>
-            </div>
-          )}
-
-          <div className="dashboard-risk-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-            <DrawdownCard
-              title="Total Drawdown Remaining"
-              usedPct={stats.stats.total_drawdown_used_pct}
-              remainingPct={stats.stats.total_drawdown_remaining_pct}
-              limitPct={stats.rules?.max_drawdown_pct || stats.account.max_drawdown_pct}
-            />
-            <ConsistencyGauge consistency={stats.stats.consistency} />
-          </div>
-
-          <div className="grid-2 dashboard-info-grid">
-            <div className="card">
-              <h3 style={{ color: 'var(--accent)', marginBottom: '16px', fontSize: '15px' }}>Account Info</h3>
-              <RuleRow label="Trader ID" value={user?.trader_uid || user?.trader_id || '—'} />
-              <RuleRow label="Account ID" value={selectedAccount.account_uid || selectedAccount.id || '—'} />
-              <RuleRow label="Account Type" value={selectedAccount.account_type.toUpperCase()} />
-              <RuleRow label="Account Size" value={`$${parseFloat(selectedAccount.account_size || 0).toLocaleString('en-US')}`} />
-              <RuleRow label="Starting Balance" value={formatMoney(stats.account.starting_balance)} />
-              <RuleRow label="Current Balance" value={formatMoney(stats.account.current_balance)} />
-              <RuleRow label="Live Equity" value={formatMoney(liveEquity)} accent />
-              <RuleRow label="Status" value={String(selectedAccount.status || '—').toUpperCase()} />
-            </div>
-
-            <div className="card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ color: 'var(--accent)', margin: 0, fontSize: '15px' }}>
-                  {isFunded ? 'Funded Account Rules' : 'Challenge Rules'}
-                </h3>
-                <button className="btn btn-secondary" onClick={onOpenRulesPage} style={{ padding: '8px 12px', fontSize: '12px' }}>
-                  Full Rules
-                </button>
-              </div>
-              <RuleRow label="Profit Target" value={stats.rules?.profit_target_pct > 0 ? `${parseFloat(stats.rules.profit_target_pct || 0).toFixed(2)}%` : 'No target'} accent />
-              <RuleRow label="Max Drawdown" value={`${parseFloat(stats.rules?.max_drawdown_pct || stats.account.max_drawdown_pct || 0).toFixed(2)}%`} />
-              <RuleRow label="Time Limit" value={stats.rules?.time_limit_days ? `${stats.rules.time_limit_days} days` : 'No expiry'} />
-              <RuleRow label="Max Daily Trades" value={`${stats.rules?.max_daily_trades || 20} per UTC day`} />
-              <RuleRow label="Min Hold Time" value={`${stats.rules?.min_hold_seconds || 60} seconds`} />
-              <RuleRow label="Forex Lots per $1k" value={parseFloat(stats.rules?.forex_lots_per_1k || 0.2).toFixed(2)} />
-              <RuleRow label="Commodity Lots per $1k" value={parseFloat(stats.rules?.commodity_lots_per_1k || 0.02).toFixed(2)} />
-              <RuleRow label="Profit Split" value={`${profitSharePct}%`} />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {selectedAccount?.status === 'locked' && (
-        <div className="card" style={{ textAlign: 'center', padding: '32px', border: '1px solid var(--rule)', marginTop: '20px' }}>
-          <h3 style={{ color: 'var(--muted)', marginBottom: '8px' }}>Account Locked</h3>
-          <p style={{ color: 'var(--text-muted)' }}>This account has been locked by admin. Contact support for assistance.</p>
-        </div>
-      )}
+        {isFunded && stats.stats.payout_cycle && (
+          <PayoutCycleBanner payoutCycle={stats.stats.payout_cycle} onRequestPayout={onOpenPayoutsPage} />
+        )}
       </div>
     </PageWrapper>
   )
