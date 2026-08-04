@@ -331,30 +331,37 @@ async function ensureDisputesTable() {
 }
 
 // ─── Startup infrastructure ───────────────────────────────────────────────────
-ensureUniqueIds().catch(err => {
-  logger.error('[startup] Failed to ensure unique ids/infrastructure:', { error: err.message })
-})
-pool.query(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS original_commission NUMERIC(10,2)`).catch(err => {
-  logger.warn('[startup] Could not add original_commission column:', { error: err.message })
-})
-ensureChatTables().catch(err => {
-  logger.error('[startup] Failed to ensure chat tables:', { error: err.message })
-})
-ensureBillingInfrastructure().catch(err => {
-  logger.error('[startup] Failed to ensure billing infrastructure:', { error: err.message })
-})
-ensureTradeExperienceInfrastructure().catch(err => {
-  logger.error('[startup] Failed to ensure trade experience infrastructure:', { error: err.message })
-})
-ensureIdempotencyInfrastructure().catch(err => {
-  logger.error('[startup] Failed to ensure idempotency infrastructure:', { error: err.message })
-})
-ensureEmailQueueInfrastructure().catch(err => {
-  logger.error('[startup] Failed to ensure email queue infrastructure:', { error: err.message })
-})
-ensureDisputesTable().catch(err => {
-  logger.error('[startup] Failed to ensure disputes table:', { error: err.message })
-})
+// These are independent of each other (different tables/columns), so they run
+// concurrently — but startServer() awaits all of them before httpServer.listen(),
+// so the first request can never race a table that hasn't been created yet.
+async function ensureStartupInfrastructure() {
+  await Promise.all([
+    ensureUniqueIds().catch(err => {
+      logger.error('[startup] Failed to ensure unique ids/infrastructure:', { error: err.message })
+    }),
+    pool.query(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS original_commission NUMERIC(10,2)`).catch(err => {
+      logger.warn('[startup] Could not add original_commission column:', { error: err.message })
+    }),
+    ensureChatTables().catch(err => {
+      logger.error('[startup] Failed to ensure chat tables:', { error: err.message })
+    }),
+    ensureBillingInfrastructure().catch(err => {
+      logger.error('[startup] Failed to ensure billing infrastructure:', { error: err.message })
+    }),
+    ensureTradeExperienceInfrastructure().catch(err => {
+      logger.error('[startup] Failed to ensure trade experience infrastructure:', { error: err.message })
+    }),
+    ensureIdempotencyInfrastructure().catch(err => {
+      logger.error('[startup] Failed to ensure idempotency infrastructure:', { error: err.message })
+    }),
+    ensureEmailQueueInfrastructure().catch(err => {
+      logger.error('[startup] Failed to ensure email queue infrastructure:', { error: err.message })
+    }),
+    ensureDisputesTable().catch(err => {
+      logger.error('[startup] Failed to ensure disputes table:', { error: err.message })
+    })
+  ])
+}
 
 // ─── Express + Socket.IO setup ────────────────────────────────────────────────
 const app = express()
@@ -837,6 +844,7 @@ const PORT = process.env.PORT || 5000
 
 async function startServer() {
   try {
+    await ensureStartupInfrastructure()
     await initializeRedis()
     await initializeKafka()
 
