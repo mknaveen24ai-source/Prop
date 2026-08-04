@@ -4383,6 +4383,54 @@ router.get('/traders', authenticateAdmin, requireAdminCapability('trader:read'),
   }
 })
 
+// "Request more" — the prototype's isAdminKyc review actions are Reject /
+// Request more / Approve. Reject and Approve already existed for real;
+// Request more didn't (no status change makes sense — the trader stays
+// pending — so it's a real trader-facing email + an internal note, reusing
+// the same admin_entity_notes table AdminEntityDrawer already writes to).
+router.post('/kyc/request-info', authenticateAdmin, requireAdminCapability('kyc:review:scoped'), async function(req, res) {
+  try {
+    await ensureFeatureTables()
+    const userId = normalizeEntityId(req.body?.user_id)
+    const message = sanitizeString(String(req.body?.message || ''), 1000)
+    if (!userId) return res.status(400).json({ error: 'user_id is required' })
+    if (message.length < 5) return res.status(400).json({ error: 'Please describe what additional information is needed' })
+
+    const userResult = await pool.query('SELECT id, email, full_name FROM users WHERE id = $1', [userId])
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'User not found' })
+    const user = userResult.rows[0]
+
+    const context = resolveMailContext()
+    const result = await sendEmailMessage({
+      to: user.email,
+      subject: `Action needed on your ${context.firmName} identity verification`,
+      html: htmlWrap('More information needed', `
+        <p style="color:#e8e0d0;font-size:14px;line-height:1.6;">Hi ${user.full_name || 'there'},</p>
+        <p style="color:#e8e0d0;font-size:14px;line-height:1.6;">
+          Our team reviewed your identity verification submission and needs a bit more before we can approve it:
+        </p>
+        <p style="color:#e8e0d0;font-size:14px;line-height:1.6;background:#132436;padding:14px;border-radius:4px;">${message}</p>
+        <p style="color:#e8e0d0;font-size:14px;line-height:1.6;">
+          Sign in and resubmit your documents from the Identity Verification page whenever you're ready.
+        </p>
+      `),
+      text: `Hi ${user.full_name || 'there'}, our team needs more information on your identity verification: ${message}`
+    })
+    if (!result.ok) return res.status(502).json({ error: 'Could not send the request email' })
+
+    await pool.query(
+      `INSERT INTO admin_entity_notes (entity_type, entity_id, note_text, created_by, created_at)
+       VALUES ('user', $1, $2, $3, NOW())`,
+      [String(userId), `Requested more KYC info: ${message}`, getAdminActorLabel(req.admin)]
+    )
+
+    res.json({ message: 'Request sent' })
+  } catch (error) {
+    logger.error('KYC request-info error:', { error: error.message })
+    res.status(500).json({ error: 'Could not send request' })
+  }
+})
+
 router.post('/kyc/approve', authenticateAdmin, requireAdminCapability('kyc:review:scoped'), async function(req, res) {
   try {
     // FIX (BUG-H1): Added user_id validation and immutable audit log
@@ -8209,6 +8257,7 @@ router.get('/kyc-quality-flags', authenticateAdmin, requireAdminCapability('kyc:
          u.kyc_status,
          COALESCE(u.kyc_submitted_at, u.created_at) AS submitted_at,
          u.id_document_path,
+         u.id_document_back_path,
          u.selfie_path
        FROM users u
        WHERE ${buildKycDocumentPresencePredicate('u')}
@@ -8238,11 +8287,13 @@ router.get('/kyc-quality-flags', authenticateAdmin, requireAdminCapability('kyc:
 
     const rows = docs.rows.map(r => {
       const idFile = inspectRelativeFile(r.id_document_path)
+      const idBackFile = inspectRelativeFile(r.id_document_back_path)
       const selfieFile = inspectRelativeFile(r.selfie_path)
       const flags = []
       let qualityScore = 0
 
       if (!idFile.exists) { flags.push('Missing ID document file'); qualityScore += 50 }
+      if (!idBackFile.exists) { flags.push('Missing ID document back file'); qualityScore += 30 }
       if (!selfieFile.exists) { flags.push('Missing selfie file'); qualityScore += 50 }
 
       if (idFile.exists && !['.jpg', '.jpeg', '.png', '.pdf'].includes(idFile.ext)) {
@@ -8279,6 +8330,8 @@ router.get('/kyc-quality-flags', authenticateAdmin, requireAdminCapability('kyc:
         ...r,
         id_file_exists: idFile.exists,
         id_file_size: idFile.size_bytes,
+        back_file_exists: idBackFile.exists,
+        back_file_size: idBackFile.size_bytes,
         selfie_file_exists: selfieFile.exists,
         selfie_file_size: selfieFile.size_bytes,
         quality_score: qualityScore,
@@ -8293,7 +8346,7 @@ router.get('/kyc-quality-flags', authenticateAdmin, requireAdminCapability('kyc:
         total_profiles: rows.length,
         high_risk_count: rows.filter(r => r.risk_level === 'high').length,
         medium_risk_count: rows.filter(r => r.risk_level === 'medium').length,
-        missing_file_count: rows.filter(r => !r.id_file_exists || !r.selfie_file_exists).length
+        missing_file_count: rows.filter(r => !r.id_file_exists || !r.back_file_exists || !r.selfie_file_exists).length
       },
       rows
     })

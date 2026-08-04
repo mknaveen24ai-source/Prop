@@ -7,6 +7,7 @@ import AdminListToolbar from '../../components/admin/AdminListToolbar';
 import AdminStatCard from '../../components/admin/AdminStatCard';
 import { useToast } from '../../components/admin/AdminToast';
 import { exportAdminResource, normalizeAdminListResponse } from '../../utils/adminList';
+import Card from '../../components/ui/Card';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -222,6 +223,8 @@ export default function AdminKYC() {
   const [rejectReason, setRejectReason] = useState('Document unclear');
   const [rejectCustom, setRejectCustom] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [historyNotes, setHistoryNotes] = useState([]);
+  const [requestingInfo, setRequestingInfo] = useState(false);
 
   const fetchViews = async () => {
     try {
@@ -349,6 +352,9 @@ export default function AdminKYC() {
         quality_score: quality?.quality_score ?? 0,
         quality_risk: quality?.risk_level || 'low',
         quality_flags: Array.isArray(quality?.flags) ? quality.flags : [],
+        id_file_exists: quality?.id_file_exists ?? null,
+        back_file_exists: quality?.back_file_exists ?? null,
+        selfie_file_exists: quality?.selfie_file_exists ?? null,
         missing_files: Boolean(quality && (!quality.id_file_exists || !quality.back_file_exists || !quality.selfie_file_exists))
       };
     })
@@ -371,6 +377,32 @@ export default function AdminKYC() {
     () => rows.find((row) => String(row.id) === String(selectedUserId)) || null,
     [rows, selectedUserId]
   );
+
+  useEffect(() => {
+    if (!selectedUserId) { setHistoryNotes([]); return undefined; }
+    let cancelled = false;
+    adminAxios.get('/api/admin/notes', { params: { entity_type: 'user', entity_id: selectedUserId } })
+      .then((res) => { if (!cancelled) setHistoryNotes(Array.isArray(res.data) ? res.data : []); })
+      .catch(() => { if (!cancelled) setHistoryNotes([]); });
+    return () => { cancelled = true; };
+  }, [adminAxios, selectedUserId]);
+
+  const requestMoreInfo = async () => {
+    if (!selectedUser || requestingInfo) return;
+    const message = window.prompt(`What does ${selectedUser.full_name || selectedUser.email} need to provide?`, 'Please re-upload a clearer photo of your ID.');
+    if (!message) return;
+    setRequestingInfo(true);
+    try {
+      await adminAxios.post('/api/admin/kyc/request-info', { user_id: selectedUser.id, message: message.trim() });
+      toast.success('Request sent to trader');
+      const res = await adminAxios.get('/api/admin/notes', { params: { entity_type: 'user', entity_id: selectedUserId } });
+      setHistoryNotes(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Could not send request');
+    } finally {
+      setRequestingInfo(false);
+    }
+  };
 
   const pagination = listData.pagination || { current: 1, total: 1, total_items: 0, page_size: 25 };
 
@@ -701,7 +733,7 @@ export default function AdminKYC() {
 
   if (accessDenied) {
     return (
-      <div className="admin-card">
+      <Card>
         <h1 className="admin-h1">KYC Queue</h1>
         <p style={{ color: 'var(--admin-text-muted)', marginBottom: '16px' }}>
           This admin session does not currently have access to the KYC queue or its supporting review endpoints.
@@ -709,7 +741,7 @@ export default function AdminKYC() {
         <button className="admin-btn admin-btn-ghost" onClick={() => { fetchKycQueue(); fetchAuxiliary(); }}>
           Retry Access Check
         </button>
-      </div>
+      </Card>
     );
   }
 
@@ -784,7 +816,7 @@ export default function AdminKYC() {
       />
 
       <div className="admin-kyc-layout">
-        <div className="admin-card" style={{ padding: 0 }}>
+        <Card flush>
           <AdminDataTable
             columns={columns}
             data={rows}
@@ -810,9 +842,9 @@ export default function AdminKYC() {
               onToggleRow: toggleSelection
             }}
           />
-        </div>
+        </Card>
 
-        <div className="admin-card admin-kyc-review-panel">
+        <Card className="admin-kyc-review-panel">
           {selectedUser ? (
             <>
               <div className="admin-kyc-review-header">
@@ -847,7 +879,7 @@ export default function AdminKYC() {
                 <div><span>Funded Accounts</span><strong>{selectedUser.funded_accounts || 0}</strong></div>
               </div>
 
-              <div className="admin-card" style={{ margin: '0 0 16px 0' }}>
+              <Card style={{ margin: '0 0 16px 0' }}>
                 <h3 className="admin-h3">Submitted Identity Details</h3>
                 <div className="admin-entity-info-grid">
                   <div><span>Country</span><strong>{selectedUser.kyc_document_country || selectedUser.country || '-'}</strong></div>
@@ -855,9 +887,9 @@ export default function AdminKYC() {
                   <div><span>Document Number</span><strong style={{ fontFamily: 'var(--font-mono)' }}>{selectedUser.kyc_document_number || '-'}</strong></div>
                   <div><span>Documents</span><strong>{selectedUser.missing_files ? 'Check missing files' : 'Front, back, live photo'}</strong></div>
                 </div>
-              </div>
+              </Card>
 
-              <div className="admin-card" style={{ margin: 0 }}>
+              <Card style={{ margin: 0 }}>
                 {String(selectedUser.kyc_status || '').toLowerCase() === 'rejected' ? (
                   <div style={{ color: 'var(--admin-text-muted)' }}>
                     This submission has been rejected. Use the trader profile if you need to review historical notes or resubmissions.
@@ -865,9 +897,9 @@ export default function AdminKYC() {
                 ) : (
                   <KycDocViewer userId={selectedUser.id} zoom={zoom} adminAxios={adminAxios} />
                 )}
-              </div>
+              </Card>
 
-              <div className="admin-card" style={{ margin: 0 }}>
+              <Card style={{ margin: 0 }}>
                 <h3 className="admin-h3">Quality Flags</h3>
                 {(selectedUser.quality_flags || []).length > 0 ? (
                   <ul className="admin-kyc-flag-list">
@@ -878,17 +910,20 @@ export default function AdminKYC() {
                 ) : (
                   <div style={{ color: 'var(--admin-text-muted)' }}>No quality issues detected for the current submission.</div>
                 )}
-              </div>
+              </Card>
 
               {String(selectedUser.kyc_status || '').toLowerCase() === 'pending' && (
-                <div className="admin-card" style={{ margin: 0 }}>
+                <Card style={{ margin: 0 }}>
                   {!rejecting ? (
                     <div style={{ display: 'flex', gap: '12px' }}>
-                      <button className="admin-btn admin-btn-success" style={{ flex: 1 }} disabled={submitting} onClick={() => handleDecision('approved')}>
-                        Approve KYC
-                      </button>
                       <button className="admin-btn admin-btn-danger" style={{ flex: 1 }} disabled={submitting} onClick={() => setRejecting(true)}>
-                        Reject KYC
+                        Reject
+                      </button>
+                      <button className="admin-btn admin-btn-ghost" style={{ flex: 1 }} disabled={requestingInfo} onClick={requestMoreInfo}>
+                        {requestingInfo ? 'Sending…' : 'Request more'}
+                      </button>
+                      <button className="admin-btn admin-btn-success" style={{ flex: 1 }} disabled={submitting} onClick={() => handleDecision('approved')}>
+                        Approve
                       </button>
                     </div>
                   ) : (
@@ -923,7 +958,7 @@ export default function AdminKYC() {
                       </div>
                     </div>
                   )}
-                </div>
+                </Card>
               )}
             </>
           ) : (
@@ -931,6 +966,50 @@ export default function AdminKYC() {
               Select a trader from the queue to start reviewing documents.
             </div>
           )}
+        </Card>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <Card style={{ margin: 0 }}>
+            <h3 className="admin-h3">Automated Checks</h3>
+            {selectedUser ? (
+              [
+                { label: 'ID document front uploaded', pass: selectedUser.id_file_exists },
+                { label: 'ID document back uploaded', pass: selectedUser.back_file_exists },
+                { label: 'Live selfie uploaded', pass: selectedUser.selfie_file_exists },
+                { label: 'No quality flags raised', pass: (selectedUser.quality_flags || []).length === 0 },
+                { label: 'Within SLA window', pass: selectedUser.kyc_sla_status !== 'breach' },
+              ].map((check) => (
+                <div key={check.label} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 0', borderBottom: '1px solid var(--rule-soft)' }}>
+                  <span style={{ color: check.pass == null ? 'var(--admin-text-faint)' : check.pass ? 'var(--gain)' : 'var(--loss)' }}>
+                    {check.pass == null ? '—' : check.pass ? '✓' : '✕'}
+                  </span>
+                  <span style={{ flex: 1, fontSize: '12.5px' }}>{check.label}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.1em', textTransform: 'uppercase', color: check.pass == null ? 'var(--admin-text-faint)' : check.pass ? 'var(--gain)' : 'var(--loss)' }}>
+                    {check.pass == null ? 'Unknown' : check.pass ? 'Pass' : 'Fail'}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div style={{ color: 'var(--admin-text-muted)' }}>Select a trader to see checks.</div>
+            )}
+          </Card>
+
+          <Card style={{ margin: 0 }}>
+            <h3 className="admin-h3">Submission History</h3>
+            {historyNotes.length === 0 ? (
+              <div style={{ color: 'var(--admin-text-muted)' }}>No reviewer notes yet for this trader.</div>
+            ) : (
+              historyNotes.map((note) => (
+                <div key={note.id} style={{ padding: '9px 0', borderBottom: '1px solid var(--rule-soft)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', fontSize: '12.5px' }}>
+                    <span>{note.created_by}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--admin-text-faint)' }}>{formatDate(note.created_at)}</span>
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: 'var(--admin-text-muted)', marginTop: '3px' }}>{note.note_text}</div>
+                </div>
+              ))
+            )}
+          </Card>
         </div>
       </div>
     </>

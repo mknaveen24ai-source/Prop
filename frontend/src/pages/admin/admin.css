@@ -196,12 +196,32 @@
   margin: 0;
 }
 
+.admin-nav-label--toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0 12px 8px;
+  margin: 0;
+  font: inherit;
+  cursor: pointer;
+}
+.admin-nav-label--toggle:hover { color: var(--admin-text-muted); }
+.admin-nav-label-chevron {
+  flex-shrink: 0;
+  transition: transform 0.16s ease;
+}
+.admin-nav-label-chevron.collapsed { transform: rotate(-90deg); }
+
 /* Nav Item */
 .admin-nav-item {
   display: flex;
   align-items: center;
   padding: 10px 12px;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   color: var(--admin-text-muted);
   text-decoration: none;
   font-family: var(--admin-font-mono);
@@ -479,32 +499,9 @@
 /* ==========================================================================
    CARDS
    ========================================================================== */
-.admin-card {
-  background: var(--admin-surface);
-  border: 1px solid var(--admin-border);
-  box-shadow: inset 0 1px 0 var(--glass-hi);
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  padding: 24px;
-  margin-bottom: 24px;
-}
-
-.admin-stat-card {
-  background: var(--admin-surface);
-  border: 1px solid var(--admin-border);
-  box-shadow: inset 0 1px 0 var(--glass-hi);
-  backdrop-filter: blur(14px) saturate(140%);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
-  padding: 20px;
-  transition: transform 0.2s, border-color 0.2s;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-}
-.admin-stat-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--admin-border-strong);
-}
+/* .admin-card and .admin-stat-card are retired — every former admin-card
+   surface now uses .lx-card / <Card> (components/ui/Card.jsx,
+   components/ui/ui.css). */
 
 .admin-stat-header {
   display: flex;
@@ -916,7 +913,8 @@
 .admin-badge.solid { color: #fff; }
 .admin-badge.outline { border: 1px solid currentColor; background: transparent !important; }
 
-/* Status Colors */
+/* Status Colors — legacy 7-bucket classes, kept for any lingering direct
+   references; AdminBadge.jsx itself now renders the 5-tone classes below. */
 .admin-badge-success { background: color-mix(in srgb, var(--admin-success) 10%, transparent); color: var(--admin-success); border: 1px solid color-mix(in srgb, var(--admin-success) 20%, transparent); }
 .admin-badge-danger { background: color-mix(in srgb, var(--admin-danger) 10%, transparent); color: var(--admin-danger); border: 1px solid color-mix(in srgb, var(--admin-danger) 20%, transparent); }
 .admin-badge-warning { background: color-mix(in srgb, var(--admin-warning) 10%, transparent); color: var(--admin-warning); border: 1px solid color-mix(in srgb, var(--admin-warning) 20%, transparent); }
@@ -924,6 +922,14 @@
 .admin-badge-neutral { background: var(--admin-elevated); color: var(--admin-text-muted); border: 1px solid var(--admin-border-strong); }
 .admin-badge-gold { background: color-mix(in srgb, var(--admin-gold) 15%, transparent); color: var(--admin-gold); border: 1px solid color-mix(in srgb, var(--admin-gold) 30%, transparent); }
 .admin-badge-accent { background: var(--admin-accent-bg); color: var(--admin-accent); border: 1px solid var(--admin-accent-glow); }
+
+/* Status Colors — the 5-tone map (Modern Gazette handoff spec: "one map,
+   every representation"), sourced straight from the core tokens, no
+   --admin-* indirection. This is what AdminBadge.jsx actually renders. */
+.admin-badge-gain { background: color-mix(in srgb, var(--gain) 12%, transparent); color: var(--gain); border: 1px solid color-mix(in srgb, var(--gain) 30%, transparent); }
+.admin-badge-warn { background: color-mix(in srgb, var(--warn) 12%, transparent); color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent); }
+.admin-badge-loss { background: color-mix(in srgb, var(--loss) 12%, transparent); color: var(--loss); border: 1px solid color-mix(in srgb, var(--loss) 30%, transparent); }
+.admin-badge-muted { background: var(--admin-elevated); color: var(--muted); border: 1px solid var(--admin-border-strong); }
 
 /* Progress Bars (Tables) */
 .admin-progress-bg {
@@ -1256,7 +1262,7 @@
 
 .admin-kyc-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(360px, 0.9fr);
+  grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.85fr) minmax(240px, 0.5fr);
   gap: 20px;
   align-items: start;
 }
