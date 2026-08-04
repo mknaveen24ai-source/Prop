@@ -11,7 +11,6 @@ const cors = require('cors')
 const cookieParser = require('cookie-parser')
 const path = require('path')
 const { createServer } = require('http')
-const { v4: uuidv4 } = require('uuid')
 const pool = require('./db')
 const { Server } = require('socket.io')
 const helmet = require('helmet')
@@ -33,6 +32,8 @@ const { ensureIdempotencyInfrastructure } = require('./utils/idempotency')
 const { ensureEmailQueueInfrastructure } = require('./utils/emailQueue')
 const { sanitizeString } = require('./utils/validation')
 const { isAllowedOrigin } = require('./utils/allowedOrigins')
+const { generateTraderUid } = require('./utils/traderIds')
+const { generateAccountUid } = require('./utils/accountIds')
 
 // ── Services (extracted from the old monolithic server.js) ────────────────────
 const { configureSocket } = require('./services/socketService')
@@ -206,6 +207,11 @@ async function ensureUniqueIds() {
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS leaderboard_visible BOOLEAN NOT NULL DEFAULT TRUE`)
     await pool.query(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS account_uid TEXT`)
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS accounts_account_uid_uq ON accounts(account_uid)`)
+    // Sequence tables for generateAccountUid/generateTraderUid (utils/accountIds.js,
+    // utils/traderIds.js) — created here too (not just in their migrations) so the
+    // backfill loops below never race against migrations not having run yet.
+    await pool.query(`CREATE TABLE IF NOT EXISTS account_id_sequences (category TEXT PRIMARY KEY, last_value INTEGER NOT NULL DEFAULT 0)`)
+    await pool.query(`CREATE TABLE IF NOT EXISTS trader_id_sequences (id INTEGER PRIMARY KEY, last_value INTEGER NOT NULL DEFAULT 0)`)
     await pool.query(`CREATE TABLE IF NOT EXISTS bbook_pnl (
       date              DATE PRIMARY KEY,
       accounts_passed   INT NOT NULL DEFAULT 0,
@@ -292,13 +298,15 @@ async function ensureUniqueIds() {
     `)
     await pool.query(`CREATE INDEX IF NOT EXISTS support_ticket_messages_ticket_idx ON support_ticket_messages(ticket_id, created_at ASC)`)
     await pool.query(`CREATE INDEX IF NOT EXISTS support_tickets_created_idx ON support_tickets(created_at DESC)`)
-    const users = await pool.query(`SELECT id FROM users WHERE trader_uid IS NULL`)
+    const users = await pool.query(`SELECT id FROM users WHERE trader_uid IS NULL ORDER BY created_at ASC`)
     for (const row of users.rows) {
-      await pool.query(`UPDATE users SET trader_uid = $1 WHERE id = $2`, [uuidv4(), row.id])
+      const trader_uid = await generateTraderUid(pool)
+      await pool.query(`UPDATE users SET trader_uid = $1 WHERE id = $2`, [trader_uid, row.id])
     }
-    const accounts = await pool.query(`SELECT id FROM accounts WHERE account_uid IS NULL`)
+    const accounts = await pool.query(`SELECT id, account_type, challenge_model_slug FROM accounts WHERE account_uid IS NULL ORDER BY created_at ASC`)
     for (const row of accounts.rows) {
-      await pool.query(`UPDATE accounts SET account_uid = $1 WHERE id = $2`, [uuidv4(), row.id])
+      const account_uid = await generateAccountUid(pool, { accountType: row.account_type, challengeModelSlug: row.challenge_model_slug })
+      await pool.query(`UPDATE accounts SET account_uid = $1 WHERE id = $2`, [account_uid, row.id])
     }
   } catch (err) {
     logger.warn('[startup] Failed to backfill unique IDs:', { error: err.message })
