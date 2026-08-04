@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { useToast } from '../../components/admin/AdminToast'
+import Card from '../../components/ui/Card'
 
 function formatMoney(value) {
   const parsed = Number(value)
@@ -61,6 +62,8 @@ function PhaseRow({ model, phase, phaseIndex, onSave, saving }) {
 function PricingRow({ model, sizeInfo, onSave, saving }) {
   const [price, setPrice] = useState(sizeInfo.price)
   const [isActive, setIsActive] = useState(sizeInfo.is_active)
+  const [isUnlimited, setIsUnlimited] = useState(sizeInfo.is_unlimited)
+  const [slotLimit, setSlotLimit] = useState(sizeInfo.slot_limit != null ? String(sizeInfo.slot_limit) : '')
 
   return (
     <tr>
@@ -84,10 +87,35 @@ function PricingRow({ model, sizeInfo, onSave, saving }) {
         </select>
       </td>
       <td style={{ padding: '6px 8px' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+          <input type="checkbox" checked={isUnlimited} onChange={(e) => setIsUnlimited(e.target.checked)} />
+          Unlimited
+        </label>
+      </td>
+      <td style={{ padding: '6px 8px' }}>
+        <input
+          type="number"
+          min="0"
+          disabled={isUnlimited}
+          value={slotLimit}
+          onChange={(e) => setSlotLimit(e.target.value)}
+          placeholder="Total slots"
+          style={{ width: '100px', padding: '6px 8px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit', opacity: isUnlimited ? 0.5 : 1 }}
+        />
+      </td>
+      <td style={{ padding: '6px 8px', fontSize: '12px', opacity: 0.75, whiteSpace: 'nowrap' }}>
+        {sizeInfo.used ?? 0} used / {sizeInfo.is_unlimited ? '∞' : (sizeInfo.remaining ?? 0)} left
+      </td>
+      <td style={{ padding: '6px 8px' }}>
         <button
           className="admin-btn admin-btn-sm"
           disabled={saving}
-          onClick={() => onSave(sizeInfo.account_size, { price, is_active: isActive })}
+          onClick={() => onSave(sizeInfo.account_size, {
+            price,
+            is_active: isActive,
+            is_unlimited: isUnlimited,
+            slot_limit: isUnlimited ? null : slotLimit
+          })}
         >
           {saving ? 'Saving...' : 'Save'}
         </button>
@@ -129,7 +157,7 @@ function StepModelCard({ model, onToggle, onSavePhase, onSavePricing }) {
   }
 
   return (
-    <div className="admin-card" style={{ marginBottom: '24px', padding: '20px' }}>
+    <Card style={{ marginBottom: '24px', padding: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
           <h3 style={{ margin: 0 }}>{model.name}</h3>
@@ -179,6 +207,9 @@ function StepModelCard({ model, onToggle, onSavePhase, onSavePricing }) {
               <th style={{ padding: '6px 10px' }}>Account Size</th>
               <th style={{ padding: '6px 8px' }}>Price (USD)</th>
               <th style={{ padding: '6px 8px' }}>Status</th>
+              <th style={{ padding: '6px 8px' }}>Slots</th>
+              <th style={{ padding: '6px 8px' }}>Slot Limit</th>
+              <th style={{ padding: '6px 8px' }}>Usage</th>
               <th style={{ padding: '6px 8px' }}></th>
             </tr>
           </thead>
@@ -195,7 +226,7 @@ function StepModelCard({ model, onToggle, onSavePhase, onSavePricing }) {
           </tbody>
         </table>
       </div>
-    </div>
+    </Card>
   )
 }
 

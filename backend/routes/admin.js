@@ -29,7 +29,6 @@ const {
   getQuickMoveThreshold,
   roundPrice
 } = require('../constants')
-const { buildAccountAvailability } = require('../utils/accountAvailability')
 const {
   ensureEmailQueueInfrastructure,
   enqueueKycApprovedEmail,
@@ -41,18 +40,17 @@ const { sanitizeString, isValidEmail } = require('../utils/validation')
 const { fetchProgressionSettings, promotePassedAccount } = require('../services/progressionService')
 const { fetchStepModels, fetchStepModelBySlug, toggleStepModel } = require('../utils/stepModels')
 const { generateAccountUid } = require('../utils/accountIds')
+const { sendEmailMessage, htmlWrap, resolveMailContext } = require('../mailer')
+const { computeRMultiple } = require('./trades')
 const { CURRENT_TOS_VERSION } = require('../utils/tosVersion')
 const { readKycFileBuffer, getKycContentType, getOriginalKycExtension } = require('../utils/secureKycStorage')
 const { ensureViolationTables } = require('../services/violationEngine')
-const { sendEmailMessage, htmlWrap, resolveMailContext } = require('../mailer')
-const { computeRMultiple } = require('./trades')
 const { getTenantSettings } = require('../services/tenantPolicyService')
 const { getPriceForTenant } = require('../priceFeed')
 const { ensureDisputesInfrastructure } = require('./disputes')
 const { ensureChatTables } = require('./chat')
 const {
-  ensureTenantSettingsInfrastructure,
-  getTenantSettingsMap
+  ensureTenantSettingsInfrastructure
 } = require('../utils/tenantSettings')
 require('../loadEnv')
 
@@ -7051,21 +7049,6 @@ router.get('/settings', authenticateAdmin, async (req, res) => {
   }
 });
 
-router.get('/settings/account-availability', authenticateAdmin, async (req, res) => {
-  try {
-    const settings = await getTenantSettingsMap()
-    const sizes = await buildAccountAvailability(pool, settings)
-
-    res.json({
-      period_start: settings.max_accounts_period_start || null,
-      period_end: settings.max_accounts_period_end || null,
-      sizes
-    })
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to load account availability' })
-  }
-});
-
 const WRITABLE_SETTINGS_KEYS = new Set([
   'challenge_start_requires_kyc', 'hide_unavailable_sizes_on_landing', 'sold_out_message',
   'promotion_requires_admin_review', 'promotion_review_sla_hours', 'failed_account_visibility_days',
@@ -7527,22 +7510,59 @@ router.patch('/step-models/:slug/pricing/:accountSize', authenticateAdmin, requi
     const accountSize = parseInt(req.params.accountSize, 10)
     const price = parseFloat(req.body?.price)
     const isActive = req.body?.is_active
+    const isUnlimitedBody = req.body?.is_unlimited
+    const slotLimitRaw = req.body?.slot_limit
 
     if (!Number.isFinite(accountSize)) return res.status(400).json({ error: 'Invalid account size' })
     if (!Number.isFinite(price) || price < 0) return res.status(400).json({ error: 'Invalid price' })
+    if (isUnlimitedBody !== undefined && typeof isUnlimitedBody !== 'boolean') {
+      return res.status(400).json({ error: 'is_unlimited must be a boolean' })
+    }
+
+    // undefined = leave the column untouched; null/'' = explicitly clear it
+    let slotLimit
+    if (slotLimitRaw !== undefined) {
+      if (slotLimitRaw === null || slotLimitRaw === '') {
+        slotLimit = null
+      } else {
+        const parsed = parseInt(slotLimitRaw, 10)
+        if (!Number.isFinite(parsed) || parsed < 0) {
+          return res.status(400).json({ error: 'slot_limit must be a non-negative integer' })
+        }
+        slotLimit = parsed
+      }
+    }
 
     const model = await fetchStepModelBySlug(slug)
     if (!model) return res.status(404).json({ error: 'Step model not found' })
 
+    const existing = await pool.query(
+      `SELECT is_unlimited, slot_limit FROM challenge_model_pricing WHERE challenge_model_id = $1 AND account_size = $2`,
+      [model.id, accountSize]
+    )
+    if (existing.rows.length === 0) return res.status(404).json({ error: 'No pricing row for this model/size' })
+
+    const effectiveUnlimited = typeof isUnlimitedBody === 'boolean' ? isUnlimitedBody : existing.rows[0].is_unlimited
+    const effectiveSlotLimit = slotLimit !== undefined ? slotLimit : existing.rows[0].slot_limit
+    if (!effectiveUnlimited && (effectiveSlotLimit === null || effectiveSlotLimit === undefined)) {
+      return res.status(400).json({ error: 'slot_limit is required when is_unlimited is false' })
+    }
+
     const result = await pool.query(
       `UPDATE challenge_model_pricing
           SET price = $3,
-              is_active = COALESCE($4, is_active)
+              is_active = COALESCE($4, is_active),
+              is_unlimited = COALESCE($5, is_unlimited),
+              slot_limit = CASE WHEN $6 THEN $7 ELSE slot_limit END
         WHERE challenge_model_id = $1 AND account_size = $2
         RETURNING *`,
-      [model.id, accountSize, price, typeof isActive === 'boolean' ? isActive : null]
+      [
+        model.id, accountSize, price,
+        typeof isActive === 'boolean' ? isActive : null,
+        typeof isUnlimitedBody === 'boolean' ? isUnlimitedBody : null,
+        slotLimit !== undefined, slotLimit ?? null
+      ]
     )
-    if (result.rows.length === 0) return res.status(404).json({ error: 'No pricing row for this model/size' })
 
     try {
       await appendImmutableAudit(pool, {
@@ -7550,7 +7570,7 @@ router.patch('/step-models/:slug/pricing/:accountSize', authenticateAdmin, requi
         entityType: 'step_model',
         entityId: slug,
         actor: getAdminActorLabel(req.admin),
-        payload: { slug, account_size: accountSize, price }
+        payload: { slug, account_size: accountSize, price, is_unlimited: isUnlimitedBody, slot_limit: slotLimit }
       })
     } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 

@@ -164,6 +164,12 @@ async function ensureStepModelInfrastructure() {
     // changes later.
     await pool.query(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS challenge_model_id INTEGER`)
     await pool.query(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS challenge_model_slug TEXT`)
+
+    // Backs countUsedSlotsForModel/countUsedSlotsForModels — every account ever
+    // created for a (model, size) pair counts against that pair's slot_limit,
+    // regardless of the account's current status (fixed lifetime pool, not a
+    // "currently active" count).
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_accounts_challenge_model_size ON accounts(challenge_model_id, account_size)`)
     await pool.query(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS step_number INTEGER`)
     await pool.query(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS daily_drawdown_pct NUMERIC`)
     await pool.query(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS drawdown_type TEXT`)
@@ -283,6 +289,72 @@ async function ensureStepModelInfrastructure() {
   return stepModelInfrastructurePromise
 }
 
+// Fixed lifetime pool: every account ever created for a (model, size) pair
+// counts as "used", regardless of its current status (pass/fail/funded all
+// still count) — the pool only grows back when an admin raises slot_limit.
+async function countUsedSlotsForModel(db, challengeModelId, accountSize) {
+  const result = await db.query(
+    `SELECT COUNT(*) AS count FROM accounts WHERE challenge_model_id = $1 AND account_size = $2`,
+    [challengeModelId, accountSize]
+  )
+  return parseInt(result.rows[0]?.count || 0, 10)
+}
+
+// Batched form of countUsedSlotsForModel for fetchStepModels(), which needs
+// usage for every (model, size) pair at once — avoids N+1 queries.
+async function countUsedSlotsForModels(db, challengeModelIds) {
+  const map = new Map()
+  if (!challengeModelIds.length) return map
+  const result = await db.query(
+    `SELECT challenge_model_id, account_size, COUNT(*) AS count
+       FROM accounts
+      WHERE challenge_model_id = ANY($1::int[])
+      GROUP BY challenge_model_id, account_size`,
+    [challengeModelIds]
+  )
+  for (const row of result.rows) {
+    map.set(`${row.challenge_model_id}:${row.account_size}`, parseInt(row.count, 10))
+  }
+  return map
+}
+
+function deriveAvailability({ isActive, isUnlimited, slotLimit, used }) {
+  const remaining = isUnlimited ? null : Math.max(0, (slotLimit || 0) - used)
+  return {
+    is_unlimited: isUnlimited,
+    slot_limit: slotLimit,
+    used,
+    remaining,
+    locked: !isActive || (!isUnlimited && remaining <= 0)
+  }
+}
+
+// Authoritative, race-safe slot check — call inside a transaction (client),
+// after the caller has already loaded the target challenge model. Takes a
+// GLOBAL advisory lock (not per-user) keyed on (challengeModelId, accountSize)
+// so two different users racing for the last slot are correctly serialized.
+async function assertSlotAvailable(client, challengeModelId, accountSize) {
+  await client.query(
+    `SELECT pg_advisory_xact_lock(hashtext('step_model_slot'), hashtext($1))`,
+    [`${challengeModelId}:${accountSize}`]
+  )
+  const result = await client.query(
+    `SELECT is_active, is_unlimited, slot_limit
+       FROM challenge_model_pricing
+      WHERE challenge_model_id = $1 AND account_size = $2`,
+    [challengeModelId, accountSize]
+  )
+  const row = result.rows[0]
+  if (!row) return { ok: false, reason: 'not_offered' }
+  if (!row.is_active) return { ok: false, reason: 'inactive' }
+  if (row.is_unlimited) return { ok: true, is_unlimited: true }
+
+  const slotLimit = row.slot_limit != null ? parseInt(row.slot_limit, 10) : 0
+  const used = await countUsedSlotsForModel(client, challengeModelId, accountSize)
+  if (used >= slotLimit) return { ok: false, reason: 'full', used, limit: slotLimit }
+  return { ok: true, is_unlimited: false, used, limit: slotLimit }
+}
+
 async function fetchStepModels({ onlyEnabled = false } = {}) {
   await ensureStepModelInfrastructure()
   const modelsResult = await pool.query(
@@ -293,12 +365,27 @@ async function fetchStepModels({ onlyEnabled = false } = {}) {
      JOIN challenge_models m ON m.id = p.challenge_model_id
      ORDER BY p.account_size ASC`
   )
+  const usageMap = await countUsedSlotsForModels(pool, modelsResult.rows.map((m) => m.id))
 
   return modelsResult.rows.map((model) => ({
     ...model,
     pricing: pricingResult.rows
       .filter((p) => p.challenge_model_id === model.id)
-      .map((p) => ({ account_size: p.account_size, price: parseFloat(p.price), is_active: p.is_active }))
+      .map((p) => {
+        const isUnlimited = p.is_unlimited
+        const used = isUnlimited ? 0 : (usageMap.get(`${p.challenge_model_id}:${p.account_size}`) || 0)
+        return {
+          account_size: p.account_size,
+          price: parseFloat(p.price),
+          is_active: p.is_active,
+          ...deriveAvailability({
+            isActive: p.is_active,
+            isUnlimited,
+            slotLimit: p.slot_limit != null ? parseInt(p.slot_limit, 10) : null,
+            used
+          })
+        }
+      })
   }))
 }
 
@@ -314,13 +401,27 @@ async function fetchStepModelBySlug(slug) {
 async function fetchStepModelPrice(slug, accountSize) {
   await ensureStepModelInfrastructure()
   const result = await pool.query(
-    `SELECT p.price, p.is_active
+    `SELECT p.challenge_model_id, p.price, p.is_active, p.is_unlimited, p.slot_limit
        FROM challenge_model_pricing p
        JOIN challenge_models m ON m.id = p.challenge_model_id
       WHERE m.slug = $1 AND p.account_size = $2`,
     [slug, accountSize]
   )
-  return result.rows[0] || null
+  const row = result.rows[0]
+  if (!row) return null
+
+  const isUnlimited = row.is_unlimited
+  const used = isUnlimited ? 0 : await countUsedSlotsForModel(pool, row.challenge_model_id, accountSize)
+  return {
+    price: row.price,
+    is_active: row.is_active,
+    ...deriveAvailability({
+      isActive: row.is_active,
+      isUnlimited,
+      slotLimit: row.slot_limit != null ? parseInt(row.slot_limit, 10) : null,
+      used
+    })
+  }
 }
 
 async function toggleStepModel(slug, enabled) {
@@ -337,6 +438,9 @@ async function toggleStepModel(slug, enabled) {
 module.exports = {
   ACCOUNT_SIZES,
   ensureStepModelInfrastructure,
+  countUsedSlotsForModel,
+  countUsedSlotsForModels,
+  assertSlotAvailable,
   fetchStepModels,
   fetchStepModelBySlug,
   fetchStepModelPrice,

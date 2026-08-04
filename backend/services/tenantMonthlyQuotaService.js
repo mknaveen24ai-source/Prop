@@ -1,5 +1,4 @@
 const pool = require('../db')
-const logger = require('../utils/logger')
 
 let infrastructureReady = false
 let infrastructurePromise = null
@@ -10,47 +9,7 @@ function getQuotaMonth(input = new Date()) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1)).toISOString().slice(0, 10)
 }
 
-function parseNonNegativeLimit(value) {
-  const parsed = parseInt(value, 10)
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
-}
-
-function normalizeAccountSize(value) {
-  const parsed = parseInt(value, 10)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
-}
-
 async function runEnsureInfrastructure(db = pool) {
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS tenant_monthly_quotas (
-      id BIGSERIAL PRIMARY KEY,
-      quota_month DATE NOT NULL,
-      account_limit INT,
-      is_unlimited BOOLEAN NOT NULL DEFAULT TRUE,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (quota_month)
-    )
-  `)
-  await db.query(`CREATE INDEX IF NOT EXISTS tenant_monthly_quotas_month_idx ON tenant_monthly_quotas(quota_month DESC)`)
-
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS tenant_monthly_size_quotas (
-      id BIGSERIAL PRIMARY KEY,
-      quota_month DATE NOT NULL,
-      account_size INT NOT NULL,
-      account_limit INT,
-      is_unlimited BOOLEAN NOT NULL DEFAULT TRUE,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (quota_month, account_size)
-    )
-  `)
-  await db.query(`
-    CREATE INDEX IF NOT EXISTS tenant_monthly_size_quotas_lookup_idx
-      ON tenant_monthly_size_quotas(quota_month DESC, account_size)
-  `)
-
   await db.query(`
     CREATE TABLE IF NOT EXISTS account_promotion_reviews (
       id BIGSERIAL PRIMARY KEY,
@@ -104,175 +63,6 @@ async function ensureTenantMonthlyQuotaInfrastructure(db = pool) {
     })
   }
   await infrastructurePromise
-}
-
-async function lockTenantQuotaMonth(db, quotaMonth = getQuotaMonth(), accountSize = null) {
-  const normalizedSize = normalizeAccountSize(accountSize)
-  await db.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
-    normalizedSize
-      ? `tenant_monthly_size_quota:${getQuotaMonth(quotaMonth)}:${normalizedSize}`
-      : `tenant_monthly_quota:${getQuotaMonth(quotaMonth)}`
-  ])
-}
-
-async function upsertTenantMonthlyQuota(db, { quotaMonth = getQuotaMonth(), accountLimit = null, isUnlimited = true }) {
-  await ensureTenantMonthlyQuotaInfrastructure(db)
-  const normalizedMonth = getQuotaMonth(quotaMonth)
-  const unlimited = !!isUnlimited
-  const limit = unlimited ? null : parseNonNegativeLimit(accountLimit)
-  if (!unlimited && limit === null) {
-    const error = new Error('account_limit must be zero or a positive number unless quota is unlimited')
-    error.statusCode = 400
-    throw error
-  }
-
-  const result = await db.query(
-    `INSERT INTO tenant_monthly_quotas (quota_month, account_limit, is_unlimited, updated_at)
-     VALUES ($1::date, $2, $3, NOW())
-     ON CONFLICT (quota_month)
-     DO UPDATE SET
-       account_limit = EXCLUDED.account_limit,
-       is_unlimited = EXCLUDED.is_unlimited,
-       updated_at = NOW()
-     RETURNING *`,
-    [normalizedMonth, limit, unlimited]
-  )
-  return result.rows[0]
-}
-
-async function upsertTenantMonthlySizeQuota(db, { quotaMonth = getQuotaMonth(), accountSize, accountLimit = null, isUnlimited = true }) {
-  await ensureTenantMonthlyQuotaInfrastructure(db)
-  const normalizedMonth = getQuotaMonth(quotaMonth)
-  const normalizedSize = normalizeAccountSize(accountSize)
-  if (!normalizedSize) {
-    const error = new Error('account_size must be a positive number')
-    error.statusCode = 400
-    throw error
-  }
-
-  const unlimited = !!isUnlimited
-  const limit = unlimited ? null : parseNonNegativeLimit(accountLimit)
-  if (!unlimited && limit === null) {
-    const error = new Error('account_limit must be zero or a positive number unless quota is unlimited')
-    error.statusCode = 400
-    throw error
-  }
-
-  const result = await db.query(
-    `INSERT INTO tenant_monthly_size_quotas (quota_month, account_size, account_limit, is_unlimited, updated_at)
-     VALUES ($1::date, $2, $3, $4, NOW())
-     ON CONFLICT (quota_month, account_size)
-     DO UPDATE SET
-       account_limit = EXCLUDED.account_limit,
-       is_unlimited = EXCLUDED.is_unlimited,
-       updated_at = NOW()
-     RETURNING *`,
-    [normalizedMonth, normalizedSize, limit, unlimited]
-  )
-  return result.rows[0]
-}
-
-async function getTenantMonthlyQuota(db, quotaMonth = getQuotaMonth()) {
-  await ensureTenantMonthlyQuotaInfrastructure(db)
-  const normalizedMonth = getQuotaMonth(quotaMonth)
-  const result = await db.query(
-    `SELECT *
-       FROM tenant_monthly_quotas
-      WHERE quota_month = $1::date
-      LIMIT 1`,
-    [normalizedMonth]
-  )
-  return result.rows[0] || {
-    quota_month: normalizedMonth,
-    account_limit: null,
-    is_unlimited: true
-  }
-}
-
-async function getTenantMonthlySizeQuota(db, accountSize, quotaMonth = getQuotaMonth()) {
-  await ensureTenantMonthlyQuotaInfrastructure(db)
-  const normalizedMonth = getQuotaMonth(quotaMonth)
-  const normalizedSize = normalizeAccountSize(accountSize)
-  if (!normalizedSize) {
-    const error = new Error('account_size must be a positive number')
-    error.statusCode = 400
-    throw error
-  }
-
-  const result = await db.query(
-    `SELECT *
-       FROM tenant_monthly_size_quotas
-      WHERE quota_month = $1::date
-        AND account_size = $2
-      LIMIT 1`,
-    [normalizedMonth, normalizedSize]
-  )
-  if (result.rows[0]) return result.rows[0]
-
-  return {
-    quota_month: normalizedMonth,
-    account_size: normalizedSize,
-    account_limit: null,
-    is_unlimited: true
-  }
-}
-
-async function countTenantMonthlyAccounts(db, quotaMonth = getQuotaMonth(), accountSize = null) {
-  const normalizedMonth = getQuotaMonth(quotaMonth)
-  const normalizedSize = normalizeAccountSize(accountSize)
-  const result = await db.query(
-    `SELECT COUNT(*)::int AS used
-       FROM accounts
-      WHERE created_at >= $1::date
-        AND created_at < ($1::date + INTERVAL '1 month')
-        AND ($2::int IS NULL OR account_size::int = $2::int)`,
-    [normalizedMonth, normalizedSize]
-  )
-  return parseInt(result.rows[0]?.used || 0, 10) || 0
-}
-
-async function getTenantMonthlyQuotaStatus(db, quotaMonth = getQuotaMonth(), accountSize = null) {
-  await ensureTenantMonthlyQuotaInfrastructure(db)
-  const normalizedSize = normalizeAccountSize(accountSize)
-  const quota = normalizedSize
-    ? await getTenantMonthlySizeQuota(db, normalizedSize, quotaMonth)
-    : await getTenantMonthlyQuota(db, quotaMonth)
-  const normalizedMonth = getQuotaMonth(quotaMonth)
-  const used = await countTenantMonthlyAccounts(db, normalizedMonth, normalizedSize)
-  const isUnlimited = !!quota.is_unlimited
-  const accountLimit = parseNonNegativeLimit(quota.account_limit)
-  const remaining = isUnlimited ? null : Math.max(0, (accountLimit || 0) - used)
-  const state = isUnlimited
-    ? 'unlimited'
-    : remaining <= 0
-      ? 'full'
-      : remaining <= Math.max(1, Math.ceil((accountLimit || 0) * 0.1))
-        ? 'near_limit'
-        : 'available'
-
-  return {
-    quota_month: normalizedMonth,
-    account_size: normalizedSize,
-    account_limit: isUnlimited ? null : accountLimit,
-    is_unlimited: isUnlimited,
-    used,
-    remaining,
-    state
-  }
-}
-
-async function assertTenantMonthlyQuotaAvailable(db, quotaMonth = getQuotaMonth(), accountSize = null) {
-  await ensureTenantMonthlyQuotaInfrastructure(db)
-  await lockTenantQuotaMonth(db, quotaMonth, accountSize)
-  const status = await getTenantMonthlyQuotaStatus(db, quotaMonth, accountSize)
-  if (!status.is_unlimited && status.remaining <= 0) {
-    const sizeLabel = status.account_size ? ` $${Number(status.account_size).toLocaleString('en-US')} account` : ''
-    const error = new Error(`Monthly quota is full for${sizeLabel} allocations in ${status.quota_month}.`)
-    error.statusCode = 403
-    error.quota = status
-    throw error
-  }
-  return status
 }
 
 function getTargetAccountType(fromAccountType) {
@@ -403,31 +193,13 @@ async function markPromotionReviewRejected(db, reviewId, { adminId = null, decis
   return result.rows[0] || null
 }
 
-async function logQuotaError(context, error) {
-  logger.warn('[tenant-quota] quota gate blocked account allocation', {
-    ...context,
-    error: error.message,
-    quota: error.quota || null
-  })
-}
-
 module.exports = {
-  assertTenantMonthlyQuotaAvailable,
-  countTenantMonthlyAccounts,
   createPromotionReview,
   ensureTenantMonthlyQuotaInfrastructure,
   getPromotionReviewForUpdate,
   getQuotaMonth,
   getTargetAccountType,
-  getTenantMonthlyQuota,
-  getTenantMonthlySizeQuota,
-  getTenantMonthlyQuotaStatus,
   listPromotionReviews,
-  lockTenantQuotaMonth,
-  logQuotaError,
-  normalizeAccountSize,
   markPromotionReviewApproved,
-  markPromotionReviewRejected,
-  upsertTenantMonthlyQuota,
-  upsertTenantMonthlySizeQuota
+  markPromotionReviewRejected
 }

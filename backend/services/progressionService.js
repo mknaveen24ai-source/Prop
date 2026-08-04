@@ -4,7 +4,6 @@ const { getTenantSettings } = require('./tenantPolicyService')
 const { fetchStepModelBySlug } = require('../utils/stepModels')
 const { generateAccountUid } = require('../utils/accountIds')
 const {
-  assertTenantMonthlyQuotaAvailable,
   createPromotionReview,
   markPromotionReviewApproved
 } = require('./tenantMonthlyQuotaService')
@@ -326,11 +325,6 @@ async function approvePromotionReview(db, review, settings, options = {}) {
     throw error
   }
 
-  await assertTenantMonthlyQuotaAvailable(
-    db,
-    undefined,
-    sourceAccount.account_size || review.account_size
-  )
   const promoted = await promotePassedAccount(db, sourceAccount, settings)
   if (!promoted) {
     const error = new Error('No promotion path exists for this account')
