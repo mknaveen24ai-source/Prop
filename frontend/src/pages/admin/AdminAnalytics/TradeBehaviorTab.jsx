@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import AdminChart, { chartThemeProps } from '../../../components/admin/AdminChart';
 import AdminDataTable from '../../../components/admin/AdminDataTable';
 import AdminBadge from '../../../components/admin/AdminBadge';
+import Card from '../../../components/ui/Card';
 import { pnlColor } from './shared';
 
 const COPY_TRADING_THRESHOLD = 0.85;
@@ -24,7 +25,7 @@ function CorrelationMatrix({ userIds, matrix, labelFor }) {
     return <p style={{ color: 'var(--admin-text-faint)', fontSize: '13px' }}>Not enough traders with overlapping trading days yet.</p>;
   }
   return (
-    <div className="admin-card" style={{ overflowX: 'auto' }}>
+    <Card style={{ overflowX: 'auto' }}>
       <table className="admin-table">
         <thead>
           <tr>
@@ -47,7 +48,7 @@ function CorrelationMatrix({ userIds, matrix, labelFor }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </Card>
   );
 }
 
@@ -78,6 +79,8 @@ export default function TradeBehaviorTab() {
   const copyTradingFlags = data?.copyTradingFlags || [];
   const profitSpikes = data?.profitSpikes || [];
   const sessionTiming = data?.sessionTiming || [];
+  const avgRMultiple = data?.avgRMultiple;
+  const rMultipleDistribution = data?.rMultipleDistribution || [];
 
   const labelFor = (userId) => {
     const t = tradeFrequency.find((r) => r.userId === userId);
@@ -118,10 +121,29 @@ export default function TradeBehaviorTab() {
         </BarChart>
       </AdminChart>
 
-      <h2 className="admin-h2" style={{ marginTop: '24px' }}>Trade Frequency & Strategy Classification</h2>
-      <div className="admin-card" style={{ padding: 0, marginBottom: '24px' }}>
-        <AdminDataTable columns={frequencyColumns} data={tradeFrequency} loading={loading} emptyMessage="No trader data yet" emptyIcon="trade" />
+      <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '16px', marginTop: '24px', alignItems: 'stretch' }}>
+        <Card>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--admin-text-muted)' }}>Avg R-Multiple</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '28px', marginTop: '10px', color: avgRMultiple == null ? 'var(--admin-text-faint)' : avgRMultiple >= 0 ? 'var(--admin-success)' : 'var(--admin-danger)' }}>
+            {avgRMultiple == null ? '—' : `${avgRMultiple.toFixed(2)}R`}
+          </div>
+          <div style={{ fontSize: '11.5px', color: 'var(--admin-text-muted)', marginTop: '6px' }}>Platform-wide, last 5,000 closed trades. Only trades with a stop-loss count.</div>
+        </Card>
+        <AdminChart title="R-Multiple Distribution">
+          <BarChart data={rMultipleDistribution}>
+            <CartesianGrid {...chartThemeProps.grid} />
+            <XAxis dataKey="bucket" {...chartThemeProps.xAxis} />
+            <YAxis {...chartThemeProps.yAxis} allowDecimals={false} />
+            <Tooltip {...chartThemeProps.tooltip} />
+            <Bar dataKey="count" fill="var(--admin-accent)" barSize={36} name="Trades" />
+          </BarChart>
+        </AdminChart>
       </div>
+
+      <h2 className="admin-h2" style={{ marginTop: '24px' }}>Trade Frequency & Strategy Classification</h2>
+      <Card flush style={{ marginBottom: '24px' }}>
+        <AdminDataTable columns={frequencyColumns} data={tradeFrequency} loading={loading} emptyMessage="No trader data yet" emptyIcon="trade" />
+      </Card>
 
       <h2 className="admin-h2">Trader Correlation Matrix</h2>
       <p style={{ color: 'var(--admin-text-muted)', fontSize: '12px', marginBottom: '12px' }}>
@@ -132,14 +154,14 @@ export default function TradeBehaviorTab() {
       </div>
 
       <h2 className="admin-h2">Copy-Trading Flags</h2>
-      <div className="admin-card" style={{ padding: 0, marginBottom: '24px' }}>
+      <Card flush style={{ marginBottom: '24px' }}>
         <AdminDataTable columns={copyTradingColumns} data={copyTradingFlags} loading={loading} emptyMessage="No flagged pairs" emptyIcon="dispute" />
-      </div>
+      </Card>
 
       <h2 className="admin-h2">Abnormal Profit Spike Detection</h2>
-      <div className="admin-card" style={{ padding: 0, marginBottom: '24px' }}>
+      <Card flush style={{ marginBottom: '24px' }}>
         <AdminDataTable columns={spikeColumns} data={profitSpikes} loading={loading} emptyMessage="No spikes detected" emptyIcon="pnl" />
-      </div>
+      </Card>
 
       <AdminChart title="Session Timing Pattern — Trade Volume by Hour (UTC)">
         <BarChart data={sessionTiming}>
