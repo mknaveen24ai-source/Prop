@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useNavigate } from 'react-router-dom';
 import AdminFilterBar from '../../components/admin/AdminFilterBar';
 import AdminListToolbar from '../../components/admin/AdminListToolbar';
 import AdminStatCard from '../../components/admin/AdminStatCard';
 import { useToast } from '../../components/admin/AdminToast';
 import { exportAdminResource } from '../../utils/adminList';
+import { getAdminStatusColor as statusColor } from '../../components/admin/adminStatusTone';
+import Card from '../../components/ui/Card';
 
 const DEFAULT_FILTERS = {
   status: 'all',
@@ -34,19 +36,14 @@ function formatDate(value) {
   return date.toLocaleDateString();
 }
 
-function statusColor(status) {
-  if (status === 'open') return 'var(--admin-accent)';
-  if (status === 'pending') return 'var(--admin-warning)';
-  if (status === 'resolved') return 'var(--admin-success)';
-  return 'var(--admin-text-faint)';
-}
-
 export default function AdminChat() {
-  const { adminAxios, socket } = useOutletContext();
+  const { adminAxios, socket, session } = useOutletContext();
   const toast = useToast();
+  const navigate = useNavigate();
 
   const [conversations, setConversations] = useState([]);
   const [stats, setStats] = useState({});
+  const [appealsOpen, setAppealsOpen] = useState(0);
   const [views, setViews] = useState([]);
   const [activeViewId, setActiveViewId] = useState('');
   const [selectedConversationId, setSelectedConversationId] = useState(null);
@@ -67,6 +64,8 @@ export default function AdminChat() {
   const traderTypingTimeoutRef = useRef(null);
   const [isReplyTyping, setIsReplyTyping] = useState(false);
   const replyTypingTimeoutRef = useRef(null);
+  const [traderSnapshot, setTraderSnapshot] = useState(null);
+  const [assigning, setAssigning] = useState(false);
 
   const fetchViews = useCallback(async () => {
     try {
@@ -83,6 +82,20 @@ export default function AdminChat() {
       setStats(res.data || {});
     } catch {
       setStats({});
+    }
+  }, [adminAxios]);
+
+  // Real awareness of the other real support queue (trader appeals) —
+  // Support Inbox is one screen with two real queues (Modern Gazette
+  // handoff spec's isAdminChat `t.queue` tag). Full unified thread list is
+  // a larger follow-up (see plan); this surfaces the count + a jump-off
+  // point without touching the working real-time chat architecture.
+  const fetchAppealsCount = useCallback(async () => {
+    try {
+      const res = await adminAxios.get('/api/admin/support-inbox');
+      setAppealsOpen(res.data?.summary?.appeals_open || 0);
+    } catch {
+      setAppealsOpen(0);
     }
   }, [adminAxios]);
 
@@ -137,7 +150,8 @@ export default function AdminChat() {
     fetchConversations();
     fetchStats();
     fetchViews();
-  }, [fetchConversations, fetchStats, fetchViews]);
+    fetchAppealsCount();
+  }, [fetchConversations, fetchStats, fetchViews, fetchAppealsCount]);
 
   useEffect(() => {
     if (selectedConversationId) {
@@ -151,6 +165,37 @@ export default function AdminChat() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Trader Snapshot rail — reuses the same /api/admin/traders list endpoint
+  // AdminUsers.jsx drives, filtered to this conversation's trader; real data,
+  // no separate per-conversation "context" endpoint needed.
+  useEffect(() => {
+    const email = selectedConversation?.user_email;
+    if (!email) { setTraderSnapshot(null); return undefined; }
+    let cancelled = false;
+    adminAxios.get('/api/admin/traders', { params: { format: 'list', page: 1, page_size: 1, search: email } })
+      .then((res) => {
+        if (cancelled) return;
+        const rows = res.data?.rows || res.data?.allRows || [];
+        setTraderSnapshot(rows[0] || null);
+      })
+      .catch(() => { if (!cancelled) setTraderSnapshot(null); });
+    return () => { cancelled = true; };
+  }, [adminAxios, selectedConversation?.user_email]);
+
+  const assignToMe = async () => {
+    if (!selectedConversation || !session?.email || assigning) return;
+    setAssigning(true);
+    try {
+      await adminAxios.patch(`/api/chat/admin/conversations/${selectedConversation.id}`, { assigned_to: session.email });
+      toast.success(`Assigned to ${session.email}`);
+      await fetchConversation(selectedConversation.id, { silent: true });
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to assign conversation');
+    } finally {
+      setAssigning(false);
+    }
+  };
 
   // Live updates — the admin socket auto-joins the 'admin' room on connect
   // (see AdminSessionProvider), so this fires whenever any trader sends a
@@ -369,9 +414,10 @@ export default function AdminChat() {
         <AdminStatCard icon="WAIT" label="Pending" value={Number(stats.pending_count || 0).toLocaleString()} />
         <AdminStatCard icon="READ" label="Needs Attention" value={Number(stats.unread_count || 0).toLocaleString()} />
         <AdminStatCard icon="MSG" label="Messages (24h)" value={Number(stats.messages_24h || 0).toLocaleString()} />
+        <AdminStatCard icon="dispute" label="Open Appeals" value={appealsOpen} onClick={() => navigate('/admin/disputes')} />
       </div>
 
-      <div className="admin-card" style={{ marginBottom: '20px' }}>
+      <Card style={{ marginBottom: '20px' }}>
         <AdminFilterBar
           searchPlaceholder="Search by trader, subject, or latest message"
           searchValue={search}
@@ -423,7 +469,7 @@ export default function AdminChat() {
             </>
           )}
         />
-      </div>
+      </Card>
 
       <div style={{ display: 'flex', height: 'calc(100vh - var(--admin-topbar-h) - 260px)', gap: '0' }}>
         <div style={{
@@ -575,11 +621,19 @@ export default function AdminChat() {
                   <div style={{ color: 'var(--admin-text-muted)', fontSize: '12px', marginTop: '4px' }}>
                     {selectedConversation.subject || 'No subject'}
                   </div>
-                  <div style={{ color: statusColor(selectedConversation.status), fontSize: '11px', marginTop: '6px', textTransform: 'uppercase', fontWeight: 700 }}>
-                    {selectedConversation.status}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
+                    <span style={{ color: statusColor(selectedConversation.status), fontSize: '11px', textTransform: 'uppercase', fontWeight: 700 }}>
+                      {selectedConversation.status}
+                    </span>
+                    <span style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>
+                      {selectedConversation.assigned_to ? `Assigned to ${selectedConversation.assigned_to}` : 'Unassigned'}
+                    </span>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  <button className="admin-btn admin-btn-ghost" onClick={assignToMe} disabled={assigning || selectedConversation.assigned_to === session?.email}>
+                    {selectedConversation.assigned_to === session?.email ? 'Assigned to you' : 'Assign to me'}
+                  </button>
                   {selectedConversation.status !== 'pending' && (
                     <button className="admin-btn admin-btn-ghost" onClick={() => updateConversationStatus(selectedConversation.id, 'pending')}>
                       Mark Pending
@@ -712,6 +766,53 @@ export default function AdminChat() {
             </div>
           )}
         </div>
+
+        {selectedConversation && (
+          <div style={{ width: '260px', flexShrink: 0, marginLeft: '16px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>
+            <Card title="Trader Snapshot">
+              {traderSnapshot ? (
+                <>
+                  {[
+                    { label: 'KYC', value: traderSnapshot.kyc_status || 'pending', tone: statusColor(traderSnapshot.kyc_status || 'pending') },
+                    { label: 'Accounts', value: `${traderSnapshot.account_count || 0} total` },
+                    { label: 'Active', value: `${traderSnapshot.active_account_count || 0}` },
+                    { label: 'Risk Tier', value: traderSnapshot.risk_tier || 'low', tone: statusColor(traderSnapshot.risk_tier === 'critical' ? 'danger' : traderSnapshot.risk_tier === 'high' ? 'warning' : 'info') },
+                    { label: 'Country', value: traderSnapshot.country || '—' },
+                    { label: 'Joined', value: traderSnapshot.created_at ? formatDate(traderSnapshot.created_at) : '—' },
+                  ].map((r) => (
+                    <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', padding: '8px 0', borderBottom: '1px solid var(--admin-border)', fontSize: '12.5px' }}>
+                      <span style={{ color: 'var(--admin-text-muted)' }}>{r.label}</span>
+                      <span style={{ fontFamily: 'var(--admin-font-mono)', color: r.tone || 'var(--admin-text)', textAlign: 'right', textTransform: 'capitalize' }}>{r.value}</span>
+                    </div>
+                  ))}
+                  <button
+                    className="admin-btn admin-btn-ghost admin-btn-full"
+                    style={{ width: '100%', marginTop: '12px' }}
+                    onClick={() => navigate(`/admin/users?q=${encodeURIComponent(selectedConversation.user_email || '')}`)}
+                  >
+                    Open full record
+                  </button>
+                </>
+              ) : (
+                <div style={{ color: 'var(--admin-text-faint)', fontSize: '12.5px' }}>No trader record found for this conversation.</div>
+              )}
+            </Card>
+
+            {traderSnapshot && (traderSnapshot.is_banned || (traderSnapshot.kyc_status && traderSnapshot.kyc_status !== 'approved') || ['high', 'critical'].includes(traderSnapshot.risk_tier)) && (
+              <Card title="Flags">
+                {traderSnapshot.is_banned && (
+                  <div style={{ padding: '9px 0', borderBottom: '1px solid var(--admin-border)', fontSize: '12.5px', color: 'var(--admin-danger)' }}>Trader is banned</div>
+                )}
+                {traderSnapshot.kyc_status && traderSnapshot.kyc_status !== 'approved' && (
+                  <div style={{ padding: '9px 0', borderBottom: '1px solid var(--admin-border)', fontSize: '12.5px', color: 'var(--admin-warning)' }}>KYC {traderSnapshot.kyc_status}</div>
+                )}
+                {['high', 'critical'].includes(traderSnapshot.risk_tier) && (
+                  <div style={{ padding: '9px 0', fontSize: '12.5px', color: 'var(--admin-danger)' }}>Risk tier: {traderSnapshot.risk_tier}</div>
+                )}
+              </Card>
+            )}
+          </div>
+        )}
       </div>
     </>
   );
