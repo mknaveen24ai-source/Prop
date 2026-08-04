@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useOutletContext, useParams, useNavigate } from 'react-router-dom'
 import { useToast } from '../../components/admin/AdminToast'
 import PrizePoolEditor from '../../components/admin/PrizePoolEditor'
+import Card from '../../components/ui/Card'
 
 const inputStyle = { width: '100%', padding: '8px 10px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }
 
@@ -66,7 +67,7 @@ function SettingsPanel({ competition, onSave, saving, stepModels }) {
   }
 
   return (
-    <form onSubmit={submit} className="admin-card" style={{ padding: '20px', marginBottom: '24px' }}>
+    <form onSubmit={submit} className="lx-card" style={{ padding: '20px', marginBottom: '24px' }}>
       <h3 style={{ margin: '0 0 4px' }}>Settings</h3>
       {isLocked && (
         <p style={{ margin: '0 0 14px', fontSize: '12px', color: 'var(--admin-text-muted)' }}>
@@ -259,7 +260,7 @@ function BotRosterPanel({ adminAxios, toast, competition, onEntered }) {
   const canEnter = ['upcoming', 'active'].includes(competition.status)
 
   return (
-    <div className="admin-card" style={{ padding: '20px', marginBottom: '24px' }}>
+    <Card style={{ padding: '20px', marginBottom: '24px' }}>
       <h3 style={{ margin: '0 0 4px' }}>Demo Bot Participants</h3>
       <p style={{ margin: '0 0 16px', fontSize: '12px', color: 'var(--admin-text-muted)' }}>
         Bots are labeled participants with no real trading activity — their balance moves via an automated background tick.
@@ -352,7 +353,7 @@ function BotRosterPanel({ adminAxios, toast, competition, onEntered }) {
           </tbody>
         </table>
       )}
-    </div>
+    </Card>
   )
 }
 
@@ -470,7 +471,7 @@ export default function AdminCompetitionDetail() {
 
       <BotRosterPanel adminAxios={adminAxios} toast={toast} competition={competition} onEntered={load} />
 
-      <div className="admin-card" style={{ padding: '20px', marginBottom: '24px', overflowX: 'auto' }}>
+      <Card style={{ padding: '20px', marginBottom: '24px', overflowX: 'auto' }}>
         <h3 style={{ margin: '0 0 12px' }}>Entries</h3>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
           <thead>
@@ -522,10 +523,10 @@ export default function AdminCompetitionDetail() {
             )}
           </tbody>
         </table>
-      </div>
+      </Card>
 
       {competition.status === 'completed' && (
-        <div className="admin-card" style={{ padding: '20px' }}>
+        <Card style={{ padding: '20px' }}>
           <h3 style={{ margin: '0 0 12px' }}>Final Leaderboard (for payout reference)</h3>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
@@ -554,7 +555,7 @@ export default function AdminCompetitionDetail() {
               ))}
             </tbody>
           </table>
-        </div>
+        </Card>
       )}
     </div>
   )
