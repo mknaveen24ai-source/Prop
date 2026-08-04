@@ -148,13 +148,11 @@ async function verifyMailTransportConnection() {
   }
 }
 
-function resolveMailContext(tenant = null) {
-  const firmName = tenant?.name || tenant?.logo_text || process.env.FIRM_NAME || process.env.PLATFORM_NAME || 'Prop Firm'
-  const fromName = tenant?.email_from_name || firmName
-  const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER || tenant?.support_email || 'noreply@propfirm.com'
-  const baseUrl = tenant?.primary_domain
-    ? `https://${tenant.primary_domain}`
-    : (process.env.FRONTEND_URL || 'http://localhost:3000')
+function resolveMailContext() {
+  const firmName = process.env.FIRM_NAME || process.env.PLATFORM_NAME || 'Prop Firm'
+  const fromName = firmName
+  const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@propfirm.com'
+  const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000'
 
   return {
     firmName,
@@ -164,8 +162,8 @@ function resolveMailContext(tenant = null) {
   }
 }
 
-function htmlWrap(title, body, tenant = null) {
-  const context = resolveMailContext(tenant)
+function htmlWrap(title, body) {
+  const context = resolveMailContext()
   return `
     <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px;background:#0d1b2a;color:#e8e0d0;border-radius:8px;">
       <h2 style="color:#c9a84c;font-family:sans-serif;margin-bottom:4px;">${context.firmName}</h2>
@@ -191,11 +189,11 @@ function isSupportedEmailTemplate(templateKey) {
   return EMAIL_TEMPLATE_KEYS.includes(String(templateKey || '').trim().toLowerCase())
 }
 
-function buildPasswordResetEmail(payload, tenant = null) {
+function buildPasswordResetEmail(payload) {
   const to = String(payload?.toEmail || '').trim()
   const resetLink = String(payload?.resetLink || '').trim()
   const resetToken = payload?.resetToken ? String(payload.resetToken) : ''
-  const context = resolveMailContext(tenant)
+  const context = resolveMailContext()
   const subject = `${context.firmName} - Password Reset Request`
   const html = htmlWrap('Password Reset Request', `
     <p>You requested a password reset. Go to the link below and enter the code to set a new password.</p>
@@ -211,7 +209,7 @@ function buildPasswordResetEmail(payload, tenant = null) {
     </div>
     <p style="color:#888;font-size:13px;">This code expires in <strong>1 hour</strong>. If you did not request this, ignore this email.</p>
     ` : `<p style="color:#888;font-size:13px;">This link expires in <strong>1 hour</strong>. If you did not request this, ignore this email.</p>`}
-  `, tenant)
+  `)
 
   return {
     to,
@@ -221,12 +219,12 @@ function buildPasswordResetEmail(payload, tenant = null) {
   }
 }
 
-function buildWelcomeOnboardingEmail(payload, tenant = null) {
+function buildWelcomeOnboardingEmail(payload) {
   const to = String(payload?.toEmail || '').trim()
   const fullName = String(payload?.fullName || 'Trader')
   const traderUid = String(payload?.traderUid || '').trim()
   const affiliateCode = String(payload?.affiliateCode || '').trim()
-  const context = resolveMailContext(tenant)
+  const context = resolveMailContext()
   return {
     to,
     subject: `${context.firmName} - Welcome to the Platform`,
@@ -252,19 +250,19 @@ function buildWelcomeOnboardingEmail(payload, tenant = null) {
         </a>
       </p>
       <p style="color:#94a3b8;font-size:13px;">Need help? Sign in and open a support request from the portal.</p>
-    `, tenant),
+    `),
     text: `Welcome to ${context.firmName}. Open your dashboard at ${context.baseUrl}/dashboard, complete KYC, and review the trading rules before you begin.`
   }
 }
 
-function buildChallengeExpiryReminderEmail(payload, tenant = null) {
+function buildChallengeExpiryReminderEmail(payload) {
   const to = String(payload?.toEmail || '').trim()
   const fullName = String(payload?.fullName || 'Trader')
   const accountType = String(payload?.accountType || 'phase1').trim().toUpperCase()
   const accountSize = Number(payload?.accountSize || 0)
   const daysRemaining = Math.max(0, parseInt(payload?.daysRemaining, 10) || 0)
   const phaseEndDate = payload?.phaseEndDate ? new Date(payload.phaseEndDate) : null
-  const context = resolveMailContext(tenant)
+  const context = resolveMailContext()
   const readableDate = phaseEndDate && Number.isFinite(phaseEndDate.getTime())
     ? phaseEndDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
     : 'soon'
@@ -283,12 +281,12 @@ function buildChallengeExpiryReminderEmail(payload, tenant = null) {
           Open Dashboard
         </a>
       </p>
-    `, tenant),
+    `),
     text: `You have ${daysRemaining} day(s) left in your ${accountType} challenge. Log in at ${context.baseUrl}/dashboard to review your progress.`
   }
 }
 
-function buildChallengeInactivityReminderEmail(payload, tenant = null) {
+function buildChallengeInactivityReminderEmail(payload) {
   const to = String(payload?.toEmail || '').trim()
   const fullName = String(payload?.fullName || 'Trader')
   const accountType = String(payload?.accountType || 'phase1').trim().toUpperCase()
@@ -296,7 +294,7 @@ function buildChallengeInactivityReminderEmail(payload, tenant = null) {
   const inactivityFailDays = Math.max(1, parseInt(payload?.inactivityFailDays, 10) || 30)
   const daysUntilFail = Math.max(0, parseInt(payload?.daysUntilFail, 10) || 0)
   const lastActivityAt = payload?.lastActivityAt ? new Date(payload.lastActivityAt) : null
-  const context = resolveMailContext(tenant)
+  const context = resolveMailContext()
   const readableLastActivity = lastActivityAt && Number.isFinite(lastActivityAt.getTime())
     ? lastActivityAt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
     : 'recently'
@@ -317,17 +315,17 @@ function buildChallengeInactivityReminderEmail(payload, tenant = null) {
           Resume Trading
         </a>
       </p>
-    `, tenant),
+    `),
     text: `Your ${accountType} challenge has ${daysUntilFail} day(s) left before the inactivity auto-fail threshold. Open ${context.baseUrl}/dashboard to resume trading.`
   }
 }
 
-function buildPhasePassedEmail(payload, tenant = null) {
+function buildPhasePassedEmail(payload) {
   const to = String(payload?.toEmail || '').trim()
   const fullName = String(payload?.fullName || 'Trader')
   const phase = String(payload?.phase || '').trim().toLowerCase()
   const accountSize = Number(payload?.accountSize || 0)
-  const context = resolveMailContext(tenant)
+  const context = resolveMailContext()
   const isFunded = phase === 'phase2'
   const subject = isFunded
     ? `${context.firmName} - You're Now a Funded Trader!`
@@ -345,18 +343,18 @@ function buildPhasePassedEmail(payload, tenant = null) {
   return {
     to,
     subject,
-    html: htmlWrap(headline, body, tenant),
+    html: htmlWrap(headline, body),
     text: `${headline} Log in to continue.`
   }
 }
 
-function buildAccountFailedEmail(payload, tenant = null) {
+function buildAccountFailedEmail(payload) {
   const to = String(payload?.toEmail || '').trim()
   const fullName = String(payload?.fullName || 'Trader')
   const phase = String(payload?.phase || '').trim().toUpperCase()
   const reason = String(payload?.reason || 'Rule violation')
   const accountSize = Number(payload?.accountSize || 0)
-  const context = resolveMailContext(tenant)
+  const context = resolveMailContext()
   return {
     to,
     subject: `${context.firmName} - Challenge Account Failed`,
@@ -365,17 +363,17 @@ function buildAccountFailedEmail(payload, tenant = null) {
       <div style="background:#1a0a0a;border-left:3px solid #c0392b;padding:12px 16px;border-radius:4px;margin:16px 0;color:#e74c3c;font-size:14px;">${reason}</div>
       <p>You can start a new challenge immediately.</p>
       <p style="margin:24px 0;"><a href="${context.baseUrl}/dashboard" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">Start New Challenge</a></p>
-    `, tenant),
+    `),
     text: `Your challenge was closed: ${reason}`
   }
 }
 
-function buildAccountExpiredEmail(payload, tenant = null) {
+function buildAccountExpiredEmail(payload) {
   const to = String(payload?.toEmail || '').trim()
   const fullName = String(payload?.fullName || 'Trader')
   const phase = String(payload?.phase || '').trim().toUpperCase()
   const accountSize = Number(payload?.accountSize || 0)
-  const context = resolveMailContext(tenant)
+  const context = resolveMailContext()
   return {
     to,
     subject: `${context.firmName} - Challenge Time Limit Reached`,
@@ -383,17 +381,17 @@ function buildAccountExpiredEmail(payload, tenant = null) {
       <p>Your ${phase} account ($${accountSize.toLocaleString()}) has expired because the 30-day time limit was reached before the profit target.</p>
       <p>You can start a new challenge right away.</p>
       <p style="margin:24px 0;"><a href="${context.baseUrl}/dashboard" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">Start New Challenge</a></p>
-    `, tenant),
+    `),
     text: `Your ${phase} challenge expired. Start a new one at ${context.baseUrl}/dashboard`
   }
 }
 
-function buildKycPendingReminderEmail(payload, tenant = null) {
+function buildKycPendingReminderEmail(payload) {
   const to = String(payload?.toEmail || '').trim()
   const fullName = String(payload?.fullName || 'Trader')
   const hoursSinceSignup = Math.max(0, parseInt(payload?.hoursSinceSignup, 10) || 0)
   const daysSinceSignup = Math.max(1, Math.floor(hoursSinceSignup / 24) || 1)
-  const context = resolveMailContext(tenant)
+  const context = resolveMailContext()
   return {
     to,
     subject: `${context.firmName} - Complete Your KYC`,
@@ -413,31 +411,31 @@ function buildKycPendingReminderEmail(payload, tenant = null) {
           Complete KYC
         </a>
       </p>
-    `, tenant),
+    `),
     text: `Your KYC is still incomplete. Log in at ${context.baseUrl}/dashboard to finish verification.`
   }
 }
 
-function buildKycApprovedEmail(payload, tenant = null) {
+function buildKycApprovedEmail(payload) {
   const to = String(payload?.toEmail || '').trim()
   const fullName = String(payload?.fullName || 'Trader')
-  const context = resolveMailContext(tenant)
+  const context = resolveMailContext()
   return {
     to,
     subject: `${context.firmName} - KYC Verified`,
     html: htmlWrap(`Hi ${fullName}, your identity has been verified.`, `
       <p>Your KYC documents have been reviewed and approved. You can now trade and request payouts.</p>
       <p style="margin:24px 0;"><a href="${context.baseUrl}/dashboard" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">Go to Dashboard</a></p>
-    `, tenant),
+    `),
     text: `KYC approved. You can now trade at ${context.baseUrl}/dashboard`
   }
 }
 
-function buildKycRejectedEmail(payload, tenant = null) {
+function buildKycRejectedEmail(payload) {
   const to = String(payload?.toEmail || '').trim()
   const fullName = String(payload?.fullName || 'Trader')
   const reason = String(payload?.reason || 'Documents did not meet verification requirements.')
-  const context = resolveMailContext(tenant)
+  const context = resolveMailContext()
   return {
     to,
     subject: `${context.firmName} - KYC Verification Failed`,
@@ -446,18 +444,18 @@ function buildKycRejectedEmail(payload, tenant = null) {
       <div style="background:#1a0a0a;border-left:3px solid #c0392b;padding:12px 16px;border-radius:4px;margin:16px 0;color:#e74c3c;font-size:14px;">${reason}</div>
       <p>Please log in and re-submit clear, valid government-issued documents.</p>
       <p style="margin:24px 0;"><a href="${context.baseUrl}/dashboard" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">Re-submit Documents</a></p>
-    `, tenant),
+    `),
     text: `KYC rejected: ${reason}. Please re-submit.`
   }
 }
 
-function buildPayoutRequestedEmail(payload, tenant = null) {
+function buildPayoutRequestedEmail(payload) {
   const to = String(payload?.toEmail || '').trim()
   const fullName = String(payload?.fullName || 'Trader')
   const amountRequested = Number(payload?.amountRequested || 0)
   const amountPayable = Number(payload?.amountPayable || 0)
   const paymentMethod = String(payload?.paymentMethod || 'your selected payment method')
-  const context = resolveMailContext(tenant)
+  const context = resolveMailContext()
   return {
     to,
     subject: `${context.firmName} - Payout Request Received`,
@@ -475,17 +473,17 @@ function buildPayoutRequestedEmail(payload, tenant = null) {
           View Payout History
         </a>
       </p>
-    `, tenant),
+    `),
     text: `We received your payout request for ${formatUsd(amountRequested)} via ${paymentMethod}. Estimated payable amount: ${formatUsd(amountPayable)}.`
   }
 }
 
-function buildPayoutApprovedEmail(payload, tenant = null) {
+function buildPayoutApprovedEmail(payload) {
   const to = String(payload?.toEmail || '').trim()
   const fullName = String(payload?.fullName || 'Trader')
   const amountPayable = Number(payload?.amountPayable || 0)
   const paymentMethod = String(payload?.paymentMethod || 'selected payment method')
-  const context = resolveMailContext(tenant)
+  const context = resolveMailContext()
   return {
     to,
     subject: `${context.firmName} - Payout Approved`,
@@ -493,17 +491,17 @@ function buildPayoutApprovedEmail(payload, tenant = null) {
       <p>Your payout of <strong style="color:#c9a84c;">${formatUsd(amountPayable)}</strong> via ${paymentMethod} has been approved and marked for payment.</p>
       <p style="color:#888;font-size:13px;">Processing time: up to 7 business days. Check your payment details for the transfer.</p>
       <p style="margin:24px 0;"><a href="${context.baseUrl}/dashboard" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">View Payout History</a></p>
-    `, tenant),
+    `),
     text: `Payout of ${formatUsd(amountPayable)} approved via ${paymentMethod}.`
   }
 }
 
-function buildPayoutRejectedEmail(payload, tenant = null) {
+function buildPayoutRejectedEmail(payload) {
   const to = String(payload?.toEmail || '').trim()
   const fullName = String(payload?.fullName || 'Trader')
   const amountRequested = Number(payload?.amountRequested || 0)
   const reason = payload?.reason ? String(payload.reason) : ''
-  const context = resolveMailContext(tenant)
+  const context = resolveMailContext()
   return {
     to,
     subject: `${context.firmName} - Payout Request Declined`,
@@ -512,17 +510,17 @@ function buildPayoutRejectedEmail(payload, tenant = null) {
       ${reason ? `<div style="background:#1a0a0a;border-left:3px solid #c0392b;padding:12px 16px;border-radius:4px;margin:16px 0;color:#e74c3c;font-size:14px;">${reason}</div>` : ''}
       <p>If you believe this is an error, please contact support.</p>
       <p style="margin:24px 0;"><a href="${context.baseUrl}/dashboard" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">Go to Dashboard</a></p>
-    `, tenant),
+    `),
     text: `Payout of $${amountRequested.toFixed(2)} declined.`
   }
 }
 
-function buildAffiliateCommissionEarnedEmail(payload, tenant = null) {
+function buildAffiliateCommissionEarnedEmail(payload) {
   const to = String(payload?.toEmail || '').trim()
   const fullName = String(payload?.fullName || 'Affiliate')
   const commissionAmount = Number(payload?.commissionAmount || 0)
   const referredName = String(payload?.referredName || 'a trader you referred')
-  const context = resolveMailContext(tenant)
+  const context = resolveMailContext()
   return {
     to,
     subject: `${context.firmName} - You Earned a Referral Commission`,
@@ -530,16 +528,16 @@ function buildAffiliateCommissionEarnedEmail(payload, tenant = null) {
       <p>${referredName} completed a paid challenge purchase, earning you a commission of <strong style="color:#c9a84c;">${formatUsd(commissionAmount)}</strong>.</p>
       <p>This has been added to your available affiliate balance.</p>
       <p style="margin:24px 0;"><a href="${context.baseUrl}/dashboard" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">View Affiliate Dashboard</a></p>
-    `, tenant),
+    `),
     text: `You earned a referral commission of ${formatUsd(commissionAmount)} from ${referredName}.`
   }
 }
 
-function buildAffiliatePayoutRequestedEmail(payload, tenant = null) {
+function buildAffiliatePayoutRequestedEmail(payload) {
   const to = String(payload?.toEmail || '').trim()
   const fullName = String(payload?.fullName || 'Affiliate')
   const amountRequested = Number(payload?.amountRequested || 0)
-  const context = resolveMailContext(tenant)
+  const context = resolveMailContext()
   return {
     to,
     subject: `${context.firmName} - Affiliate Payout Request Received`,
@@ -547,17 +545,17 @@ function buildAffiliatePayoutRequestedEmail(payload, tenant = null) {
       <p>We received your affiliate payout request for <strong style="color:#c9a84c;">${formatUsd(amountRequested)}</strong>.</p>
       <p>Our team will review the request and update the status inside your affiliate dashboard.</p>
       <p style="margin:24px 0;"><a href="${context.baseUrl}/dashboard" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">View Affiliate Dashboard</a></p>
-    `, tenant),
+    `),
     text: `We received your affiliate payout request for ${formatUsd(amountRequested)}.`
   }
 }
 
-function buildAffiliatePayoutApprovedEmail(payload, tenant = null) {
+function buildAffiliatePayoutApprovedEmail(payload) {
   const to = String(payload?.toEmail || '').trim()
   const fullName = String(payload?.fullName || 'Affiliate')
   const amountPayable = Number(payload?.amountPayable || 0)
   const paymentMethod = String(payload?.paymentMethod || 'selected payment method')
-  const context = resolveMailContext(tenant)
+  const context = resolveMailContext()
   return {
     to,
     subject: `${context.firmName} - Affiliate Payout Approved`,
@@ -565,17 +563,17 @@ function buildAffiliatePayoutApprovedEmail(payload, tenant = null) {
       <p>Your affiliate payout of <strong style="color:#c9a84c;">${formatUsd(amountPayable)}</strong> via ${paymentMethod} has been approved and marked for payment.</p>
       <p style="color:#888;font-size:13px;">Processing time: up to 7 business days. Check your payment details for the transfer.</p>
       <p style="margin:24px 0;"><a href="${context.baseUrl}/dashboard" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">View Affiliate Dashboard</a></p>
-    `, tenant),
+    `),
     text: `Affiliate payout of ${formatUsd(amountPayable)} approved via ${paymentMethod}.`
   }
 }
 
-function buildAffiliatePayoutRejectedEmail(payload, tenant = null) {
+function buildAffiliatePayoutRejectedEmail(payload) {
   const to = String(payload?.toEmail || '').trim()
   const fullName = String(payload?.fullName || 'Affiliate')
   const amountRequested = Number(payload?.amountRequested || 0)
   const reason = payload?.reason ? String(payload.reason) : ''
-  const context = resolveMailContext(tenant)
+  const context = resolveMailContext()
   return {
     to,
     subject: `${context.firmName} - Affiliate Payout Request Declined`,
@@ -584,19 +582,19 @@ function buildAffiliatePayoutRejectedEmail(payload, tenant = null) {
       ${reason ? `<div style="background:#1a0a0a;border-left:3px solid #c0392b;padding:12px 16px;border-radius:4px;margin:16px 0;color:#e74c3c;font-size:14px;">${reason}</div>` : ''}
       <p>If you believe this is an error, please contact support.</p>
       <p style="margin:24px 0;"><a href="${context.baseUrl}/dashboard" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">Go to Dashboard</a></p>
-    `, tenant),
+    `),
     text: `Affiliate payout of ${formatUsd(amountRequested)} declined.`
   }
 }
 
-function buildCompetitionPrizeVoucherEmail(payload, tenant = null) {
+function buildCompetitionPrizeVoucherEmail(payload) {
   const to = String(payload?.toEmail || '').trim()
   const fullName = String(payload?.fullName || 'Trader')
   const competitionTitle = String(payload?.competitionTitle || 'the competition')
   const voucherCode = String(payload?.voucherCode || '')
   const accountSize = Number(payload?.accountSize || 0)
   const expiresAt = payload?.expiresAt ? new Date(payload.expiresAt) : null
-  const context = resolveMailContext(tenant)
+  const context = resolveMailContext()
   const expiryText = expiresAt && !Number.isNaN(expiresAt.getTime())
     ? ` before ${expiresAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
     : ''
@@ -608,61 +606,59 @@ function buildCompetitionPrizeVoucherEmail(payload, tenant = null) {
       <p>Redeem it at checkout with this code${expiryText}:</p>
       <p style="margin:24px 0;font-size:20px;font-weight:700;letter-spacing:0.08em;color:#c9a84c;">${voucherCode}</p>
       <p style="margin:24px 0;"><a href="${context.baseUrl}/dashboard" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">Claim Your Prize</a></p>
-    `, tenant),
+    `),
     text: `You won a free $${accountSize.toLocaleString()} challenge account in ${competitionTitle}. Redeem code ${voucherCode} at checkout${expiryText}.`
   }
 }
 
-function buildEmailMessage(templateKey, payload = {}, options = {}) {
+function buildEmailMessage(templateKey, payload = {}) {
   const normalizedKey = String(templateKey || '').trim().toLowerCase()
-  const tenant = options?.tenant || null
 
   switch (normalizedKey) {
     case 'password_reset':
-      return buildPasswordResetEmail(payload, tenant)
+      return buildPasswordResetEmail(payload)
     case 'welcome_onboarding':
-      return buildWelcomeOnboardingEmail(payload, tenant)
+      return buildWelcomeOnboardingEmail(payload)
     case 'challenge_expiry_reminder':
-      return buildChallengeExpiryReminderEmail(payload, tenant)
+      return buildChallengeExpiryReminderEmail(payload)
     case 'challenge_inactivity_reminder':
-      return buildChallengeInactivityReminderEmail(payload, tenant)
+      return buildChallengeInactivityReminderEmail(payload)
     case 'phase_passed':
-      return buildPhasePassedEmail(payload, tenant)
+      return buildPhasePassedEmail(payload)
     case 'account_failed':
-      return buildAccountFailedEmail(payload, tenant)
+      return buildAccountFailedEmail(payload)
     case 'account_expired':
-      return buildAccountExpiredEmail(payload, tenant)
+      return buildAccountExpiredEmail(payload)
     case 'kyc_pending_reminder':
-      return buildKycPendingReminderEmail(payload, tenant)
+      return buildKycPendingReminderEmail(payload)
     case 'kyc_approved':
-      return buildKycApprovedEmail(payload, tenant)
+      return buildKycApprovedEmail(payload)
     case 'kyc_rejected':
-      return buildKycRejectedEmail(payload, tenant)
+      return buildKycRejectedEmail(payload)
     case 'payout_requested':
-      return buildPayoutRequestedEmail(payload, tenant)
+      return buildPayoutRequestedEmail(payload)
     case 'payout_approved':
-      return buildPayoutApprovedEmail(payload, tenant)
+      return buildPayoutApprovedEmail(payload)
     case 'payout_rejected':
-      return buildPayoutRejectedEmail(payload, tenant)
+      return buildPayoutRejectedEmail(payload)
     case 'affiliate_commission_earned':
-      return buildAffiliateCommissionEarnedEmail(payload, tenant)
+      return buildAffiliateCommissionEarnedEmail(payload)
     case 'affiliate_payout_requested':
-      return buildAffiliatePayoutRequestedEmail(payload, tenant)
+      return buildAffiliatePayoutRequestedEmail(payload)
     case 'affiliate_payout_approved':
-      return buildAffiliatePayoutApprovedEmail(payload, tenant)
+      return buildAffiliatePayoutApprovedEmail(payload)
     case 'affiliate_payout_rejected':
-      return buildAffiliatePayoutRejectedEmail(payload, tenant)
+      return buildAffiliatePayoutRejectedEmail(payload)
     case 'competition_prize_voucher':
-      return buildCompetitionPrizeVoucherEmail(payload, tenant)
+      return buildCompetitionPrizeVoucherEmail(payload)
     default:
       throw new Error(`Unsupported email template: ${normalizedKey || 'unknown'}`)
   }
 }
 
-async function sendEmailMessage(message, options = {}) {
+async function sendEmailMessage(message) {
   try {
-    const tenant = options?.tenant || null
-    const context = resolveMailContext(tenant)
+    const context = resolveMailContext()
     const mailer = await getMailTransporter()
     const info = await mailer.sendMail({
       from: `"${context.fromName}" <${context.fromEmail}>`,
