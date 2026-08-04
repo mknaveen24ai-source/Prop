@@ -1,18 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine,
   PieChart, Pie, Cell, Legend
 } from 'recharts';
 import AdminBadge from '../../components/admin/AdminBadge';
-import AdminChart, { chartThemeProps } from '../../components/admin/AdminChart';
+import AdminChart, { chartThemeProps, renderActiveDonutArc, dimUnlessActive } from '../../components/admin/AdminChart';
 import AdminDataTable from '../../components/admin/AdminDataTable';
 import AdminEntityDrawer from '../../components/admin/AdminEntityDrawer';
 import AdminFilterBar from '../../components/admin/AdminFilterBar';
 import AdminListToolbar from '../../components/admin/AdminListToolbar';
 import AdminStatCard from '../../components/admin/AdminStatCard';
 import AdminStatGrid from '../../components/admin/AdminStatGrid';
+import Card from '../../components/ui/Card';
 import { useToast } from '../../components/admin/AdminToast';
 import { exportAdminResource } from '../../utils/adminList';
 
@@ -56,6 +57,9 @@ export default function AdminPlatformPnL() {
   const [density, setDensity] = useState('comfortable');
   const [visibleColumnKeys, setVisibleColumnKeys] = useState(ALL_COLUMN_KEYS);
   const [drawerRow, setDrawerRow] = useState(null);
+  const [passFailActiveIndex, setPassFailActiveIndex] = useState(null);
+  const [ledger, setLedger] = useState(null);
+  const [costActiveIndex, setCostActiveIndex] = useState(null);
 
   const fetchViews = async () => {
     try {
@@ -85,6 +89,7 @@ export default function AdminPlatformPnL() {
   useEffect(() => {
     fetchData();
     fetchViews();
+    adminAxios.get('/api/admin/pnl-ledger').then((res) => setLedger(res.data)).catch(() => setLedger(null));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -311,8 +316,147 @@ export default function AdminPlatformPnL() {
         <AdminStatCard icon="funded" label="Funded Accounts" value={fundedAccounts.toLocaleString()} />
       </AdminStatGrid>
 
-      <div className="admin-card" style={{ marginBottom: '24px' }}>
-        <h2 className="admin-h2" style={{ marginBottom: '24px' }}>Recent Platform Edge</h2>
+      {ledger && (
+        <>
+          <h2 className="admin-h2" style={{ margin: '28px 0 16px' }}>Firm Ledger</h2>
+          <AdminStatGrid minColumnWidth={190} style={{ marginBottom: '20px' }}>
+            <AdminStatCard icon="pnl" label="Gross Fees (90d)" value={formatMoney(ledger.gross_fees_90d)} />
+            <AdminStatCard icon="payouts" label="Trader Payouts (90d)" value={formatMoney(ledger.cost_breakdown.find((b) => b.label === 'Trader Payouts')?.amount || 0)} />
+            <AdminStatCard icon="affiliate" label="Affiliate Payouts (90d)" value={formatMoney(ledger.cost_breakdown.find((b) => b.label === 'Affiliate Payouts')?.amount || 0)} />
+            <AdminStatCard icon="funded" label="Retained (90d)" value={formatMoney(ledger.cost_breakdown.find((b) => b.label === 'Retained')?.amount || 0)} trendDirection="up" />
+          </AdminStatGrid>
+
+          <Card ruled title="Fees In, Payouts Out" eyebrow="Net position · monthly" style={{ marginBottom: '24px' }}>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={ledger.monthly}>
+                <CartesianGrid {...chartThemeProps.grid} />
+                <XAxis dataKey="month" {...chartThemeProps.xAxis} />
+                <YAxis {...chartThemeProps.yAxis} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                <Tooltip {...chartThemeProps.tooltip} formatter={(value) => `$${Number(value).toLocaleString()}`} />
+                <Legend wrapperStyle={{ fontSize: '12px' }} />
+                <Bar dataKey="fees" fill="var(--gain)" name="Fees" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="payouts" fill="var(--loss)" name="Payouts" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.5fr) minmax(0,1fr)', gap: '16px', alignItems: 'start', marginBottom: '24px' }}>
+            <Card title="Cumulative Net Revenue" eyebrow="After payouts · trailing 12 months">
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart data={ledger.monthly}>
+                  <defs>
+                    <linearGradient id="netGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid {...chartThemeProps.grid} />
+                  <XAxis dataKey="month" {...chartThemeProps.xAxis} />
+                  <YAxis {...chartThemeProps.yAxis} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip {...chartThemeProps.tooltip} formatter={(value) => `$${Number(value).toLocaleString()}`} />
+                  <ReferenceLine y={0} stroke="var(--admin-border-strong)" strokeDasharray="4 2" />
+                  <Area type="monotone" dataKey="cumulative_net" stroke="var(--accent)" fill="url(#netGrad)" strokeWidth={2} name="Cumulative Net" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </Card>
+
+            <Card title="Where the Money Goes" eyebrow="Share of gross fees · trailing 90d">
+              {ledger.cost_breakdown.length > 0 ? (
+                <>
+                  <ResponsiveContainer width="100%" height={160}>
+                    <PieChart>
+                      <Pie
+                        data={ledger.cost_breakdown}
+                        dataKey="amount"
+                        nameKey="label"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={45}
+                        outerRadius={68}
+                        paddingAngle={4}
+                        activeIndex={costActiveIndex}
+                        activeShape={renderActiveDonutArc}
+                        onMouseEnter={(_, index) => setCostActiveIndex(index)}
+                        onMouseLeave={() => setCostActiveIndex(null)}
+                      >
+                        {ledger.cost_breakdown.map((entry, index) => (
+                          <Cell
+                            key={entry.label}
+                            fill={[ 'var(--loss)', 'var(--warn)', 'var(--gain)' ][index % 3]}
+                            fillOpacity={dimUnlessActive(costActiveIndex, index)}
+                          />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  {ledger.cost_breakdown.map((b, index) => (
+                    <div key={b.label} style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 0', borderBottom: '1px solid var(--rule-soft)' }}>
+                      <span style={{ width: '9px', height: '9px', background: ['var(--loss)', 'var(--warn)', 'var(--gain)'][index % 3], flex: '0 0 auto' }} />
+                      <span style={{ flex: 1, fontSize: '12.5px' }}>{b.label}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--admin-text-muted)' }}>{formatMoney(b.amount)}</span>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--admin-text-faint)' }}>No paid fees in the last 90 days</div>
+              )}
+            </Card>
+          </div>
+
+          <Card
+            ruled flush title="Monthly Ledger"
+            actions={(
+              <button
+                className="admin-btn admin-btn-ghost"
+                onClick={() => {
+                  const headers = ['Month', 'Fees', 'Payouts', 'Net', 'Cumulative Net'];
+                  const rows = ledger.monthly.map((m) => [m.month, m.fees, m.payouts, m.net, m.cumulative_net]);
+                  const csv = [headers, ...rows].map((r) => r.join(',')).join('\n');
+                  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = `platform_pnl_ledger_${new Date().toISOString().slice(0, 10)}.csv`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                Export ledger
+              </button>
+            )}
+            style={{ marginBottom: '24px' }}
+          >
+            <table className="lx-table">
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th>Fees</th>
+                  <th>Payouts</th>
+                  <th>Net</th>
+                  <th>Cumulative Net</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ledger.monthly.map((m) => (
+                  <tr key={m.month + m.cumulative_net}>
+                    <td>{m.month}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--gain)' }}>{formatMoney(m.fees)}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--loss)' }}>{formatMoney(m.payouts)}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)', color: m.net >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{formatMoney(m.net)}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)' }}>{formatMoney(m.cumulative_net)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+
+          <h2 className="admin-h2" style={{ margin: '28px 0 16px' }}>B-Book Trading Edge</h2>
+        </>
+      )}
+
+      <Card ruled title="Recent Platform Edge" style={{ marginBottom: '24px' }}>
         <ResponsiveContainer width="100%" height={280}>
           <AreaChart data={rollingData}>
             <defs>
@@ -330,7 +474,7 @@ export default function AdminPlatformPnL() {
             <Area type="monotone" dataKey="fees" stroke="var(--admin-gold)" fill="none" strokeWidth={2} name="Fee Revenue" strokeDasharray="5 3" />
           </AreaChart>
         </ResponsiveContainer>
-      </div>
+      </Card>
 
       <div style={{ marginBottom: '24px' }}>
         {passFailData.length > 0 ? (
@@ -348,24 +492,32 @@ export default function AdminPlatformPnL() {
                 dataKey="value"
                 stroke="var(--admin-surface)"
                 strokeWidth={2}
+                activeIndex={passFailActiveIndex}
+                activeShape={renderActiveDonutArc}
+                onMouseEnter={(_, index) => setPassFailActiveIndex(index)}
+                onMouseLeave={() => setPassFailActiveIndex(null)}
               >
                 {passFailData.map((entry, index) => (
-                  <Cell key={entry.name || index} fill={entry.color} />
+                  <Cell
+                    key={entry.name || index}
+                    fill={entry.color}
+                    fillOpacity={dimUnlessActive(passFailActiveIndex, index)}
+                    style={{ transition: 'fill-opacity 160ms ease' }}
+                  />
                 ))}
               </Pie>
             </PieChart>
           </AdminChart>
         ) : (
-          <div className="admin-card">
-            <h3 className="admin-h2" style={{ marginBottom: '24px' }}>Pass / Fail Breakdown</h3>
+          <Card title="Pass / Fail Breakdown">
             <div style={{ height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--admin-text-faint)' }}>
               No account data yet
             </div>
-          </div>
+          </Card>
         )}
       </div>
 
-      <div className="admin-card" style={{ marginBottom: '20px' }}>
+      <Card style={{ marginBottom: '20px' }}>
         <AdminFilterBar
           searchPlaceholder="Search by trade id or symbol"
           searchValue={search}
@@ -403,9 +555,9 @@ export default function AdminPlatformPnL() {
             </button>
           )}
         />
-      </div>
+      </Card>
 
-      <div className="admin-card" style={{ padding: 0 }}>
+      <Card flush>
         <AdminDataTable
           columns={columns}
           data={filteredTrades}
@@ -422,7 +574,7 @@ export default function AdminPlatformPnL() {
           pagination={{ current: 1, total: 1, total_items: filteredTrades.length, page_size: filteredTrades.length || 1 }}
           onPageChange={() => {}}
         />
-      </div>
+      </Card>
 
       <AdminEntityDrawer
         open={!!drawerRow}

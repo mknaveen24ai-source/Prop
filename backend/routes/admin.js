@@ -6851,6 +6851,88 @@ router.get('/platform-analytics', authenticateAdmin, async (req, res) => {
   }
 });
 
+// Platform P&L ledger — the prototype's isPnl block is a firm-accounting
+// view (fees in, payouts out, net position, monthly ledger) distinct from
+// the existing /bbook trade-level edge view below (which AdminPlatformPnL.jsx
+// already covers well and keeps). Real 3-bucket cost breakdown: trader
+// payouts and affiliate payouts both have dedicated tables with paid_at,
+// so "where the money goes" is computed, not guessed.
+router.get('/pnl-ledger', authenticateAdmin, requireSuperAdmin, async (req, res) => {
+  try {
+    const [feesByMonth, payoutsByMonth, affiliateByMonth, payouts90d, affiliate90d, fees90d] = await Promise.all([
+      pool.query(
+        `SELECT to_char(date_trunc('month', paid_at), 'Mon') AS month,
+                date_trunc('month', paid_at) AS month_start,
+                COALESCE(SUM(amount), 0) AS amount
+           FROM challenge_orders
+          WHERE status = 'paid' AND paid_at >= NOW() - INTERVAL '12 months'
+          GROUP BY date_trunc('month', paid_at)`
+      ),
+      pool.query(
+        `SELECT to_char(date_trunc('month', paid_at), 'Mon') AS month,
+                date_trunc('month', paid_at) AS month_start,
+                COALESCE(SUM(amount_payable), 0) AS amount
+           FROM payouts
+          WHERE status = 'paid' AND paid_at >= NOW() - INTERVAL '12 months'
+          GROUP BY date_trunc('month', paid_at)`
+      ),
+      pool.query(
+        `SELECT to_char(date_trunc('month', paid_at), 'Mon') AS month,
+                date_trunc('month', paid_at) AS month_start,
+                COALESCE(SUM(amount_requested), 0) AS amount
+           FROM affiliate_payout_requests
+          WHERE status = 'paid' AND paid_at >= NOW() - INTERVAL '12 months'
+          GROUP BY date_trunc('month', paid_at)`
+      ),
+      pool.query(`SELECT COALESCE(SUM(amount_payable), 0) AS total FROM payouts WHERE status = 'paid' AND paid_at >= NOW() - INTERVAL '90 days'`),
+      pool.query(`SELECT COALESCE(SUM(amount_requested), 0) AS total FROM affiliate_payout_requests WHERE status = 'paid' AND paid_at >= NOW() - INTERVAL '90 days'`),
+      pool.query(`SELECT COALESCE(SUM(amount), 0) AS total FROM challenge_orders WHERE status = 'paid' AND paid_at >= NOW() - INTERVAL '90 days'`)
+    ])
+
+    const monthKey = (row) => new Date(row.month_start).toISOString().slice(0, 7)
+    const feesMap = new Map(feesByMonth.rows.map((r) => [monthKey(r), { month: r.month, amount: parseFloat(r.amount) }]))
+    const payoutsMap = new Map(payoutsByMonth.rows.map((r) => [monthKey(r), parseFloat(r.amount)]))
+    const affiliateMap = new Map(affiliateByMonth.rows.map((r) => [monthKey(r), parseFloat(r.amount)]))
+
+    const months = []
+    for (let i = 11; i >= 0; i -= 1) {
+      const d = new Date()
+      d.setDate(1)
+      d.setMonth(d.getMonth() - i)
+      months.push(d.toISOString().slice(0, 7))
+    }
+
+    let cumulative = 0
+    const monthly = months.map((key) => {
+      const fees = feesMap.get(key)?.amount || 0
+      const traderPayouts = payoutsMap.get(key) || 0
+      const affiliatePayouts = affiliateMap.get(key) || 0
+      const net = fees - traderPayouts - affiliatePayouts
+      cumulative += net
+      const label = feesMap.get(key)?.month || new Date(`${key}-01`).toLocaleDateString('en-US', { month: 'short' })
+      return { month: label, fees: parseFloat(fees.toFixed(2)), payouts: parseFloat((traderPayouts + affiliatePayouts).toFixed(2)), net: parseFloat(net.toFixed(2)), cumulative_net: parseFloat(cumulative.toFixed(2)) }
+    })
+
+    const fees90 = parseFloat(fees90d.rows[0].total) || 0
+    const traderPayouts90 = parseFloat(payouts90d.rows[0].total) || 0
+    const affiliatePayouts90 = parseFloat(affiliate90d.rows[0].total) || 0
+    const retained90 = Math.max(0, fees90 - traderPayouts90 - affiliatePayouts90)
+
+    res.json({
+      monthly,
+      cost_breakdown: [
+        { label: 'Trader Payouts', amount: parseFloat(traderPayouts90.toFixed(2)) },
+        { label: 'Affiliate Payouts', amount: parseFloat(affiliatePayouts90.toFixed(2)) },
+        { label: 'Retained', amount: parseFloat(retained90.toFixed(2)) }
+      ].filter((b) => b.amount > 0),
+      gross_fees_90d: parseFloat(fees90.toFixed(2))
+    })
+  } catch (err) {
+    logger.error('PnL ledger error:', { error: err.message })
+    res.status(500).json({ error: 'Could not load PnL ledger' })
+  }
+})
+
 router.get('/bbook', authenticateAdmin, requireSuperAdmin, async (req, res) => {
   try {
     const result = await pool.query(`
