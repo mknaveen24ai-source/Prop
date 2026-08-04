@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useOutletContext, useParams, useNavigate } from 'react-router-dom'
 import { useToast } from '../../components/admin/AdminToast'
 import AdminStatCard from '../../components/admin/AdminStatCard'
+import Card from '../../components/ui/Card'
 
 const inputStyle = { width: '100%', padding: '8px 10px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }
 
@@ -95,7 +96,7 @@ export default function AdminAffiliateDetail() {
         <AdminStatCard icon="approve" label="Paid Out" value={formatMoney(summary.paid_total)} />
       </div>
 
-      <div className="admin-card" style={{ padding: '20px', marginBottom: '20px' }}>
+      <Card style={{ padding: '20px', marginBottom: '20px' }}>
         <h3 style={{ margin: '0 0 14px' }}>Referrals ({referrals.total})</h3>
         <div className="admin-table-wrapper">
           <table className="admin-table">
@@ -121,9 +122,9 @@ export default function AdminAffiliateDetail() {
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
 
-      <div className="admin-card" style={{ padding: '20px', marginBottom: '20px' }}>
+      <Card style={{ padding: '20px', marginBottom: '20px' }}>
         <h3 style={{ margin: '0 0 14px' }}>Commission Ledger ({commissions.total})</h3>
         <div className="admin-table-wrapper">
           <table className="admin-table">
@@ -153,9 +154,9 @@ export default function AdminAffiliateDetail() {
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
 
-      <div className="admin-card" style={{ padding: '20px' }}>
+      <Card style={{ padding: '20px' }}>
         <h3 style={{ margin: '0 0 14px' }}>Payout History ({payouts.total})</h3>
         <div className="admin-table-wrapper">
           <table className="admin-table">
@@ -183,7 +184,7 @@ export default function AdminAffiliateDetail() {
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
     </div>
   )
 }
