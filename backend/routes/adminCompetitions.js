@@ -7,6 +7,7 @@ const { authenticateAdmin, requireSuperAdmin } = require('./middleware')
 const logger = require('../utils/logger')
 const { sanitizeString } = require('../utils/validation')
 const { fetchCompetitionBySlugOrId, fetchCompetitionLeaderboard, computeCompetitionAnalytics, createCompetitionEntry } = require('../utils/competitions')
+const { generateTraderUid } = require('../utils/traderIds')
 const { applyBalanceAdjustment } = require('../utils/balanceAdjustments')
 const { computeAndPersistRanking } = require('../competitionEngine')
 const { appendImmutableAudit, getAdminActorLabel, ensureFeatureTables } = require('./admin')._internals
@@ -410,7 +411,7 @@ router.post('/bots', authenticateAdmin, requireSuperAdmin, async function (req, 
                              ? randomCountry()
                              : countryOverride
       const affiliateCode = uuidv4().substring(0, 8).toUpperCase()
-      const traderUid     = uuidv4()
+      const traderUid     = await generateTraderUid(pool)
       const email         = `bot+${uuidv4().slice(0, 8)}@bots.internal`
       const passwordHash  = await bcrypt.hash(uuidv4(), 10)
 

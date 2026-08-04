@@ -16,6 +16,7 @@ const totp     = require('../utils/totp')
 const { invalidateTokenCache } = require('../utils/tokenCache')
 const { CURRENT_TOS_VERSION } = require('../utils/tosVersion')
 const { resolveAffiliateCode } = require('../utils/affiliates')
+const { generateTraderUid } = require('../utils/traderIds')
 require('../loadEnv')
 
 
@@ -165,7 +166,7 @@ router.post('/register', registerLimiter, async function(req, res) {
 
     const password_hash = await bcrypt.hash(password, 12)
     const affiliate_code = uuidv4().substring(0, 8).toUpperCase()
-    const trader_uid = uuidv4()
+    const trader_uid = await generateTraderUid(pool)
 
     // Soft-validate the incoming referral code: an unrecognized code never blocks
     // registration, it's just dropped. Store the resolved/uppercased code (not the

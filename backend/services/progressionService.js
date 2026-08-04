@@ -1,8 +1,8 @@
 const pool = require('../db')
-const { v4: uuidv4 } = require('uuid')
 const logger = require('../utils/logger')
 const { getTenantSettings } = require('./tenantPolicyService')
 const { fetchStepModelBySlug } = require('../utils/stepModels')
+const { generateAccountUid } = require('../utils/accountIds')
 const {
   assertTenantMonthlyQuotaAvailable,
   createPromotionReview,
@@ -112,7 +112,7 @@ async function fetchProgressionSettings() {
 // Legacy fallback path — used only if an account somehow has no `challenge_model_slug`
 // (e.g. created before the step-model system existed). New accounts always carry
 // a step_model, so buildNextPhaseStepModelPlan below is the normal path.
-function buildPhase2InsertArgs(acc, settings) {
+async function buildPhase2InsertArgs(acc, settings, db) {
   // BUG FIX 15: use UTC date for phase_end_date to avoid timezone off-by-one
   const phaseEndDate = new Date()
   phaseEndDate.setUTCDate(phaseEndDate.getUTCDate() + settings.phase2_day_limit)
@@ -121,6 +121,7 @@ function buildPhase2InsertArgs(acc, settings) {
   const profitTarget = parseFloat(
     (parseFloat(acc.account_size) * (settings.phase2_profit_target_pct / 100)).toFixed(2)
   )
+  const accountUid = await generateAccountUid(db, { accountType: 'phase2', challengeModelSlug: null })
 
   return {
     sql: `INSERT INTO accounts
@@ -129,7 +130,7 @@ function buildPhase2InsertArgs(acc, settings) {
            phase_start_date, phase_end_date, account_uid)
           VALUES ($1, 'phase2', $2, $2, $2, $2, $3, $4, 'active', NOW(), $5, $6)
           RETURNING id`,
-    values: [acc.user_id, acc.account_size, profitTarget, settings.phase2_max_drawdown_pct, phaseEndDate, uuidv4()],
+    values: [acc.user_id, acc.account_size, profitTarget, settings.phase2_max_drawdown_pct, phaseEndDate, accountUid],
     bbookSql: `INSERT INTO bbook_pnl (date, accounts_passed)
                VALUES (CURRENT_DATE, 1)
                ON CONFLICT (date) DO UPDATE
@@ -140,14 +141,15 @@ function buildPhase2InsertArgs(acc, settings) {
   }
 }
 
-function buildFundedInsertArgs(acc, settings) {
+async function buildFundedInsertArgs(acc, settings, db) {
+  const accountUid = await generateAccountUid(db, { accountType: 'funded', challengeModelSlug: null })
   return {
     sql: `INSERT INTO accounts
           (user_id, account_type, account_size, current_balance, starting_balance,
            peak_balance, profit_target, max_drawdown_pct, status, phase_start_date, account_uid)
           VALUES ($1, 'funded', $2, $2, $2, $2, 0, $3, 'active', NOW(), $4)
           RETURNING id`,
-    values: [acc.user_id, acc.account_size, settings.funded_max_drawdown_pct, uuidv4()],
+    values: [acc.user_id, acc.account_size, settings.funded_max_drawdown_pct, accountUid],
     bbookSql: `INSERT INTO bbook_pnl (date, new_funded)
                VALUES (CURRENT_DATE, 1)
                ON CONFLICT (date) DO UPDATE
@@ -162,10 +164,13 @@ function buildFundedInsertArgs(acc, settings) {
 // system shipped carries `challenge_model_slug`/`step_number`, so the next
 // phase (or funded promotion) is resolved from `challenge_models` instead of
 // hardcoded phase1/phase2 settings.
-async function buildNextPhaseStepModelPlan(acc, stepModel) {
+async function buildNextPhaseStepModelPlan(acc, stepModel, db) {
   const currentStep = parseInt(acc.step_number || 1, 10)
   const nextStep = currentStep + 1
-  const accountUid = uuidv4()
+  const accountUid = await generateAccountUid(db, {
+    accountType: nextStep <= stepModel.steps ? `phase${nextStep}` : 'funded',
+    challengeModelSlug: stepModel.slug
+  })
   const currentPhaseName = Array.isArray(stepModel.profit_targets_pct) && stepModel.profit_targets_pct.length > 1
     ? `Phase ${currentStep}`
     : stepModel.name
@@ -249,11 +254,11 @@ async function buildNextPhaseStepModelPlan(acc, stepModel) {
 async function buildPromotionPlan(acc, settings, db = pool) {
   if (acc.challenge_model_slug) {
     const stepModel = await fetchStepModelBySlug(acc.challenge_model_slug)
-    if (stepModel) return buildNextPhaseStepModelPlan(acc, stepModel)
+    if (stepModel) return buildNextPhaseStepModelPlan(acc, stepModel, db)
     logger.error(`[progression] Account ${acc.id} references unknown step model "${acc.challenge_model_slug}" — falling back to legacy settings.`)
   }
-  if (acc.account_type === 'phase1') return buildPhase2InsertArgs(acc, settings)
-  if (acc.account_type === 'phase2') return buildFundedInsertArgs(acc, settings)
+  if (acc.account_type === 'phase1') return buildPhase2InsertArgs(acc, settings, db)
+  if (acc.account_type === 'phase2') return buildFundedInsertArgs(acc, settings, db)
   return null
 }
 

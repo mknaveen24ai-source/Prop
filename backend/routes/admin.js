@@ -11,7 +11,6 @@ const {
 } = require('./middleware')
 const jwt = require('jsonwebtoken')
 const bcrypt = require('bcryptjs')
-const { v4: uuidv4 } = require('uuid')
 const rateLimit = require('express-rate-limit')
 const fs = require('fs')
 const path = require('path')
@@ -41,6 +40,7 @@ const {
 const { sanitizeString, isValidEmail } = require('../utils/validation')
 const { fetchProgressionSettings, promotePassedAccount } = require('../services/progressionService')
 const { fetchStepModels, fetchStepModelBySlug, toggleStepModel } = require('../utils/stepModels')
+const { generateAccountUid } = require('../utils/accountIds')
 const { CURRENT_TOS_VERSION } = require('../utils/tosVersion')
 const { readKycFileBuffer, getKycContentType, getOriginalKycExtension } = require('../utils/secureKycStorage')
 const { ensureViolationTables } = require('../services/violationEngine')
@@ -692,6 +692,7 @@ async function buildTraderListResult({ query = {} } = {}) {
         'user'::text AS entity_type,
         u.email,
         u.full_name,
+        u.trader_uid,
         u.country,
         u.phone,
         u.kyc_status,
@@ -1256,6 +1257,11 @@ async function createAdminIssuedAccount(client, { userId, accountType, accountSi
     ? overrides.phase_end_date
     : computePhaseEndDateForAccountType(normalizedType, settings)
 
+  // Admin-issued/replacement accounts never carry a challenge_model_slug (this
+  // path predates the step-model system), so generateAccountUid falls back to
+  // its 2-step default for category purposes — see utils/accountIds.js.
+  const accountUid = await generateAccountUid(client, { accountType: normalizedType, challengeModelSlug: null })
+
   const result = await client.query(
     `INSERT INTO accounts (
        user_id, account_type, account_size, current_balance, starting_balance,
@@ -1275,7 +1281,7 @@ async function createAdminIssuedAccount(client, { userId, accountType, accountSi
       profitTarget,
       maxDrawdownPct,
       phaseEndDate,
-      uuidv4()
+      accountUid
     ]
   )
 
@@ -6144,13 +6150,14 @@ router.get('/command-center/money-risk', authenticateAdmin, requireAdminCapabili
     const result = await pool.query(
       `SELECT p.id, p.user_id, p.account_id, p.amount_requested, p.amount_payable,
               p.status, COALESCE(p.is_flagged, FALSE) AS is_flagged, p.flag_reason, p.admin_notes,
-              p.requested_at, u.email, u.full_name,
+              p.requested_at, u.email, u.full_name, a.account_uid,
               COALESCE(ds.open_disputes_count, 0)::int AS open_disputes_count,
               ds.latest_dispute_id AS dispute_id,
               COALESCE(vs.critical_violations_count, 0)::int AS critical_violations_count,
               vs.latest_violation_id
        FROM payouts p
        JOIN users u ON u.id = p.user_id
+       LEFT JOIN accounts a ON a.id = p.account_id
        LEFT JOIN (
          SELECT d.account_id::text AS account_id,
                 COUNT(*) FILTER (WHERE d.status IN ('open', 'under_review'))::int AS open_disputes_count,
