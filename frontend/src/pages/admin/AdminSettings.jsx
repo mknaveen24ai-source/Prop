@@ -1,16 +1,29 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { useToast } from '../../components/admin/AdminToast'
+import Card from '../../components/ui/Card'
 
-function currentMonth() {
-  return new Date().toISOString().slice(0, 7)
-}
-
-const ACCOUNT_SIZES = [5000, 10000, 25000, 50000, 100000, 200000, 400000]
-
-function formatMoney(value) {
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? `$${parsed.toLocaleString()}` : 'N/A'
+// Real toggle switch for the true/false settings — matches the prototype's
+// isSettings block (r.isToggle), which renders a switch for booleans and a
+// right-aligned value input for everything else, not a <select>.
+function SettingToggle({ checked, onChange }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(checked ? 'false' : 'true')}
+      style={{
+        width: '38px', height: '22px', borderRadius: '99px', border: '1px solid var(--admin-border)',
+        background: checked ? 'var(--admin-accent)' : 'var(--admin-elevated)', position: 'relative',
+        cursor: 'pointer', flex: '0 0 auto', transition: 'background 0.15s'
+      }}
+    >
+      <span style={{
+        position: 'absolute', top: '2px', left: checked ? '18px' : '2px',
+        width: '16px', height: '16px', borderRadius: '50%', background: checked ? 'var(--paper)' : 'var(--admin-text-faint)',
+        transition: 'left 0.15s'
+      }} />
+    </button>
+  )
 }
 
 const SETTINGS_GROUPS = [
@@ -103,10 +116,6 @@ export default function AdminSettings() {
   const toast = useToast()
 
   const [values, setValues] = useState({})
-  const [quotaMonth, setQuotaMonth] = useState(currentMonth())
-  const [quotaRows, setQuotaRows] = useState([])
-  const [quotaDrafts, setQuotaDrafts] = useState({})
-  const [quotaSavingSize, setQuotaSavingSize] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
@@ -117,42 +126,11 @@ export default function AdminSettings() {
   const [newTier, setNewTier] = useState({ tier_rank: '', label: '', min_referrals: '', commission_pct: '' })
   const [creatingTier, setCreatingTier] = useState(false)
 
-  const getQuotaParams = useCallback(() => {
-    return { month: `${quotaMonth || currentMonth()}-01` }
-  }, [quotaMonth])
-
-  const applyQuotaRows = useCallback((payload) => {
-    const rows = Array.isArray(payload?.sizes) ? payload.sizes : []
-    setQuotaRows(rows)
-    setQuotaDrafts(rows.reduce((acc, row) => {
-      acc[row.account_size || row.size] = {
-        mode: row.is_unlimited ? 'unlimited' : 'limited',
-        limit: row.account_limit != null ? String(row.account_limit) : ''
-      }
-      return acc
-    }, {}))
-  }, [])
-
-  const loadMonthlyQuota = useCallback(async ({ silent = false } = {}) => {
-    try {
-      const response = await adminAxios.get('/api/admin/account-batches', {
-        params: { ...getQuotaParams(), all_sizes: true }
-      })
-      applyQuotaRows(response.data || null)
-    } catch (error) {
-      if (!silent) toast.error(error?.response?.data?.error || 'Could not load monthly quota')
-    }
-  }, [adminAxios, applyQuotaRows, getQuotaParams, toast])
-
   const loadSettings = () => {
     setLoading(true)
-    Promise.all([
-      adminAxios.get('/api/admin/settings'),
-      adminAxios.get('/api/admin/account-batches', { params: { ...getQuotaParams(), all_sizes: true } }).catch(() => ({ data: null }))
-    ])
-      .then(([settingsResponse, quotaResponse]) => {
+    adminAxios.get('/api/admin/settings')
+      .then((settingsResponse) => {
         setValues(settingsResponse.data || {})
-        applyQuotaRows(quotaResponse.data || null)
         setDirty(false)
       })
       .catch(() => toast.error('Could not load settings'))
@@ -163,11 +141,6 @@ export default function AdminSettings() {
     loadSettings()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  useEffect(() => {
-    if (loading) return
-    loadMonthlyQuota({ silent: true })
-  }, [loading, loadMonthlyQuota])
 
   const loadTiers = useCallback(async () => {
     try {
@@ -236,46 +209,6 @@ export default function AdminSettings() {
     }
   }
 
-  const updateQuotaDraft = (size, patch) => {
-    setQuotaDrafts(current => ({
-      ...current,
-      [size]: {
-        mode: 'unlimited',
-        limit: '',
-        ...(current[size] || {}),
-        ...patch
-      }
-    }))
-  }
-
-  const handleSaveQuota = async (size) => {
-    const draft = quotaDrafts[size] || { mode: 'unlimited', limit: '' }
-    setQuotaSavingSize(size)
-    try {
-      const payload = {
-        ...getQuotaParams(),
-        quota_month: `${quotaMonth || currentMonth()}-01`,
-        account_size: size,
-        is_unlimited: draft.mode === 'unlimited',
-        account_limit: draft.mode === 'unlimited' ? null : Number(draft.limit)
-      }
-      const response = await adminAxios.post('/api/admin/account-batches', payload)
-      setQuotaRows(current => {
-        const nextRow = response.data || null
-        if (!nextRow) return current
-        const found = current.some(row => Number(row.account_size) === Number(size))
-        return found
-          ? current.map(row => Number(row.account_size) === Number(size) ? nextRow : row)
-          : [...current, nextRow]
-      })
-      toast.success(`${formatMoney(size)} monthly quota saved`)
-    } catch (error) {
-      toast.error(error?.response?.data?.error || 'Could not save monthly quota')
-    } finally {
-      setQuotaSavingSize(null)
-    }
-  }
-
   const handleChange = (key, value) => {
     setValues(current => ({ ...current, [key]: value }))
     setDirty(true)
@@ -310,7 +243,6 @@ export default function AdminSettings() {
           <h1 className="admin-h1">Platform Settings</h1>
           <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
             Changes are audited and take effect immediately (30s cache on trading rules).
-            Per-size monthly allocation resets automatically at the start of each calendar month.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -327,99 +259,7 @@ export default function AdminSettings() {
         </div>
       </div>
 
-      <div className="admin-card" style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 18 }}>
-          <div>
-            <h2 className="admin-h2">Per-Size Monthly Allocation</h2>
-            <p style={{ color: 'var(--admin-text-muted)', fontSize: 13, marginTop: 6 }}>
-              Each account size has its own monthly batch limit. Usage resets at the start of the next calendar month.
-            </p>
-          </div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <input
-              className="admin-input"
-              style={{ width: 150 }}
-              type="month"
-              value={quotaMonth}
-              onChange={(event) => setQuotaMonth(event.target.value || currentMonth())}
-            />
-            <button className="admin-btn admin-btn-ghost" onClick={() => loadMonthlyQuota()}>Refresh</button>
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
-          {ACCOUNT_SIZES.map((size) => {
-            const row = quotaRows.find((item) => Number(item.account_size) === Number(size)) || {}
-            const draft = quotaDrafts[size] || {
-              mode: row.is_unlimited === false ? 'limited' : 'unlimited',
-              limit: row.account_limit != null ? String(row.account_limit) : ''
-            }
-            const savingThisSize = quotaSavingSize === size
-            return (
-              <div key={size} style={{ border: '1px solid var(--admin-border)', borderRadius: 14, padding: 14, background: 'var(--admin-bg-elevated)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start', marginBottom: 12 }}>
-                  <div>
-                    <div style={{ color: 'var(--admin-text)', fontSize: 18, fontWeight: 800, fontFamily: 'var(--font-mono)' }}>{formatMoney(size)}</div>
-                    <div style={{ color: 'var(--admin-text-muted)', fontSize: 12, marginTop: 4 }}>
-                      Used {row.used ?? 0} / {row.is_unlimited ? 'Unlimited' : row.account_limit ?? 0}
-                    </div>
-                  </div>
-                  <span className={`admin-badge ${row.state === 'full' ? 'admin-badge-danger' : row.state === 'near_limit' ? 'admin-badge-warning' : 'admin-badge-success'}`}>
-                    {row.state ? String(row.state).replace('_', ' ').toUpperCase() : 'UNLIMITED'}
-                  </span>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-                  <div>
-                    <div style={{ color: 'var(--admin-text-faint)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Remaining</div>
-                    <div style={{ color: 'var(--admin-text)', fontWeight: 800, fontFamily: 'var(--font-mono)', marginTop: 4 }}>
-                      {row.is_unlimited ? 'Unlimited' : row.remaining ?? 0}
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ color: 'var(--admin-text-faint)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Month</div>
-                    <div style={{ color: 'var(--admin-text)', fontWeight: 800, fontFamily: 'var(--font-mono)', marginTop: 4 }}>
-                      {row.quota_month || `${quotaMonth}-01`}
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, alignItems: 'end' }}>
-                  <div className="admin-form-group" style={{ marginBottom: 0 }}>
-                    <label className="admin-label">Mode</label>
-                    <select className="admin-select" value={draft.mode} onChange={(event) => updateQuotaDraft(size, { mode: event.target.value })}>
-                      <option value="unlimited">Unlimited</option>
-                      <option value="limited">Monthly quota</option>
-                    </select>
-                  </div>
-                  <div className="admin-form-group" style={{ marginBottom: 0 }}>
-                    <label className="admin-label">Limit</label>
-                    <input
-                      className="admin-input"
-                      type="number"
-                      min="0"
-                      disabled={draft.mode === 'unlimited'}
-                      value={draft.limit}
-                      onChange={(event) => updateQuotaDraft(size, { limit: event.target.value })}
-                      placeholder="0 = unavailable"
-                    />
-                  </div>
-                </div>
-                <button
-                  className="admin-btn admin-btn-primary"
-                  style={{ width: '100%', marginTop: 12 }}
-                  onClick={() => handleSaveQuota(size)}
-                  disabled={savingThisSize}
-                >
-                  {savingThisSize ? 'Saving...' : `Save ${formatMoney(size)} Quota`}
-                </button>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      <div className="admin-card" style={{ marginBottom: 24 }}>
+      <Card style={{ marginBottom: 24 }}>
         <h2 className="admin-h2" style={{ marginBottom: 6 }}>Affiliate Commission Tiers</h2>
         <p style={{ color: 'var(--admin-text-muted)', fontSize: 13, marginBottom: 18 }}>
           Rate applied to a referrer's commission is chosen by their current count of paying (ever-purchased) referrals —
@@ -489,15 +329,26 @@ export default function AdminSettings() {
             </button>
           </div>
         </div>
-      </div>
+      </Card>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '24px' }}>
         {SETTINGS_GROUPS.map(group => (
-          <div key={group.title} className="admin-card">
+          <Card key={group.title}>
             <h3 className="admin-h3" style={{ marginBottom: '20px', borderBottom: '1px solid var(--admin-border)', paddingBottom: '12px' }}>
               {group.title}
             </h3>
-            {group.fields.map(field => (
+            {group.fields.map(field => {
+              const isBooleanToggle = field.type === 'select' && Array.isArray(field.options)
+                && field.options.length === 2 && field.options.includes('true') && field.options.includes('false')
+              return isBooleanToggle ? (
+                <div key={field.key} style={{ display: 'flex', alignItems: 'center', gap: '18px', padding: '14px 0', borderBottom: '1px solid var(--admin-border)' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13.5px' }}>{field.label}</div>
+                    {field.hint && <div style={{ fontSize: '12px', color: 'var(--admin-text-muted)', marginTop: '3px', lineHeight: 1.5 }}>{field.hint}</div>}
+                  </div>
+                  <SettingToggle checked={values[field.key] === 'true'} onChange={(next) => handleChange(field.key, next)} />
+                </div>
+              ) : (
               <div key={field.key} className="admin-form-group">
                 <label className="admin-label">
                   {field.label}
@@ -543,9 +394,17 @@ export default function AdminSettings() {
                   />
                 )}
               </div>
-            ))}
-          </div>
+              )
+            })}
+          </Card>
         ))}
+      </div>
+
+      <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingBottom: '8px', marginTop: '24px' }}>
+        <button className="admin-btn admin-btn-ghost" onClick={loadSettings} disabled={saving}>Discard</button>
+        <button className="admin-btn admin-btn-primary" onClick={handleSave} disabled={saving || !dirty}>
+          {saving ? 'Saving...' : 'Save changes'}
+        </button>
       </div>
     </>
   )

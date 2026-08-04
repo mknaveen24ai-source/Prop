@@ -30,6 +30,7 @@ const AdminTrades = lazy(() => import('./pages/admin/AdminTrades'))
 const AdminPayouts = lazy(() => import('./pages/admin/AdminPayouts'))
 const AdminPlatformPnL = lazy(() => import('./pages/admin/AdminPlatformPnL'))
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'))
+const AdminCoupons = lazy(() => import('./pages/admin/AdminCoupons'))
 const AdminTradingEconomics = lazy(() => import('./pages/admin/AdminTradingEconomics'))
 const AdminStepModels = lazy(() => import('./pages/admin/AdminStepModels'))
 const AdminAccess = lazy(() => import('./pages/admin/AdminAccess'))
@@ -142,6 +143,7 @@ function AnimatedRoutes({ user, login, logout }) {
             <Route path="affiliates/:userId" element={<AdminAffiliateDetail />} />
             <Route path="pnl" element={<AdminPlatformPnL />} />
             <Route path="settings" element={<AdminSettings />} />
+            <Route path="coupons" element={<AdminCoupons />} />
             <Route path="trading-economics" element={<AdminTradingEconomics />} />
             <Route path="step-models" element={<AdminStepModels />} />
             <Route path="access" element={<AdminAccess />} />
