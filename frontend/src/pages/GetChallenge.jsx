@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import api, { affiliateAPI } from '../services/api'
+import api, { accountsAPI, affiliateAPI } from '../services/api'
 import toast from 'react-hot-toast'
 import { TRADABLE_INSTRUMENTS_SUMMARY } from '../utils/instruments'
 import { renderIcon } from '../utils/iconMap'
@@ -17,7 +17,6 @@ function Pill({ children, color = 'var(--accent)' }) {
 
 export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage }) {
   const [models, setModels]             = useState([])
-  const [sizes, setSizes]               = useState([])
   const [loading, setLoading]           = useState(true)
   const [selectedModel, setSelectedModel] = useState(null) // slug
   const [confirmSize, setConfirmSize]   = useState(null)
@@ -25,16 +24,17 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
   const [error, setError]               = useState('')
   const [successMsg, setSuccessMsg]     = useState('')
   const [discountEligibility, setDiscountEligibility] = useState(null)
+  const [showCouponField, setShowCouponField] = useState(false)
+  const [couponCode, setCouponCode]     = useState('')
+  const [couponResult, setCouponResult] = useState(null)
+  const [couponError, setCouponError]   = useState('')
+  const [validatingCoupon, setValidatingCoupon] = useState(false)
 
   const loadAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [modelsRes, sizesRes] = await Promise.all([
-        api.get('/api/accounts/step-models').catch(() => ({ data: { models: [] } })),
-        api.get('/api/accounts/available-sizes').catch(() => ({ data: [] })),
-      ])
+      const modelsRes = await api.get('/api/accounts/step-models').catch(() => ({ data: { models: [] } }))
       setModels(modelsRes.data?.models || [])
-      setSizes(sizesRes.data || [])
     } finally {
       setLoading(false)
     }
@@ -49,6 +49,16 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
       .then(res => setDiscountEligibility(res.data))
       .catch(() => setDiscountEligibility(null))
   }, [])
+
+  // Reset any applied coupon whenever the confirm target changes (new size
+  // picked, or the modal is closed) — a coupon validated for one size/model
+  // shouldn't silently carry over to another.
+  useEffect(() => {
+    setShowCouponField(false)
+    setCouponCode('')
+    setCouponResult(null)
+    setCouponError('')
+  }, [confirmSize])
 
   const model = useMemo(
     () => models.find((m) => m.slug === selectedModel) || null,
@@ -70,6 +80,33 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
     return row && row.is_active ? row.price : null
   }
 
+  async function handleApplyCoupon() {
+    if (!couponCode.trim() || !model || !confirmSize || validatingCoupon) return
+    setValidatingCoupon(true)
+    setCouponError('')
+    setCouponResult(null)
+    const basePrice = priceForSize(model, confirmSize)
+    const baseAmount = discountEligibility?.eligible
+      ? basePrice * (1 - discountEligibility.discount_pct / 100)
+      : basePrice
+    try {
+      const res = await accountsAPI.validateCoupon(couponCode.trim().toUpperCase(), {
+        account_size: confirmSize,
+        step_model: model.slug,
+        base_amount: baseAmount
+      })
+      if (res?.data?.valid) {
+        setCouponResult(res.data)
+      } else {
+        setCouponError(res?.data?.error || 'This coupon code is not valid')
+      }
+    } catch (err) {
+      setCouponError(err?.response?.data?.error || 'Could not validate this coupon code')
+    } finally {
+      setValidatingCoupon(false)
+    }
+  }
+
   async function handleConfirm() {
     if (!confirmSize || !model || creating) return
     if (kycBlocked) {
@@ -83,9 +120,22 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
     try {
       const orderRes = await api.post(
         '/api/accounts/orders',
-        { account_size: confirmSize, step_model: model.slug },
+        {
+          account_size: confirmSize,
+          step_model: model.slug,
+          ...(couponResult?.valid ? { coupon_code: couponResult.code } : {})
+        },
         { skipAuthRedirect: true }
       )
+      const orderId = orderRes?.data?.order?.id
+      if (orderRes?.data?.requires_payment === false && orderId) {
+        // A referral discount and/or coupon covered the full price — the
+        // order is already paid, nothing to send to Stripe. Full navigation
+        // (not react-router) so Dashboard.jsx's own checkout=success handler
+        // picks it up and creates the account, same as the Stripe redirect path.
+        window.location.href = `/dashboard?checkout=success&order_id=${orderId}`
+        return
+      }
       const checkoutUrl = orderRes?.data?.checkout_url
       if (checkoutUrl) {
         window.location.href = checkoutUrl
@@ -268,11 +318,15 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '18px', marginBottom: '40px' }}>
-            {sizes.map(({ size, locked, remaining, quota, reason }) => {
-              const price = priceForSize(model, size)
+            {model.pricing.map((p) => {
+              const size = p.account_size
+              const locked = p.locked
+              const remaining = p.remaining
+              const isUnlimited = p.is_unlimited
+              const price = p.is_active ? p.price : null
               const isLocked = locked || kycBlocked || price == null
-              const isUnlimited = quota === null || (quota >= 999999)
               const almostFull = !isUnlimited && remaining !== null && remaining <= 5
+              const reason = locked ? (p.is_active ? 'No slots available' : 'Not offered at this size') : null
 
               return (
                 <button
@@ -346,24 +400,93 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
             <h3 style={{ fontSize: '22px', fontWeight: 800, marginBottom: '8px', color: 'var(--text-primary)', textAlign: 'center' }}>
               Start ${confirmSize.toLocaleString()} {model.name} Challenge?
             </h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: discountEligibility?.eligible ? '8px' : '24px', lineHeight: 1.6, textAlign: 'center' }}>
-              You'll receive a simulated <strong style={{ color: 'var(--accent)' }}>${confirmSize.toLocaleString()}</strong> account and must hit a <strong>{model.profit_targets_pct[0]}%</strong> profit target within <strong>{model.time_limits_days[0]} days</strong> while staying within a <strong>{parseFloat(model.max_drawdown_pct)}%</strong> max drawdown. This challenge costs{' '}
-              {discountEligibility?.eligible ? (
-                <>
-                  <span style={{ textDecoration: 'line-through', color: 'var(--text-dim)' }}>${priceForSize(model, confirmSize)}</span>{' '}
-                  <strong style={{ color: 'var(--gain)' }}>
-                    ${(priceForSize(model, confirmSize) * (1 - discountEligibility.discount_pct / 100)).toFixed(2)}
-                  </strong>
-                </>
-              ) : (
-                <strong style={{ color: 'var(--accent)' }}>${priceForSize(model, confirmSize)}</strong>
-              )}, paid securely via checkout.
-            </p>
+            {(() => {
+              const basePrice = priceForSize(model, confirmSize)
+              const priceAfterReferral = discountEligibility?.eligible
+                ? basePrice * (1 - discountEligibility.discount_pct / 100)
+                : basePrice
+              const finalPrice = couponResult?.valid ? couponResult.final_amount : priceAfterReferral
+              const hasDiscount = finalPrice < basePrice
+              return (
+                <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: (discountEligibility?.eligible || couponResult?.valid) ? '8px' : '24px', lineHeight: 1.6, textAlign: 'center' }}>
+                  You'll receive a simulated <strong style={{ color: 'var(--accent)' }}>${confirmSize.toLocaleString()}</strong> account and must hit a <strong>{model.profit_targets_pct[0]}%</strong> profit target within <strong>{model.time_limits_days[0]} days</strong> while staying within a <strong>{parseFloat(model.max_drawdown_pct)}%</strong> max drawdown. This challenge costs{' '}
+                  {hasDiscount ? (
+                    <>
+                      <span style={{ textDecoration: 'line-through', color: 'var(--text-dim)' }}>${basePrice}</span>{' '}
+                      <strong style={{ color: 'var(--gain)' }}>${finalPrice.toFixed(2)}</strong>
+                    </>
+                  ) : (
+                    <strong style={{ color: 'var(--accent)' }}>${basePrice}</strong>
+                  )}, paid securely via checkout.
+                </p>
+              )
+            })()}
             {discountEligibility?.eligible && (
-              <p style={{ color: 'var(--gain)', fontSize: '12px', marginBottom: '24px', textAlign: 'center' }}>
+              <p style={{ color: 'var(--gain)', fontSize: '12px', marginBottom: couponResult?.valid ? '4px' : '24px', textAlign: 'center' }}>
                 ✓ {discountEligibility.discount_pct}% referral discount applied (first challenge only)
               </p>
             )}
+            {couponResult?.valid && (
+              <p style={{ color: 'var(--gain)', fontSize: '12px', marginBottom: '24px', textAlign: 'center' }}>
+                ✓ Coupon {couponResult.code} applied ({couponResult.discount_type === 'percent' ? `${couponResult.discount_value}% off` : `$${couponResult.discount_value} off`})
+              </p>
+            )}
+
+            <div style={{ marginBottom: '20px', fontSize: '13px' }}>
+              {!showCouponField ? (
+                <button
+                  type="button"
+                  onClick={() => setShowCouponField(true)}
+                  style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '13px', cursor: 'pointer', padding: 0, display: 'block', margin: '0 auto' }}
+                >
+                  Have a coupon code?
+                </button>
+              ) : couponResult?.valid ? (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ color: 'var(--gain)' }}>✓ Coupon {couponResult.code} applied</span>
+                  <button
+                    type="button"
+                    onClick={() => { setCouponResult(null); setCouponCode(''); setCouponError('') }}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '12px', cursor: 'pointer', padding: 0 }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      value={couponCode}
+                      onChange={(e) => { setCouponCode(e.target.value); setCouponError('') }}
+                      placeholder="e.g. SAVE20"
+                      style={{
+                        flex: 1, padding: '9px 10px', textTransform: 'uppercase',
+                        background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                        color: 'var(--text-primary)', fontSize: '13px'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyCoupon}
+                      disabled={!couponCode.trim() || validatingCoupon}
+                      style={{
+                        padding: '9px 16px', background: 'var(--accent)', color: 'var(--paper)',
+                        border: 'none', fontSize: '13px', fontWeight: 700,
+                        cursor: (!couponCode.trim() || validatingCoupon) ? 'not-allowed' : 'pointer',
+                        opacity: (!couponCode.trim() || validatingCoupon) ? 0.6 : 1
+                      }}
+                    >
+                      {validatingCoupon ? 'Checking…' : 'Apply'}
+                    </button>
+                  </div>
+                  {couponError && (
+                    <div style={{ marginTop: '8px', color: 'var(--red)', fontSize: '12px' }}>{couponError}</div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div style={{ display: 'flex', gap: '10px' }}>
               <button
                 onClick={handleConfirm}

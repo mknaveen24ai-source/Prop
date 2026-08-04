@@ -173,16 +173,6 @@ export const accountsAPI = {
   getMyAccounts: () => 
     api.get('/api/accounts/my-accounts'),
 
-  getAvailableSizes: () =>
-    api.get('/api/accounts/available-sizes'),
-
-  getPublicAvailableSizes: () =>
-    api.get('/api/accounts/available-sizes-public', {
-      timeout: 5000,
-      params: { _t: Date.now() },
-      headers: { 'Cache-Control': 'no-cache' }
-    }),
-
   getPublicStepModels: () =>
     api.get('/api/accounts/step-models-public', {
       timeout: 5000,
@@ -198,7 +188,10 @@ export const accountsAPI = {
 
   createChallengeOrder: (data) =>
     api.post('/api/accounts/orders', data),
-  
+
+  validateCoupon: (code, params) =>
+    api.get(`/api/accounts/coupons/validate/${encodeURIComponent(code)}`, { params }),
+
   createAccount: (data) => 
     api.post('/api/accounts/create', data, { headers: createIdempotencyHeaders('accounts:create') }),
   

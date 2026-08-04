@@ -21,7 +21,6 @@ export default function Checkout() {
   const voucherFromUrl = searchParams.get('voucher') || ''
   const [pending, setPending] = useState(undefined) // undefined = not checked yet, null = nothing stashed
   const [model, setModel] = useState(null)
-  const [availability, setAvailability] = useState(null)
   const [dataLoaded, setDataLoaded] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -29,6 +28,11 @@ export default function Checkout() {
   const [showVoucherField, setShowVoucherField] = useState(!!voucherFromUrl)
   const [voucherCode, setVoucherCode] = useState(voucherFromUrl)
   const [redeemingVoucher, setRedeemingVoucher] = useState(false)
+  const [showCouponField, setShowCouponField] = useState(false)
+  const [couponCode, setCouponCode] = useState('')
+  const [couponResult, setCouponResult] = useState(null)
+  const [couponError, setCouponError] = useState('')
+  const [validatingCoupon, setValidatingCoupon] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -62,22 +66,15 @@ export default function Checkout() {
     let cancelled = false
     async function load() {
       try {
-        const [modelsRes, sizesRes] = await Promise.all([
-          accountsAPI.getPublicStepModels(),
-          accountsAPI.getPublicAvailableSizes()
-        ])
+        const modelsRes = await accountsAPI.getPublicStepModels()
         if (cancelled) return
         const models = Array.isArray(modelsRes.data?.models) ? modelsRes.data.models : []
         const chosen = pending.stepModel
           ? models.find((m) => m.slug === pending.stepModel)
           : models[0]
         setModel(chosen || null)
-        const sizes = Array.isArray(sizesRes.data) ? sizesRes.data : []
-        const row = sizes.find((s) => Number(s.size) === Number(pending.accountSize))
-        setAvailability(row || null)
       } catch {
         setModel(null)
-        setAvailability(null)
       } finally {
         if (!cancelled) setDataLoaded(true)
       }
@@ -86,12 +83,42 @@ export default function Checkout() {
     return () => { cancelled = true }
   }, [pending])
 
-  const price = model
-    ? (model.pricing || []).find((p) => p.account_size === Number(pending?.accountSize) && p.is_active)?.price
+  const availability = model
+    ? (model.pricing || []).find((p) => p.account_size === Number(pending?.accountSize))
     : null
-  const isLocked = availability ? (availability.locked || availability.quota === 0) : false
+  const price = availability?.is_active ? availability.price : null
+  const priceAfterReferral = price != null && discountEligibility?.eligible
+    ? price * (1 - discountEligibility.discount_pct / 100)
+    : price
+  const finalPrice = price != null
+    ? (couponResult?.valid ? couponResult.final_amount : priceAfterReferral)
+    : null
+  const isLocked = availability ? (availability.locked || !availability.is_active) : false
   const targets = Array.isArray(model?.profit_targets_pct) ? model.profit_targets_pct : []
   const days = Array.isArray(model?.time_limits_days) ? model.time_limits_days[0] : null
+
+  async function handleApplyCoupon() {
+    if (!couponCode.trim() || !model || price == null || validatingCoupon) return
+    setValidatingCoupon(true)
+    setCouponError('')
+    setCouponResult(null)
+    try {
+      const res = await accountsAPI.validateCoupon(couponCode.trim().toUpperCase(), {
+        account_size: pending.accountSize,
+        step_model: model.slug,
+        base_amount: priceAfterReferral
+      })
+      if (res?.data?.valid) {
+        setCouponResult(res.data)
+      } else {
+        setCouponError(res?.data?.error || 'This coupon code is not valid')
+      }
+    } catch (err) {
+      setCouponError(err?.response?.data?.error || 'Could not validate this coupon code')
+    } finally {
+      setValidatingCoupon(false)
+    }
+  }
 
   async function handlePay() {
     if (!model || !pending || submitting) return
@@ -100,9 +127,21 @@ export default function Checkout() {
     try {
       const res = await api.post(
         '/api/accounts/orders',
-        { account_size: pending.accountSize, step_model: model.slug },
+        {
+          account_size: pending.accountSize,
+          step_model: model.slug,
+          ...(couponResult?.valid ? { coupon_code: couponResult.code } : {})
+        },
         { skipAuthRedirect: true }
       )
+      const orderId = res?.data?.order?.id
+      if (res?.data?.requires_payment === false && orderId) {
+        // A referral discount and/or coupon covered the full price — the
+        // order is already paid, nothing to send to Stripe. Same post-checkout
+        // flow the voucher redemption below uses.
+        navigate(`/dashboard?checkout=success&order_id=${orderId}`)
+        return
+      }
       const checkoutUrl = res?.data?.checkout_url
       if (checkoutUrl) {
         window.location.href = checkoutUrl
@@ -166,7 +205,7 @@ export default function Checkout() {
       <div className="auth-ambient auth-ambient-primary" />
       <div className="auth-ambient auth-ambient-secondary" />
 
-      <div className="card auth-glass-card" style={{ width: 'min(100%, 520px)', zIndex: 10, padding: '40px 32px' }}>
+      <div className="lx-card auth-glass-card" style={{ width: 'min(100%, 520px)', zIndex: 10, padding: '40px 32px' }}>
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>
           <div className="auth-logo-mark" style={{ margin: '0 auto 16px' }}>⚡</div>
           <h1 style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: '8px' }}>
@@ -214,6 +253,54 @@ export default function Checkout() {
           </div>
         )}
 
+        {authChecked && user && dataLoaded && pending && model && (
+          <div style={{ border: '1px solid var(--rule)', padding: '16px 20px', marginBottom: '20px' }}>
+            {!showCouponField ? (
+              <button
+                onClick={() => setShowCouponField(true)}
+                style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '13px', cursor: 'pointer', padding: 0 }}
+              >
+                Have a coupon code?
+              </button>
+            ) : couponResult?.valid ? (
+              <div style={{ fontSize: '13px', color: 'var(--gain)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>✓ Coupon {couponResult.code} applied</span>
+                <button
+                  onClick={() => { setCouponResult(null); setCouponCode(''); setCouponError('') }}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '12px', cursor: 'pointer', padding: 0 }}
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                  Enter a coupon code to get a discount on this challenge.
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <input
+                    type="text"
+                    value={couponCode}
+                    onChange={(e) => { setCouponCode(e.target.value); setCouponError('') }}
+                    placeholder="e.g. SAVE20"
+                    className="input"
+                    style={{ flex: 1, textTransform: 'uppercase' }}
+                  />
+                  <button
+                    className="btn btn-primary"
+                    style={{ width: 'auto', padding: '0 20px' }}
+                    disabled={!couponCode.trim() || validatingCoupon}
+                    onClick={handleApplyCoupon}
+                  >
+                    {validatingCoupon ? 'Checking…' : 'Apply'}
+                  </button>
+                </div>
+                {couponError && <div className="error" style={{ marginTop: '10px', fontSize: '12px' }}>{couponError}</div>}
+              </>
+            )}
+          </div>
+        )}
+
         {error && <div className="error" style={{ marginBottom: '16px' }}>{error}</div>}
 
         {!dataLoaded && (
@@ -253,21 +340,26 @@ export default function Checkout() {
                 </span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '22px', fontWeight: 800, color: 'var(--accent)' }}>
                   {price != null ? (
-                    discountEligibility?.eligible ? (
+                    finalPrice != null && finalPrice < price ? (
                       <>
                         <span style={{ textDecoration: 'line-through', color: 'var(--text-dim)', fontSize: '15px', marginRight: '8px' }}>${price}</span>
-                        <span style={{ color: 'var(--gain)' }}>${(price * (1 - discountEligibility.discount_pct / 100)).toFixed(2)}</span>
+                        <span style={{ color: 'var(--gain)' }}>${finalPrice.toFixed(2)}</span>
                       </>
                     ) : `$${price}`
                   ) : '—'}
                 </span>
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: discountEligibility?.eligible ? '4px' : '16px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: discountEligibility?.eligible || couponResult?.valid ? '4px' : '16px' }}>
                 ${Number(pending.accountSize).toLocaleString('en-US')} account · {sizeLabel(pending.accountSize)}
               </div>
               {discountEligibility?.eligible && (
-                <div style={{ fontSize: '12px', color: 'var(--gain)', marginBottom: '16px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--gain)', marginBottom: couponResult?.valid ? '4px' : '16px' }}>
                   ✓ {discountEligibility.discount_pct}% referral discount applied (first challenge only)
+                </div>
+              )}
+              {couponResult?.valid && (
+                <div style={{ fontSize: '12px', color: 'var(--gain)', marginBottom: '16px' }}>
+                  ✓ Coupon {couponResult.code} applied ({couponResult.discount_type === 'percent' ? `${couponResult.discount_value}% off` : `$${couponResult.discount_value} off`})
                 </div>
               )}
 
