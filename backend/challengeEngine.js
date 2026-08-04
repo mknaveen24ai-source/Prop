@@ -3,7 +3,7 @@
 const pool = require('./db')
 const Decimal = require('decimal.js')
 const logger = require('./utils/logger')
-const { CONTRACT_SIZES } = require('./constants')
+const { calculatePnL } = require('./utils/pnlCalculator')
 require('./loadEnv')
 const { getCurrentPricesForTenant } = require('./priceFeed')
 const { fetchProgressionSettings, promotePassedAccount } = require('./services/progressionService')
@@ -87,14 +87,6 @@ async function incrementBbookMetric(client, column) {
      ON CONFLICT (date) DO UPDATE
      SET ${safeColumn} = bbook_pnl.${safeColumn} + 1`
   )
-}
-
-function calculatePnL(direction, open_price, close_price, lots, instrument, commission = 0) {
-  const contractSize = new Decimal(CONTRACT_SIZES[instrument] || 100000)
-  const priceDiff = direction === 'buy' 
-    ? new Decimal(close_price).minus(open_price) 
-    : new Decimal(open_price).minus(close_price)
-  return priceDiff.times(lots).times(contractSize).minus(commission).toDecimalPlaces(2).toNumber()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

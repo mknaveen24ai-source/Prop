@@ -31,6 +31,7 @@ const { VALID_CHART_TIMEFRAME_LABELS, getChartTimeframeMinutes } = require('../u
 const { ensureViolationTables, recordEnforcementEvent, recordViolation } = require('../services/violationEngine')
 const { getTenantFeedConfig, getTenantSettings } = require('../services/tenantPolicyService')
 const { resolveTieredInstrumentSetting } = require('../utils/tenantSettings')
+const { calculatePnL } = require('../utils/pnlCalculator')
 const {
   abandonIdempotentRequest,
   beginIdempotentRequest,
@@ -304,13 +305,6 @@ async function getPlatformSettingsForProgression(client) {
 async function getLivePriceMap() {
   const basePrices = await getCurrentPrices()
   return getCurrentPricesForTenant(basePrices)
-}
-
-function calculatePnL(direction, open_price, current_price, lots, instrument, commission = 0) {
-  const lotDec       = new Decimal(lots)
-  const contractSize = new Decimal(CONTRACT_SIZES[instrument])
-  const priceDiff = direction === 'buy' ? new Decimal(current_price).minus(open_price) : new Decimal(open_price).minus(current_price)
-  return priceDiff.times(lotDec).times(contractSize).minus(commission).toDecimalPlaces(2).toNumber()
 }
 
 function calculateMargin(instrument, lots) {
