@@ -1,6 +1,7 @@
 .cursor/
 .orchids/
 .qwen/
+node_modules/
 
 ALL_*.md
 BUG_ANALYSIS_REPORT.md
