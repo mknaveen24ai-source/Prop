@@ -205,6 +205,91 @@ router.get('/affiliates/tiers', authenticateAdmin, requireSuperAdmin, async func
   }
 })
 
+// GET /admin/affiliates/analytics — new Affiliate Analysis view (not one of
+// the 26 prototype screens; explicit user request alongside pulling
+// Affiliates into scope). Real aggregates only: top affiliates by lifetime
+// commission, a referred-vs-paying conversion funnel, commission paid by
+// month, and tier distribution (same "highest tier whose min_referrals is
+// at or below the affiliate's paying-referral count wins" rule documented
+// in AdminSettings.jsx, applied here per-affiliate to bucket the roster).
+router.get('/affiliates/analytics', authenticateAdmin, requireSuperAdmin, async function(req, res) {
+  try {
+    const [topResult, funnelResult, monthlyResult, tiers] = await Promise.all([
+      pool.query(
+        `SELECT u.id AS user_id, u.full_name, u.email, u.affiliate_code,
+                COUNT(DISTINCT ar.referred_user_id)::int AS total_referrals,
+                COUNT(DISTINCT c.referral_id) FILTER (WHERE c.order_id IS NOT NULL)::int AS paying_referrals,
+                COALESCE(SUM(c.commission_amount), 0) AS lifetime_commission
+           FROM users u
+           JOIN affiliate_referrals ar ON ar.referrer_user_id = u.id
+           LEFT JOIN affiliate_commissions c ON c.referrer_user_id = u.id
+          GROUP BY u.id
+          ORDER BY lifetime_commission DESC
+          LIMIT 10`
+      ),
+      pool.query(
+        `SELECT COUNT(DISTINCT ar.referred_user_id)::int AS total_referrals,
+                COUNT(DISTINCT c.referral_id) FILTER (WHERE c.order_id IS NOT NULL)::int AS paying_referrals
+           FROM affiliate_referrals ar
+           LEFT JOIN affiliate_commissions c ON c.referral_id = ar.id`
+      ),
+      pool.query(
+        `SELECT to_char(date_trunc('month', paid_at), 'Mon') AS month,
+                date_trunc('month', paid_at) AS month_start,
+                COALESCE(SUM(amount_requested), 0) AS paid
+           FROM affiliate_payout_requests
+          WHERE status = 'paid' AND paid_at >= NOW() - INTERVAL '6 months'
+          GROUP BY date_trunc('month', paid_at)
+          ORDER BY month_start ASC`
+      ),
+      fetchAffiliateTiers({ includeInactive: false })
+    ])
+
+    const topAffiliates = topResult.rows.map((r) => ({
+      userId: r.user_id,
+      fullName: r.full_name,
+      email: r.email,
+      affiliateCode: r.affiliate_code,
+      totalReferrals: r.total_referrals,
+      payingReferrals: r.paying_referrals,
+      lifetimeCommission: parseFloat(r.lifetime_commission) || 0
+    }))
+
+    const funnel = {
+      totalReferrals: funnelResult.rows[0]?.total_referrals || 0,
+      payingReferrals: funnelResult.rows[0]?.paying_referrals || 0
+    }
+    funnel.conversionPct = funnel.totalReferrals > 0
+      ? Math.round((funnel.payingReferrals / funnel.totalReferrals) * 1000) / 10
+      : 0
+
+    const commissionByMonth = monthlyResult.rows.map((r) => ({ month: r.month, paid: parseFloat(r.paid) || 0 }))
+
+    // Tier distribution — bucket every affiliate in the top-commission list
+    // (and, for a true platform-wide count, every affiliate) by paying-
+    // referral count against the sorted tier thresholds.
+    const allAffiliatesResult = await pool.query(
+      `SELECT COUNT(DISTINCT c.referral_id) FILTER (WHERE c.order_id IS NOT NULL)::int AS paying_referrals
+         FROM users u
+         JOIN affiliate_referrals ar ON ar.referrer_user_id = u.id
+         LEFT JOIN affiliate_commissions c ON c.referrer_user_id = u.id
+        GROUP BY u.id`
+    )
+    const sortedTiers = [...tiers].sort((a, b) => b.min_referrals - a.min_referrals)
+    const tierDistribution = sortedTiers.map((t) => ({ label: t.label || `Tier ${t.tier_rank}`, count: 0 }))
+    for (const row of allAffiliatesResult.rows) {
+      const payingCount = row.paying_referrals || 0
+      const tierIndex = sortedTiers.findIndex((t) => payingCount >= t.min_referrals)
+      if (tierIndex !== -1) tierDistribution[tierIndex].count += 1
+    }
+
+    res.json({ topAffiliates, funnel, commissionByMonth, tierDistribution })
+  } catch (err) {
+    logger.error('[admin-affiliates] Failed to load affiliate analytics:', { error: err.message })
+    res.status(500).json({ error: 'Failed to load affiliate analytics' })
+  }
+})
+
 // POST /admin/affiliates/tiers
 router.post('/affiliates/tiers', authenticateAdmin, requireSuperAdmin, async function(req, res) {
   try {
