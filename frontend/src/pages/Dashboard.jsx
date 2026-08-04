@@ -147,7 +147,7 @@ function Dashboard({ user, onLogout }) {
     oco_order_type: 'sell_stop',
     oco_pending_price: ''
   })
-  const [payoutForm, setPayoutForm] = useState({ amount_requested: '', payment_method: 'crypto', payment_details: '' })
+  const [payoutForm, setPayoutForm] = useState({ amount_requested: '', payment_method: 'usdt_trc20', payment_details: '' })
   const [kycStatus, setKycStatus] = useState(user?.kyc_status || 'not_submitted')
   const [kycCountry, setKycCountry] = useState(user?.kyc_document_country || user?.country || '')
   const [kycDocumentType, setKycDocumentType] = useState(user?.kyc_document_type || 'passport')
@@ -746,7 +746,7 @@ function Dashboard({ user, onLogout }) {
         headers: createIdempotencyHeaders('payouts:request')
       })
       setSuccess('Payout request submitted!')
-      setPayoutForm({ amount_requested: '', payment_method: 'crypto', payment_details: '' })
+      setPayoutForm({ amount_requested: '', payment_method: 'usdt_trc20', payment_details: '' })
       fetchPayouts()
     } catch (err) {
       setError(normalizeApiError(err, 'Could not submit payout').message)

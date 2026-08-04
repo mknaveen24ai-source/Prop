@@ -202,20 +202,70 @@ async function fetchAffiliatePayouts(userId, { page = 1, pageSize = 20 } = {}) {
   }
 }
 
-// Settles the referrer's ENTIRE current unpaid balance (all 'available'/'adjusted'
-// rows) against one approved payout request — no clawback exists in v1, so there's
-// no reason to support partial withdrawals that would leave a fragmented ledger.
-// Returns the total amount actually settled (for the admin approval response/audit log).
-async function markCommissionsPaidForPayout(client, referrerUserId, payoutRequestId) {
+// Per-affiliate trend data for the trader-facing Affiliate Analysis tab —
+// scoped mirror of the admin-only platform-wide analytics in
+// adminAffiliates.js's GET /affiliates/analytics, but grouped per month for
+// a single referrer rather than aggregated across all affiliates.
+async function fetchAffiliateAnalytics(userId) {
+  const [referralsResult, commissionResult] = await Promise.all([
+    pool.query(
+      `SELECT to_char(date_trunc('month', ar.created_at), 'Mon') AS month,
+              date_trunc('month', ar.created_at) AS month_start,
+              COUNT(*)::int AS total,
+              COUNT(*) FILTER (
+                WHERE EXISTS (
+                  SELECT 1 FROM affiliate_commissions c
+                   WHERE c.referral_id = ar.id AND c.order_id IS NOT NULL
+                )
+              )::int AS paying
+         FROM affiliate_referrals ar
+        WHERE ar.referrer_user_id = $1 AND ar.created_at >= NOW() - INTERVAL '6 months'
+        GROUP BY date_trunc('month', ar.created_at)
+        ORDER BY month_start ASC`,
+      [userId]
+    ),
+    pool.query(
+      `SELECT to_char(date_trunc('month', earned_at), 'Mon') AS month,
+              date_trunc('month', earned_at) AS month_start,
+              COALESCE(SUM(commission_amount) FILTER (WHERE status = 'paid'), 0) AS paid,
+              COALESCE(SUM(commission_amount) FILTER (WHERE status != 'paid'), 0) AS pending
+         FROM affiliate_commissions
+        WHERE referrer_user_id = $1 AND earned_at >= NOW() - INTERVAL '6 months'
+        GROUP BY date_trunc('month', earned_at)
+        ORDER BY month_start ASC`,
+      [userId]
+    )
+  ])
+
+  return {
+    referralsByMonth: referralsResult.rows.map(r => ({ month: r.month, total: r.total, paying: r.paying })),
+    commissionByMonth: commissionResult.rows.map(r => ({
+      month: r.month,
+      paid: parseFloat(r.paid) || 0,
+      pending: parseFloat(r.pending) || 0
+    }))
+  }
+}
+
+// Settles a SPECIFIC amount (v2: partial withdrawals allowed) against an
+// approved payout request. Rather than marking/splitting individual earn
+// rows, this posts one negative 'adjusted' ledger entry for the settled
+// amount — same mechanism as insertBalanceAdjustment below — which keeps
+// every original commission row's order_id/earned_at history intact while
+// still reducing available_balance (SUM of 'available'+'adjusted' rows) by
+// exactly the amount paid out. Any remainder stays available for a future
+// payout request. Returns the amount settled (for the admin approval
+// response/audit log).
+async function settleAffiliatePayoutAmount(client, referrerUserId, payoutRequestId, amount) {
+  const settled = Math.round(Math.abs(parseFloat(amount) || 0) * 100) / 100
   const result = await client.query(
-    `UPDATE affiliate_commissions
-        SET status = 'paid', payout_request_id = $2, updated_at = NOW()
-      WHERE referrer_user_id = $1 AND status IN ('available','adjusted')
-      RETURNING commission_amount`,
-    [referrerUserId, payoutRequestId]
+    `INSERT INTO affiliate_commissions
+       (referrer_user_id, commission_amount, status, adjustment_note, adjusted_at, earned_at, payout_request_id)
+     VALUES ($1, $2, 'adjusted', $3, NOW(), NOW(), $4)
+     RETURNING commission_amount`,
+    [referrerUserId, -settled, `Payout settlement for request #${payoutRequestId}`, payoutRequestId]
   )
-  const total = result.rows.reduce((sum, r) => sum + parseFloat(r.commission_amount || 0), 0)
-  return Math.round(total * 100) / 100
+  return Math.abs(parseFloat(result.rows[0].commission_amount))
 }
 
 // Manual admin correction — no automatic refund/chargeback clawback exists (v1
@@ -321,7 +371,8 @@ module.exports = {
   fetchAffiliateReferrals,
   fetchAffiliateCommissions,
   fetchAffiliatePayouts,
-  markCommissionsPaidForPayout,
+  fetchAffiliateAnalytics,
+  settleAffiliatePayoutAmount,
   insertBalanceAdjustment,
   fetchAllAffiliatesForAdmin,
   fetchAffiliateTiers,

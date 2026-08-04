@@ -10,11 +10,16 @@ import { getStatusToneColor } from '../utils/statusTone'
 
 const PAYOUTS_PAGE_SIZE = 10
 const PRESET_PCTS = [0.25, 0.5, 1]
-const PAYMENT_METHODS = [
-  { id: 'crypto', label: 'Cryptocurrency', meta: 'USDT / BTC', tone: 'var(--warn)' },
-  { id: 'bank', label: 'Bank Transfer', meta: 'SWIFT / IBAN', tone: 'var(--accent)' },
-  { id: 'wise', label: 'Wise', meta: 'Multi-currency', tone: 'var(--gain)' },
-  { id: 'paypal', label: 'PayPal', meta: 'Email-linked', tone: 'var(--muted)' },
+const CRYPTO_CURRENCIES = [
+  { id: 'usdt', label: 'USDT', meta: 'Tether — select network below', tone: 'var(--gain)' },
+  { id: 'btc', label: 'Bitcoin', meta: 'BTC', tone: 'var(--warn)' },
+  { id: 'ltc', label: 'Litecoin', meta: 'LTC', tone: 'var(--accent)' },
+]
+const USDT_NETWORKS = [
+  { id: 'trc20', label: 'TRC20', meta: 'Tron — lowest fees', tone: 'var(--gain)' },
+  { id: 'bep20', label: 'BEP20', meta: 'BNB Smart Chain', tone: 'var(--warn)' },
+  { id: 'erc20', label: 'ERC20', meta: 'Ethereum', tone: 'var(--accent)' },
+  { id: 'polygon', label: 'Polygon', meta: 'Polygon PoS', tone: 'var(--muted)' },
 ]
 const CURVE_RANGES = [
   { id: 'week', label: '1W' },
@@ -111,6 +116,10 @@ export default function DashboardPayoutsPage({
 
   const presetAmount = (pct) => Math.floor(availableProfit * pct * 100) / 100
 
+  const [payoutCurrency, payoutNetwork] = payoutForm.payment_method.startsWith('usdt_')
+    ? ['usdt', payoutForm.payment_method.slice(5)]
+    : [payoutForm.payment_method, USDT_NETWORKS[0].id]
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
       <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', margin: 0 }}>Payouts</h2>
@@ -160,14 +169,14 @@ export default function DashboardPayoutsPage({
             ))}
           </div>
 
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', margin: '16px 0 8px' }}>Method</div>
-          {PAYMENT_METHODS.map((m) => {
-            const active = payoutForm.payment_method === m.id
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', margin: '16px 0 8px' }}>Cryptocurrency</div>
+          {CRYPTO_CURRENCIES.map((m) => {
+            const active = payoutCurrency === m.id
             return (
               <button
                 key={m.id}
                 type="button"
-                onClick={() => setPayoutForm({ ...payoutForm, payment_method: m.id })}
+                onClick={() => setPayoutForm({ ...payoutForm, payment_method: m.id === 'usdt' ? `usdt_${payoutNetwork}` : m.id })}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '10px 12px', marginBottom: '6px',
                   border: `1px solid ${active ? 'var(--accent)' : 'var(--rule)'}`, borderRadius: '4px',
@@ -183,16 +192,46 @@ export default function DashboardPayoutsPage({
             )
           })}
 
+          {payoutCurrency === 'usdt' && (
+            <>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', margin: '12px 0 8px' }}>Network</div>
+              {USDT_NETWORKS.map((n) => {
+                const active = payoutNetwork === n.id
+                return (
+                  <button
+                    key={n.id}
+                    type="button"
+                    onClick={() => setPayoutForm({ ...payoutForm, payment_method: `usdt_${n.id}` })}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '10px 12px', marginBottom: '6px',
+                      border: `1px solid ${active ? 'var(--accent)' : 'var(--rule)'}`, borderRadius: '4px',
+                      background: active ? 'var(--glass)' : 'transparent', cursor: 'pointer', textAlign: 'left'
+                    }}
+                  >
+                    <span style={{ width: '8px', height: '8px', background: n.tone, flex: '0 0 auto' }} />
+                    <span style={{ flex: 1 }}>
+                      <span style={{ display: 'block', fontSize: '13px', color: 'var(--ink)' }}>{n.label}</span>
+                      <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)', marginTop: '2px' }}>{n.meta}</span>
+                    </span>
+                  </button>
+                )
+              })}
+            </>
+          )}
+
           <div>
             <label style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Payment Details</label>
             <textarea
               value={payoutForm.payment_details}
               onChange={(e) => setPayoutForm({ ...payoutForm, payment_details: e.target.value })}
-              placeholder="Wallet address, account number, or linked email"
+              placeholder="Enter your wallet address"
               rows="3"
               required
               style={{ width: '100%', marginTop: '6px', resize: 'vertical' }}
             />
+            <p style={{ marginTop: '8px', fontSize: '11px', color: 'var(--warn)' }}>
+              Double-check before submitting — crypto payouts are final. Funds sent to an incorrect address or wrong network cannot be recovered.
+            </p>
           </div>
 
           <div style={{ borderTop: '1px solid var(--rule-soft)', marginTop: '14px', paddingTop: '12px' }}>

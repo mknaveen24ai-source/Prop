@@ -10,7 +10,7 @@ const {
   fetchAffiliateReferrals,
   fetchAffiliateCommissions,
   fetchAffiliatePayouts,
-  markCommissionsPaidForPayout,
+  settleAffiliatePayoutAmount,
   insertBalanceAdjustment,
   fetchAffiliateTiers,
   createAffiliateTier,
@@ -115,7 +115,7 @@ router.post('/affiliates/payouts/approve', authenticateAdmin, requireSuperAdmin,
       return res.status(400).json({ error: 'Payout request is not pending' })
     }
 
-    const settledAmount = await markCommissionsPaidForPayout(client, payout.affiliate_user_id, payout.id)
+    const settledAmount = await settleAffiliatePayoutAmount(client, payout.affiliate_user_id, payout.id, payout.amount_requested)
 
     await client.query(
       `UPDATE affiliate_payout_requests

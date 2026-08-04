@@ -60,7 +60,7 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
     }
 
     // Must match the options actually offered in the payout request form.
-    const ALLOWED_PAYMENT_METHODS = ['crypto', 'bank', 'wise', 'paypal']
+    const ALLOWED_PAYMENT_METHODS = ['usdt_trc20', 'usdt_bep20', 'usdt_erc20', 'usdt_polygon', 'btc', 'ltc']
     if (!ALLOWED_PAYMENT_METHODS.includes(String(payment_method))) {
       return res.status(400).json({ error: `Invalid payment method. Must be one of: ${ALLOWED_PAYMENT_METHODS.join(', ')}` })
     }

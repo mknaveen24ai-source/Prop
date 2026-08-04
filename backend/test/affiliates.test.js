@@ -4,7 +4,7 @@ const pool = require('../db')
 const {
   resolveAffiliateCode,
   computeEffectiveTier,
-  markCommissionsPaidForPayout,
+  settleAffiliatePayoutAmount,
   insertBalanceAdjustment
 } = require('../utils/affiliates')
 
@@ -88,21 +88,20 @@ test('computeEffectiveTier falls back to the default commission pct when no tier
   assert.equal(result.commission_pct, 12)
 })
 
-test('markCommissionsPaidForPayout settles the referrer\'s entire available/adjusted balance, not a partial amount', async () => {
+test('settleAffiliatePayoutAmount posts a single negative adjusted ledger entry for the requested amount (partial withdrawals allowed)', async () => {
   const calls = []
   const mockClient = {
     async query(sql, values) {
       calls.push({ sql, values })
-      return { rows: [{ commission_amount: '10.50' }, { commission_amount: '5.25' }] }
+      return { rows: [{ commission_amount: '-20.00' }] }
     }
   }
 
-  const total = await markCommissionsPaidForPayout(mockClient, 'referrer-3', 'payout-9')
-  assert.equal(total, 15.75)
-  assert.match(calls[0].sql, /UPDATE affiliate_commissions/)
-  assert.match(calls[0].sql, /status IN \('available','adjusted'\)/)
-  assert.match(calls[0].sql, /SET status = 'paid', payout_request_id = \$2/)
-  assert.deepEqual(calls[0].values, ['referrer-3', 'payout-9'])
+  const total = await settleAffiliatePayoutAmount(mockClient, 'referrer-3', 'payout-9', 20)
+  assert.equal(total, 20)
+  assert.match(calls[0].sql, /INSERT INTO affiliate_commissions/)
+  assert.match(calls[0].sql, /VALUES \(\$1, \$2, 'adjusted', \$3, NOW\(\), NOW\(\), \$4\)/)
+  assert.deepEqual(calls[0].values, ['referrer-3', -20, 'Payout settlement for request #payout-9', 'payout-9'])
 })
 
 test('insertBalanceAdjustment inserts an adjusted-status row that can carry a negative amount', async () => {

@@ -12,7 +12,8 @@ const {
   fetchAffiliateSummary,
   fetchAffiliateReferrals,
   fetchAffiliateCommissions,
-  fetchAffiliatePayouts
+  fetchAffiliatePayouts,
+  fetchAffiliateAnalytics
 } = require('../utils/affiliates')
 
 function buildReferralLink(req, affiliateCode) {
@@ -99,6 +100,16 @@ router.get('/commissions', authenticateToken, async function(req, res) {
   }
 })
 
+router.get('/analytics', authenticateToken, async function(req, res) {
+  try {
+    const result = await fetchAffiliateAnalytics(req.user.userId)
+    res.json(result)
+  } catch (error) {
+    logger.error('Affiliate analytics error:', { error: error.message })
+    res.status(500).json({ error: 'Could not fetch affiliate analytics' })
+  }
+})
+
 router.get('/payouts', authenticateToken, async function(req, res) {
   try {
     const { page, pageSize } = parsePagination(req)
@@ -110,18 +121,24 @@ router.get('/payouts', authenticateToken, async function(req, res) {
   }
 })
 
-// Requests payout of the affiliate's ENTIRE current available balance (not a
-// partial amount) — simplest model given commissions accrue continuously and
-// there's no clawback mechanism to reconcile partial withdrawals against.
+// Requests payout of a trader-chosen amount, up to their current available
+// balance (v2: partial withdrawals allowed — settlement posts one negative
+// ledger entry for the requested amount via settleAffiliatePayoutAmount,
+// leaving any remainder available for a future request).
 router.post('/payouts/request', authenticateToken, affiliatePayoutRequestLimiter, async function(req, res) {
   try {
-    const { payment_method, payment_details } = req.body
+    const { payment_method, payment_details, amount_requested } = req.body
     if (!payment_method || !payment_details) {
       return res.status(400).json({ error: 'Payment method and details are required' })
     }
 
+    const requestedAmount = Math.round((parseFloat(amount_requested) || 0) * 100) / 100
+    if (!(requestedAmount > 0)) {
+      return res.status(400).json({ error: 'A valid payout amount is required' })
+    }
+
     // Must match the options actually offered in the affiliate payout request form.
-    const ALLOWED_PAYMENT_METHODS = ['crypto', 'bank', 'wise', 'paypal']
+    const ALLOWED_PAYMENT_METHODS = ['usdt_trc20', 'usdt_bep20', 'usdt_erc20', 'usdt_polygon', 'btc', 'ltc']
     if (!ALLOWED_PAYMENT_METHODS.includes(String(payment_method))) {
       return res.status(400).json({ error: `Invalid payment method. Must be one of: ${ALLOWED_PAYMENT_METHODS.join(', ')}` })
     }
@@ -164,12 +181,20 @@ router.post('/payouts/request', authenticateToken, affiliatePayoutRequestLimiter
           error: `Minimum payout amount is $${minPayout}. Your current available balance is $${availableBalance.toFixed(2)}.`
         })
       }
+      if (requestedAmount < minPayout) {
+        await client.query('ROLLBACK')
+        return res.status(400).json({ error: `Minimum payout amount is $${minPayout}.` })
+      }
+      if (requestedAmount > availableBalance) {
+        await client.query('ROLLBACK')
+        return res.status(400).json({ error: `Requested amount exceeds your available balance of $${availableBalance.toFixed(2)}.` })
+      }
 
       const insertResult = await client.query(
         `INSERT INTO affiliate_payout_requests (affiliate_user_id, amount_requested, payment_method, payment_details)
          VALUES ($1, $2, $3, $4)
          RETURNING *`,
-        [req.user.userId, availableBalance, String(payment_method).trim(), paymentDetailsStr]
+        [req.user.userId, requestedAmount, String(payment_method).trim(), paymentDetailsStr]
       )
 
       await client.query('COMMIT')
@@ -178,7 +203,7 @@ router.post('/payouts/request', authenticateToken, affiliatePayoutRequestLimiter
         const userResult = await pool.query(`SELECT email, full_name FROM users WHERE id = $1`, [req.user.userId])
         const user = userResult.rows[0]
         if (user?.email) {
-          await enqueueAffiliatePayoutRequestedEmail(user.email, user.full_name, availableBalance, { userId: req.user.userId })
+          await enqueueAffiliatePayoutRequestedEmail(user.email, user.full_name, requestedAmount, { userId: req.user.userId })
         }
       } catch (emailErr) {
         logger.warn('Failed to enqueue affiliate payout requested email:', { error: emailErr.message })

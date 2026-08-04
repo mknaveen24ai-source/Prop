@@ -271,6 +271,9 @@ export const affiliateAPI = {
   getPayouts: (params) =>
     api.get('/api/affiliates/payouts', { params }),
 
+  getAnalytics: () =>
+    api.get('/api/affiliates/analytics'),
+
   requestPayout: (data) =>
     api.post('/api/affiliates/payouts/request', data, { headers: createIdempotencyHeaders('affiliate-payouts:request') }),
 
