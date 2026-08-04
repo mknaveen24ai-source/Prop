@@ -4,6 +4,7 @@ const pool = require('../db')
 const logger = require('../utils/logger')
 const { authenticateAdmin } = require('./middleware')
 const { calcTradePnl, getExposureData } = require('./admin')._internals
+const { computeRMultiple } = require('./trades')
 
 // New sibling router for the Admin Analytics section — mirrors the
 // adminViolations.js precedent (separate file, mounted at /api/admin)
@@ -228,6 +229,7 @@ router.get('/analytics/firm-profitability', authenticateAdmin, async (req, res) 
       return {
         model: m.name,
         slug: m.slug,
+        revenue: round(revenue),
         passRate: round(passRate, 1),
         fundedCount: counts.funded_count,
         costPerFundedTrader: null, // no acquisition-cost ledger exists — not fabricated
@@ -355,7 +357,8 @@ router.get('/analytics/trade-behavior', authenticateAdmin, async (req, res) => {
     // doesn't reduce cleanly to a single SQL query), fine at current volume,
     // would need a real windowing/pagination pass once trade volume grows.
     const result = await pool.query(`
-      SELECT a.user_id, u.email, u.full_name, t.lot_size, t.demo_pnl, t.instrument, t.open_time, t.close_time
+      SELECT a.user_id, u.email, u.full_name, t.lot_size, t.demo_pnl, t.instrument, t.open_time, t.close_time,
+             t.stop_loss, t.open_price
         FROM trades t
         JOIN accounts a ON a.id = t.account_id
         JOIN users u ON u.id = a.user_id
@@ -364,6 +367,25 @@ router.get('/analytics/trade-behavior', authenticateAdmin, async (req, res) => {
        LIMIT 5000
     `)
     const trades = result.rows
+
+    // Platform-wide R-multiple — same computeRMultiple as the trader-facing
+    // /api/trades/analytics (3a); null for trades with no stop-loss, excluded
+    // from the average rather than counted as 0.
+    const rMultiples = trades.map((t) => computeRMultiple(t)).filter((r) => r != null)
+    const avgRMultiple = rMultiples.length ? round(rMultiples.reduce((a, b) => a + b, 0) / rMultiples.length, 2) : null
+    const rMultipleBuckets = [
+      { bucket: '< -2R', min: -Infinity, max: -2, count: 0 },
+      { bucket: '-2 to -1R', min: -2, max: -1, count: 0 },
+      { bucket: '-1 to 0R', min: -1, max: 0, count: 0 },
+      { bucket: '0 to 1R', min: 0, max: 1, count: 0 },
+      { bucket: '1 to 2R', min: 1, max: 2, count: 0 },
+      { bucket: '> 2R', min: 2, max: Infinity, count: 0 },
+    ]
+    for (const r of rMultiples) {
+      const b = rMultipleBuckets.find((x) => r >= x.min && r < x.max) || rMultipleBuckets[rMultipleBuckets.length - 1]
+      b.count += 1
+    }
+    const rMultipleDistribution = rMultipleBuckets.map(({ bucket, count }) => ({ bucket, count }))
 
     // Lot size histogram
     const buckets = [
@@ -480,6 +502,8 @@ router.get('/analytics/trade-behavior', authenticateAdmin, async (req, res) => {
       copyTradingFlags,
       profitSpikes,
       sessionTiming,
+      avgRMultiple,
+      rMultipleDistribution,
     })
   } catch (err) {
     logger.error('Trade behavior analytics error:', { error: err.message })

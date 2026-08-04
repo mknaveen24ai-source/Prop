@@ -5,6 +5,7 @@ import AdminChart, { chartThemeProps } from '../../../components/admin/AdminChar
 import AdminDataTable from '../../../components/admin/AdminDataTable';
 import AdminStatCard from '../../../components/admin/AdminStatCard';
 import AdminStatGrid from '../../../components/admin/AdminStatGrid';
+import Card from '../../../components/ui/Card';
 import { pnlColor } from './shared';
 
 function formatMoney(value) {
@@ -45,6 +46,7 @@ export default function FirmProfitabilityTab({ dateRange }) {
 
   const modelColumns = [
     { header: 'Model', key: 'model' },
+    { header: 'Revenue', render: (row) => formatMoney(row.revenue) },
     { header: 'Pass Rate', render: (row) => `${row.passRate}%` },
     { header: 'Funded Traders', key: 'fundedCount', isMono: true },
     { header: 'Cost per Funded Trader', render: (row) => row.costPerFundedTrader == null ? <span style={{ color: 'var(--admin-text-faint)' }}>N/A — no cost ledger</span> : formatMoney(row.costPerFundedTrader) },
@@ -60,7 +62,7 @@ export default function FirmProfitabilityTab({ dateRange }) {
         <AdminStatCard icon="payouts" label="Total Payouts" value={formatMoney(totalPayouts)} />
       </AdminStatGrid>
 
-      <div className="admin-card" style={{ marginBottom: '24px' }}>
+      <Card style={{ marginBottom: '24px' }}>
         <div className="admin-form-group" style={{ maxWidth: '260px', marginBottom: 0 }}>
           <label className="admin-label">Operating Costs (for selected range)</label>
           <input
@@ -70,7 +72,7 @@ export default function FirmProfitabilityTab({ dateRange }) {
             onChange={(e) => setOperatingCost(Number(e.target.value) || 0)}
           />
         </div>
-      </div>
+      </Card>
 
       <AdminChart title="Pass Rate per Evaluation Model">
         <BarChart data={models}>
@@ -83,9 +85,9 @@ export default function FirmProfitabilityTab({ dateRange }) {
       </AdminChart>
 
       <h2 className="admin-h2" style={{ marginTop: '24px' }}>Model Economics</h2>
-      <div className="admin-card" style={{ padding: 0 }}>
+      <Card flush style={{ marginBottom: '24px' }}>
         <AdminDataTable columns={modelColumns} data={models} loading={loading} emptyMessage="No model data" emptyIcon="pnl" />
-      </div>
+      </Card>
     </>
   );
 }
