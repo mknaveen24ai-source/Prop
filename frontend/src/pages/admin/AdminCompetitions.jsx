@@ -1,16 +1,16 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { useOutletContext, useNavigate } from 'react-router-dom'
 import { useToast } from '../../components/admin/AdminToast'
 import PrizePoolEditor from '../../components/admin/PrizePoolEditor'
+import AdminBadge from '../../components/admin/AdminBadge'
+import AdminStatCard from '../../components/admin/AdminStatCard'
+import AdminStatGrid from '../../components/admin/AdminStatGrid'
+import AdminFilterBar from '../../components/admin/AdminFilterBar'
+import AdminDataTable from '../../components/admin/AdminDataTable'
+import Card from '../../components/ui/Card'
 
-function statusColor(status) {
-  return {
-    upcoming: 'var(--admin-text-muted)',
-    active: 'var(--admin-success)',
-    completed: 'var(--admin-text-faint)',
-    cancelled: 'var(--admin-danger, #d33)'
-  }[status] || 'var(--admin-text-muted)'
-}
+const PAGE_SIZE = 15
+const STATUS_FILTERS = ['all', 'upcoming', 'active', 'completed', 'cancelled']
 
 function toLocalInputValue(date) {
   const pad = (n) => String(n).padStart(2, '0')
@@ -54,7 +54,7 @@ function CreateCompetitionForm({ onCreate, creating }) {
   const inputStyle = { width: '100%', padding: '8px 10px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }
 
   return (
-    <form onSubmit={submit} className="admin-card" style={{ padding: '20px', marginBottom: '24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+    <form onSubmit={submit} className="lx-card" style={{ marginBottom: '24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
       <div style={{ gridColumn: '1 / -1' }}>
         <h3 style={{ margin: '0 0 4px' }}>Create Competition</h3>
       </div>
@@ -121,6 +121,9 @@ export default function AdminCompetitions() {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [page, setPage] = useState(1)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -135,6 +138,7 @@ export default function AdminCompetitions() {
   }, [adminAxios, toast])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => { setPage(1) }, [search, statusFilter])
 
   async function handleCreate(payload) {
     setCreating(true)
@@ -150,61 +154,81 @@ export default function AdminCompetitions() {
     }
   }
 
-  if (loading) {
-    return <div style={{ padding: '32px', opacity: 0.7 }}>Loading competitions...</div>
-  }
+  const kpis = useMemo(() => ({
+    total: competitions.length,
+    active: competitions.filter((c) => c.status === 'active').length,
+    upcoming: competitions.filter((c) => c.status === 'upcoming').length,
+    participants: competitions.reduce((sum, c) => sum + (c.participant_count || 0), 0),
+  }), [competitions])
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return competitions.filter((c) => {
+      if (statusFilter !== 'all' && c.status !== statusFilter) return false
+      if (q && !String(c.title || '').toLowerCase().includes(q)) return false
+      return true
+    })
+  }, [competitions, search, statusFilter])
+
+  const pagination = { current: page, total: Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)), total_items: filtered.length, page_size: PAGE_SIZE }
+  const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const columns = [
+    { key: 'title', header: 'Title', render: (c) => <span style={{ fontWeight: 600 }}>{c.title}</span> },
+    { key: 'type', header: 'Type', render: (c) => c.type },
+    { key: 'status', header: 'Status', render: (c) => <AdminBadge status={c.status} /> },
+    { key: 'start', header: 'Start', render: (c) => new Date(c.start_at).toLocaleString() },
+    { key: 'end', header: 'End', render: (c) => new Date(c.end_at).toLocaleString() },
+    { key: 'participants', header: 'Participants', isMono: true, render: (c) => `${c.participant_count || 0}${c.max_participants ? ` / ${c.max_participants}` : ''}` },
+    { key: 'prizes', header: 'Prizes', render: (c) => (Array.isArray(c.prize_pool) ? c.prize_pool.length : 0) },
+  ]
 
   return (
     <div style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
-          <h2 style={{ margin: '0 0 4px' }}>Trading Competitions</h2>
-          <p style={{ margin: 0, opacity: 0.7, fontSize: '13px' }}>
+          <h1 className="admin-h1">Competitions</h1>
+          <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
             Create and manage weekly/monthly contests. Entries are free in v1; final rankings are shown once a contest completes for manual prize payout.
           </p>
         </div>
-        <button className="admin-btn" onClick={() => setShowForm((s) => !s)}>
-          {showForm ? 'Cancel' : 'New Competition'}
+        <button className="admin-btn admin-btn-primary" onClick={() => setShowForm((s) => !s)}>
+          {showForm ? 'Cancel' : '+ New Competition'}
         </button>
       </div>
 
       {showForm && <CreateCompetitionForm onCreate={handleCreate} creating={creating} />}
 
-      <div className="admin-card" style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-          <thead>
-            <tr style={{ textAlign: 'left', opacity: 0.7 }}>
-              <th style={{ padding: '10px 12px' }}>Title</th>
-              <th style={{ padding: '10px 12px' }}>Type</th>
-              <th style={{ padding: '10px 12px' }}>Status</th>
-              <th style={{ padding: '10px 12px' }}>Start</th>
-              <th style={{ padding: '10px 12px' }}>End</th>
-              <th style={{ padding: '10px 12px' }}>Participants</th>
-            </tr>
-          </thead>
-          <tbody>
-            {competitions.map((c) => (
-              <tr
-                key={c.id}
-                onClick={() => navigate(`/admin/competitions/${c.id}`)}
-                style={{ cursor: 'pointer', borderTop: '1px solid var(--admin-border)' }}
-              >
-                <td style={{ padding: '10px 12px', fontWeight: 600 }}>{c.title}</td>
-                <td style={{ padding: '10px 12px' }}>{c.type}</td>
-                <td style={{ padding: '10px 12px' }}>
-                  <span style={{ color: statusColor(c.status), fontWeight: 700, textTransform: 'uppercase', fontSize: '11px' }}>{c.status}</span>
-                </td>
-                <td style={{ padding: '10px 12px' }}>{new Date(c.start_at).toLocaleString()}</td>
-                <td style={{ padding: '10px 12px' }}>{new Date(c.end_at).toLocaleString()}</td>
-                <td style={{ padding: '10px 12px' }}>{c.participant_count}{c.max_participants ? ` / ${c.max_participants}` : ''}</td>
-              </tr>
-            ))}
-            {competitions.length === 0 && (
-              <tr><td colSpan={6} style={{ padding: '24px', textAlign: 'center', opacity: 0.6 }}>No competitions yet</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <AdminStatGrid style={{ marginBottom: '20px' }}>
+        <AdminStatCard icon="challenges" label="Total Competitions" value={kpis.total} />
+        <AdminStatCard icon="activity" label="Active Now" value={kpis.active} />
+        <AdminStatCard icon="calendar" label="Upcoming" value={kpis.upcoming} />
+        <AdminStatCard icon="users" label="Total Entrants" value={kpis.participants} />
+      </AdminStatGrid>
+
+      <AdminFilterBar searchPlaceholder="Search competitions by title..." searchValue={search} onSearchChange={setSearch}>
+        {STATUS_FILTERS.map((status) => (
+          <button
+            key={status}
+            className={`admin-filter-chip ${statusFilter === status ? 'active' : ''}`}
+            onClick={() => setStatusFilter(status)}
+          >
+            {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
+          </button>
+        ))}
+      </AdminFilterBar>
+
+      <Card flush>
+        <AdminDataTable
+          columns={columns}
+          data={pageRows}
+          loading={loading}
+          emptyMessage="No competitions match the current filters"
+          pagination={pagination}
+          onPageChange={setPage}
+          onRowClick={(row) => navigate(`/admin/competitions/${row.id}`)}
+        />
+      </Card>
     </div>
   )
 }

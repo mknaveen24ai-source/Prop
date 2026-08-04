@@ -9,13 +9,14 @@ import AdminStatCard from '../../components/admin/AdminStatCard';
 import AdminStatGrid from '../../components/admin/AdminStatGrid';
 import { useToast } from '../../components/admin/AdminToast';
 import { exportAdminResource, normalizeAdminListResponse } from '../../utils/adminList';
+import Card from '../../components/ui/Card';
 
 const DEFAULT_FILTERS = {
   direction: 'all',
   status: 'all'
 };
 
-const ALL_COLUMN_KEYS = ['id', 'account', 'symbol', 'direction', 'lots', 'prices', 'sltp', 'pnl', 'status', 'opened'];
+const ALL_COLUMN_KEYS = ['id', 'account', 'symbol', 'direction', 'lots', 'prices', 'sltp', 'pnl', 'r_multiple', 'status', 'opened'];
 
 function buildViewConfig({ search, filters, visibleColumnKeys, density }) {
   return {
@@ -288,6 +289,20 @@ export default function AdminTrades() {
         }
       },
       {
+        header: 'R-Multiple',
+        key: 'r_multiple',
+        isMono: true,
+        render: (trade) => {
+          if (trade.r_multiple == null) return <span style={{ color: 'var(--admin-text-faint)' }}>—</span>;
+          const r = parseFloat(trade.r_multiple);
+          return (
+            <span style={{ color: r >= 0 ? 'var(--admin-success)' : 'var(--admin-danger)' }}>
+              {r >= 0 ? '+' : ''}{r.toFixed(2)}R
+            </span>
+          );
+        }
+      },
+      {
         header: 'Status',
         key: 'status',
         render: (trade) => <AdminBadge status={trade.status === 'open' ? 'info' : trade.status === 'pending' ? 'warning' : 'neutral'} label={trade.status} />
@@ -369,7 +384,7 @@ export default function AdminTrades() {
         onExport={exportCurrentView}
       />
 
-      <div className="admin-card" style={{ padding: 0 }}>
+      <Card flush>
         <AdminDataTable
           columns={columns}
           data={filteredTrades}
@@ -380,7 +395,7 @@ export default function AdminTrades() {
           density={density}
           onRowClick={(trade) => handleTradeAction(trade)}
         />
-      </div>
+      </Card>
 
       <AdminModal
         isOpen={showOverrideModal}

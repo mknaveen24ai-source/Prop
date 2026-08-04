@@ -3740,6 +3740,7 @@ module.exports = {
   getMarketStatus,
   ensureTradeExperienceInfrastructure,
   calculatePnL,
-  getLivePriceMap
+  getLivePriceMap,
+  computeRMultiple
 }
 

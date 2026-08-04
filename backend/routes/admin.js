@@ -44,6 +44,7 @@ const { CURRENT_TOS_VERSION } = require('../utils/tosVersion')
 const { readKycFileBuffer, getKycContentType, getOriginalKycExtension } = require('../utils/secureKycStorage')
 const { ensureViolationTables } = require('../services/violationEngine')
 const { sendEmailMessage, htmlWrap, resolveMailContext } = require('../mailer')
+const { computeRMultiple } = require('./trades')
 const { getTenantSettings } = require('../services/tenantPolicyService')
 const { getPriceForTenant } = require('../priceFeed')
 const { ensureDisputesInfrastructure } = require('./disputes')
@@ -5312,9 +5313,14 @@ router.get('/trades', authenticateAdmin, requireAdminCapability('trader:read'), 
           ) - parseFloat(row.commission || 0)
         ).toFixed(2))
       }
+      const r_multiple = ['closed', 'cancelled'].includes(row.status)
+        ? computeRMultiple({ stop_loss: row.sl, open_price: row.open_price, lot_size: row.lots, demo_pnl: pnl, instrument: row.symbol })
+        : null
+
       return {
         ...row,
-        pnl
+        pnl,
+        r_multiple
       }
     })
 
