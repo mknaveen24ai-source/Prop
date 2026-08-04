@@ -14,6 +14,20 @@ const SUPER_ADMIN_PERMISSIONS = [
   'bulk:*'
 ]
 
+// Least-privileged built-in roles — real capability sets, not the
+// super_admin wildcard. Each maps to the exact requireAdminCapability(...)
+// strings already gating routes across the app (grep confirmed no invented
+// capability names). POST/PATCH /admin-users below is what actually lets an
+// admin be created/changed into one of these; before that fix, every admin
+// account was forced to be super_admin regardless of this table's existence.
+const ROLE_PERMISSIONS = {
+  kyc_reviewer: ['kyc:review:scoped', 'trader:read', 'account:read:scoped'],
+  support_agent: ['chat:read:scoped', 'chat:reply:scoped', 'trader:read'],
+  risk_ops: ['violation:read:scoped', 'violation:resolve:scoped', 'trader:read', 'trader:moderate:scoped', 'account:read:scoped', 'account:override'],
+  finance_ops: ['payout:read:scoped', 'payout:review:scoped', 'payout:flag', 'trader:read', 'account:read:scoped'],
+}
+const BUILT_IN_ROLES = ['super_admin', ...Object.keys(ROLE_PERMISSIONS)]
+
 function normalizePermission(value) {
   return String(value || '').trim().toLowerCase()
 }
@@ -21,6 +35,7 @@ function normalizePermission(value) {
 function getAdminPermissionsForRole(role) {
   const normalizedRole = normalizePermission(role)
   if (normalizedRole === 'super_admin') return [...SUPER_ADMIN_PERMISSIONS]
+  if (ROLE_PERMISSIONS[normalizedRole]) return [...ROLE_PERMISSIONS[normalizedRole]]
   return []
 }
 
@@ -346,6 +361,8 @@ module.exports = {
   authenticateAdminPre2FA,
   buildAdminSessionPayload,
   getAdminPermissionsForRole,
+  ROLE_PERMISSIONS,
+  BUILT_IN_ROLES,
   hasAdminCapability,
   requireAdminCapability,
   requireSuperAdmin

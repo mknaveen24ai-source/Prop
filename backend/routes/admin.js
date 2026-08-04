@@ -6,7 +6,8 @@ const {
   authenticateAdminPre2FA,
   buildAdminSessionPayload,
   requireAdminCapability,
-  requireSuperAdmin
+  requireSuperAdmin,
+  BUILT_IN_ROLES
 } = require('./middleware')
 const jwt = require('jsonwebtoken')
 const bcrypt = require('bcryptjs')
@@ -2556,9 +2557,14 @@ router.post('/admin-users', authenticateAdmin, requireSuperAdmin, async function
     const email = normalizeAdminEmail(req.body?.email)
     const password = String(req.body?.password || '')
     const fullName = String(req.body?.full_name || '').trim() || null
-    const role = 'super_admin'
+    // Default to the least-privileged real role rather than super_admin —
+    // this used to be hardcoded to super_admin regardless of input, so
+    // every admin account ever created had full platform access.
+    const requestedRole = String(req.body?.role || '').trim().toLowerCase() || 'support_agent'
+    const role = BUILT_IN_ROLES.includes(requestedRole) ? requestedRole : null
 
     if (!email) return res.status(400).json({ error: 'Admin email is required' })
+    if (!role) return res.status(400).json({ error: `role must be one of: ${BUILT_IN_ROLES.join(', ')}` })
     if (password.length < 10) {
       return res.status(400).json({ error: 'Admin password must be at least 10 characters' })
     }
@@ -2612,9 +2618,15 @@ router.patch('/admin-users/:id', authenticateAdmin, requireSuperAdmin, async fun
     const nextStatus = Object.prototype.hasOwnProperty.call(req.body || {}, 'status')
       ? String(req.body?.status || '').trim().toLowerCase()
       : current.status
+    const nextRole = Object.prototype.hasOwnProperty.call(req.body || {}, 'role')
+      ? String(req.body?.role || '').trim().toLowerCase()
+      : current.role
 
     if (!['active', 'disabled'].includes(nextStatus)) {
       return res.status(400).json({ error: 'status must be active or disabled' })
+    }
+    if (!BUILT_IN_ROLES.includes(nextRole)) {
+      return res.status(400).json({ error: `role must be one of: ${BUILT_IN_ROLES.join(', ')}` })
     }
 
     if (current.status === 'active' && nextStatus !== 'active') {
@@ -2629,14 +2641,32 @@ router.patch('/admin-users/:id', authenticateAdmin, requireSuperAdmin, async fun
       }
     }
 
+    // Same floor, extended to role demotion (not just disabling): losing
+    // the last active super_admin locks the platform out of super-admin-only
+    // routes just as effectively as disabling their account would.
+    const losesActiveSuperAdmin = current.role === 'super_admin' && current.status === 'active'
+      && (nextStatus !== 'active' || nextRole !== 'super_admin')
+    if (losesActiveSuperAdmin) {
+      const countResult = await pool.query(
+        `SELECT COUNT(*)::int AS count
+           FROM platform_admins
+          WHERE status = 'active' AND role = 'super_admin'`
+      )
+      const activeSuperAdmins = parseInt(countResult.rows[0]?.count || 0, 10) || 0
+      if (activeSuperAdmins <= 1) {
+        return res.status(400).json({ error: 'You must keep at least one active super_admin' })
+      }
+    }
+
     const update = await pool.query(
       `UPDATE platform_admins
           SET full_name = $2,
               status = $3,
+              role = $4,
               updated_at = NOW()
         WHERE id = $1
         RETURNING id, email, full_name, role, status, token_version, totp_enabled, last_login_at, created_at, updated_at`,
-      [adminId, nextFullName, nextStatus]
+      [adminId, nextFullName, nextStatus, nextRole]
     )
 
     try {

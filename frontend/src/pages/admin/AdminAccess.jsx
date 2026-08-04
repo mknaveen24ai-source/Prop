@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import AdminBadge from '../../components/admin/AdminBadge'
 import { useToast } from '../../components/admin/AdminToast'
+import Card from '../../components/ui/Card'
 
 function AccessCard({ title, value, helper, status = 'neutral' }) {
   const accent = status === 'danger'
@@ -13,7 +14,7 @@ function AccessCard({ title, value, helper, status = 'neutral' }) {
         : 'var(--admin-accent)'
 
   return (
-    <div className="admin-card" style={{ marginBottom: 0 }}>
+    <Card stat tone={accent} style={{ marginBottom: 0 }}>
       <div style={{ fontSize: '12px', color: 'var(--admin-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
         {title}
       </div>
@@ -21,19 +22,19 @@ function AccessCard({ title, value, helper, status = 'neutral' }) {
         {value}
       </div>
       <div style={{ fontSize: '12px', color: 'var(--admin-text-muted)' }}>{helper}</div>
-    </div>
+    </Card>
   )
 }
 
 function SecurityFlag({ label, healthy, detail }) {
   return (
-    <div className="admin-card" style={{ marginBottom: 0 }}>
+    <Card style={{ marginBottom: 0 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', marginBottom: '8px' }}>
         <div style={{ fontWeight: 600 }}>{label}</div>
         <AdminBadge status={healthy ? 'success' : 'danger'} label={healthy ? 'OK' : 'Needs Action'} />
       </div>
       <div style={{ fontSize: '12px', color: 'var(--admin-text-muted)' }}>{detail}</div>
-    </div>
+    </Card>
   )
 }
 
@@ -55,9 +56,30 @@ function createEmptyAdminForm() {
   return {
     email: '',
     full_name: '',
-    password: ''
+    password: '',
+    role: 'support_agent'
   }
 }
+
+// Mirrors backend/routes/middleware.js's ROLE_PERMISSIONS exactly — this is
+// display-only (the backend is the source of truth/enforcement), but keeping
+// the literal capability strings here means the matrix never drifts from
+// what's actually gated route-by-route.
+const ROLE_PERMISSIONS = {
+  super_admin: ['platform:*', 'trader:*', 'account:*', 'payout:*', 'kyc:*', 'violation:*', 'command_center:*', 'bulk:*'],
+  kyc_reviewer: ['kyc:review:scoped', 'trader:read', 'account:read:scoped'],
+  support_agent: ['chat:read:scoped', 'chat:reply:scoped', 'trader:read'],
+  risk_ops: ['violation:read:scoped', 'violation:resolve:scoped', 'trader:read', 'trader:moderate:scoped', 'account:read:scoped', 'account:override'],
+  finance_ops: ['payout:read:scoped', 'payout:review:scoped', 'payout:flag', 'trader:read', 'account:read:scoped'],
+}
+const ROLE_LABELS = {
+  super_admin: 'Super Admin',
+  kyc_reviewer: 'KYC Reviewer',
+  support_agent: 'Support Agent',
+  risk_ops: 'Risk Ops',
+  finance_ops: 'Finance Ops',
+}
+const ASSIGNABLE_ROLES = Object.keys(ROLE_PERMISSIONS)
 
 const AUDIT_PAGE_SIZE = 50
 
@@ -263,7 +285,7 @@ export default function AdminAccess() {
   }
 
   const currentAdminCards = useMemo(() => {
-    const role = session?.role === 'super_admin' ? 'Super Admin' : 'Unknown'
+    const role = ROLE_LABELS[session?.role] || session?.role || 'Unknown'
     return [
       {
         title: 'Current Role',
@@ -291,7 +313,7 @@ export default function AdminAccess() {
   }, [session, twoFaStatus])
 
   if (loading) {
-    return <div className="admin-card">Loading admin access controls...</div>
+    return <Card style={{ marginBottom: '24px' }}>Loading admin access controls...</Card>
   }
 
   return (
@@ -316,7 +338,7 @@ export default function AdminAccess() {
         ))}
       </div>
 
-      <div className="admin-card">
+      <Card style={{ marginBottom: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center', marginBottom: '18px' }}>
           <div>
             <h2 className="admin-h2" style={{ marginBottom: '6px' }}>Admin 2FA</h2>
@@ -338,11 +360,11 @@ export default function AdminAccess() {
           </div>
         ) : setupPayload ? (
           <div style={{ display: 'grid', gap: '20px', gridTemplateColumns: 'minmax(240px, 320px) minmax(280px, 1fr)' }}>
-            <div className="admin-card" style={{ marginBottom: 0, background: 'var(--admin-bg)' }}>
+            <Card style={{ marginBottom: 0, background: 'var(--admin-bg)' }}>
               <div style={{ fontWeight: 600, marginBottom: '10px' }}>Scan QR Code</div>
               <img src={setupPayload.qr} alt="Admin 2FA QR" style={{ width: '100%', maxWidth: '240px', background: 'var(--paper)', padding: '10px' }} />
-            </div>
-            <div className="admin-card" style={{ marginBottom: 0, background: 'var(--admin-bg)' }}>
+            </Card>
+            <Card style={{ marginBottom: 0, background: 'var(--admin-bg)' }}>
               <div style={{ fontWeight: 600, marginBottom: '10px' }}>Verify Setup</div>
               <div style={{ fontSize: '13px', color: 'var(--admin-text-muted)', marginBottom: '12px' }}>
                 Manual secret: <span className="admin-font-mono" style={{ color: 'var(--admin-text)' }}>{setupPayload.secret}</span>
@@ -364,11 +386,11 @@ export default function AdminAccess() {
                   Cancel
                 </button>
               </div>
-            </div>
+            </Card>
           </div>
         ) : (
           <div style={{ display: 'grid', gap: '16px', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
-            <div className="admin-card" style={{ marginBottom: 0, background: 'var(--admin-bg)' }}>
+            <Card style={{ marginBottom: 0, background: 'var(--admin-bg)' }}>
               <div style={{ fontWeight: 600, marginBottom: '10px' }}>Enrollment</div>
               <div style={{ fontSize: '13px', color: 'var(--admin-text-muted)', marginBottom: '16px' }}>
                 {twoFaStatus?.totp_enabled
@@ -380,10 +402,10 @@ export default function AdminAccess() {
                   {busyKey === '2fa-setup' ? 'Preparing...' : 'Begin 2FA Setup'}
                 </button>
               )}
-            </div>
+            </Card>
 
             {twoFaStatus?.totp_enabled && (
-              <div className="admin-card" style={{ marginBottom: 0, background: 'var(--admin-bg)' }}>
+              <Card style={{ marginBottom: 0, background: 'var(--admin-bg)' }}>
                 <div style={{ fontWeight: 600, marginBottom: '10px' }}>Disable 2FA</div>
                 <div style={{ fontSize: '13px', color: 'var(--admin-text-muted)', marginBottom: '12px' }}>
                   Enter an authenticator code or a remaining backup code to remove 2FA from this admin account.
@@ -400,13 +422,13 @@ export default function AdminAccess() {
                 <button className="admin-btn admin-btn-danger" onClick={handleDisable2fa} disabled={busyKey === '2fa-disable' || !disableCode.trim()}>
                   {busyKey === '2fa-disable' ? 'Disabling...' : 'Disable 2FA'}
                 </button>
-              </div>
+              </Card>
             )}
           </div>
         )}
 
         {backupCodes.length > 0 && (
-          <div className="admin-card" style={{ marginTop: '20px', marginBottom: 0, background: 'var(--admin-bg)' }}>
+          <Card style={{ marginTop: '20px', marginBottom: 0, background: 'var(--admin-bg)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
               <div style={{ fontWeight: 600 }}>Backup Codes</div>
               <AdminBadge status="warning" label="Shown Once" />
@@ -421,9 +443,9 @@ export default function AdminAccess() {
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
         )}
-      </div>
+      </Card>
 
       {isSuperAdmin && (
         <>
@@ -459,7 +481,7 @@ export default function AdminAccess() {
             </div>
           </div>
 
-          <div className="admin-card">
+          <Card style={{ marginBottom: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center', marginBottom: '18px' }}>
               <div>
                 <h2 className="admin-h2" style={{ marginBottom: '6px' }}>Create Platform Admin</h2>
@@ -482,15 +504,23 @@ export default function AdminAccess() {
                 <label className="admin-label">Password</label>
                 <input className="admin-input" type="password" value={adminForm.password} onChange={(event) => setAdminForm((current) => ({ ...current, password: event.target.value }))} required />
               </div>
+              <div className="admin-form-group" style={{ marginBottom: 0 }}>
+                <label className="admin-label">Role</label>
+                <select className="admin-select" value={adminForm.role} onChange={(event) => setAdminForm((current) => ({ ...current, role: event.target.value }))}>
+                  {ASSIGNABLE_ROLES.map((role) => (
+                    <option key={role} value={role}>{ROLE_LABELS[role]}</option>
+                  ))}
+                </select>
+              </div>
               <div style={{ display: 'flex', alignItems: 'flex-end' }}>
                 <button className="admin-btn admin-btn-primary" type="submit" disabled={busyKey === 'create-admin'}>
                   {busyKey === 'create-admin' ? 'Creating...' : 'Create Platform Admin'}
                 </button>
               </div>
             </form>
-          </div>
+          </Card>
 
-          <div className="admin-card">
+          <Card style={{ marginBottom: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center', marginBottom: '16px' }}>
               <div>
                 <h2 className="admin-h2" style={{ marginBottom: '6px' }}>Platform Admin Accounts</h2>
@@ -504,6 +534,7 @@ export default function AdminAccess() {
                 <thead>
                   <tr>
                     <th className="admin-th">Admin</th>
+                    <th className="admin-th">Role</th>
                     <th className="admin-th">Status</th>
                     <th className="admin-th">2FA</th>
                     <th className="admin-th">Last Login</th>
@@ -516,6 +547,19 @@ export default function AdminAccess() {
                       <td className="admin-td">
                         <div style={{ fontWeight: 600 }}>{adminUser.full_name || adminUser.email}</div>
                         <div style={{ color: 'var(--admin-text-muted)', fontSize: '12px' }}>{adminUser.email}</div>
+                      </td>
+                      <td className="admin-td">
+                        <select
+                          className="admin-select"
+                          style={{ minWidth: '150px' }}
+                          value={adminUser.role || 'super_admin'}
+                          disabled={busyKey === `patch-${adminUser.id}` || String(adminUser.id) === String(session?.adminId)}
+                          onChange={(event) => patchPlatformAdmin(adminUser.id, { role: event.target.value }, 'Role updated')}
+                        >
+                          {ASSIGNABLE_ROLES.map((role) => (
+                            <option key={role} value={role}>{ROLE_LABELS[role]}</option>
+                          ))}
+                        </select>
                       </td>
                       <td className="admin-td"><AdminBadge status={adminUser.status === 'active' ? 'success' : 'danger'} label={adminUser.status} /></td>
                       <td className="admin-td"><AdminBadge status={adminUser.totp_enabled ? 'success' : 'warning'} label={adminUser.totp_enabled ? 'Enabled' : 'Disabled'} /></td>
@@ -549,9 +593,44 @@ export default function AdminAccess() {
                 </tbody>
               </table>
             </div>
-          </div>
+          </Card>
 
-          <div className="admin-card">
+          <Card style={{ marginBottom: '24px' }}>
+            <div style={{ marginBottom: '16px' }}>
+              <h2 className="admin-h2" style={{ marginBottom: '6px' }}>Permission Matrix</h2>
+              <div style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+                Read-only reference — the exact capability strings each role is granted, straight from backend/routes/middleware.js. This is what requireAdminCapability(...) actually checks on every gated route, not a separate approximation.
+              </div>
+            </div>
+            <div className="admin-table-wrapper">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th className="admin-th">Role</th>
+                    <th className="admin-th">Capabilities</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ASSIGNABLE_ROLES.map((role) => (
+                    <tr key={role}>
+                      <td className="admin-td" style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{ROLE_LABELS[role]}</td>
+                      <td className="admin-td">
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          {ROLE_PERMISSIONS[role].map((cap) => (
+                            <span key={cap} className="admin-font-mono" style={{ fontSize: '11px', padding: '3px 8px', border: '1px solid var(--admin-border)', borderRadius: 'var(--radius-sm)', color: 'var(--admin-text-muted)' }}>
+                              {cap}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          <Card style={{ marginBottom: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center', marginBottom: '16px' }}>
               <div>
                 <h2 className="admin-h2" style={{ marginBottom: '6px' }}>Admin Action Audit Log</h2>
@@ -603,7 +682,7 @@ export default function AdminAccess() {
                 </button>
               </div>
             )}
-          </div>
+          </Card>
 
         </>
       )}
