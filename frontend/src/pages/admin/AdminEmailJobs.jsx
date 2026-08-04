@@ -7,6 +7,7 @@ import AdminFilterBar from '../../components/admin/AdminFilterBar';
 import AdminListToolbar from '../../components/admin/AdminListToolbar';
 import AdminStatCard from '../../components/admin/AdminStatCard';
 import { useToast } from '../../components/admin/AdminToast';
+import Card from '../../components/ui/Card';
 import { exportAdminResource, normalizeAdminListResponse } from '../../utils/adminList';
 
 const DEFAULT_FILTERS = {
@@ -406,7 +407,7 @@ export default function AdminEmailJobs() {
           })}
         />
 
-        <div className="admin-card" style={{ padding: 0 }}>
+        <Card flush>
           <AdminDataTable
             columns={visibleColumns}
             data={rows}
@@ -421,12 +422,11 @@ export default function AdminEmailJobs() {
             emptyIcon="mail"
             onRowClick={(row) => setDrawerRow(row)}
           />
-        </div>
+        </Card>
 
         {drawerRow && (
           <div className="admin-modal-overlay" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }} onMouseDown={() => setDrawerRow(null)}>
-            <div
-              className="admin-card"
+            <Card
               style={{ width: 'min(960px, calc(100vw - 32px))', maxHeight: '88vh', overflowY: 'auto', margin: 0 }}
               onMouseDown={(event) => event.stopPropagation()}
             >
@@ -464,7 +464,7 @@ export default function AdminEmailJobs() {
                 )}
               </div>
 
-              <div className="admin-card" style={{ margin: 0, background: 'var(--admin-bg)' }}>
+              <Card style={{ margin: 0, background: 'var(--admin-bg)' }}>
                 <h3 className="admin-h3">Provider / Preview</h3>
                 <div style={{ display: 'grid', gap: '8px', marginBottom: '14px' }}>
                   <div><strong style={{ display: 'block', marginBottom: '4px' }}>Provider Message ID</strong><span className="admin-font-mono">{drawerRow.provider_message_id || '—'}</span></div>
@@ -475,15 +475,15 @@ export default function AdminEmailJobs() {
                   <strong style={{ display: 'block', marginBottom: '6px' }}>Last Error</strong>
                   <div style={{ color: 'var(--admin-text-muted)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{drawerRow.last_error || 'No error recorded.'}</div>
                 </div>
-              </div>
+              </Card>
 
-              <div className="admin-card" style={{ margin: '16px 0 0', background: 'var(--admin-bg)' }}>
+              <Card style={{ margin: '16px 0 0', background: 'var(--admin-bg)' }}>
                 <h3 className="admin-h3">Payload</h3>
                 <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--admin-text-muted)', fontSize: '12px' }}>
                   {JSON.stringify(drawerRow.payload_json || {}, null, 2)}
                 </pre>
-              </div>
-            </div>
+              </Card>
+            </Card>
           </div>
         )}
       </>

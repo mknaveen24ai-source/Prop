@@ -1,18 +1,13 @@
 /* ── The Ledger Desk: global structural enforcement ───────────────────────────
-   The spec is explicit and total: flat corners, no shadows, no glass blur,
-   no gradients, ANYWHERE. Rather than hand-edit every legacy gradient/shadow
-   declaration across App.css and the mode stylesheets, this file wins the
-   cascade (loaded last) and enforces the rule universally. Verified safe:
-   no component in this codebase uses background-image for real image
-   content (only decorative gradients), so resetting it globally has no
-   functional side effects.
+   v2 "Modern Gazette": depth comes back in a controlled way — translucent
+   glass surfaces (--glass/--elev from tokens.css) and a 4px radius cap, never
+   above 5px. Corners/shadows/blur are no longer force-zeroed globally; only
+   gradients and text-shadow stay banned everywhere (no component in this
+   codebase uses background-image for real image content, only decorative
+   gradients, so resetting it globally has no functional side effects).
 ──────────────────────────────────────────────────────────────────────────── */
 
 *, *::before, *::after {
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
   text-shadow: none !important;
   background-image: none !important;
 }

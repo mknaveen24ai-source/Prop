@@ -5,6 +5,7 @@ import AdminFilterBar from '../../../components/admin/AdminFilterBar';
 import AdminBadge from '../../../components/admin/AdminBadge';
 import AdminStatCard from '../../../components/admin/AdminStatCard';
 import AdminStatGrid from '../../../components/admin/AdminStatGrid';
+import Card from '../../../components/ui/Card';
 import { pnlColor, downloadCsv } from './shared';
 
 function formatHours(hours) {
@@ -20,9 +21,9 @@ function LogSection({ title, columns, csvColumns, csvFilename, rows, loading, em
         <h2 className="admin-h2" style={{ margin: 0 }}>{title}</h2>
         <button className="admin-btn admin-btn-ghost" onClick={() => downloadCsv(csvFilename, rows, csvColumns)}>Export CSV</button>
       </div>
-      <div className="admin-card" style={{ padding: 0 }}>
+      <Card flush>
         <AdminDataTable columns={columns} data={rows} loading={loading} emptyMessage="No records in the selected range" emptyIcon={emptyIcon} />
-      </div>
+      </Card>
     </>
   );
 }

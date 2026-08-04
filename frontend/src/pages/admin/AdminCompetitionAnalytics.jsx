@@ -1,13 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { useOutletContext, useParams, useNavigate } from 'react-router-dom'
 import { useToast } from '../../components/admin/AdminToast'
+import Card from '../../components/ui/Card'
 
 function StatCard({ label, value }) {
   return (
-    <div className="admin-card" style={{ padding: '16px 20px' }}>
+    <Card stat>
       <div style={{ fontSize: '11px', opacity: 0.7, marginBottom: '6px' }}>{label}</div>
       <div style={{ fontSize: '20px', fontWeight: 700 }}>{value}</div>
-    </div>
+    </Card>
   )
 }
 
@@ -66,7 +67,7 @@ export default function AdminCompetitionAnalytics() {
         <StatCard label="Most Active Trader" value={summary.most_active_trader || '—'} />
       </div>
 
-      <div className="admin-card" style={{ padding: '20px', overflowX: 'auto' }}>
+      <Card style={{ padding: '20px', overflowX: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
           <span style={{ fontSize: '12px', opacity: 0.7 }}>Sort by:</span>
           {SORT_OPTIONS.map((opt) => (
@@ -116,7 +117,7 @@ export default function AdminCompetitionAnalytics() {
             )}
           </tbody>
         </table>
-      </div>
+      </Card>
     </div>
   )
 }

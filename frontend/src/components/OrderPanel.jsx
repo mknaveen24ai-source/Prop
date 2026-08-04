@@ -186,7 +186,7 @@ export default function OrderPanel({
   }
 
   return (
-    <div className="card order-panel" style={{ padding: '20px' }}>
+    <div className="lx-card order-panel" style={{ padding: '20px' }}>
       {!marketStatus.open && (
         <div style={{
           background: 'var(--danger-bg)',

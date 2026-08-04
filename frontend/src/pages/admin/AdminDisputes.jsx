@@ -7,6 +7,7 @@ import AdminListToolbar from '../../components/admin/AdminListToolbar';
 import AdminModal from '../../components/admin/AdminModal';
 import AdminStatCard from '../../components/admin/AdminStatCard';
 import { useToast } from '../../components/admin/AdminToast';
+import Card from '../../components/ui/Card';
 import { exportAdminResource } from '../../utils/adminList';
 
 const STATUS_OPTIONS = ['all', 'open', 'under_review', 'resolved', 'rejected'];
@@ -418,7 +419,7 @@ export default function AdminDisputes() {
         onExport={exportCurrentView}
       />
 
-      <div className="admin-card" style={{ padding: 0 }}>
+      <Card flush>
         <AdminDataTable
           columns={columns}
           data={filteredDisputes}
@@ -431,7 +432,7 @@ export default function AdminDisputes() {
           density={density}
           onRowClick={(dispute) => openDispute(dispute)}
         />
-      </div>
+      </Card>
 
       <AdminModal
         isOpen={showModal}
@@ -483,7 +484,7 @@ export default function AdminDisputes() {
               </div>
             )}
 
-            <div className="admin-card" style={{ margin: 0 }}>
+            <Card style={{ margin: 0 }}>
               <h3 className="admin-h3">Workflow Controls</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '12px' }}>
                 <input
@@ -516,7 +517,7 @@ export default function AdminDisputes() {
                 onChange={(event) => setMetaNotes(event.target.value)}
                 placeholder="Workflow notes, escalations, or external dependencies..."
               />
-            </div>
+            </Card>
 
             <div className="admin-form-group">
               <label className="admin-label">Admin Resolution Notes</label>

@@ -3,6 +3,8 @@ import { Menu } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { renderIcon } from '../../utils/iconMap'
 import ThemeToggle from '../ThemeToggle'
+import MarketStatusPill from '../MarketStatusPill'
+import CommandPaletteTrigger from '../CommandPaletteTrigger'
 
 export default function AdminTopBar({ onMobileMenuClick, onLogout, session }) {
   const location = useLocation()
@@ -54,9 +56,11 @@ export default function AdminTopBar({ onMobileMenuClick, onLogout, session }) {
           Admin <span style={{ color: 'var(--admin-border-strong)' }}>/</span>
           <span className="admin-breadcrumb-active">{currentPage}</span>
         </div>
+        <MarketStatusPill />
       </div>
 
       <div className="admin-topbar-right">
+        <CommandPaletteTrigger />
         <div style={{
           display: 'flex',
           flexDirection: 'column',

@@ -9,6 +9,7 @@ import AdminFilterBar from '../../components/admin/AdminFilterBar'
 import { useAdminSession } from '../../providers/AdminSessionProvider'
 import { AdminLoginScreen } from './AdminLayout'
 import { renderIcon } from '../../utils/iconMap'
+import Card from '../../components/ui/Card'
 
 // Standalone admin tool — not nested under AdminLayout/AdminSidebar, reachable
 // only via the button in AdminTopBar. Reuses the same Ledger Desk tokens/
@@ -150,9 +151,9 @@ function SupportTicketsSection() {
         <button className={`admin-filter-chip ${slaRiskOnly ? 'active' : ''}`} onClick={() => setSlaRiskOnly((v) => !v)}>SLA Breach Risk</button>
       </AdminFilterBar>
 
-      <div className="admin-card" style={{ padding: 0 }}>
+      <Card flush>
         <AdminDataTable columns={columns} data={filtered} loading={loading} emptyMessage="No tickets found" emptyIcon="chat" onRowClick={openTicket} />
-      </div>
+      </Card>
 
       <AdminModal isOpen={!!selected} onClose={() => setSelectedId(null)} title={selected ? `Ticket #${selected.id} — ${selected.subject}` : ''} size="lg"
         footer={selected && (
@@ -304,9 +305,9 @@ function BreachAppealsSection() {
         ))}
       </AdminFilterBar>
 
-      <div className="admin-card" style={{ padding: 0 }}>
+      <Card flush>
         <AdminDataTable columns={columns} data={filtered} loading={loading} emptyMessage="No open appeals" emptyIcon="dispute" onRowClick={openAppeal} />
-      </div>
+      </Card>
 
       <AdminModal isOpen={!!selected} onClose={() => setSelectedId(null)} title={selected ? `Violation #${selected.id} — ${selected.violation_type}` : ''} size="lg"
         footer={selected && (
@@ -327,7 +328,7 @@ function BreachAppealsSection() {
 
             <div className="admin-form-group">
               <label className="admin-label">Evidence Snapshot (trades around time of breach)</label>
-              <div className="admin-card" style={{ padding: 0 }}>
+              <Card flush>
                 <AdminDataTable
                   columns={[
                     { header: 'Opened', render: (row) => new Date(row.open_time).toLocaleTimeString(), isMono: true },
@@ -339,7 +340,7 @@ function BreachAppealsSection() {
                   data={evidence}
                   emptyMessage="No trade data available for this account/window"
                 />
-              </div>
+              </Card>
             </div>
 
             <div className="admin-form-group">
@@ -435,7 +436,7 @@ function NotificationCenterSection() {
 
   return (
     <>
-      <div className="admin-card" style={{ marginBottom: '20px' }}>
+      <Card style={{ marginBottom: '20px' }}>
         <h2 className="admin-h2">Compose Broadcast</h2>
 
         <div className="admin-form-group">
@@ -490,11 +491,11 @@ function NotificationCenterSection() {
         </div>
 
         <button className="admin-btn admin-btn-primary" disabled={!message.trim() || sending} onClick={send}>{sending ? 'Sending...' : 'Send Notification'}</button>
-      </div>
+      </Card>
 
-      <div className="admin-card" style={{ padding: 0 }}>
+      <Card flush>
         <AdminDataTable columns={columns} data={history} loading={loading} emptyMessage="No notifications sent yet" emptyIcon="bell" />
-      </div>
+      </Card>
     </>
   )
 }
@@ -583,9 +584,9 @@ function ComplianceLogSection() {
         </button>
       </AdminFilterBar>
 
-      <div className="admin-card" style={{ padding: 0 }}>
+      <Card flush>
         <AdminDataTable columns={columns} data={entries} loading={loading} emptyMessage="No matching log entries" emptyIcon="file" />
-      </div>
+      </Card>
     </>
   )
 }
@@ -634,9 +635,9 @@ function TosTrackingSection() {
       <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px', marginBottom: '16px' }}>
         Current agreement version: <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--admin-text)' }}>{currentVersion}</span>
       </p>
-      <div className="admin-card" style={{ padding: 0 }}>
+      <Card flush>
         <AdminDataTable columns={columns} data={rows} loading={loading} emptyMessage="No users found" emptyIcon="journal" />
-      </div>
+      </Card>
     </>
   )
 }

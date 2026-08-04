@@ -9,6 +9,7 @@ import { useToast } from '../../components/admin/AdminToast';
 import AdminListToolbar from '../../components/admin/AdminListToolbar';
 import AdminEntityDrawer from '../../components/admin/AdminEntityDrawer';
 import { exportAdminResource, normalizeAdminListResponse } from '../../utils/adminList';
+import Card from '../../components/ui/Card';
 
 const DEFAULT_FILTERS = {
   status: 'all',
@@ -388,7 +389,7 @@ export default function AdminPayouts() {
           ) : null}
         />
 
-        <div className="admin-card" style={{ padding: 0 }}>
+        <Card flush>
           <AdminDataTable
             columns={visibleColumns}
             data={rows}
@@ -412,7 +413,7 @@ export default function AdminPayouts() {
               onToggleAll: () => setSelectedIds(allSelected ? [] : rows.map((row) => String(row.id)))
             }}
           />
-        </div>
+        </Card>
 
         <AdminEntityDrawer
           open={!!drawerRow}

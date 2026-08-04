@@ -7,6 +7,7 @@ import AdminFilterBar from '../../components/admin/AdminFilterBar';
 import AdminListToolbar from '../../components/admin/AdminListToolbar';
 import AdminStatCard from '../../components/admin/AdminStatCard';
 import { useToast } from '../../components/admin/AdminToast';
+import Card from '../../components/ui/Card';
 import { exportAdminResource } from '../../utils/adminList';
 
 const DEFAULT_FILTERS = {
@@ -355,7 +356,7 @@ export default function AdminLeaderboard() {
         <AdminStatCard icon="WR" label="Avg Win Rate" value={`${summary.avgWinRate.toFixed(1)}%`} />
       </div>
 
-      <div className="admin-card" style={{ marginBottom: '20px' }}>
+      <Card style={{ marginBottom: '20px' }}>
         <AdminFilterBar
           searchPlaceholder="Search by trader, email, country, or account UID"
           searchValue={search}
@@ -402,9 +403,9 @@ export default function AdminLeaderboard() {
             </>
           )}
         />
-      </div>
+      </Card>
 
-      <div className="admin-card" style={{ padding: 0 }}>
+      <Card flush>
         <AdminDataTable
           columns={columns}
           data={filteredTraders}
@@ -424,7 +425,7 @@ export default function AdminLeaderboard() {
           pagination={{ current: 1, total: 1, total_items: filteredTraders.length, page_size: filteredTraders.length || 1 }}
           onPageChange={() => {}}
         />
-      </div>
+      </Card>
 
       <AdminEntityDrawer
         open={!!drawerRow}

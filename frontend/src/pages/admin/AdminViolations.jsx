@@ -8,6 +8,7 @@ import AdminModal from '../../components/admin/AdminModal';
 import AdminStatCard from '../../components/admin/AdminStatCard';
 import { useToast } from '../../components/admin/AdminToast';
 import { exportAdminResource } from '../../utils/adminList';
+import Card from '../../components/ui/Card';
 
 const STATUS_FILTERS = ['all', 'open', 'resolved'];
 const SEVERITY_FILTERS = ['all', 'critical', 'high', 'medium', 'low'];
@@ -568,7 +569,7 @@ export default function AdminViolations() {
         ) : null}
       />
 
-      <div className="admin-card" style={{ padding: 0, marginBottom: '24px' }}>
+      <Card flush style={{ marginBottom: '24px' }}>
         <AdminDataTable
           columns={columns}
           data={filteredViolations}
@@ -600,9 +601,9 @@ export default function AdminViolations() {
             }
           }}
         />
-      </div>
+      </Card>
 
-      <div className="admin-card">
+      <Card>
         <h2 className="admin-h2" style={{ marginBottom: '16px' }}>Top Violation Types (Last 24h)</h2>
         {summary?.top_types_last_24h?.length > 0 ? (
           <div style={{ display: 'grid', gap: '10px' }}>
@@ -628,7 +629,7 @@ export default function AdminViolations() {
             <div className="admin-empty-title">No recent violation patterns</div>
           </div>
         )}
-      </div>
+      </Card>
 
       <AdminModal
         isOpen={showModal}

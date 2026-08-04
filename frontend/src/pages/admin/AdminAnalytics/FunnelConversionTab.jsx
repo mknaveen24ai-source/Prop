@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, LabelList } from 'recharts';
 import AdminChart, { chartThemeProps } from '../../../components/admin/AdminChart';
 import AdminDataTable from '../../../components/admin/AdminDataTable';
+import Card from '../../../components/ui/Card';
 
 function withDropoff(stages) {
   return stages.map((s, i, arr) => {
@@ -17,18 +18,40 @@ function withDropoff(stages) {
 }
 
 function FunnelChart({ title, data }) {
+  const [activeIndex, setActiveIndex] = useState(null);
   return (
     <AdminChart title={title} height={Math.max(180, data.length * 70)}>
       <BarChart data={data} layout="vertical" margin={{ right: 90 }}>
         <CartesianGrid {...chartThemeProps.grid} horizontal={false} />
         <XAxis type="number" hide />
         <YAxis dataKey="stage" type="category" {...chartThemeProps.yAxis} width={130} />
-        <Tooltip {...chartThemeProps.tooltip} formatter={(value) => value.toLocaleString()} />
-        <Bar dataKey="count" barSize={34} name="Count">
+        <Tooltip
+          {...chartThemeProps.tooltip}
+          formatter={(value) => value.toLocaleString()}
+          cursor={{ fill: 'var(--admin-accent)', fillOpacity: 0.08 }}
+        />
+        <Bar
+          dataKey="count"
+          barSize={34}
+          name="Count"
+          onMouseEnter={(_, index) => setActiveIndex(index)}
+          onMouseLeave={() => setActiveIndex(null)}
+        >
           <LabelList dataKey="label" position="right" style={{ fill: 'var(--admin-text)', fontFamily: 'var(--font-mono)', fontSize: 12 }} />
-          {data.map((row) => (
-            <Cell key={row.stage} fill={row.dropoff !== null && row.dropoff >= 50 ? 'var(--admin-danger)' : 'var(--admin-accent)'} />
-          ))}
+          {data.map((row, index) => {
+            const color = row.dropoff !== null && row.dropoff >= 50 ? 'var(--admin-danger)' : 'var(--admin-accent)';
+            return (
+              <Cell
+                key={row.stage}
+                fill={color}
+                style={{
+                  filter: index === activeIndex ? `drop-shadow(0 0 6px ${color})` : 'none',
+                  transition: 'filter 160ms ease',
+                  cursor: 'pointer',
+                }}
+              />
+            );
+          })}
         </Bar>
       </BarChart>
     </AdminChart>
@@ -86,9 +109,9 @@ export default function FunnelConversionTab() {
       </div>
 
       <h2 className="admin-h2">Time-to-Outcome & Retry Rate per Phase</h2>
-      <div className="admin-card" style={{ padding: 0, marginBottom: '24px' }}>
+      <Card flush style={{ marginBottom: '24px' }}>
         <AdminDataTable columns={timingColumns} data={phaseTiming} loading={loading} emptyMessage="No completed phases yet" emptyIcon="timer" />
-      </div>
+      </Card>
 
       <AdminChart title="Conversion Rate per Order Tier">
         <BarChart data={conversionByTier}>

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import ThemeToggle from '../components/ThemeToggle'
 import { PageWrapper } from '../App'
 import { renderIcon } from '../utils/iconMap'
+import Card from '../components/ui/Card'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
@@ -43,18 +44,18 @@ export default function Leaderboard() {
         {loading ? (
           <div style={{ textAlign: 'center', padding: '80px', color: 'var(--text-muted)' }}>Loading...</div>
         ) : leaders.length === 0 ? (
-          <div className="card" style={{ textAlign: 'center', padding: '64px' }}>
+          <Card style={{ textAlign: 'center', padding: '64px' }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
               {renderIcon('analytics', { size: 40, color: 'var(--accent)' })}
             </div>
             <p style={{ color: 'var(--text-muted)' }}>No funded traders yet. Be the first!</p>
-          </div>
+          </Card>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {leaders.map((row, idx) => (
-              <div
+              <Card
                 key={idx}
-                className="card"
+                interactive
                 onClick={() => navigate(`/trader/${row.user_id}`)}
                 style={{
                   display: 'flex',
@@ -104,7 +105,7 @@ export default function Leaderboard() {
                     +${parseFloat(row.profit_usd).toFixed(2)}
                   </div>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         )}

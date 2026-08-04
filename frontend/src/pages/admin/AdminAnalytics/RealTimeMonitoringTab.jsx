@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
-import AdminChart, { chartThemeProps } from '../../../components/admin/AdminChart';
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import AdminChart, { chartThemeProps, dimUnlessActive, barHoverHandlers, renderStackedTotalLabel } from '../../../components/admin/AdminChart';
 import AdminDataTable from '../../../components/admin/AdminDataTable';
 import AdminStatCard from '../../../components/admin/AdminStatCard';
 import AdminStatGrid from '../../../components/admin/AdminStatGrid';
 import AdminBadge from '../../../components/admin/AdminBadge';
+import Card from '../../../components/ui/Card';
 import { pnlColor } from './shared';
 
 const POLL_INTERVAL_MS = 5000;
@@ -14,6 +15,7 @@ export default function RealTimeMonitoringTab() {
   const { adminAxios } = useOutletContext();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [exposureActiveIndex, setExposureActiveIndex] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,24 +69,41 @@ export default function RealTimeMonitoringTab() {
       </AdminStatGrid>
 
       <h2 className="admin-h2">Open Positions — All Accounts</h2>
-      <div className="admin-card" style={{ padding: 0, marginBottom: '24px' }}>
+      <Card flush style={{ marginBottom: '24px' }}>
         <AdminDataTable columns={positionColumns} data={positions} loading={loading} emptyMessage="No open positions" emptyIcon="trades" />
-      </div>
+      </Card>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         <AdminChart title="Firm Exposure per Instrument (Lots)">
-          <BarChart data={exposure}>
+          <BarChart data={exposure} {...barHoverHandlers(setExposureActiveIndex)}>
             <CartesianGrid {...chartThemeProps.grid} />
             <XAxis dataKey="instrument" {...chartThemeProps.xAxis} />
             <YAxis {...chartThemeProps.yAxis} />
             <Tooltip {...chartThemeProps.tooltip} />
             <Legend wrapperStyle={{ fontSize: '12px' }} />
-            <Bar dataKey="buyLots" stackId="lots" fill="var(--admin-success)" name="Buy Lots" />
-            <Bar dataKey="sellLots" stackId="lots" fill="var(--admin-danger)" name="Sell Lots" />
+            <Bar dataKey="buyLots" stackId="lots" fill="var(--admin-success)" name="Buy Lots">
+              {exposure.map((_, index) => (
+                <Cell key={`buy-${index}`} fillOpacity={dimUnlessActive(exposureActiveIndex, index)} />
+              ))}
+            </Bar>
+            <Bar
+              dataKey="sellLots"
+              stackId="lots"
+              fill="var(--admin-danger)"
+              name="Sell Lots"
+              label={renderStackedTotalLabel(exposureActiveIndex, (i) => {
+                const row = exposure[i];
+                return row ? row.buyLots + row.sellLots : null;
+              })}
+            >
+              {exposure.map((_, index) => (
+                <Cell key={`sell-${index}`} fillOpacity={dimUnlessActive(exposureActiveIndex, index)} />
+              ))}
+            </Bar>
           </BarChart>
         </AdminChart>
 
-        <div className="admin-card">
+        <Card style={{ marginBottom: '24px' }}>
           <h3 className="admin-h2" style={{ marginBottom: '16px' }}>Directional Bias</h3>
           <div style={{ display: 'flex', height: '28px', border: '1px solid var(--rule)' }}>
             <div style={{ width: `${buyPct}%`, background: 'var(--admin-success)' }} />
@@ -107,7 +126,7 @@ export default function RealTimeMonitoringTab() {
               ))}
             </ul>
           )}
-        </div>
+        </Card>
       </div>
     </>
   );

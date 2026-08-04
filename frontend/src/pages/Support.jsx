@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import axios from 'axios'
 import { renderIcon } from '../utils/iconMap'
+import Card from '../components/ui/Card'
 
 
 
@@ -91,7 +92,7 @@ export default function Support({ user }) {
       <div className="trader-service-layout">
         
         {activeTab === 'new' ? (
-          <div className="card trader-service-card">
+          <Card className="trader-service-card">
             {error && <div style={{ background: 'color-mix(in srgb, var(--red) 10%, transparent)', border: '1px solid var(--red)', padding: '12px 16px', marginBottom: '20px', color: 'var(--red)', fontSize: '13px' }}>{error}</div>}
             
             <div className="input-group">
@@ -128,9 +129,9 @@ export default function Support({ user }) {
                 <span>{submitting ? 'Submitting...' : 'Submit Ticket'}</span>
               </span>
             </button>
-          </div>
+          </Card>
         ) : (
-          <div className="card trader-service-card service-table-card">
+          <Card flush className="trader-service-card service-table-card">
             {loadingTickets ? <div style={{ padding: '24px', color:'var(--text-muted)' }}>Loading tickets...</div> : 
              tickets.length === 0 ? <div style={{ padding: '40px 24px', textAlign:'center', color:'var(--text-muted)' }}>You have no support tickets.</div> :
              <table style={{ width:'100%', borderCollapse:'collapse' }}>
@@ -159,19 +160,19 @@ export default function Support({ user }) {
                </tbody>
              </table>
             }
-          </div>
+          </Card>
         )}
 
         {/* ── Help Panel (Sidebar) ── */}
         <div className="service-side-panel">
           {user && (
-            <div className="card" style={{ padding: '16px 20px' }}>
+            <Card style={{ padding: '16px 20px' }}>
               <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginBottom: '10px', letterSpacing: '0.08em' }}>SUBMITTING AS</div>
               <div style={{ fontSize: '14px', color: 'var(--text)', fontWeight: '600', marginBottom: '4px' }}>{user.full_name}</div>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{user.email}</div>
-            </div>
+            </Card>
           )}
-          <div className="card" style={{ padding: '16px 20px' }}>
+          <Card style={{ padding: '16px 20px' }}>
             <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginBottom: '12px', letterSpacing: '0.08em' }}>RESPONSE TIMES</div>
             {[ { label: 'KYC / Payout', time: '24 hours' }, { label: 'Account Issues', time: '24–48 hours' }, { label: 'Technical Bugs', time: '48–72 hours' } ].map(row => (
               <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid var(--navy-border)' }}>
@@ -179,7 +180,7 @@ export default function Support({ user }) {
                 <span style={{ fontSize: '12px', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{row.time}</span>
               </div>
             ))}
-          </div>
+          </Card>
         </div>
 
       </div>

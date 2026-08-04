@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import './admin.css'
 import { AdminToastProvider, useToast } from '../../components/admin/AdminToast'
 import AdminSidebar from '../../components/admin/AdminSidebar'
+import CommandPalette from '../../components/CommandPalette'
+import { buildAdminNavResults } from '../../components/admin/adminNavResults'
 import AdminTopBar from '../../components/admin/AdminTopBar'
 import { useAdminSession } from '../../providers/AdminSessionProvider'
 import ErrorBoundary from '../../ErrorBoundary'
@@ -145,7 +147,7 @@ export function AdminLoginScreen({ onLoginSuccess }) {
       <div style={{ position: 'absolute', top: '24px', right: '24px', zIndex: 20 }}>
         <ThemeToggle />
       </div>
-      <div className="admin-card ui-surface ui-auth-card" style={{ position: 'relative', zIndex: 10 }}>
+      <div className="lx-card ui-surface ui-auth-card" style={{ position: 'relative', zIndex: 10 }}>
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <div style={{ width: '48px', height: '48px', background: 'var(--admin-accent-bg)', color: 'var(--admin-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: '24px' }}>
             {step === 'totp' ? '🔐' : '⚡'}
@@ -269,6 +271,7 @@ export default function AdminLayout() {
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
 
   if (checking) {
     return <div className="mode-operator admin-layout" style={{ justifyContent: 'center', alignItems: 'center' }}>Connecting secure tunnel...</div>
@@ -281,6 +284,9 @@ export default function AdminLayout() {
   return (
     <AdminToastProvider>
       <AdminRealtimeAlerts socket={socket} />
+      <CommandPalette
+        results={buildAdminNavResults({ isSuperAdmin: session?.role === 'super_admin', navigate })}
+      />
       <div className="mode-operator admin-layout">
         <AdminSidebar
           adminAxios={adminAxios}

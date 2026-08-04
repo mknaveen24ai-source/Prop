@@ -1,4 +1,5 @@
 import React from 'react';
+import Card from '../../ui/Card';
 
 export function Skeleton({ height = 40, width = '100%', radius = 8, style = {} }) {
   return (
@@ -20,10 +21,10 @@ export function StatsSkeleton() {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '24px' }}>
       {Array.from({ length: 6 }).map((_, index) => (
-        <div key={index} className="admin-card" style={{ padding: '20px' }}>
+        <Card key={index} style={{ padding: '20px' }}>
           <Skeleton height={12} width="60%" style={{ marginBottom: '12px' }} />
           <Skeleton height={28} width="40%" />
-        </div>
+        </Card>
       ))}
     </div>
   );
@@ -31,10 +32,10 @@ export function StatsSkeleton() {
 
 export function ChartSkeleton({ height = 220 }) {
   return (
-    <div className="admin-card" style={{ padding: '20px' }}>
+    <Card style={{ padding: '20px' }}>
       <Skeleton height={14} width="45%" style={{ marginBottom: '16px' }} />
       <Skeleton height={height} radius={6} />
-    </div>
+    </Card>
   );
 }
 

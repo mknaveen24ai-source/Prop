@@ -10,8 +10,8 @@ import AdminBadge from '../../../components/admin/AdminBadge';
 import AdminModal from '../../../components/admin/AdminModal';
 import Sparkline from './Sparkline';
 import { pnlColor } from './shared';
-
-const STATUS_COLORS = { Clean: 'var(--admin-success)', Warned: 'var(--admin-warning)', Breached: 'var(--admin-danger)' };
+import { getAdminStatusColor } from '../../../components/admin/adminStatusTone';
+import Card from '../../../components/ui/Card';
 
 function accountStatusBadgeProps(status) {
   const s = String(status || '').toLowerCase();
@@ -67,9 +67,9 @@ export default function RiskViolationTab() {
   }, [adminAxios]);
 
   const pieData = [
-    { name: 'Clean', value: statusCounts.clean || 0, color: STATUS_COLORS.Clean },
-    { name: 'Warned', value: statusCounts.warned || 0, color: STATUS_COLORS.Warned },
-    { name: 'Breached', value: statusCounts.breached || 0, color: STATUS_COLORS.Breached },
+    { name: 'Clean', value: statusCounts.clean || 0, color: getAdminStatusColor('clean') },
+    { name: 'Warned', value: statusCounts.warned || 0, color: getAdminStatusColor('warned') },
+    { name: 'Breached', value: statusCounts.breached || 0, color: getAdminStatusColor('breached') },
   ];
 
   const violationTypes = useMemo(() => ['All', ...Array.from(new Set(violations.map((v) => v.violation_type)))], [violations]);
@@ -127,9 +127,9 @@ export default function RiskViolationTab() {
       </AdminChart>
 
       <h2 className="admin-h2" style={{ marginTop: '24px' }}>Daily Drawdown Tracking — Active Accounts</h2>
-      <div className="admin-card" style={{ padding: 0, marginBottom: '24px' }}>
+      <Card flush style={{ marginBottom: '24px' }}>
         <AdminDataTable columns={drawdownColumns} data={accounts} loading={accountsLoading} emptyMessage="No active accounts" emptyIcon="violations" />
-      </div>
+      </Card>
 
       <h2 className="admin-h2">Violation Log</h2>
       <AdminFilterBar searchPlaceholder="Search by user ID..." searchValue={search} onSearchChange={setSearch}>
@@ -138,7 +138,7 @@ export default function RiskViolationTab() {
         ))}
       </AdminFilterBar>
 
-      <div className="admin-card" style={{ padding: 0 }}>
+      <Card flush style={{ marginBottom: '24px' }}>
         <AdminDataTable
           columns={violationColumns}
           data={filteredViolations}
@@ -147,13 +147,13 @@ export default function RiskViolationTab() {
           emptyIcon="violations"
           rowActions={(row) => [{ label: 'View Evidence', icon: 'file', onClick: () => openEvidence(row) }]}
         />
-      </div>
+      </Card>
 
       <AdminModal isOpen={!!evidenceRow} onClose={() => setEvidenceRow(null)} title={evidenceRow ? `Violation #${evidenceRow.id} — ${evidenceRow.violation_type}` : ''} size="lg">
         {evidenceRow && (
           <div>
             <p style={{ fontSize: '13px', color: 'var(--admin-text-muted)', marginBottom: '16px' }}>{evidenceRow.message}</p>
-            <div className="admin-card" style={{ padding: 0 }}>
+            <Card flush style={{ marginBottom: '24px' }}>
               <AdminDataTable
                 columns={[
                   { header: 'Opened', render: (row) => new Date(row.open_time).toLocaleTimeString(), isMono: true },
@@ -165,7 +165,7 @@ export default function RiskViolationTab() {
                 data={evidenceTrades}
                 emptyMessage="No trade data available for this account/window"
               />
-            </div>
+            </Card>
           </div>
         )}
       </AdminModal>

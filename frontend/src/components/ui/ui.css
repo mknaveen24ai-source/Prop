@@ -3,11 +3,17 @@
    A small, self-contained set of classes for the Button / Card / StatCell /
    Field / Table React primitives in this folder. Everything routes through
    tokens.css: color via --paper/--ink/--rule/--gain/--loss/--warn/--muted,
-   spacing via the --space-* scale, type via --font-*. No hardcoded hex, no
-   drop shadows, no gradients, no border-radius — theme-aware in both the
-   Rag Cotton White (light) and Charcoal Noir (dark) editions by construction.
+   spacing via the --space-* scale, type via --font-*. No hardcoded hex —
+   v2 "Modern Gazette" adds a whisper-soft --elev shadow, glass surfaces and
+   a 4-5px radius cap (see tokens.css), theme-aware in both the Rag Cotton
+   White (light) and Charcoal Noir (dark) editions by construction.
    The `lx-` prefix keeps this layer from colliding with the legacy .btn/.card
-   and the .admin-* / .mp-* families.
+   and the .admin-* / .mp-* families (being migrated onto this layer — see
+   Card.jsx and the per-page migrations).
+   Handoff-spec token names: the v2 doc calls the hover-glow token `--glow`
+   and the tinted-fill token `--soft` — this app already has those under
+   `--accent-glow` (glow) and `--brand-primary-soft` / `--accent-dim` (soft).
+   Use the existing names; don't reintroduce `--glow`/`--soft` as new tokens.
    ============================================================================ */
 
 /* ── Button ───────────────────────────────────────────────────────────────── */
@@ -77,13 +83,48 @@
 .lx-btn--full { width: 100%; }
 
 /* ── Card ─────────────────────────────────────────────────────────────────── */
+/* The one card recipe (v2 "Modern Gazette" handoff spec): glass surface,
+   whisper-soft --elev shadow, 4px radius — never a flat solid box. */
 .lx-card {
-  background: var(--paper-2);
+  position: relative;
+  background: var(--glass);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
   border: 1px solid var(--rule);
-  padding: var(--space-6);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--elev);
+  padding: 20px 18px;
+  transition: border-color 0.16s ease;
 }
-.lx-card--ruled { border-top: 3px double var(--ink); }
+.lx-card:hover { border-color: var(--accent); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lx-card { background: var(--paper-2); }
+}
+
 .lx-card--flush { padding: 0; }
+
+/* Stat variant: tighter density + a 2px tone bar along the top edge. Pass
+   --tone (a color) via inline style on the element to set the bar color. */
+.lx-card--stat {
+  padding: 15px 16px;
+}
+.lx-card--stat::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: var(--tone, var(--accent));
+}
+
+/* Interactive variant: for cards that drill through to a detail view */
+.lx-card--interactive {
+  cursor: pointer;
+}
+.lx-card--interactive:hover {
+  border-color: var(--accent);
+  box-shadow: var(--elev-lg);
+}
 
 .lx-card__head {
   display: flex;
@@ -91,6 +132,13 @@
   justify-content: space-between;
   gap: var(--space-4);
   margin-bottom: var(--space-5);
+  border-bottom: 1px solid var(--rule-soft);
+  padding-bottom: var(--space-3);
+}
+/* Primary card headers (--ruled modifier) get the masthead double-rule;
+   secondary/nested headers keep the 1px hairline above. */
+.lx-card--ruled > .lx-card__head {
+  border-bottom: 3px double var(--rule);
 }
 .lx-card__eyebrow {
   font-family: var(--font-mono);
@@ -149,12 +197,22 @@
 
 /* ── StatCell ─────────────────────────────────────────────────────────────── */
 .lx-stat {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  padding: var(--space-4) var(--space-5);
+  padding: 15px 16px;
   border: 1px solid var(--rule);
-  background: transparent;
+  border-radius: var(--radius-sm);
+  background: var(--glass);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  box-shadow: var(--elev);
+  transition: border-color 0.16s ease;
+}
+.lx-stat:hover { border-color: var(--accent); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lx-stat { background: var(--paper-2); }
 }
 .lx-stat__label {
   font-family: var(--font-mono);
@@ -239,7 +297,7 @@ textarea.lx-field__control { resize: vertical; min-height: 84px; }
 }
 .lx-table tbody td {
   padding: var(--space-3);
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule-soft);
   font-size: 13px;
   color: var(--ink);
   vertical-align: middle;
@@ -256,6 +314,24 @@ textarea.lx-field__control { resize: vertical; min-height: 84px; }
   text-align: center;
   color: var(--muted);
   font-size: 13px;
+}
+
+/* ── Badge ────────────────────────────────────────────────────────────────── */
+/* Status pill — driven entirely by the shared ACCOUNT_STATUSES lookup
+   (utils/constants.js) via the StatusBadge component. One markup, every
+   trader-facing status: mono, uppercase, bordered, never filled. */
+.lx-badge {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  padding: 2px 7px;
+  white-space: nowrap;
+  line-height: 1.5;
 }
 
 @media (prefers-reduced-motion: reduce) {

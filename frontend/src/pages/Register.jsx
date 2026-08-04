@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useBranding } from '../BrandingContext'
+import AuthMasthead from '../components/auth/AuthMasthead'
 
 function EyeIcon({ hidden }) {
   return (
@@ -215,9 +216,9 @@ function Register({ onLogin }) {
   // ── Shared card header ──────────────────────────────────────────────────────
   const cardHeader = (
     <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-        <div className="auth-logo-mark">⚡</div>
-      </div>
+      <span className="auth-eyebrow" style={{ display: 'block', marginBottom: '12px' }}>
+        {step === STEP_OTP ? 'Phone Verification' : 'New Account'}
+      </span>
       <h1 style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: '8px' }}>
         {step === STEP_OTP ? 'Verify your phone' : `Create your ${tenant?.name || 'trading'} account.`}
       </h1>
@@ -233,6 +234,7 @@ function Register({ onLogin }) {
     <div className="auth-shell mode-public" style={{
       minHeight: '100vh',
       display: 'flex',
+      flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
       padding: '24px',
@@ -250,7 +252,9 @@ function Register({ onLogin }) {
       <div className="auth-ambient auth-ambient-primary" />
       <div className="auth-ambient auth-ambient-secondary" />
 
-      <div className="card auth-glass-card" style={{ width: '460px', zIndex: 10, animation: 'fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1)', padding: '40px 32px' }}>
+      <AuthMasthead eyebrow="Section B · New Members" maxWidth={460} />
+
+      <div className="lx-card auth-glass-card" style={{ width: '460px', zIndex: 10, animation: 'fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1)', padding: '40px 32px' }}>
 
         {cardHeader}
 
@@ -264,8 +268,8 @@ function Register({ onLogin }) {
                 {i > 0 && <div style={{ flex: 1, height: '1px', background: done || step === STEP_OTP ? 'var(--accent)' : 'var(--border)' }} />}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <div style={{
-                    width: '22px', height: '22px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '11px', fontWeight: 700,
+                    width: '22px', height: '22px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '11px', fontWeight: 700, fontFamily: 'var(--font-mono)',
                     background: done ? 'var(--accent)' : active ? 'var(--accent)' : 'var(--bg-hover)',
                     color: done || active ? 'var(--paper)' : 'var(--text-muted)',
                     border: `1.5px solid ${done || active ? 'var(--accent)' : 'var(--border)'}`,
@@ -273,7 +277,7 @@ function Register({ onLogin }) {
                   }}>
                     {done ? '✓' : i + 1}
                   </div>
-                  <span style={{ fontSize: '12px', fontWeight: active ? 600 : 400, color: active ? 'var(--accent)' : 'var(--text-muted)' }}>{label}</span>
+                  <span style={{ fontSize: '12px', fontWeight: active ? 600 : 400, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em', textTransform: 'uppercase', color: active ? 'var(--accent)' : 'var(--text-muted)' }}>{label}</span>
                 </div>
               </React.Fragment>
             )

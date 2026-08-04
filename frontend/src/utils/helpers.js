@@ -104,25 +104,12 @@ export function calculateMargin(instrument, lots) {
 }
 
 /**
- * Get status color for display
+ * Get status color for display — single source of truth is ACCOUNT_STATUSES
+ * in utils/constants.js; re-exported here so existing imports keep working.
  * @param {string} status - Status value
  * @returns {string} CSS color value
  */
-export function getStatusColor(status) {
-  const colors = {
-    active: 'var(--accent)',
-    passed: 'var(--green)',
-    failed: 'var(--red)',
-    funded: 'var(--cyan)',
-    pending: 'var(--accent)',
-    approved: 'var(--green)',
-    paid: 'var(--green)',
-    rejected: 'var(--red)',
-    locked: 'var(--muted)',
-    expired: 'var(--muted)'
-  }
-  return colors[status] || 'var(--muted)'
-}
+export { getStatusColor } from './constants.js'
 
 /**
  * Format currency for display

@@ -3,6 +3,7 @@ import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import AdminBadge from '../../components/admin/AdminBadge';
 import AdminDataTable from '../../components/admin/AdminDataTable';
 import { useToast } from '../../components/admin/AdminToast';
+import Card from '../../components/ui/Card';
 
 function formatMoney(value) {
   return `$${parseFloat(value || 0).toFixed(2)}`;
@@ -241,11 +242,11 @@ export default function AdminAccountDetail() {
 
   if (!account) {
     return (
-      <div className="admin-card">
+      <Card>
         <h1 className="admin-h1">Account Detail</h1>
         <p style={{ color: 'var(--admin-text-muted)' }}>The requested account could not be found.</p>
         <button className="admin-btn admin-btn-ghost" onClick={() => navigate('/admin/violations')}>Back To Violations</button>
-      </div>
+      </Card>
     );
   }
 
@@ -256,7 +257,7 @@ export default function AdminAccountDetail() {
           <button className="admin-btn admin-btn-ghost" style={{ marginBottom: '12px' }} onClick={() => navigate('/admin/violations')}>
             ← Back To Violations
           </button>
-          <h1 className="admin-h1">Account #{String(account.id).padStart(5, '0')}</h1>
+          <h1 className="admin-h1">Account {account.account_uid || `#${String(account.id).padStart(5, '0')}`}</h1>
           <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
             {formatAccountType(account.account_type)} account for {account.full_name || account.user_email || account.email}
           </p>
@@ -272,14 +273,14 @@ export default function AdminAccountDetail() {
           { label: 'Open Violations', value: String(openViolations.length) },
           { label: 'Actions Logged', value: String(enforcementEvents.length) }
         ].map((card) => (
-          <div key={card.label} className="admin-card" style={{ margin: 0 }}>
+          <Card key={card.label} stat style={{ margin: 0 }}>
             <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>{card.label}</div>
             <div style={{ marginTop: '8px', fontSize: '24px', fontFamily: 'var(--admin-font-mono)', fontWeight: 700 }}>{card.value}</div>
-          </div>
+          </Card>
         ))}
       </div>
 
-      <div className="admin-card" style={{ marginBottom: '24px' }}>
+      <Card style={{ marginBottom: '24px' }}>
         <h2 className="admin-h2" style={{ marginBottom: '16px' }}>Account Snapshot</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px' }}>
           <div>
@@ -343,9 +344,9 @@ export default function AdminAccountDetail() {
             View Violations Feed
           </button>
         </div>
-      </div>
+      </Card>
 
-      <div className="admin-card" style={{ marginBottom: '24px' }}>
+      <Card style={{ marginBottom: '24px' }}>
         <h2 className="admin-h2" style={{ marginBottom: '16px' }}>Admin Controls</h2>
         {!isSuperAdmin && (
           <div style={{ marginBottom: '16px', color: 'var(--admin-text-muted)', fontSize: '13px' }}>
@@ -468,9 +469,9 @@ export default function AdminAccountDetail() {
             </div>
           </div>
         )}
-      </div>
+      </Card>
 
-      <div className="admin-card" style={{ padding: 0 }}>
+      <Card flush>
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--admin-border)' }}>
           <h2 className="admin-h2" style={{ margin: 0 }}>Violations For This Account</h2>
         </div>
@@ -483,9 +484,9 @@ export default function AdminAccountDetail() {
           pagination={{ current: 1, total: 1 }}
           onPageChange={() => {}}
         />
-      </div>
+      </Card>
 
-      <div className="admin-card" style={{ padding: 0, marginTop: '24px' }}>
+      <Card flush style={{ marginTop: '24px' }}>
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--admin-border)' }}>
           <h2 className="admin-h2" style={{ margin: 0 }}>Automation Action History</h2>
         </div>
@@ -498,7 +499,7 @@ export default function AdminAccountDetail() {
           pagination={{ current: 1, total: 1 }}
           onPageChange={() => {}}
         />
-      </div>
+      </Card>
     </>
   );
 }

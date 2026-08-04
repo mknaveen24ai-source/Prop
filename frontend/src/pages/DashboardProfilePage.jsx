@@ -1,4 +1,5 @@
 import React from 'react'
+import Card from '../components/ui/Card'
 
 const COUNTRY_OPTIONS = [
   'India', 'United Kingdom', 'Australia', 'UAE', 'South Africa', 'Nigeria',
@@ -30,7 +31,7 @@ export default function DashboardProfilePage({
         Profile
       </h2>
 
-      <div className="card" style={{ maxWidth: '700px' }}>
+      <Card style={{ maxWidth: '700px' }}>
         <h3 style={{ marginBottom: '20px', color: 'var(--accent)' }}>Name & Address</h3>
         <form onSubmit={updateProfile}>
           <div className="grid-2">
@@ -127,7 +128,7 @@ export default function DashboardProfilePage({
             {profileSaving ? 'Saving...' : 'Save Changes'}
           </button>
         </form>
-      </div>
+      </Card>
     </div>
   )
 }

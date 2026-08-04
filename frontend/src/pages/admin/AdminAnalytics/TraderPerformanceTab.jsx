@@ -6,6 +6,7 @@ import AdminDataTable from '../../../components/admin/AdminDataTable';
 import AdminStatCard from '../../../components/admin/AdminStatCard';
 import AdminStatGrid from '../../../components/admin/AdminStatGrid';
 import AdminFilterBar from '../../../components/admin/AdminFilterBar';
+import Card from '../../../components/ui/Card';
 import { pnlColor } from './shared';
 
 function average(list, key) {
@@ -92,7 +93,7 @@ export default function TraderPerformanceTab() {
 
       <AdminFilterBar searchPlaceholder="Search by trader email or name..." searchValue={search} onSearchChange={setSearch} />
 
-      <div className="admin-card" style={{ padding: 0, marginBottom: '24px' }}>
+      <Card flush style={{ marginBottom: '24px' }}>
         <AdminDataTable
           columns={columns}
           data={sorted}
@@ -103,7 +104,7 @@ export default function TraderPerformanceTab() {
           emptyMessage="No closed trades yet — this firm has no trading activity recorded"
           emptyIcon="trade"
         />
-      </div>
+      </Card>
 
       {selected && (
         <>
@@ -118,7 +119,7 @@ export default function TraderPerformanceTab() {
             </LineChart>
           </AdminChart>
 
-          <div className="admin-card" style={{ marginTop: '24px' }}>
+          <Card style={{ marginTop: '24px' }}>
             <h2 className="admin-h2">Full Stat Block — {selected.fullName || selected.email || selected.traderId}</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px' }}>
               {[
@@ -137,7 +138,7 @@ export default function TraderPerformanceTab() {
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
         </>
       )}
     </>

@@ -2,6 +2,12 @@ import React, { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useBranding } from '../BrandingContext'
 import { authAPI } from '../services/api'
+import AuthMasthead from '../components/auth/AuthMasthead'
+
+// Cosmetic/local-only "remember me" — pre-fills the email field on return
+// visits. authAPI.login() has no session-duration param, so this doesn't
+// extend the actual server session, just spares a retype.
+const REMEMBER_EMAIL_KEY = 'propfirm:remembered-email'
 
 function EyeIcon({ hidden }) {
   return (
@@ -152,7 +158,10 @@ function TotpInput({ onSubmit, onBack, loading, error }) {
 function Login({ onLogin, initialMode = 'login' }) {
   const { tenant } = useBranding()
   const [mode, setMode]         = useState(initialMode === 'reset' ? 'reset' : 'login')  // 'login' | 'totp' | 'forgot' | 'reset'
-  const [email, setEmail]       = useState('')
+  const [email, setEmail]       = useState(() => {
+    try { return localStorage.getItem(REMEMBER_EMAIL_KEY) || '' } catch { return '' }
+  })
+  const [rememberMe, setRememberMe] = useState(true)
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [resetToken, setResetToken]   = useState('')
@@ -189,6 +198,11 @@ function Login({ onLogin, initialMode = 'login' }) {
     setLoading(true)
     try {
       const response = await authAPI.login(email, password)
+
+      try {
+        if (rememberMe) localStorage.setItem(REMEMBER_EMAIL_KEY, email)
+        else localStorage.removeItem(REMEMBER_EMAIL_KEY)
+      } catch { /* ignore storage errors (private browsing, etc.) */ }
 
       if (response.data.requires2FA) {
         // Password accepted — go to 2FA step
@@ -262,11 +276,16 @@ function Login({ onLogin, initialMode = 'login' }) {
     setLoading(false)
   }
 
+  const modeEyebrow = mode === 'forgot' ? 'Password Recovery'
+    : mode === 'reset'  ? 'Password Reset'
+    : 'Member Sign-In'
+
   return (
-    <div className="auth-shell mode-public" style={{ 
-      minHeight: '100vh', 
-      display: 'flex', 
-      alignItems: 'center', 
+    <div className="auth-shell mode-public" style={{
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
       justifyContent: 'center',
       position: 'relative',
       overflow: 'hidden'
@@ -283,16 +302,14 @@ function Login({ onLogin, initialMode = 'login' }) {
       <div className="auth-ambient auth-ambient-primary" />
       <div className="auth-ambient auth-ambient-secondary" />
 
-      <div className="card auth-glass-card" style={{ width: '420px', zIndex: 10, animation: 'fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+      {mode !== 'totp' && <AuthMasthead eyebrow="Section A · Members" maxWidth={420} />}
+
+      <div className="lx-card auth-glass-card" style={{ width: '420px', zIndex: 10, animation: 'fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1)' }}>
 
         {/* ── HEADER ── */}
         {mode !== 'totp' && (
           <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
-              <div className="auth-logo-mark">
-                ⚡
-              </div>
-            </div>
+            <span className="auth-eyebrow" style={{ display: 'block', marginBottom: '12px' }}>{modeEyebrow}</span>
             <h1 style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: '8px' }}>
               Sign in to {tenant?.name || 'your portal'}.
             </h1>
@@ -359,13 +376,22 @@ function Login({ onLogin, initialMode = 'login' }) {
               </div>
             </div>
 
-            <div style={{ textAlign: 'right', marginBottom: '16px', marginTop: '-4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', marginTop: '-4px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={e => setRememberMe(e.target.checked)}
+                  style={{ accentColor: 'var(--accent)', cursor: 'pointer' }}
+                />
+                Keep me on the floor
+              </label>
               <button
                 type="button"
                 onClick={() => { setMode('forgot'); setError(''); setSuccess('') }}
                 className="auth-text-link"
                 style={{
-                  border: 'none', fontSize: '12px',
+                  background: 'transparent', border: 'none', fontSize: '12px',
                   cursor: 'pointer', padding: 0
                 }}
               >

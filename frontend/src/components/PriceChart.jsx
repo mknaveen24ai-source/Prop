@@ -16,6 +16,9 @@ function PriceChart({ instrument, prices }) {
   const candleSeriesRef   = useRef(null)
   const currentCandleRef  = useRef(null)
   const candlesLoadedRef  = useRef(false)
+  const allCandlesRef     = useRef([])
+  const tooltipElRef      = useRef(null)
+  const pinTooltipToLastRef = useRef(() => {})
   const [selectedTF, setSelectedTF] = useState(DEFAULT_CHART_TIMEFRAME)
   const selectedTFRef               = useRef(DEFAULT_CHART_TIMEFRAME)
   const [loading, setLoading]       = useState(false)
@@ -94,6 +97,65 @@ function PriceChart({ instrument, prices }) {
     chartRef.current        = chart
     candleSeriesRef.current = candleSeries
 
+    // Chart contract (v2 "Modern Gazette" handoff spec): crosshair + dot +
+    // tooltip anchored to the point, and it never blanks — with no hover it
+    // pins to the last candle instead of disappearing.
+    function renderTooltipAt(candle, prevCandle) {
+      const el = tooltipElRef.current
+      const series = candleSeriesRef.current
+      const c = chartRef.current
+      const container = chartContainerRef.current
+      if (!el || !series || !c || !container || !candle) return
+      const x = c.timeScale().timeToCoordinate(candle.time)
+      const y = series.priceToCoordinate(candle.close)
+      if (x == null || y == null) { el.style.display = 'none'; return }
+
+      const delta = prevCandle ? candle.close - prevCandle.close : 0
+      const deltaPct = prevCandle && prevCandle.close ? (delta / prevCandle.close) * 100 : 0
+      const up = delta >= 0
+      const tone = up ? chartColorsRef.current.up : chartColorsRef.current.down
+      const sign = up ? '+' : ''
+
+      el.innerHTML =
+        '<div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)">' +
+          (instrument || '') +
+        '</div>' +
+        '<div style="font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:15px;color:var(--ink);margin-top:2px">' +
+          candle.close.toFixed(5) +
+        '</div>' +
+        '<div style="font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:11px;color:' + tone + ';margin-top:2px">' +
+          sign + delta.toFixed(5) + ' (' + sign + deltaPct.toFixed(2) + '%)' +
+        '</div>'
+
+      const width = container.clientWidth
+      const left = Math.min(Math.max(x + 12, 4), width - 150)
+      el.style.left = left + 'px'
+      el.style.top = Math.max(y - 46, 4) + 'px'
+      el.style.display = 'block'
+    }
+
+    function pinTooltipToLast() {
+      const candles = allCandlesRef.current
+      if (!candles.length) {
+        if (tooltipElRef.current) tooltipElRef.current.style.display = 'none'
+        return
+      }
+      renderTooltipAt(candles[candles.length - 1], candles[candles.length - 2])
+    }
+    pinTooltipToLastRef.current = pinTooltipToLast
+
+    chart.subscribeCrosshairMove((param) => {
+      const candles = allCandlesRef.current
+      if (!candles.length) return
+      if (!param || param.time == null || !param.point) {
+        pinTooltipToLast()
+        return
+      }
+      const idx = candles.findIndex((cd) => cd.time === param.time)
+      if (idx === -1) { pinTooltipToLast(); return }
+      renderTooltipAt(candles[idx], candles[idx - 1])
+    })
+
     const resizeObserver = new ResizeObserver(() => {
       if (chartContainerRef.current && chartRef.current) {
         chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth })
@@ -159,6 +221,7 @@ function PriceChart({ instrument, prices }) {
 
       candleSeriesRef.current.setData(clean)
       candlesLoadedRef.current = true
+      allCandlesRef.current    = clean
 
       const last = clean[clean.length - 1]
       if (last) currentCandleRef.current = { ...last }
@@ -166,6 +229,7 @@ function PriceChart({ instrument, prices }) {
       // fitContent() scales the visible range to show all loaded candles.
       // scrollToPosition alone only pans — it doesn't zoom to fit.
       chartRef.current?.timeScale().fitContent()
+      pinTooltipToLastRef.current()
 
     } catch (err) {
       console.error('PriceChart: failed to load candles', err.message)
@@ -212,6 +276,14 @@ function PriceChart({ instrument, prices }) {
     }
 
     try { candleSeriesRef.current.update(currentCandleRef.current) } catch (e) {}
+
+    const list = allCandlesRef.current
+    if (list.length && list[list.length - 1].time === currentCandleRef.current.time) {
+      list[list.length - 1] = currentCandleRef.current
+    } else {
+      list.push(currentCandleRef.current)
+    }
+    pinTooltipToLastRef.current()
   }, [prices, instrument])
 
   return (
@@ -250,15 +322,38 @@ function PriceChart({ instrument, prices }) {
       </div>
 
       {/* Chart container */}
-      <div
-        ref={chartContainerRef}
-        style={{
-          width:        '100%',
-          height:       '420px',
-          overflow:     'hidden',
-          border:       '1px solid var(--navy-border)',
-        }}
-      />
+      <div style={{ position: 'relative' }}>
+        <div
+          ref={chartContainerRef}
+          style={{
+            width:        '100%',
+            height:       '420px',
+            overflow:     'hidden',
+            border:       '1px solid var(--navy-border)',
+          }}
+        />
+        {/* Sticky tooltip (chart contract, v2 "Modern Gazette" spec): anchored
+            to the crosshair point, pinned to the last candle when not hovered.
+            Content is written imperatively in the crosshair-move handler above
+            to avoid a React re-render on every mouse move. */}
+        <div
+          ref={tooltipElRef}
+          style={{
+            position:       'absolute',
+            display:        'none',
+            pointerEvents:  'none',
+            zIndex:         2,
+            padding:        '8px 10px',
+            background:     'var(--glass)',
+            backdropFilter: 'blur(16px) saturate(140%)',
+            WebkitBackdropFilter: 'blur(16px) saturate(140%)',
+            border:         '1px solid var(--rule)',
+            borderRadius:   'var(--radius-sm)',
+            boxShadow:      'var(--elev)',
+            whiteSpace:     'nowrap',
+          }}
+        />
+      </div>
     </div>
   )
 }

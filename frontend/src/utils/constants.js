@@ -10,6 +10,7 @@ import {
   calculatePnL,
   calculateMargin,
 } from './instruments.js'
+import { getStatusToneColor } from './statusTone.js'
 
 export { CONTRACT_SIZES, LEVERAGE, INSTRUMENT_GROUPS }
 
@@ -19,17 +20,25 @@ export const ACCOUNT_TYPES = {
   FUNDED: 'funded'
 }
 
+// Single lookup table driving every trader-facing status pill, dot and
+// colored figure (Modern Gazette handoff spec: "one map, every
+// representation"). Colors are sourced from utils/statusTone.js, the one
+// 5-tone (gain/accent/warn/muted/loss) map shared with the admin side
+// (components/admin/AdminBadge.jsx) — only the label wording differs here.
 export const ACCOUNT_STATUSES = {
-  active: { label: 'Active', color: 'var(--accent)' },
-  passed: { label: 'Passed', color: 'var(--green)' },
-  failed: { label: 'Failed', color: 'var(--red)' },
-  funded: { label: 'Funded', color: 'var(--cyan)' },
-  pending: { label: 'Pending', color: 'var(--accent)' },
-  approved: { label: 'Approved', color: 'var(--green)' },
-  paid: { label: 'Paid', color: 'var(--green)' },
-  rejected: { label: 'Rejected', color: 'var(--red)' },
-  locked: { label: 'Locked', color: 'var(--muted)' },
-  expired: { label: 'Expired', color: 'var(--muted)' }
+  active: { label: 'Active', color: getStatusToneColor('active') },
+  passed: { label: 'Passed', color: getStatusToneColor('passed') },
+  failed: { label: 'Failed', color: getStatusToneColor('failed') },
+  funded: { label: 'Funded', color: getStatusToneColor('funded') },
+  pending: { label: 'Pending', color: getStatusToneColor('pending') },
+  processing: { label: 'Processing', color: getStatusToneColor('processing') },
+  approved: { label: 'Approved', color: getStatusToneColor('approved') },
+  paid: { label: 'Paid', color: getStatusToneColor('paid') },
+  available: { label: 'Available', color: getStatusToneColor('available') },
+  adjusted: { label: 'Adjusted', color: getStatusToneColor('adjusted') },
+  rejected: { label: 'Rejected', color: getStatusToneColor('rejected') },
+  locked: { label: 'Locked', color: getStatusToneColor('locked') },
+  expired: { label: 'Expired', color: getStatusToneColor('expired') }
 }
 
 export const DRAWDOWN_THRESHOLDS = {

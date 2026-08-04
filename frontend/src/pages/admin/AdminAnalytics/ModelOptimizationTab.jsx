@@ -4,6 +4,7 @@ import { ScatterChart, Scatter, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tool
 import AdminChart, { chartThemeProps } from '../../../components/admin/AdminChart';
 import AdminDataTable from '../../../components/admin/AdminDataTable';
 import AdminBadge from '../../../components/admin/AdminBadge';
+import Card from '../../../components/ui/Card';
 
 export default function ModelOptimizationTab() {
   const { adminAxios } = useOutletContext();
@@ -75,14 +76,14 @@ export default function ModelOptimizationTab() {
       </div>
 
       <h2 className="admin-h2">Rule Strictness vs Retention</h2>
-      <div className="admin-card" style={{ padding: 0, marginBottom: '24px' }}>
+      <Card flush style={{ marginBottom: '24px' }}>
         <AdminDataTable columns={strictnessColumns} data={strictnessVsRetention} loading={loading} emptyMessage="No data" emptyIcon="challenges" />
-      </div>
+      </Card>
 
       <h2 className="admin-h2">A/B Test Results</h2>
-      <div className="admin-card" style={{ padding: 0, marginBottom: '24px' }}>
+      <Card flush style={{ marginBottom: '24px' }}>
         <AdminDataTable columns={abColumns} data={abTests} loading={loading} emptyMessage="No experiments running yet — infrastructure is in place (ab_experiments/ab_experiment_events), waiting on a real experiment to be wired up" emptyIcon="challenges" />
-      </div>
+      </Card>
 
       <AdminChart title="Revenue per Acquisition Segment">
         <BarChart data={revenueBySegment}>
@@ -95,7 +96,7 @@ export default function ModelOptimizationTab() {
       </AdminChart>
 
       <h2 className="admin-h2" style={{ marginTop: '24px' }}>Failure Pattern Analysis</h2>
-      <div className="admin-card">
+      <Card style={{ marginBottom: '24px' }}>
         {failurePatterns.length === 0 ? (
           <p style={{ color: 'var(--admin-text-faint)', fontSize: '13px' }}>No failed accounts yet.</p>
         ) : (
@@ -108,7 +109,7 @@ export default function ModelOptimizationTab() {
             ))}
           </ol>
         )}
-      </div>
+      </Card>
     </>
   );
 }

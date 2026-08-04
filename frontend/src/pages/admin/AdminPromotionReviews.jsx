@@ -4,6 +4,7 @@ import AdminBadge from '../../components/admin/AdminBadge'
 import AdminDataTable from '../../components/admin/AdminDataTable'
 import AdminStatCard from '../../components/admin/AdminStatCard'
 import { useToast } from '../../components/admin/AdminToast'
+import Card from '../../components/ui/Card'
 
 function currentMonth() {
   return new Date().toISOString().slice(0, 7)
@@ -136,14 +137,14 @@ export default function AdminPromotionReviews() {
         <AdminStatCard icon="warning" label="Pending Reviews" value={String(reviews.filter((row) => row.status === 'pending').length)} />
       </div>
 
-      <div className="admin-card" style={{ marginBottom: 24 }}>
+      <Card style={{ marginBottom: 24 }}>
         <h2 className="admin-h2">Per-Size Quota Gate</h2>
         <p style={{ color: 'var(--admin-text-muted)', fontSize: 13, marginTop: 6 }}>
           Promotion approval checks the target account size against its monthly quota. Edit limits from Settings to Per-Size Monthly Allocation.
         </p>
-      </div>
+      </Card>
 
-      <div className="admin-card" style={{ padding: 0 }}>
+      <Card flush>
         <AdminDataTable
           loading={loading}
           data={reviews}
@@ -154,7 +155,7 @@ export default function AdminPromotionReviews() {
             { label: 'Reject', onClick: () => reviewAction(row, 'reject') }
           ] : []}
         />
-      </div>
+      </Card>
     </>
   )
 }

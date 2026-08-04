@@ -9,6 +9,7 @@ import AdminModal from '../../components/admin/AdminModal';
 import AdminStatCard from '../../components/admin/AdminStatCard';
 import AdminStatGrid from '../../components/admin/AdminStatGrid';
 import { useToast } from '../../components/admin/AdminToast';
+import Card from '../../components/ui/Card';
 import { exportAdminResource } from '../../utils/adminList';
 
 const TABS = [
@@ -648,10 +649,7 @@ export default function AdminCommandCenter() {
       header: 'Account',
       key: 'id',
       render: (row) => (
-        <div>
-          <div className="admin-td-mono" style={{ color: 'var(--admin-text)', fontWeight: 700 }}>#{row.id}</div>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>{row.account_uid || 'No UID'}</div>
-        </div>
+        <div className="admin-td-mono" style={{ color: 'var(--admin-text)', fontWeight: 700 }}>{row.account_uid || `#${row.id}`}</div>
       )
     },
     {
@@ -772,7 +770,7 @@ export default function AdminCommandCenter() {
       render: (row) => (
         <div>
           <div className="admin-td-mono" style={{ color: 'var(--admin-text)', fontWeight: 700 }}>PAY-{String(row.id).padStart(5, '0')}</div>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>Account #{row.account_id}</div>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>Account {row.account_uid || `#${row.account_id}`}</div>
         </div>
       )
     },
@@ -869,7 +867,7 @@ export default function AdminCommandCenter() {
   const drawerEntityType = activeTab === 'accounts' ? 'account' : activeTab === 'users' ? 'user' : 'payout';
   const drawerTitle = drawerRow
     ? activeTab === 'accounts'
-      ? `Account #${drawerRow.id}`
+      ? `Account ${drawerRow.account_uid || `#${drawerRow.id}`}`
       : activeTab === 'users'
         ? drawerRow.email || `User #${drawerRow.id}`
         : `Payout #${drawerRow.id}`
@@ -877,10 +875,10 @@ export default function AdminCommandCenter() {
 
   if (!isSuperAdmin) {
     return (
-      <div className="admin-card">
+      <Card>
         <h1 className="admin-h1">Command Center</h1>
         <p style={{ color: 'var(--admin-text-muted)' }}>This workspace is available to super-admins only.</p>
-      </div>
+      </Card>
     );
   }
 
@@ -1057,7 +1055,7 @@ export default function AdminCommandCenter() {
         ) : null}
       />
 
-      <div className="admin-card" style={{ padding: 0 }}>
+      <Card flush>
         <AdminDataTable
           columns={visibleColumns}
           data={rows}
@@ -1070,7 +1068,7 @@ export default function AdminCommandCenter() {
           density={density}
           onRowClick={(row) => setDrawerRow(row)}
         />
-      </div>
+      </Card>
 
       <AdminEntityDrawer
         open={!!drawerRow}
@@ -1111,7 +1109,7 @@ export default function AdminCommandCenter() {
                 {selectedActionRows.slice(0, 4).map((row) => (
                   <div key={`${actionContext.action}-${row.id}`}>
                     {actionContext.tab === 'accounts'
-                      ? `Account #${row.id} - ${row.full_name || row.email || 'Unknown trader'}`
+                      ? `Account ${row.account_uid || `#${row.id}`} - ${row.full_name || row.email || 'Unknown trader'}`
                       : actionContext.tab === 'users'
                         ? `${row.email || `User #${row.id}`} - ${row.full_name || 'Unnamed trader'}`
                         : `Payout #${row.id} - ${row.email || 'Unknown trader'} - ${formatMoney(row.amount_requested)}`}

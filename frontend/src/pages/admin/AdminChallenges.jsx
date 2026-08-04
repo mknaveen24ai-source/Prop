@@ -9,6 +9,7 @@ import AdminStatGrid from '../../components/admin/AdminStatGrid';
 import { useToast } from '../../components/admin/AdminToast';
 import AdminListToolbar from '../../components/admin/AdminListToolbar';
 import { exportAdminResource, normalizeAdminListResponse } from '../../utils/adminList';
+import Card from '../../components/ui/Card';
 
 const DEFAULT_FILTERS = {
   phase: 'all',
@@ -259,10 +260,8 @@ export default function AdminChallenges() {
       sortKey: 'created_at',
       render: (account) => (
         <div>
-          <div className="admin-td-mono">#{String(account.id).padStart(5, '0')}</div>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>
-            {account.account_uid ? account.account_uid.slice(0, 10) : 'No UID'}
-          </div>
+          <div className="admin-td-mono">{account.account_uid || `#${String(account.id).padStart(5, '0')}`}</div>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>#{account.id}</div>
         </div>
       )
     },
@@ -387,7 +386,7 @@ export default function AdminChallenges() {
         })}
       />
 
-      <div className="admin-card" style={{ padding: 0 }}>
+      <Card flush>
         <AdminDataTable
           columns={visibleColumns}
           data={rows}
@@ -400,12 +399,12 @@ export default function AdminChallenges() {
           density={density}
           onRowClick={(row) => openAccountModal(row)}
         />
-      </div>
+      </Card>
 
       <AdminModal
         isOpen={showOverrideModal}
         onClose={() => setShowOverrideModal(false)}
-        title={`Challenge Account #${String(selectedAcc?.id || '').padStart(5, '0')}`}
+        title={`Challenge Account ${selectedAcc?.account_uid || `#${String(selectedAcc?.id || '').padStart(5, '0')}`}`}
         size="lg"
         footer={(
           <button className="admin-btn admin-btn-ghost" onClick={() => setShowOverrideModal(false)} disabled={submitting}>
@@ -431,7 +430,7 @@ export default function AdminChallenges() {
               ))}
             </div>
 
-            <div className="admin-card" style={{ margin: 0 }}>
+            <Card style={{ margin: 0 }}>
               <h3 className="admin-h3">Override Reason</h3>
               <textarea
                 className="admin-input"
@@ -441,9 +440,9 @@ export default function AdminChallenges() {
                 rows={3}
                 style={{ resize: 'vertical', minHeight: '96px' }}
               />
-            </div>
+            </Card>
 
-            <div className="admin-card" style={{ margin: 0 }}>
+            <Card style={{ margin: 0 }}>
               <h3 className="admin-h3">Account Controls</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
                 <button className="admin-btn admin-btn-success" onClick={() => executeOverride('pass')} disabled={submitting}>
@@ -459,9 +458,9 @@ export default function AdminChallenges() {
                   Extend 14 Days
                 </button>
               </div>
-            </div>
+            </Card>
 
-            <div className="admin-card" style={{ margin: 0 }}>
+            <Card style={{ margin: 0 }}>
               <h3 className="admin-h3">Balance Adjustment</h3>
               <p style={{ color: 'var(--admin-text-muted)', fontSize: '12px', marginBottom: '16px' }}>
                 Use a positive number to credit the account or a negative number to debit it.
@@ -487,7 +486,7 @@ export default function AdminChallenges() {
                   Apply Balance Adjustment
                 </button>
               </div>
-            </div>
+            </Card>
           </div>
         )}
       </AdminModal>

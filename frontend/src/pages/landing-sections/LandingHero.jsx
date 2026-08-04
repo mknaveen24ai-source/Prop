@@ -67,7 +67,9 @@ function AnimatedCounter({ value, prefix = '', suffix = '', duration = 2000 }) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   LANDING HERO SECTION — flat editorial masthead, no 3D/glow/particles
+   LANDING HERO SECTION — editorial masthead: headline + justified intro
+   column on the left, a matted "plate" photo placeholder on the right
+   (Modern Gazette handoff spec — no 3D/glow/particles).
    ══════════════════════════════════════════════════════════════ */
 export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
   const navigate = useNavigate();
@@ -78,75 +80,123 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
     <section className="mp-section mp-hero" ref={heroRef} style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', paddingTop: '120px', position: 'relative' }}>
 
       <div className="mp-container" style={{ position: 'relative', zIndex: 2 }}>
+        <div
+          className="mp-hero-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 1fr)',
+            gap: '48px',
+            alignItems: 'center',
+          }}
+        >
+          <div style={{ position: 'relative', zIndex: 10 }}>
+            <div className="mp-badge mp-reveal mp-active" style={{ marginBottom: '32px' }}>
+              <ScrambleText text={landingCopy.heroBadge} delay={500} />
+            </div>
 
-        <div style={{ maxWidth: '950px', position: 'relative', zIndex: 10 }}>
-          <div className="mp-badge mp-reveal mp-active" style={{ marginBottom: '32px' }}>
-            <ScrambleText text={landingCopy.heroBadge} delay={500} />
-          </div>
+            <h1 className="mp-h1 mp-reveal mp-delay-100 mp-active" style={{ textWrap: 'balance' }}>
+              {landingCopy.heroTitleLead} <span className="mp-glow-text" style={{ whiteSpace: 'nowrap' }}>{landingCopy.heroTitleHighlight}</span><br />
+              Start Trading <span style={{ color: 'var(--gain)' }}>Ours.</span>
+            </h1>
 
-          <h1 className="mp-h1 mp-reveal mp-delay-100 mp-active" style={{ textWrap: 'balance' }}>
-            {landingCopy.heroTitleLead} <span className="mp-glow-text" style={{ whiteSpace: 'nowrap' }}>{landingCopy.heroTitleHighlight}</span><br />
-            Start Trading <span style={{ color: 'var(--gain)' }}>Ours.</span>
-          </h1>
-
-          <p className="mp-p-lead mp-reveal mp-delay-200 mp-active" style={{ textWrap: 'balance' }}>
-            {landingCopy.heroSubtitle}
-          </p>
-
-          <div className="mp-reveal mp-delay-300 mp-active" style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
-            <button
-              className="mp-btn-primary"
-              onClick={() => {
-                // Save pending challenge intent in memory so /checkout can
-                // show the right order summary. Default size 10000; overridden
-                // by the pricing section if a size was selected there instead.
-                const selectedSize = parseInt(getMemoryItem('heroSelectedSize') || '10000')
-                setMemoryItem('pendingChallenge', JSON.stringify({
-                  accountSize: selectedSize,
-                  accountType: 'phase1',
-                  stepModel: null
-                }))
-                if (onPrimaryCta) onPrimaryCta();
-                navigate('/checkout');
-              }}
-              style={{ padding: '22px 54px', fontSize: '18px' }}
+            {/* Justified two-column intro (Modern Gazette handoff spec) collapses
+                to the single lead paragraph below on narrow viewports. */}
+            <div
+              className="mp-hero-intro mp-reveal mp-delay-200 mp-active"
+              style={{ display: 'flex', gap: '22px', maxWidth: '640px', marginBottom: '40px' }}
             >
-              {landingCopy.heroPrimaryCta}
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-            <button className="mp-btn-secondary" onClick={() => {
-              if (onSecondaryCta) onSecondaryCta();
-              const target = document.getElementById('mp-calculator');
-              const nav = document.querySelector('.nav-transparent');
-              const navRect = nav ? nav.getBoundingClientRect() : { top: 0, height: 72 };
-              const headerOffset = (navRect.top || 0) + navRect.height;
-              if (target) {
-                const top = window.pageYOffset + target.getBoundingClientRect().top - headerOffset - 28;
-                window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-              }
-            }} style={{ padding: '20px 40px' }}>
-              View Account Sizes
-            </button>
+              <p style={{
+                flex: 1, fontSize: '15px', lineHeight: 1.72, color: 'var(--mp-text-secondary)',
+                textAlign: 'justify', hyphens: 'auto', margin: 0,
+              }}>
+                {landingCopy.heroSubtitle}
+              </p>
+            </div>
+
+            <div className="mp-reveal mp-delay-300 mp-active" style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <button
+                className="mp-btn-primary"
+                onClick={() => {
+                  // Save pending challenge intent in memory so /checkout can
+                  // show the right order summary. Default size 10000; overridden
+                  // by the pricing section if a size was selected there instead.
+                  const selectedSize = parseInt(getMemoryItem('heroSelectedSize') || '10000')
+                  setMemoryItem('pendingChallenge', JSON.stringify({
+                    accountSize: selectedSize,
+                    accountType: 'phase1',
+                    stepModel: null
+                  }))
+                  if (onPrimaryCta) onPrimaryCta();
+                  navigate('/checkout');
+                }}
+                style={{ padding: '22px 54px', fontSize: '18px' }}
+              >
+                {landingCopy.heroPrimaryCta}
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              <button className="mp-btn-secondary" onClick={() => {
+                if (onSecondaryCta) onSecondaryCta();
+                const target = document.getElementById('mp-calculator');
+                const nav = document.querySelector('.nav-transparent');
+                const navRect = nav ? nav.getBoundingClientRect() : { top: 0, height: 72 };
+                const headerOffset = (navRect.top || 0) + navRect.height;
+                if (target) {
+                  const top = window.pageYOffset + target.getBoundingClientRect().top - headerOffset - 28;
+                  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+                }
+              }} style={{ padding: '20px 40px' }}>
+                View Account Sizes
+              </button>
+            </div>
+
+            {/* Trust Stats */}
+            <div className="mp-reveal mp-delay-400 mp-active mp-stat-counter">
+              <div className="mp-stat-item">
+                  <span style={{ color: 'var(--warn)', fontFamily: 'var(--font-mono)', fontSize: '14px', fontWeight: 700 }}>{landingCopy.heroStatsLead}</span>
+                <span className="mp-stat-number">&nbsp;{landingCopy.heroStatsLeadSuffix}</span>
+              </div>
+              <div className="mp-stat-divider" />
+              <div className="mp-stat-item">
+                <span className="mp-stat-number">
+                  <AnimatedCounter value="2400" suffix="" /> Funded Traders
+                </span>
+              </div>
+              <div className="mp-stat-divider" />
+              <div className="mp-stat-item">
+                <span className="mp-stat-number" style={{ color: 'var(--warn)' }}>Weekly</span>
+                <span className="mp-stat-number">&nbsp;Payout Cycles</span>
+              </div>
+            </div>
           </div>
 
-          {/* Trust Stats */}
-          <div className="mp-reveal mp-delay-400 mp-active mp-stat-counter">
-            <div className="mp-stat-item">
-                <span style={{ color: 'var(--warn)', fontFamily: 'var(--font-mono)', fontSize: '14px', fontWeight: 700 }}>{landingCopy.heroStatsLead}</span>
-              <span className="mp-stat-number">&nbsp;{landingCopy.heroStatsLeadSuffix}</span>
-            </div>
-            <div className="mp-stat-divider" />
-            <div className="mp-stat-item">
-              <span className="mp-stat-number">
-                <AnimatedCounter value="2400" suffix="" /> Funded Traders
-              </span>
-            </div>
-            <div className="mp-stat-divider" />
-            <div className="mp-stat-item">
-              <span className="mp-stat-number" style={{ color: 'var(--warn)' }}>Weekly</span>
-              <span className="mp-stat-number">&nbsp;Payout Cycles</span>
+          {/* Plate — matted photo placeholder (Modern Gazette handoff spec:
+              production should slot in real trader photography here). */}
+          <div
+            className="mp-hero-plate mp-reveal mp-delay-200 mp-active"
+            style={{ position: 'relative', zIndex: 10 }}
+          >
+            <div style={{
+              border: '1px solid var(--rule)', background: 'var(--glass)',
+              backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+              padding: '12px', boxShadow: 'var(--elev)',
+            }}>
+              <div style={{
+                aspectRatio: '4 / 5', border: '1px solid var(--rule-soft)',
+                background: 'repeating-linear-gradient(45deg, var(--paper-2), var(--paper-2) 10px, var(--paper) 10px, var(--paper) 20px)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px',
+              }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--muted)' }}>
+                  Plate I
+                </div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px', color: 'var(--muted)', textAlign: 'center', padding: '0 28px' }}>
+                  A trader at the desk
+                </div>
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.1em', color: 'var(--muted)', marginTop: '10px', textAlign: 'center' }}>
+                Fig. 1 — funded and trading live
+              </div>
             </div>
           </div>
         </div>

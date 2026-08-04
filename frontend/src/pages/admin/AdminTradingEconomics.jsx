@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { useToast } from '../../components/admin/AdminToast'
+import Card from '../../components/ui/Card'
 
 const TIER_LABELS = {
   challenge: 'Challenge',
@@ -135,7 +136,7 @@ export default function AdminTradingEconomics() {
         ))}
       </div>
 
-      <div className="admin-card">
+      <Card>
         <div style={{ overflowX: 'auto' }}>
           <table className="admin-table" style={{ width: '100%' }}>
             <thead>
@@ -178,7 +179,7 @@ export default function AdminTradingEconomics() {
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
     </>
   )
 }

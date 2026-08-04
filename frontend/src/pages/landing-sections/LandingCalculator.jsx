@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { accountsAPI } from '../../services/api';
-import { buildUnavailableAvailabilityRows, normalizeAvailabilityRows, UNLIMITED_QUOTA, ALL_ACCOUNT_SIZES } from '../../utils/accountAvailability';
 import { setMemoryItem } from '../../utils/memoryStore';
 import { renderIcon } from '../../utils/iconMap';
 
 const RECOMMENDED_SIZE = 25000;
+const FALLBACK_ACCOUNT_SIZES = [5000, 10000, 25000, 50000, 100000, 200000, 400000];
 
 function sizeLabel(size) {
   if (size >= 200000) return 'Institutional';
@@ -26,21 +26,6 @@ const MODEL_HOOKS = {
   3: { badge: 'LOWEST COST TO START', color: 'var(--gain)' },
 };
 
-function priceForSize(model, size) {
-  const row = (model?.pricing || []).find(p => p.account_size === size);
-  return row && row.is_active ? row.price : null;
-}
-
-function reopenMessage(acc) {
-  if (acc?.period_end) {
-    const d = new Date(acc.period_end);
-    if (!Number.isNaN(d.getTime())) {
-      return `Reopens ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-    }
-  }
-  return 'New slots release periodically — check back soon';
-}
-
 function InfoDot({ title }) {
   return (
     <span title={title} style={{ display: 'inline-flex', verticalAlign: 'middle', marginLeft: '4px', cursor: 'help', opacity: 0.6 }}>
@@ -53,11 +38,12 @@ export default function LandingCalculator({ onStartAssessment }) {
   const navigate = useNavigate();
   const [models, setModels] = useState([]);
   const [modelsLoaded, setModelsLoaded] = useState(false);
-  const [accounts, setAccounts] = useState(() => buildUnavailableAvailabilityRows());
+  const [accountSizes, setAccountSizes] = useState(FALLBACK_ACCOUNT_SIZES);
   const [availabilitySource, setAvailabilitySource] = useState('config');
   const [selectedModelSlug, setSelectedModelSlug] = useState(null);
 
-  // Models + pricing + rules — fetched once, changes rarely relative to live quota.
+  // Models + pricing + per-size slot availability, in one response — polled so
+  // "sold out" state stays fresh without a second, separately-scoped fetch.
   useEffect(() => {
     async function fetchModels() {
       try {
@@ -65,13 +51,20 @@ export default function LandingCalculator({ onStartAssessment }) {
         const list = Array.isArray(res.data?.models) ? res.data.models : [];
         list.sort((a, b) => (a.steps || 0) - (b.steps || 0));
         setModels(list);
+        if (Array.isArray(res.data?.account_sizes) && res.data.account_sizes.length > 0) {
+          setAccountSizes(res.data.account_sizes);
+        }
+        setAvailabilitySource('live');
       } catch (_err) {
         setModels([]);
+        setAvailabilitySource('offline');
       } finally {
         setModelsLoaded(true);
       }
     }
     fetchModels();
+    const iv = setInterval(fetchModels, 30000);
+    return () => clearInterval(iv);
   }, []);
 
   // Default to the first (fastest) model once models arrive, so the size
@@ -82,29 +75,13 @@ export default function LandingCalculator({ onStartAssessment }) {
     }
   }, [models, selectedModelSlug]);
 
-  // Live quota / OPEN-LOW-FULL — polled, same cadence as before.
-  useEffect(() => {
-    async function fetchSizes() {
-      try {
-        const res = await accountsAPI.getPublicAvailableSizes();
-        setAccounts(normalizeAvailabilityRows(res.data));
-        setAvailabilitySource('live');
-      } catch (_err) {
-        setAvailabilitySource('offline');
-        setAccounts(buildUnavailableAvailabilityRows());
-      }
-    }
-    fetchSizes();
-    const iv = setInterval(fetchSizes, 30000);
-    return () => clearInterval(iv);
-  }, []);
-
   const selectedModel = models.find(m => m.slug === selectedModelSlug) || null;
-  const totalEnabled = accounts.filter(a => a.quota > 0).length;
-  const hasUnlimitedAvailability = accounts.some(a => !a.locked && a.quota >= UNLIMITED_QUOTA);
+  const activePricing = (selectedModel?.pricing || []).filter(p => p.is_active);
+  const totalEnabled = activePricing.filter(p => !p.locked).length;
+  const hasUnlimitedAvailability = activePricing.some(p => !p.locked && p.is_unlimited);
   const totalRemaining = hasUnlimitedAvailability
     ? null
-    : accounts.reduce((sum, account) => sum + (account.remaining || 0), 0);
+    : activePricing.filter(p => !p.locked).reduce((sum, p) => sum + (p.remaining || 0), 0);
 
   function startChallenge(size) {
     setMemoryItem('pendingChallenge', JSON.stringify({
@@ -218,16 +195,16 @@ export default function LandingCalculator({ onStartAssessment }) {
             margin: '0 auto 60px',
             alignItems: 'stretch',
           }}>
-            {ALL_ACCOUNT_SIZES.map((size) => {
-              const acc = accounts.find(a => a.size === size) || { size, locked: true, quota: 0, remaining: 0 };
-              const price = priceForSize(selectedModel, size);
-              const isSoldOut = acc.locked || acc.quota === 0 || price == null;
-              const isUnlimited = !isSoldOut && acc.quota >= UNLIMITED_QUOTA;
+            {accountSizes.map((size) => {
+              const priceRow = selectedModel.pricing.find(p => p.account_size === size);
+              const price = priceRow?.is_active ? priceRow.price : null;
+              const isSoldOut = !priceRow || price == null || priceRow.locked;
+              const isUnlimited = !isSoldOut && priceRow.is_unlimited;
               const pct = isUnlimited
                 ? 100
-                : acc.quota > 0
-                  ? Math.max(0, Math.min(100, ((acc.remaining ?? 0) / acc.quota) * 100))
-                  : 0;
+                : (priceRow?.slot_limit > 0
+                    ? Math.max(0, Math.min(100, ((priceRow.remaining ?? 0) / priceRow.slot_limit) * 100))
+                    : 0);
               const targets = Array.isArray(selectedModel.profit_targets_pct) ? selectedModel.profit_targets_pct : [];
               const isRecommended = size === RECOMMENDED_SIZE && !isSoldOut;
               const inverted = isRecommended;
@@ -241,7 +218,10 @@ export default function LandingCalculator({ onStartAssessment }) {
                   key={size}
                   className={`mp-account-size-card ${!isSoldOut ? 'mp-active-selection' : ''}`}
                   style={{
-                    background: isSoldOut ? 'var(--paper-2)' : inverted ? 'var(--ink)' : 'var(--paper)',
+                    background: isSoldOut ? 'var(--paper-2)' : inverted ? 'var(--ink)' : 'var(--glass)',
+                    backdropFilter: isSoldOut || inverted ? undefined : 'blur(16px) saturate(140%)',
+                    WebkitBackdropFilter: isSoldOut || inverted ? undefined : 'blur(16px) saturate(140%)',
+                    boxShadow: isSoldOut ? undefined : 'var(--elev)',
                     border: `1px solid ${inverted ? 'var(--ink)' : 'var(--rule)'}`,
                     padding: '24px 20px',
                     display: 'flex',
@@ -384,7 +364,7 @@ export default function LandingCalculator({ onStartAssessment }) {
 
                   {isSoldOut && (
                     <div style={{ marginTop: '14px', fontSize: '11px', color: 'var(--muted)' }}>
-                      {price == null ? 'Not offered at this size' : reopenMessage(acc)}
+                      {price == null ? 'Not offered at this size' : 'All slots claimed — check back soon'}
                     </div>
                   )}
                 </div>

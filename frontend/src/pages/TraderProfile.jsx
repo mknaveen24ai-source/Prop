@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import ThemeToggle from '../components/ThemeToggle'
+import Card from '../components/ui/Card'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
@@ -70,7 +71,7 @@ export function TraderProfileContent({ userId, onBack }) {
       </button>
 
       {/* ── Profile Header ── */}
-      <div className="card" style={{ marginBottom: '20px', padding: '32px' }}>
+      <Card style={{ marginBottom: '20px', padding: '32px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
           {/* Avatar */}
           <div style={{
@@ -119,7 +120,7 @@ export function TraderProfileContent({ userId, onBack }) {
             </div>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* ── Key Stats ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
@@ -142,7 +143,7 @@ export function TraderProfileContent({ userId, onBack }) {
 
       {/* ── Trading Style ── */}
       {(stats.favourite_instrument || stats.avg_hold_mins) && (
-        <div className="card" style={{ marginBottom: '20px' }}>
+        <Card style={{ marginBottom: '20px' }}>
           <h3 style={{ color: 'var(--accent)', marginBottom: '16px', fontSize: '14px', letterSpacing: '0.08em' }}>TRADING STYLE</h3>
           <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
             {stats.favourite_instrument && (
@@ -172,7 +173,7 @@ export function TraderProfileContent({ userId, onBack }) {
               </div>
             )}
           </div>
-        </div>
+        </Card>
       )}
 
       {/* ── Privacy notice ── */}

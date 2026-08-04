@@ -184,6 +184,7 @@ export const MASTERPIECE_CSS = `
     border: 1px solid var(--mp-glass-border);
     backdrop-filter: var(--mp-glass-blur);
     -webkit-backdrop-filter: var(--mp-glass-blur);
+    box-shadow: var(--elev);
     padding: 40px;
     transition: border-color 0.3s ease;
     position: relative;
@@ -271,6 +272,7 @@ export const MASTERPIECE_CSS = `
     border: 1px solid var(--mp-glass-border);
     backdrop-filter: var(--mp-glass-blur);
     -webkit-backdrop-filter: var(--mp-glass-blur);
+    box-shadow: var(--elev);
     padding: 40px;
     position: relative;
     overflow: hidden;
@@ -417,6 +419,10 @@ export const MASTERPIECE_CSS = `
       padding-top: calc(104px + var(--risk-warning-height, 0px)) !important;
       padding-bottom: 78px !important;
     }
+  }
+  @media (max-width: 900px) {
+    .mp-hero-grid { grid-template-columns: 1fr !important; }
+    .mp-hero-plate { display: none; }
   }
   @media (max-width: 768px) {
     .mp-h1 { font-size: 38px; }
@@ -687,6 +693,7 @@ export const MASTERPIECE_CSS = `
     background: var(--mp-glass-bg);
     backdrop-filter: var(--mp-glass-blur);
     -webkit-backdrop-filter: var(--mp-glass-blur);
+    box-shadow: var(--elev);
   }
 
   .mp-live-stats-header,

@@ -10,6 +10,7 @@ import AdminStatCard from '../../components/admin/AdminStatCard';
 import AdminStatGrid from '../../components/admin/AdminStatGrid';
 import { useToast } from '../../components/admin/AdminToast';
 import { exportAdminResource, normalizeAdminListResponse } from '../../utils/adminList';
+import Card from '../../components/ui/Card';
 
 const DEFAULT_FILTERS = {
   status: 'all',
@@ -300,10 +301,8 @@ export default function AdminFunded() {
         sortKey: 'created_at',
         render: (account) => (
           <div>
-            <div className="admin-td-mono">#{String(account.id).padStart(5, '0')}</div>
-            <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>
-              {account.account_uid ? account.account_uid.slice(0, 10) : 'No UID'}
-            </div>
+            <div className="admin-td-mono">{account.account_uid || `#${String(account.id).padStart(5, '0')}`}</div>
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>#{account.id}</div>
           </div>
         )
       },
@@ -458,7 +457,7 @@ export default function AdminFunded() {
         ) : null}
       />
 
-      <div className="admin-card" style={{ padding: 0 }}>
+      <Card flush>
         <AdminDataTable
           columns={columns}
           data={rows}
@@ -484,13 +483,13 @@ export default function AdminFunded() {
             onToggleRow: (row) => toggleRowSelection(row.id)
           }}
         />
-      </div>
+      </Card>
 
       <AdminEntityDrawer
         open={!!drawerRow}
         entityType="account"
         row={drawerRow}
-        title={drawerRow ? `Funded Account #${String(drawerRow.id).padStart(5, '0')}` : ''}
+        title={drawerRow ? `Funded Account ${drawerRow.account_uid || `#${String(drawerRow.id).padStart(5, '0')}`}` : ''}
         adminAxios={adminAxios}
         quickActions={drawerRow ? [
           { label: 'Manage Account', onClick: () => openManageModal(drawerRow) },
@@ -503,7 +502,7 @@ export default function AdminFunded() {
       <AdminModal
         isOpen={showManageModal}
         onClose={() => setShowManageModal(false)}
-        title={`Funded Account #${String(selectedAcc?.id || '').padStart(5, '0')}`}
+        title={`Funded Account ${selectedAcc?.account_uid || `#${String(selectedAcc?.id || '').padStart(5, '0')}`}`}
         size="lg"
         footer={(
           <>
@@ -531,7 +530,7 @@ export default function AdminFunded() {
               ))}
             </div>
 
-            <div className="admin-card" style={{ margin: 0 }}>
+            <Card style={{ margin: 0 }}>
               <h3 className="admin-h3">Action Reason</h3>
               <textarea
                 className="admin-input"
@@ -541,9 +540,9 @@ export default function AdminFunded() {
                 rows={3}
                 style={{ resize: 'vertical', minHeight: '96px' }}
               />
-            </div>
+            </Card>
 
-            <div className="admin-card" style={{ margin: 0 }}>
+            <Card style={{ margin: 0 }}>
               <h3 className="admin-h3">Funded Controls</h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
                 <button className="admin-btn admin-btn-primary" onClick={() => executeOverride('force_close_open_trades')} disabled={submitting}>
@@ -553,9 +552,9 @@ export default function AdminFunded() {
                   Revoke And Lock Funded Account
                 </button>
               </div>
-            </div>
+            </Card>
 
-            <div className="admin-card" style={{ margin: 0 }}>
+            <Card style={{ margin: 0 }}>
               <h3 className="admin-h3">Balance Adjustment</h3>
               <p style={{ color: 'var(--admin-text-muted)', fontSize: '12px', marginBottom: '16px' }}>
                 Use a positive amount to credit or a negative amount to debit the funded balance.
@@ -581,7 +580,7 @@ export default function AdminFunded() {
                   Apply Balance Adjustment
                 </button>
               </div>
-            </div>
+            </Card>
           </div>
         )}
       </AdminModal>
