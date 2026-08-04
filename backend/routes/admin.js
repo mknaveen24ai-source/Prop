@@ -4384,6 +4384,35 @@ router.get('/traders', authenticateAdmin, requireAdminCapability('trader:read'),
   }
 })
 
+// GET /api/admin/traders/:userId/activity-spark — 30-day cumulative realized
+// P&L across all of a trader's accounts, for the isAdminUsers drawer's
+// `row.spark` (Modern Gazette handoff spec). Computed on read, no new table.
+router.get('/traders/:userId/activity-spark', authenticateAdmin, requireAdminCapability('trader:read'), async function(req, res) {
+  try {
+    const { userId } = req.params
+    const result = await pool.query(
+      `SELECT DATE(t.close_time) AS day, COALESCE(SUM(t.demo_pnl), 0) AS pnl
+         FROM trades t
+         JOIN accounts a ON a.id = t.account_id
+        WHERE a.user_id = $1 AND t.status = 'closed' AND t.close_time >= NOW() - INTERVAL '30 days'
+        GROUP BY day ORDER BY day ASC`,
+      [userId]
+    )
+    const byDay = new Map(result.rows.map((r) => [new Date(r.day).toISOString().slice(0, 10), parseFloat(r.pnl) || 0]))
+    let running = 0
+    const spark = []
+    for (let i = 29; i >= 0; i -= 1) {
+      const d = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10)
+      running += byDay.get(d) || 0
+      spark.push({ value: parseFloat(running.toFixed(2)) })
+    }
+    res.json({ spark })
+  } catch (error) {
+    logger.error('Admin trader activity-spark error:', { error: error.message })
+    res.status(500).json({ error: 'Could not fetch trader activity' })
+  }
+})
+
 // "Request more" — the prototype's isAdminKyc review actions are Reject /
 // Request more / Approve. Reject and Approve already existed for real;
 // Request more didn't (no status change makes sense — the trader stays

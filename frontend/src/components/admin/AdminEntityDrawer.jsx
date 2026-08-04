@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import AdminBadge from './AdminBadge';
+import Card from '../ui/Card';
+import Sparkline from '../ui/Sparkline';
 
 function formatDateTime(value) {
   if (!value) return '—';
@@ -23,6 +25,7 @@ export default function AdminEntityDrawer({
   const [noteText, setNoteText] = useState('');
   const [tagText, setTagText] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
+  const [activitySpark, setActivitySpark] = useState(null);
   const [metaForm, setMetaForm] = useState({
     classification: '',
     risk_tier: '',
@@ -41,6 +44,19 @@ export default function AdminEntityDrawer({
       linked_case_id: row.linked_case_id || ''
     });
   }, [open, row]);
+
+  // 30-day realized-P&L trend — the prototype's isAdminUsers drawer `row.spark`.
+  // Only meaningful for the trader entity, and only fetched when the drawer
+  // actually opens on one (not baked into the list payload — 20+ sparklines
+  // per page load would be wasteful for something only shown one row at a time).
+  useEffect(() => {
+    if (!row || !open || entityType !== 'user') { setActivitySpark(null); return }
+    let cancelled = false
+    adminAxios.get(`/api/admin/traders/${row.id}/activity-spark`)
+      .then((res) => { if (!cancelled) setActivitySpark(Array.isArray(res.data?.spark) ? res.data.spark : []) })
+      .catch(() => { if (!cancelled) setActivitySpark([]) })
+    return () => { cancelled = true }
+  }, [adminAxios, entityType, open, row]);
 
   useEffect(() => {
     if (!row || !open) return;
@@ -155,7 +171,17 @@ export default function AdminEntityDrawer({
         <div className="admin-entity-drawer-body">
           {activeTab === 'overview' ? (
             <>
-              <div className="admin-card" style={{ margin: 0 }}>
+              <Card>
+                {entityType === 'user' && Array.isArray(activitySpark) && activitySpark.length > 1 && (
+                  <div style={{ height: '64px', marginBottom: '14px' }}>
+                    <Sparkline
+                      data={activitySpark}
+                      width="100%"
+                      height={64}
+                      tone={activitySpark[activitySpark.length - 1]?.value >= 0 ? 'var(--gain)' : 'var(--loss)'}
+                    />
+                  </div>
+                )}
                 <div className="admin-entity-badge-row">
                   {row.risk_tier && <AdminBadge status={row.risk_tier === 'critical' ? 'danger' : row.risk_tier === 'high' ? 'warning' : 'info'} label={`Risk ${row.risk_tier}`} />}
                   {row.kyc_status && <AdminBadge status={row.kyc_status} label={`KYC ${row.kyc_status}`} />}
@@ -180,10 +206,9 @@ export default function AdminEntityDrawer({
                     ))}
                   </div>
                 )}
-              </div>
+              </Card>
 
-              <div className="admin-card" style={{ margin: 0 }}>
-                <h3 className="admin-h3">Tags</h3>
+              <Card title="Tags">
                 <div className="admin-tag-row">
                   {(row.tags || []).map((tag) => (
                     <button key={tag} className="admin-tag-pill" onClick={() => removeTag(tag)}>
@@ -200,10 +225,9 @@ export default function AdminEntityDrawer({
                   />
                   <button className="admin-btn admin-btn-primary" onClick={addTag}>Add Tag</button>
                 </div>
-              </div>
+              </Card>
 
-              <div className="admin-card" style={{ margin: 0 }}>
-                <h3 className="admin-h3">Classification</h3>
+              <Card title="Classification">
                 <div className="admin-entity-form-grid">
                   <input className="admin-input" value={metaForm.classification} onChange={(event) => setMetaForm((current) => ({ ...current, classification: event.target.value }))} placeholder="classification" />
                   <select className="admin-select" value={metaForm.risk_tier} onChange={(event) => setMetaForm((current) => ({ ...current, risk_tier: event.target.value }))}>
@@ -232,10 +256,9 @@ export default function AdminEntityDrawer({
                 <button className="admin-btn admin-btn-primary" style={{ marginTop: '12px' }} onClick={saveMeta}>
                   Save Metadata
                 </button>
-              </div>
+              </Card>
 
-              <div className="admin-card" style={{ margin: 0 }}>
-                <h3 className="admin-h3">Notes</h3>
+              <Card title="Notes">
                 <div className="admin-inline-form">
                   <textarea
                     className="admin-input"
@@ -262,11 +285,10 @@ export default function AdminEntityDrawer({
                     </div>
                   ))}
                 </div>
-              </div>
+              </Card>
             </>
           ) : (
-            <div className="admin-card" style={{ margin: 0 }}>
-              <h3 className="admin-h3">Timeline</h3>
+            <Card title="Timeline">
               <div className="admin-entity-timeline">
                 {timelineItems.length === 0 ? (
                   <div style={{ color: 'var(--admin-text-muted)' }}>No timeline data yet.</div>
@@ -277,7 +299,7 @@ export default function AdminEntityDrawer({
                   </div>
                 ))}
               </div>
-            </div>
+            </Card>
           )}
         </div>
       </div>
