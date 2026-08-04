@@ -9026,6 +9026,74 @@ router.post('/cases/:id/status', authenticateAdmin, async (req, res) => {
   }
 })
 
+// GET /api/admin/support-inbox — unified queue combining live chat
+// conversations and trader appeals (Modern Gazette handoff spec, isAdminChat
+// block's `t.queue` tag: one inbox, two real queues). Per the plan's Phase
+// 3c decision: kept as two source tables (chat is real-time/Socket.IO-first,
+// disputes is async/single-response) rather than a forced schema merge —
+// this endpoint just normalizes both into one sorted, taggable list.
+router.get('/support-inbox', authenticateAdmin, async (req, res) => {
+  try {
+    await ensureDisputesInfrastructure()
+    const [chatResult, disputeResult] = await Promise.all([
+      pool.query(
+        `SELECT c.id, c.subject, c.status, c.assigned_to, c.updated_at, c.unread_admin_count,
+                u.full_name, u.email
+           FROM chat_conversations c
+           JOIN users u ON u.id::text = c.user_id
+          WHERE c.status IN ('open', 'pending')
+          ORDER BY c.updated_at DESC
+          LIMIT 100`
+      ),
+      pool.query(
+        `SELECT d.id, d.reason, d.status, d.created_at AS updated_at,
+                u.full_name, u.email
+           FROM disputes d
+           JOIN users u ON u.id::text = d.user_id::text
+          WHERE d.status IN ('open', 'under_review')
+          ORDER BY d.created_at DESC
+          LIMIT 100`
+      )
+    ])
+
+    const chatRows = chatResult.rows.map((r) => ({
+      id: r.id,
+      channel: 'chat',
+      queue: 'Chat',
+      name: r.full_name || r.email,
+      subject: r.subject,
+      status: r.status,
+      assigned_to: r.assigned_to,
+      unread: r.unread_admin_count || 0,
+      updated_at: r.updated_at
+    }))
+    const disputeRows = disputeResult.rows.map((r) => ({
+      id: r.id,
+      channel: 'dispute',
+      queue: 'Appeal',
+      name: r.full_name || r.email,
+      subject: r.reason,
+      status: r.status,
+      assigned_to: null,
+      unread: 0,
+      updated_at: r.updated_at
+    }))
+
+    const combined = [...chatRows, ...disputeRows].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+    res.json({
+      rows: combined,
+      summary: {
+        chat_open: chatRows.length,
+        appeals_open: disputeRows.length,
+        total: combined.length
+      }
+    })
+  } catch (error) {
+    logger.error('Support inbox error:', { error: error.message })
+    res.status(500).json({ error: 'Could not load support inbox' })
+  }
+})
+
 router.get('/dispute-workflow', authenticateAdmin, async (req, res) => {
   try {
     await ensureFeatureTables()
