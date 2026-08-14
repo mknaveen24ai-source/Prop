@@ -1,8 +1,5 @@
-import React, { Suspense, lazy, useState, useEffect, useMemo, useRef } from 'react'
-import axios from 'axios'
+import React, { Suspense, lazy, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { io } from 'socket.io-client'
-import toast from 'react-hot-toast'
 import MarketStatusPill from '../components/MarketStatusPill'
 import CommandPaletteTrigger from '../components/CommandPaletteTrigger'
 import Sidebar, { NAV_GROUPS } from '../components/Sidebar'
@@ -14,22 +11,31 @@ import Onboarding, { shouldShowOnboarding } from './Onboarding'
 import Support from './Support'
 import Dispute from './Dispute'
 import Chat from './Chat'
-import { calculatePnL } from '../utils/instruments'
-import { createIdempotencyHeaders, normalizeApiError, authAPI, notificationsAPI } from '../services/api'
 import { useAuth } from '../providers/AuthProvider'
-import useStore from '../store/useStore'
 import { renderIcon } from '../utils/iconMap'
-import { calculatePayoutPreview, calculateRealizedProfit, formatCurrency } from '../utils/finance'
-import { filterVisibleTraderAccounts, isTraderAccountVisible } from '../utils/accountVisibility'
+import { calculateRealizedProfit } from '../utils/finance'
 import { getStatusColor } from '../utils/constants'
-import { getPersistentItem, setPersistentItem, removePersistentItem } from '../utils/memoryStore'
 import DashboardKYCPage from './DashboardKYCPage'
 import DashboardCompetitionsPage from './DashboardCompetitionsPage'
 import DashboardProfilePage from './DashboardProfilePage'
 import DashboardComparePage from './DashboardComparePage'
 import GetChallenge from './GetChallenge'
 import ErrorBoundary from '../ErrorBoundary'
-import { API_BASE_URL as API_URL, SOCKET_URL } from '../config/apiBase'
+import useStore from '../store/useStore'
+import { API_BASE_URL as API_URL } from '../config/apiBase'
+
+// State, effects and side-effecting actions live in these hooks. Dashboard
+// itself is the shell: page chrome plus the view switch.
+import useDashboardFeedback from './dashboard/hooks/useDashboardFeedback'
+import useNotifications from './dashboard/hooks/useNotifications'
+import useAnnouncement from './dashboard/hooks/useAnnouncement'
+import useSidebarCollapse from './dashboard/hooks/useSidebarCollapse'
+import useDashboardData from './dashboard/hooks/useDashboardData'
+import useTradeActions from './dashboard/hooks/useTradeActions'
+import useAccountActions from './dashboard/hooks/useAccountActions'
+import useKycForm from './dashboard/hooks/useKycForm'
+import useKycStatusPolling from './dashboard/hooks/useKycStatusPolling'
+import useDashboardSocket from './dashboard/hooks/useDashboardSocket'
 
 const TradingPanel = lazy(() => import('../components/TradingPanel'))
 const Analytics = lazy(() => import('./Analytics'))
@@ -70,33 +76,6 @@ function greeting() {
   return 'Good evening'
 }
 
-function enrichTradesWithPrices(trades = [], currentPrices = {}) {
-  return trades.map(trade => {
-    if (trade.status === 'pending') return trade
-    const priceData = currentPrices[trade.instrument]
-    if (!priceData || trade.open_price == null) return trade
-
-    const currentPrice = trade.direction === 'buy'
-      ? parseFloat(priceData.bid)
-      : parseFloat(priceData.ask)
-
-    const floatingPnl = calculatePnL(
-      trade.direction,
-      parseFloat(trade.open_price),
-      currentPrice,
-      parseFloat(trade.lot_size),
-      trade.instrument,
-      parseFloat(trade.commission || 0)
-    )
-
-    return {
-      ...trade,
-      floating_pnl: floatingPnl,
-      current_price: currentPrice
-    }
-  })
-}
-
 function DashboardSectionFallback({ label = 'Loading module...' }) {
   return (
     <div
@@ -123,755 +102,103 @@ function Dashboard({ user, onLogout }) {
   const navigate = useNavigate()
   const activePage = location.pathname.replace(/^\/dashboard\/?/, '').split('/')[0] || 'dashboard'
   const setActivePage = (page) => navigate(page === 'dashboard' ? '/dashboard' : `/dashboard/${page}`)
-  const [profileForm, setProfileForm] = useState({
-    full_name: user?.full_name || '',
-    country: user?.country || '',
-    address_line1: user?.address_line1 || '',
-    address_line2: user?.address_line2 || '',
-    city: user?.city || '',
-    state_province: user?.state_province || '',
-    postal_code: user?.postal_code || ''
-  })
-  const [profileSaving, setProfileSaving] = useState(false)
-  const [stats, setStats] = useState(null)
-  const [accountRules, setAccountRules] = useState(null)
-  const [tradeHistory, setTradeHistory] = useState([])
-  const [payouts, setPayouts] = useState([])
-  const [connected, setConnected] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    try { return localStorage.getItem('sidebarCollapsed') === 'true' } catch { return false }
-  })
-  const handleToggleSidebar = () => setSidebarCollapsed(prev => {
-    const next = !prev
-    try { localStorage.setItem('sidebarCollapsed', String(next)) } catch {}
-    return next
-  })
-  const [orderForm, setOrderForm] = useState({
-    instrument: 'EURUSD',
-    lots: '0.01',
-    stop_loss: '',
-    take_profit: '',
-    oco_enabled: false,
-    oco_order_type: 'sell_stop',
-    oco_pending_price: ''
-  })
-  const [payoutForm, setPayoutForm] = useState({ amount_requested: '', payment_method: 'usdt_trc20', payment_details: '' })
-  const [kycStatus, setKycStatus] = useState(user?.kyc_status || 'not_submitted')
-  const [kycCountry, setKycCountry] = useState(user?.kyc_document_country || user?.country || '')
-  const [kycDocumentType, setKycDocumentType] = useState(user?.kyc_document_type || 'passport')
-  const [kycDocumentNumber, setKycDocumentNumber] = useState(user?.kyc_document_number || '')
-  const [idDocument, setIdDocument] = useState(null)
-  const [idDocumentBack, setIdDocumentBack] = useState(null)
-  const [selfie, setSelfie] = useState(null)
-  const [kycUploading, setKycUploading] = useState(false)
-  const [accountLoading, setAccountLoading] = useState(false)
-  const [profitSharePct, setProfitSharePct] = useState(80)
-  const [accountSubmitting, setAccountSubmitting] = useState(false)
-  const [tradeSubmitting, setTradeSubmitting] = useState(false)
-  const [closingTradeIds, setClosingTradeIds] = useState([])
-  const [payoutSubmitting, setPayoutSubmitting] = useState(false)
 
-  // ── Quota state: set when the backend returns quota_full on account creation ──
-  const [quotaFull, setQuotaFull] = useState(false)
-  const [quotaNextOpen, setQuotaNextOpen] = useState(null)
-
-  // ── Notification centre ──
-  const [notifications, setNotifications] = useState(() => {
-    try { return JSON.parse(getPersistentItem('notifications') || '[]') } catch { return [] }
-  })
-  const [showNotifications, setShowNotifications] = useState(false)
-  const notifRef = useRef(null)
-  const notifButtonRef = useRef(null)
-
-  useEffect(() => {
-    if (!showNotifications) return
-    function handleClickOutside(e) {
-      if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotifications(false)
-    }
-    function handleEscape(e) {
-      if (e.key === 'Escape') {
-        setShowNotifications(false)
-        notifButtonRef.current?.focus()
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    document.addEventListener('keydown', handleEscape)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [showNotifications])
-
-  // Seed with persisted history (currently: admin broadcasts) so the bell
-  // survives a localStorage clear and syncs across devices/tabs — merged
-  // with, not replacing, whatever's already local (live trade/account
-  // events pushed via pushNotification() are still client-only).
-  useEffect(() => {
-    notificationsAPI.getMine()
-      .then((res) => {
-        const serverNotifs = (res.data || []).map((n) => ({
-          id: `srv-${n.id}`,
-          message: n.title ? `${n.title}: ${n.message}` : n.message,
-          type: n.type,
-          time: n.created_at,
-          read: n.read,
-        }))
-        setNotifications((prev) => {
-          const existingIds = new Set(prev.map((n) => n.id))
-          const merged = [...prev, ...serverNotifs.filter((n) => !existingIds.has(n.id))]
-          merged.sort((a, b) => new Date(b.time) - new Date(a.time))
-          return merged.slice(0, 50)
-        })
-      })
-      .catch(() => {})
-  }, [])
-
-  // ── Account history ──
-  const [accountHistory, setAccountHistory] = useState([])
-
-  // ── Onboarding ──
   const [showOnboarding, setShowOnboarding] = useState(() => shouldShowOnboarding())
 
-  // ── Platform announcement banner ──
-  const [announcement, setAnnouncement] = useState(null)
-  const [announcementDismissed, setAnnouncementDismissed] = useState(false)
-  const dismissedAnnouncementKeyRef = useRef(null)
-  const announcementKey = (a) => a ? `${a.message}|${a.updated_at}` : null
+  const { error, setError, success, setSuccess } = useDashboardFeedback()
+  const { sidebarCollapsed, handleToggleSidebar } = useSidebarCollapse()
+  const { announcement, announcementDismissed, dismissAnnouncement } = useAnnouncement()
+  const {
+    notifications,
+    showNotifications,
+    setShowNotifications,
+    notifRef,
+    notifButtonRef,
+    pushNotification,
+    markAllRead,
+    clearNotifications
+  } = useNotifications()
 
   const {
-    activeAccount: selectedAccount,
-    allAccounts: accounts,
-    setActiveAccount,
-    setAllAccounts,
-    switchAccount,
+    stats,
+    accountRules,
+    tradeHistory,
+    payouts,
+    accountHistory,
+    profitSharePct,
+    accountLoading,
+    accounts,
+    visibleAccounts,
+    selectedAccount,
+    setSelectedAccount,
+    selectedAccountRef,
+    pricesRef,
     prices,
-    updatePrice,
-    updatePrices,
-    openPositions: openTrades,
-    setOpenPositions,
-    updatePositionPnL,
-    addPosition,
-    removePosition,
-  } = useStore()
-  const visibleAccounts = useMemo(() => filterVisibleTraderAccounts(accounts), [accounts])
+    fetchAccounts,
+    fetchStats,
+    fetchOpenTrades,
+    fetchTradeHistory,
+    fetchPayouts,
+    fetchAccountHistory,
+    refreshSelectedAccount
+  } = useDashboardData({ setError })
 
-  useEffect(() => {
-    // Fetch on mount
-    axios.get(`${API_URL}/api/announcement`)
-      .then(res => { if (res.data) setAnnouncement(res.data) })
-      .catch(() => {})
-    // Re-poll every 5 minutes
-    const iv = setInterval(() => {
-      axios.get(`${API_URL}/api/announcement`)
-        .then(res => {
-          setAnnouncement(res.data || null)
-          // Reset dismissal when the announcement disappears OR changes to
-          // different content — a dismissed banner shouldn't stay hidden
-          // forever once an admin posts a new one.
-          if (announcementKey(res.data) !== dismissedAnnouncementKeyRef.current) {
-            setAnnouncementDismissed(false)
-          }
-        })
-        .catch(() => {})
-    }, 5 * 60 * 1000)
-    return () => clearInterval(iv)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  const openTrades = useStore((s) => s.openPositions)
 
-  const socketRef = useRef(null)
-  const selectedAccountRef = useRef(null)
-  const pricesRef = useRef({})
-  const closingTradesRef = useRef(new Set())
+  const kyc = useKycForm({ user, setError, setSuccess })
+  useKycStatusPolling(kyc.kycStatus, kyc.setKycStatus)
 
-  useEffect(() => { selectedAccountRef.current = selectedAccount }, [selectedAccount])
-  useEffect(() => { pricesRef.current = prices }, [prices])
+  const {
+    orderForm,
+    setOrderForm,
+    closingTradeIds,
+    openTrade,
+    closeTrade,
+    cancelOrder,
+    handleTradeModified
+  } = useTradeActions({
+    selectedAccount,
+    setError,
+    setSuccess,
+    fetchOpenTrades,
+    fetchStats,
+    fetchTradeHistory
+  })
 
-  function setSelectedAccount(account) {
-    if (!account) {
-      setActiveAccount(null)
-      return
-    }
+  const {
+    createAccount,
+    quotaFull,
+    quotaNextOpen,
+    payoutForm,
+    setPayoutForm,
+    requestPayout,
+    profileForm,
+    setProfileForm,
+    profileSaving,
+    updateProfile
+  } = useAccountActions({
+    user,
+    login,
+    selectedAccount,
+    setError,
+    setSuccess,
+    fetchAccounts,
+    fetchPayouts
+  })
 
-    switchAccount(account.id)
-
-    if (useStore.getState().activeAccount?.id !== account.id) {
-      setActiveAccount(account)
-    }
-  }
-
-  useEffect(() => {
-    // FIX: include 'polling' as fallback — works behind proxies/firewalls that
-    // block WebSocket upgrades. Socket.IO prefers WebSocket, falls back automatically.
-    const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'], withCredentials: true })
-    socketRef.current = socket
-    socket.on('connect', () => {
-      setConnected(true)
-      if (user?.id) socket.emit('join_account', String(user.id))
-    })
-    socket.on('disconnect', () => setConnected(false))
-    socket.on('price_update', (payload) => {
-      const mergedPrices = payload?.instrument
-        ? { ...pricesRef.current, [payload.instrument]: payload }
-        : payload
-
-      if (!mergedPrices || typeof mergedPrices !== 'object') return
-
-      if (payload?.instrument) {
-        updatePrice(payload.instrument, payload)
-      } else {
-        updatePrices(mergedPrices)
-      }
-
-      pricesRef.current = mergedPrices
-      setOpenPositions(enrichTradesWithPrices(useStore.getState().openPositions, mergedPrices))
-    })
-    socket.on('position_update', (data) => {
-      const tradeId = data?.tradeId ?? data?.trade_id
-      const floatingPnl = data?.floatingPnL ?? data?.floating_pnl ?? 0
-      if (tradeId == null) return
-      updatePositionPnL(tradeId, floatingPnl)
-    })
-    socket.on('trade_closed', (data) => {
-      const tradeId = data?.tradeId ?? data?.trade_id
-      const existingTrade = useStore.getState().openPositions.find(trade => trade.id === tradeId)
-      if (tradeId == null) return
-      const instrument = data?.instrument || existingTrade?.instrument || 'Trade'
-      const pnl = Number(data?.pnl ?? data?.demo_pnl ?? 0)
-      const profit = pnl >= 0
-      toast(
-        `${instrument} closed ${formatCurrency(pnl, { signed: true })}`,
-        {
-          icon: renderIcon(profit ? 'approve' : 'reject', { size: 16, color: profit ? 'var(--accent-green)' : 'var(--accent-red)' }),
-          style: {
-            borderLeft: `3px solid ${profit ? 'var(--gain)' : 'var(--loss)'}`
-          }
-        }
-      )
-      removePosition(tradeId)
-    })
-    socket.on('trade_opened', (data) => {
-      if (!data?.position) return
-      const openedPosition = enrichTradesWithPrices([data.position], pricesRef.current)[0]
-      addPosition(openedPosition)
-      toast(`Trade opened: ${openedPosition.instrument} ${openedPosition.direction}`, {
-        icon: renderIcon('trade', { size: 16, color: 'var(--accent)' }),
-        style: { borderLeft: '3px solid var(--accent)' }
-      })
-    })
-    socket.on('account_passed', (data) => {
-      toast.success(`Congratulations! You passed ${data?.phase || 'your challenge'}!`, {
-        duration: 8000,
-        icon: renderIcon('leaderboard', { size: 16, color: 'var(--accent-gold)' }),
-        style: { borderLeft: '3px solid var(--warn)' }
-      })
-    })
-    socket.on('payout_approved', (data) => {
-      toast.success(`Payout of ${formatCurrency(data?.amount)} approved!`, {
-        duration: 8000,
-        icon: renderIcon('payouts', { size: 16, color: 'var(--accent-gold)' }),
-        style: { borderLeft: '3px solid var(--warn)' }
-      })
-    })
-    socket.on('kyc_status_changed', (data) => {
-      if (!data?.status) return
-      setKycStatus(data.status)
-      if (data.status === 'approved') {
-        toast.success('Your identity verification was approved!', {
-          duration: 8000,
-          icon: renderIcon('kyc', { size: 16, color: 'var(--accent-gold)' }),
-          style: { borderLeft: '3px solid var(--gain)' }
-        })
-      } else if (data.status === 'rejected') {
-        toast.error(data.reason ? `Identity verification rejected: ${data.reason}` : 'Identity verification was rejected.', {
-          duration: 8000,
-          style: { borderLeft: '3px solid var(--loss)' }
-        })
-      }
-    })
-    socket.on('sl_triggered', (data) => {
-      const slipMsg = Number(data?.slippage_pips || 0) > 0
-        ? ` (${data.slippage_pips} pip slippage)`
-        : ''
-      toast(`SL triggered on ${data?.instrument || 'trade'}${slipMsg}`, {
-        icon: renderIcon('warning', { size: 16, color: 'var(--accent-red)' }),
-        style: { borderLeft: '3px solid var(--loss)' }
-      })
-    })
-    socket.on('tp_triggered', (data) => {
-      toast.success(`TP hit on ${data?.instrument || 'trade'}! ${formatCurrency(data?.pnl, { signed: true })}`, {
-        icon: renderIcon('target', { size: 16, color: 'var(--accent-green)' }),
-        style: { borderLeft: '3px solid var(--gain)' }
-      })
-    })
-    socket.on('account_update', (data) => {
-      const isPhasePassedEvent = /^phase\d+_passed$/.test(data?.event || '')
-      if (data?.message) {
-        const pnlSuffix = data.pnl != null ? ` P&L: ${formatCurrency(data.pnl, { signed: true })}` : ''
-        setSuccess(data.message + pnlSuffix)
-        pushNotification(data.message + pnlSuffix,
-          data.event === 'account_failed' ? 'error' : isPhasePassedEvent ? 'success' : 'info')
-      }
-      if (isPhasePassedEvent) {
-        const phaseLabel = `Phase ${data.event.match(/^phase(\d+)_passed$/)[1]}`
-        toast.success(`Congratulations! You passed ${phaseLabel}!`, {
-          duration: 8000,
-          icon: renderIcon('leaderboard', { size: 16, color: 'var(--accent-gold)' }),
-          style: { borderLeft: '3px solid var(--warn)' }
-        })
-      }
-      if (selectedAccountRef.current) {
-        fetchStats(selectedAccountRef.current.id)
-        fetchAccountRules(selectedAccountRef.current.id)
-        fetchOpenTrades(selectedAccountRef.current.id)
-        fetchTradeHistory(selectedAccountRef.current.id)
-      }
-      // FIX: Auto-select the newly promoted account when a phase is passed.
-      // The backend emits new_account_id on phase1_passed and phase2_passed events.
-      // Without this, the trader sees the old (passed) account selected and has to
-      // manually click the new Phase 2 / Funded account to start trading it.
-      fetchAccounts().then((latestAccounts) => {
-        if (data?.new_account_id && latestAccounts) {
-          const newAcc = latestAccounts.find(a => a.id === data.new_account_id)
-          if (newAcc) setSelectedAccount(newAcc)
-        }
-      })
-      fetchAccountHistory()
-    })
-
-    // ── Drawdown warning alerts (50% / 75% / 90% of limit) ───────────────────
-    socket.on('drawdown_warning', (data) => {
-      if (!data?.message) return
-      const percentage = data?.percentage ?? data?.warning_level ?? 0
-      const type = percentage >= 90 ? 'error'
-        : percentage >= 75 ? 'warning'
-        : 'info'
-      pushNotification(data.message, type)
-      toast.error(
-        `Warning: ${percentage}% drawdown used. Trade carefully.`,
-        {
-          duration: 10000,
-          icon: renderIcon('warning', { size: 16, color: 'var(--accent-red)' }),
-        }
-      )
-      setError(data.message)
-    })
-
-    // ── Platform-wide admin broadcasts (Notification Center → "web" channel) ──
-    socket.on('platform_notification', (data) => {
-      if (!data?.message) return
-      pushNotification(data.title ? `${data.title}: ${data.message}` : data.message, data.type || 'info')
-    })
-
-    return () => socket.disconnect()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => { fetchAccounts(); fetchPrices(); fetchPayouts(); fetchPayoutSettings(); fetchAccountHistory() }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Stripe checkout return handler ──────────────────────────────────────
-  // After a challenge order is paid, Stripe redirects back to
-  // /dashboard?checkout=success&order_id=N. Webhook delivery can lag a few
-  // seconds behind the redirect, so poll the order until it's marked paid,
-  // then create the challenge account.
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const checkout = params.get('checkout')
-    const orderId = params.get('order_id')
-    if (!checkout) return
-
-    window.history.replaceState({}, '', window.location.pathname)
-
-    if (checkout === 'cancelled') {
-      toast.error('Checkout was cancelled — no charge was made.')
-      return
-    }
-    if (checkout !== 'success' || !orderId) return
-
-    let cancelled = false
-    async function confirmPayment() {
-      setSuccess('Confirming your payment...')
-      for (let attempt = 0; attempt < 10 && !cancelled; attempt++) {
-        try {
-          const res = await axios.get(`${API_URL}/api/accounts/orders/${orderId}`)
-          const order = res.data?.order
-          if (order?.status === 'paid') {
-            if (order.is_gift) {
-              // Gift orders never create an account for the buyer — a
-              // redemption voucher was issued to the recipient instead
-              // (see backend/utils/giftVouchers.js).
-              setSuccess(`Gift sent to ${order.gift_recipient_email}! They'll receive an email with a redemption code.`)
-              return
-            }
-            await createAccount(parseFloat(order.account_size), { challengeOrderId: order.id })
-            return
-          }
-        } catch (_) {
-          // keep retrying — webhook may not have landed yet
-        }
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-      }
-      if (!cancelled) {
-        setError('Payment is taking longer than expected to confirm. If you were charged, your account will appear shortly — refresh in a minute or contact support.')
-      }
-    }
-    confirmPayment()
-    return () => { cancelled = true }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (selectedAccount) {
-      setAccountLoading(true)
-      setOpenPositions([])
-      setStats(null)
-      setAccountRules(null)
-      setTradeHistory([])
-      Promise.all([
-        fetchStats(selectedAccount.id),
-        fetchAccountRules(selectedAccount.id),
-        fetchOpenTrades(selectedAccount.id),
-        fetchTradeHistory(selectedAccount.id)
-      ]).finally(() => setAccountLoading(false))
-    }
-  }, [selectedAccount?.id]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!selectedAccount || isTraderAccountVisible(selectedAccount)) return
-    setActiveAccount(visibleAccounts[0] || null)
-  }, [selectedAccount?.id, visibleAccounts, setActiveAccount]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (error || success) {
-      const t = setTimeout(() => { setError(''); setSuccess('') }, 5000)
-      return () => clearTimeout(t)
-    }
-  }, [error, success])
-
-  // Poll KYC status every 30s
-  useEffect(() => {
-    const pollKyc = async () => {
-      try {
-        const res = await axios.get(`${API_URL}/api/auth/me`)
-        const newStatus = res.data?.kyc_status
-        if (newStatus && newStatus !== kycStatus) {
-          setKycStatus(newStatus)
-        }
-      } catch {}
-    }
-    const interval = setInterval(pollKyc, 30000)
-    return () => clearInterval(interval)
-  }, [kycStatus]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function fetchAccounts() {
-    try {
-      const res = await axios.get(`${API_URL}/api/accounts/my-accounts`)
-      const latestAccounts = Array.isArray(res.data) ? res.data : []
-      const latestVisibleAccounts = filterVisibleTraderAccounts(latestAccounts)
-      setAllAccounts(latestAccounts)
-      if (selectedAccountRef.current?.id) {
-        const refreshed = latestVisibleAccounts.find(account => account.id === selectedAccountRef.current.id)
-        setActiveAccount(refreshed || latestVisibleAccounts[0] || null)
-      } else if (latestVisibleAccounts.length > 0) {
-        setActiveAccount(latestVisibleAccounts[0])
-      }
-      return res.data
-    } catch { setError('Could not fetch accounts') }
-  }
-
-  async function fetchPrices() {
-    try {
-      const res = await axios.get(`${API_URL}/api/prices`)
-      updatePrices(res.data)
-      pricesRef.current = res.data
-    } catch {}
-  }
-
-  async function fetchStats(id) {
-    try {
-      const res = await axios.get(`${API_URL}/api/accounts/stats/${id}`)
-      setStats(res.data)
-    } catch (err) {
-      console.error('[Dashboard] fetchStats failed:', err.response?.data?.error || err.message)
-      // Keep stats null so the loading state shows rather than a blank page
-    }
-  }
-
-  async function fetchAccountRules(id) {
-    try {
-      const res = await axios.get(`${API_URL}/api/accounts/rules/${id}`)
-      setAccountRules(res.data)
-    } catch {}
-  }
-
-  async function fetchOpenTrades(id) {
-    try {
-      const [openRes, pendingRes] = await Promise.all([
-        axios.get(`${API_URL}/api/trades/open`, { params: { account_id: id } }),
-        axios.get(`${API_URL}/api/trades/pending`, { params: { account_id: id } })
-      ])
-      const mergedTrades = [
-        ...(Array.isArray(openRes.data) ? openRes.data : []),
-        ...(Array.isArray(pendingRes.data) ? pendingRes.data : [])
-      ]
-      setOpenPositions(enrichTradesWithPrices(mergedTrades, pricesRef.current))
-    } catch {}
-  }
-
-  async function fetchTradeHistory(id) {
-    try { const res = await axios.get(`${API_URL}/api/trades/history`, { params: { account_id: id } }); setTradeHistory(res.data) } catch {}
-  }
-
-  async function fetchPayouts() {
-    try { const res = await axios.get(`${API_URL}/api/payouts/my-payouts`); setPayouts(res.data) } catch {}
-  }
-
-  async function fetchPayoutSettings() {
-    try {
-      const res = await axios.get(`${API_URL}/api/payouts/settings`)
-      if (res.data?.profit_share_pct) setProfitSharePct(parseFloat(res.data.profit_share_pct))
-    } catch {}
-  }
-
-  function pushNotification(message, type = 'info') {
-    // FIX (MEDIUM #14): Use crypto.randomUUID() instead of Date.now() to prevent
-    // ID collisions when two notifications arrive in the same millisecond.
-    const notif = { 
-      id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, 
-      message, 
-      type, 
-      time: new Date().toISOString(), 
-      read: false 
-    }
-    setNotifications(prev => {
-      const updated = [notif, ...prev].slice(0, 50)
-      setPersistentItem('notifications', JSON.stringify(updated))
-      return updated
-    })
-  }
-
-  function markAllRead() {
-    setNotifications(prev => {
-      const updated = prev.map(n => ({ ...n, read: true }))
-      setPersistentItem('notifications', JSON.stringify(updated))
-      return updated
-    })
-    notificationsAPI.markAllRead().catch(() => {})
-  }
-
-  function clearNotifications() {
-    setNotifications([])
-    removePersistentItem('notifications')
-    notificationsAPI.clearAll().catch(() => {})
-  }
-
-  async function fetchAccountHistory() {
-    try {
-      const res = await axios.get(`${API_URL}/api/accounts/history`)
-      setAccountHistory(res.data)
-    } catch {}
-  }
-
-  async function createAccount(size, options = {}) {
-    if (accountSubmitting) return
-    setAccountSubmitting(true)
-    try {
-      // Clear any previous quota state before trying
-      setQuotaFull(false)
-      setQuotaNextOpen(null)
-      const payload = { account_size: size }
-      if (options.challengeOrderId) {
-        payload.challenge_order_id = options.challengeOrderId
-      }
-      await axios.post(`${API_URL}/api/accounts/create`, payload, {
-        headers: createIdempotencyHeaders('accounts:create'),
-        skipAuthRedirect: true
-      })
-      setSuccess('Challenge account created!')
-      fetchAccounts()
-    } catch (err) {
-      const data = err.response?.data
-      if (data?.quota_full) {
-        // Backend told us quota is full — show the dedicated banner instead of the error toast
-        setQuotaFull(true)
-        setQuotaNextOpen(data.next_open || null)
-      } else {
-        setError(normalizeApiError(err, 'Could not create account').message)
-      }
-    } finally {
-      setAccountSubmitting(false)
-    }
-  }
-
-  async function openTrade({
-    direction,
-    orderType,
-    pendingPrice,
-    ocoSibling
-  }) {
-    if (tradeSubmitting) return
-    setTradeSubmitting(true)
-    try {
-      setError('')
-      const payload = {
-        account_id: selectedAccount.id,
-        instrument: orderForm.instrument,
-        direction,
-        lots: parseFloat(orderForm.lots),
-        order_type: orderType,
-      }
-      if (pendingPrice) payload.pending_price = pendingPrice
-      if (orderForm.stop_loss) payload.stop_loss = parseFloat(orderForm.stop_loss)
-      if (orderForm.take_profit) payload.take_profit = parseFloat(orderForm.take_profit)
-      if (ocoSibling) payload.oco_sibling = ocoSibling
-      await axios.post(`${API_URL}/api/trades/open`, payload, {
-        headers: createIdempotencyHeaders('trades:open')
-      })
-      setSuccess(`${orderType === 'market' ? direction.toUpperCase() : orderType.replace(/_/g, ' ').toUpperCase()} order placed on ${orderForm.instrument}`)
-      setOrderForm(f => ({
-        ...f,
-        stop_loss: '',
-        take_profit: '',
-        oco_enabled: false,
-        oco_order_type: 'sell_stop',
-        oco_pending_price: ''
-      }))
-      fetchOpenTrades(selectedAccount.id)
-      fetchStats(selectedAccount.id)
-    } catch (err) {
-      setError(normalizeApiError(err, 'Could not open trade').message)
-    } finally {
-      setTradeSubmitting(false)
-    }
-  }
-
-  async function closeTrade(tradeId, options = {}) {
-    if (closingTradesRef.current.has(tradeId)) return false
-    closingTradesRef.current.add(tradeId)
-    setClosingTradeIds((current) => (current.includes(tradeId) ? current : [...current, tradeId]))
-    try {
-      const payload = { trade_id: tradeId }
-      if (options.closeLots) payload.close_lots = options.closeLots
-      const res = await axios.post(`${API_URL}/api/trades/close`, payload)
-      setSuccess(`${options.closeLots ? 'Partial close executed' : 'Trade closed'}. P&L: ${formatCurrency(res.data.pnl, { signed: true })}`)
-      fetchOpenTrades(selectedAccount.id)
-      fetchStats(selectedAccount.id)
-      fetchTradeHistory(selectedAccount.id)
-      return true
-    } catch (err) {
-      setError(err.response?.data?.error || 'Could not close trade')
-      return false
-    } finally {
-      closingTradesRef.current.delete(tradeId)
-      setClosingTradeIds((current) => current.filter((id) => id !== tradeId))
-    }
-  }
-
-  async function cancelOrder(tradeId) {
-    try {
-      await axios.post(`${API_URL}/api/trades/cancel`, { trade_id: tradeId })
-      setSuccess('Pending order cancelled')
-      fetchOpenTrades(selectedAccount.id)
-    } catch (err) { setError(err.response?.data?.error || 'Could not cancel order') }
-  }
-
-  function handleTradeModified() {
-    if (selectedAccount) {
-      fetchOpenTrades(selectedAccount.id)
-      fetchStats(selectedAccount.id)
-      fetchTradeHistory(selectedAccount.id)
-    }
-  }
-
-  async function uploadKYC(e) {
-    e.preventDefault()
-    if (!idDocument || !idDocumentBack || !selfie) {
-      return setError('Please upload ID front, ID back, and live photo')
-    }
-    if (!kycCountry.trim()) return setError('Please enter your country of residence')
-    if (!kycDocumentType) return setError('Please choose your document type')
-    if (!kycDocumentNumber.trim()) return setError('Please enter your document number')
-    try {
-      setKycUploading(true)
-      const formData = new FormData()
-      formData.append('country', kycCountry.trim())
-      formData.append('document_type', kycDocumentType)
-      formData.append('document_number', kycDocumentNumber.trim())
-      formData.append('id_document', idDocument)
-      formData.append('id_document_back', idDocumentBack)
-      formData.append('selfie', selfie)
-      await axios.post(`${API_URL}/api/kyc/upload`, formData)
-      setKycStatus('pending')
-      setSuccess('KYC documents uploaded! Admin will review within 24 hours.')
-      setIdDocument(null)
-      setIdDocumentBack(null)
-      setSelfie(null)
-    } catch (err) {
-      setError(err.response?.data?.error || 'Upload failed')
-    } finally {
-      setKycUploading(false)
-    }
-  }
-
-  // Lets a trader replace a single rejected KYC document (e.g. just the
-  // selfie) instead of resubmitting all three files via uploadKYC() above —
-  // backend's POST /api/kyc/upload accepts any subset of the three fields
-  // and keeps whatever isn't resent as-is.
-  const KYC_DOC_FIELD_NAMES = { id: 'id_document', id_back: 'id_document_back', selfie: 'selfie' }
-  async function uploadSingleKycDocument(docType, file) {
-    const fieldName = KYC_DOC_FIELD_NAMES[docType]
-    if (!fieldName || !file) return false
-    try {
-      setKycUploading(true)
-      const formData = new FormData()
-      formData.append(fieldName, file)
-      await axios.post(`${API_URL}/api/kyc/upload`, formData)
-      setKycStatus('pending')
-      setSuccess('Document replaced! Admin will review within 24 hours.')
-      return true
-    } catch (err) {
-      setError(err.response?.data?.error || 'Upload failed')
-      return false
-    } finally {
-      setKycUploading(false)
-    }
-  }
-
-  async function requestPayout(e) {
-    e.preventDefault()
-    if (payoutSubmitting) return
-    setPayoutSubmitting(true)
-    try {
-      await axios.post(`${API_URL}/api/payouts/request`, {
-        account_id: selectedAccount.id,
-        amount_requested: parseFloat(payoutForm.amount_requested),
-        payment_method: payoutForm.payment_method,
-        payment_details: payoutForm.payment_details
-      }, {
-        headers: createIdempotencyHeaders('payouts:request')
-      })
-      setSuccess('Payout request submitted!')
-      setPayoutForm({ amount_requested: '', payment_method: 'usdt_trc20', payment_details: '' })
-      fetchPayouts()
-    } catch (err) {
-      setError(normalizeApiError(err, 'Could not submit payout').message)
-    } finally {
-      setPayoutSubmitting(false)
-    }
-  }
-
-  async function updateProfile(e) {
-    e.preventDefault()
-    if (profileSaving) return
-    setProfileSaving(true)
-    try {
-      const res = await authAPI.updateProfile(profileForm)
-      login(res.data)
-      setSuccess('Profile updated!')
-    } catch (err) {
-      setError(normalizeApiError(err, 'Could not update profile').message)
-    } finally {
-      setProfileSaving(false)
-    }
-  }
+  useDashboardSocket({
+    user,
+    pricesRef,
+    selectedAccountRef,
+    setError,
+    setSuccess,
+    setKycStatus: kyc.setKycStatus,
+    setSelectedAccount,
+    pushNotification,
+    refreshSelectedAccount,
+    fetchAccounts,
+    fetchAccountHistory
+  })
 
   const fundedAccount = accounts.find(a => a.account_type === 'funded' && a.status === 'active')
   const availableProfit = fundedAccount
@@ -916,10 +243,7 @@ function Dashboard({ user, onLogout }) {
               {announcement.message}
             </span>
             <button
-              onClick={() => {
-                dismissedAnnouncementKeyRef.current = announcementKey(announcement)
-                setAnnouncementDismissed(true)
-              }}
+              onClick={dismissAnnouncement}
               aria-label="Dismiss announcement"
               style={{ background: 'none', border: 'none', color: c.text, cursor: 'pointer', fontSize: '16px', opacity: 0.7, padding: '0 4px' }}
             >
@@ -933,7 +257,7 @@ function Dashboard({ user, onLogout }) {
         user={user}
         activePage={activePage}
         setActivePage={setActivePage}
-        kycStatus={kycStatus}
+        kycStatus={kyc.kycStatus}
         pendingPayouts={payouts.filter(p => p.status === 'pending').length}
         unreadNotifications={notifications.filter(n => !n.read).length}
         onLogout={onLogout}
@@ -1073,7 +397,7 @@ function Dashboard({ user, onLogout }) {
         {/* Profile Page */}
         {activePage === 'profile' && (
           <DashboardProfilePage
-            kycStatus={kycStatus}
+            kycStatus={kyc.kycStatus}
             profileForm={profileForm}
             setProfileForm={setProfileForm}
             updateProfile={updateProfile}
@@ -1085,7 +409,7 @@ function Dashboard({ user, onLogout }) {
         {activePage === 'get-challenge' && (
           <GetChallenge
             onCreateAccount={createAccount}
-            kycStatus={kycStatus}
+            kycStatus={kyc.kycStatus}
             setActivePage={setActivePage}
           />
         )}
@@ -1102,7 +426,7 @@ function Dashboard({ user, onLogout }) {
 
         {/* Trade Page */}
         {activePage === 'trade' && (
-          kycStatus !== 'approved' ? (
+          kyc.kycStatus !== 'approved' ? (
             <Card style={{ textAlign: 'center', padding: '48px' }}>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
                 {renderIcon('kyc', { size: 48, color: 'var(--accent)' })}
@@ -1161,25 +485,9 @@ function Dashboard({ user, onLogout }) {
 
         {/* KYC Page */}
         {activePage === 'kyc' && (
-          <DashboardKYCPage
-            user={user}
-            kycStatus={kycStatus}
-            uploadKYC={uploadKYC}
-            kycCountry={kycCountry}
-            setKycCountry={setKycCountry}
-            kycDocumentType={kycDocumentType}
-            setKycDocumentType={setKycDocumentType}
-            kycDocumentNumber={kycDocumentNumber}
-            setKycDocumentNumber={setKycDocumentNumber}
-            idDocument={idDocument}
-            setIdDocument={setIdDocument}
-            idDocumentBack={idDocumentBack}
-            setIdDocumentBack={setIdDocumentBack}
-            selfie={selfie}
-            setSelfie={setSelfie}
-            kycUploading={kycUploading}
-            uploadSingleKycDocument={uploadSingleKycDocument}
-          />
+          // useKycForm returns exactly the props this page takes, so spreading
+          // it keeps the two in step instead of restating 16 bindings here.
+          <DashboardKYCPage user={user} {...kyc} />
         )}
 
         {/* Payouts Page */}
