@@ -8,14 +8,14 @@ const path = require('path')
 const { authenticateToken } = require('./middleware')
 const { v4: uuidv4 } = require('uuid')
 const rateLimit = require('express-rate-limit')
-const { fetchProgressionSettings, promotePassedAccount } = require('../services/progressionService')
+const { fetchProgressionSettings } = require('../services/progressionService')
 const { tradingLimiter } = require('../utils/security')
 const { isValidLotSize, sanitizeString } = require('../utils/validation')
 const logger = require('../utils/logger')
+// LEVERAGE and INSTRUMENTS moved out with the margin helpers and
+// VALID_INSTRUMENTS — see services/tradeShared.js.
 const {
   CONTRACT_SIZES,
-  LEVERAGE,
-  INSTRUMENTS,
   FOREX_INSTRUMENTS,
   COMMODITY_INSTRUMENTS,
   getPipSize,
@@ -25,10 +25,10 @@ const {
 } = require('../constants')
 const Decimal = require('decimal.js')
 const newsService = require('../services/newsService')
-const { getCurrentPrices, getCurrentPricesForTenant, getPriceForTenant } = require('../priceFeed')
+const { getCurrentPricesForTenant } = require('../priceFeed')
 const { validatePendingOrderPrice } = require('../utils/pendingOrderValidation')
 const { VALID_CHART_TIMEFRAME_LABELS, getChartTimeframeMinutes } = require('../utils/chartTimeframes')
-const { ensureViolationTables, recordEnforcementEvent, recordViolation } = require('../services/violationEngine')
+const { ensureViolationTables } = require('../services/violationEngine')
 const { getTenantFeedConfig, getTenantSettings } = require('../services/tenantPolicyService')
 const { resolveTieredInstrumentSetting } = require('../utils/tenantSettings')
 const { calculatePnL } = require('../utils/pnlCalculator')
@@ -38,124 +38,60 @@ const {
   completeIdempotentRequest,
   getIdempotencyKey
 } = require('../utils/idempotency')
-const drawdownService = require('../services/drawdownService')
-const tradingDaysService = require('../services/tradingDaysService')
+// Resolved lazily so this file and services/tradeEngine.js can require each
+// other's exports without depending on which one Node loads first.
+let _tradeEngine = null
+function engine() {
+  if (!_tradeEngine) _tradeEngine = require('../services/tradeEngine')
+  return _tradeEngine
+}
+const tradeIndex = require('../utils/tradeIndex')
 const { fetchStepModelBySlug } = require('../utils/stepModels')
-
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Leverage: 1:30 on forex (EURUSD, GBPUSD), 1:10 on commodities (XAUUSD, XAGUSD)
-// These values must NOT be changed without also reviewing margin checks.
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Instrument groups for combined exposure checks
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const VALID_INSTRUMENTS = INSTRUMENTS
-
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Combined exposure limits per $1,000 of account size
-//   Forex (all supported forex pairs combined):        0.10 lots per $1k
-//   Commodities (XAUUSD + XAGUSD combined):            0.02 lots per $1k
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const FOREX_LOTS_PER_1K     = 0.10
-const COMMODITY_LOTS_PER_1K = 0.02
-// Flat cap, not scaled by account size (spec: "Max 10 open positions at once").
-const MAX_OPEN_POSITIONS = 10
-
-// â”€â”€ Load admin-configurable trading rules from platform_settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Falls back to hardcoded defaults if a setting hasn't been configured yet.
-// Cached for 30s to avoid a DB hit on every single trade open.
-let _tradingRulesCache = null
-const TRADING_RULES_TTL  = 30 * 1000 // 30 seconds
-const candleCache = new Map()
-const CANDLE_CACHE_TTL_MS = 15000
-const MAX_RAW_CANDLE_BARS = 3000
-const tradeFeatureInfraPromise = { current: null }
-const TRADE_JOURNAL_UPLOAD_ROOT = path.resolve(__dirname, '..', 'uploads', 'trade-journal')
-const TRADING_RULE_KEYS = [
-  'min_hold_seconds',
-  'forex_lots_per_1k',
-  'commodity_lots_per_1k',
-  'min_lot_size',
-  'max_trades_per_1k',
-  'max_open_positions',
-  'dynamic_commission_per_lot',
-  'commission_per_lot_json',
-  'slippage_simulator_enabled',
-  'slippage_max_pips_adverse',
-  'slippage_max_pips_adverse_json',
-  'weekend_holding_enabled',
-  'max_daily_trades'
-]
-const DEFAULT_TRADING_RULES = {
-  minHoldSeconds: 60,
-  forexLotsPer1k: FOREX_LOTS_PER_1K,
-  commodityLotsPer1k: COMMODITY_LOTS_PER_1K,
-  minLotSize: 0.01,
-  maxTradesPer1k: 1,
-  maxOpenPositions: MAX_OPEN_POSITIONS,
-  maxDailyTrades: 20,
-  dynamicCommissionPerLot: 3.0,
-  slippageSimulatorEnabled: false,
-  slippageMaxPipsAdverse: 0,
-  weekendHoldingEnabled: true,
-}
-
-function getCachedCandles(cacheKey) {
-  const cached = candleCache.get(cacheKey)
-  if (!cached) return null
-  if ((Date.now() - cached.cachedAt) > CANDLE_CACHE_TTL_MS) {
-    candleCache.delete(cacheKey)
-    return null
-  }
-  return cached.value
-}
-
-function setCachedCandles(cacheKey, value) {
-  candleCache.set(cacheKey, { value, cachedAt: Date.now() })
-}
-
-function getRawCandleLookbackDays(tfMinutes, retainDays) {
-  const safeTfMinutes = Math.max(1, parseInt(tfMinutes, 10) || 1)
-  const cappedBars = Math.max(500, parseInt(process.env.MAX_RAW_CANDLE_BARS || String(MAX_RAW_CANDLE_BARS), 10) || MAX_RAW_CANDLE_BARS)
-  const lookbackMinutes = safeTfMinutes * cappedBars
-  const lookbackDays = Math.ceil(lookbackMinutes / (60 * 24))
-  return Math.max(1, Math.min(retainDays, lookbackDays))
-}
-
-function normalizeCandleRows(rows = []) {
-  return rows
-    .map((row) => ({
-      time: Number(row.time),
-      open: parseFloat(row.open),
-      high: parseFloat(row.high),
-      low: parseFloat(row.low),
-      close: parseFloat(row.close),
-      volume: parseInt(row.volume, 10) || 0
-    }))
-    .filter((row) =>
-      Number.isFinite(row.time)
-      && [row.open, row.high, row.low, row.close].every(Number.isFinite)
-    )
-}
-
-async function ensureTradeExperienceInfrastructure() {
-  if (tradeFeatureInfraPromise.current) {
-    return tradeFeatureInfraPromise.current
-  }
-
-  tradeFeatureInfraPromise.current = (async () => {
-    await pool.query(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS open_screenshot_path TEXT`)
-    await pool.query(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS close_screenshot_path TEXT`)
-    await pool.query(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS oco_group_id TEXT`)
-    await pool.query(`CREATE INDEX IF NOT EXISTS trades_oco_group_idx ON trades(oco_group_id) WHERE oco_group_id IS NOT NULL`)
-    await fs.promises.mkdir(TRADE_JOURNAL_UPLOAD_ROOT, { recursive: true })
-  })().catch((error) => {
-    tradeFeatureInfraPromise.current = null
-    throw error
-  })
-
-  return tradeFeatureInfraPromise.current
-}
+const {
+  MAX_RAW_CANDLE_BARS,
+  getCachedCandles,
+  setCachedCandles,
+  getRawCandleLookbackDays,
+  normalizeCandleRows
+} = require('../utils/tradeCandles')
+const {
+  toFiniteNumber,
+  toSafeDate,
+  computeDaysRemainingForAnalytics,
+  computeTradeDurationMinutes,
+  getAnalyticsSessionMeta,
+  buildPerformanceBreakdown,
+  buildActivityHeatmap,
+  buildEquityCurveRanges,
+  percentile,
+  buildHoldTimeAnalytics,
+  calculateCoefficientOfVariation,
+  clampScore,
+  toScoreGrade,
+  buildDisciplineScore,
+  buildRiskConsistencyScore,
+  buildSetupReports,
+  buildBreachAnalysis,
+  buildPayoutForecast,
+  buildImprovementSuggestions,
+  ANALYTICS_WEEKDAY_LABELS,
+  ANALYTICS_WEEKDAY_ORDER
+} = require('../services/tradeAnalytics')
+// Shared trading primitives. These used to be defined here, but the background
+// engine needs them too — see services/tradeShared.js. Re-exported at the bottom
+// of this file so existing importers keep working.
+const {
+  VALID_INSTRUMENTS,
+  TRADE_JOURNAL_UPLOAD_ROOT,
+  ensureTradeExperienceInfrastructure,
+  computeRMultiple,
+  getTradingRules,
+  getLivePriceMap,
+  getLivePrice,
+  calculateMargin,
+  calculateUsedMargin,
+  getMarketStatus
+} = require('../services/tradeShared')
 
 function normalizePositiveNumber(value) {
   if (value === '' || value === null || value === undefined) return null
@@ -202,24 +138,6 @@ function buildTradeScreenshotAbsolutePath(relativePath) {
   return resolved.startsWith(TRADE_JOURNAL_UPLOAD_ROOT) ? resolved : null
 }
 
-// R-multiple = realized P&L expressed as a multiple of the dollar risk the
-// stop-loss defined at entry. Computed on read (no migration, no backfill
-// problem) — trades placed without a stop-loss have no defined risk unit,
-// so they get r_multiple: null rather than a fabricated one; a muted "—"
-// in the UI is itself useful risk-discipline signal, not a gap to paper over.
-function computeRMultiple(trade) {
-  const stopLoss = parseFloat(trade.stop_loss)
-  const openPrice = parseFloat(trade.open_price)
-  const lots = parseFloat(trade.lot_size)
-  const pnl = parseFloat(trade.demo_pnl)
-  if (!Number.isFinite(stopLoss) || !Number.isFinite(openPrice) || !Number.isFinite(lots) || !Number.isFinite(pnl)) return null
-  const contractSize = CONTRACT_SIZES[trade.instrument]
-  if (!contractSize) return null
-  const riskAmount = Math.abs(openPrice - stopLoss) * lots * contractSize
-  if (riskAmount <= 0) return null
-  return parseFloat((pnl / riskAmount).toFixed(2))
-}
-
 function mapTradeRow(row) {
   if (!row || typeof row !== 'object') return row
 
@@ -228,52 +146,6 @@ function mapTradeRow(row) {
     r_multiple: ['closed', 'cancelled'].includes(row.status) ? computeRMultiple(row) : null,
     open_screenshot_url: row.open_screenshot_path ? `/api/trades/${row.id}/screenshot/open` : null,
     close_screenshot_url: row.close_screenshot_path ? `/api/trades/${row.id}/screenshot/close` : null
-  }
-}
-
-async function getTradingRules() {
-  if (_tradingRulesCache && (Date.now() - _tradingRulesCache.cachedAt) < TRADING_RULES_TTL) {
-    return _tradingRulesCache.value
-  }
-  try {
-    const settings = await getTenantSettings(TRADING_RULE_KEYS)
-    // FIX (BUG-2): parseFloat('true') === NaN, so every boolean flag was always falsy.
-    // Parse each value with the correct type: booleans use strict string comparison,
-    // numerics continue to use parseFloat.
-    const BOOL_KEYS = new Set(['slippage_simulator_enabled', 'weekend_holding_enabled'])
-    const JSON_KEYS = new Set(['commission_per_lot_json', 'slippage_max_pips_adverse_json'])
-    const parsed = {}
-    for (const [key, value] of Object.entries(settings)) {
-      if (JSON_KEYS.has(key)) {
-        parsed[key] = value
-      } else {
-        parsed[key] = BOOL_KEYS.has(key)
-          ? (value === 'true' || value === true)
-          : parseFloat(value)
-      }
-    }
-    const resolved = {
-      minHoldSeconds: parsed.min_hold_seconds ?? DEFAULT_TRADING_RULES.minHoldSeconds,
-      forexLotsPer1k: parsed.forex_lots_per_1k ?? DEFAULT_TRADING_RULES.forexLotsPer1k,
-      commodityLotsPer1k: parsed.commodity_lots_per_1k ?? DEFAULT_TRADING_RULES.commodityLotsPer1k,
-      minLotSize: parsed.min_lot_size ?? DEFAULT_TRADING_RULES.minLotSize,
-      maxTradesPer1k: parsed.max_trades_per_1k ?? DEFAULT_TRADING_RULES.maxTradesPer1k,
-      maxOpenPositions: parsed.max_open_positions ?? DEFAULT_TRADING_RULES.maxOpenPositions,
-      maxDailyTrades: parsed.max_daily_trades ?? DEFAULT_TRADING_RULES.maxDailyTrades,
-      dynamicCommissionPerLot: parsed.dynamic_commission_per_lot ?? DEFAULT_TRADING_RULES.dynamicCommissionPerLot,
-      commissionPerLotJson: parsed.commission_per_lot_json ?? '{}',
-      slippageSimulatorEnabled: parsed.slippage_simulator_enabled ?? DEFAULT_TRADING_RULES.slippageSimulatorEnabled,
-      slippageMaxPipsAdverse: Number.isFinite(parsed.slippage_max_pips_adverse)
-        ? parsed.slippage_max_pips_adverse
-        : DEFAULT_TRADING_RULES.slippageMaxPipsAdverse,
-      slippageMaxPipsAdverseJson: parsed.slippage_max_pips_adverse_json ?? '{}',
-      weekendHoldingEnabled: parsed.weekend_holding_enabled ?? DEFAULT_TRADING_RULES.weekendHoldingEnabled,
-    }
-    _tradingRulesCache = { value: resolved, cachedAt: Date.now() }
-    return resolved
-  } catch {
-    // If DB read fails, return safe defaults
-    return DEFAULT_TRADING_RULES
   }
 }
 
@@ -294,904 +166,8 @@ const tradeOpenLimiter = rateLimit({
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Helpers
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-async function getLivePrice(instrument, basePrices = null) {
-  return getPriceForTenant(instrument, basePrices)
-}
-
 async function getPlatformSettingsForProgression(client) {
   return fetchProgressionSettings(client)
-}
-
-async function getLivePriceMap() {
-  const basePrices = await getCurrentPrices()
-  return getCurrentPricesForTenant(basePrices)
-}
-
-function calculateMargin(instrument, lots) {
-  const lotDec       = new Decimal(lots)
-  const contractSize = new Decimal(CONTRACT_SIZES[instrument])
-  const leverage     = new Decimal(LEVERAGE[instrument])
-  return lotDec.times(contractSize).div(leverage).toDecimalPlaces(2).toNumber()
-}
-
-function calculateUsedMargin(trades) {
-  return trades.reduce((total, trade) => {
-    return total.plus(calculateMargin(trade.instrument, parseFloat(trade.lot_size)))
-  }, new Decimal(0)).toDecimalPlaces(2).toNumber()
-}
-
-function getMarketStatus(instrument, options = {}) {
-  const now      = options.now instanceof Date ? options.now : new Date()
-  const purpose  = options.purpose || 'open'
-  const day      = now.getUTCDay()
-  const hour     = now.getUTCHours()
-  const min      = now.getUTCMinutes()
-  const totalMins = hour * 60 + min
-
-  // Saturday â€” fully closed
-  if (day === 6) {
-    return { open: false, reason: 'Market is closed for the weekend. Opens Sunday 22:00 UTC.' }
-  }
-  // New positions are cut off earlier on Friday to reduce weekend gap exposure.
-  if (purpose === 'open' && day === 5 && totalMins >= 21 * 60) {
-    return { open: false, reason: 'New trades are disabled after Friday 21:00 UTC to avoid weekend gap risk.' }
-  }
-  // Friday after 22:00 UTC â€” weekend
-  if (day === 5 && totalMins >= 22 * 60) {
-    return { open: false, reason: 'Market is closed for the weekend. Opens Sunday 22:00 UTC.' }
-  }
-  // Sunday before 22:00 UTC â€” not yet open
-  if (day === 0 && totalMins < 22 * 60) {
-    const minsUntil = 22 * 60 - totalMins
-    const h = Math.floor(minsUntil / 60)
-    const m = minsUntil % 60
-    return { open: false, reason: `Market opens Sunday 22:00 UTC (in ${h}h ${m}m).` }
-  }
-  // FIX (Bug 11): Daily rollover only applies to opens on Monâ€“Thu and
-  // to closes on Monâ€“Fri, keeping Friday open cut-off aligned to 21:00 UTC.
-  const inRollover = totalMins >= 21 * 60 + 55 && totalMins < 22 * 60 + 5
-  if (
-    (purpose === 'open' && day >= 1 && day <= 4 && inRollover) ||
-    (purpose === 'close' && day >= 1 && day <= 5 && inRollover)
-  ) {
-    return { open: false, reason: 'Market is in daily rollover (21:55â€“22:05 UTC). Try again in a few minutes.' }
-  }
-  return { open: true, reason: '' }
-}
-
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// checkSLTP â€” SL/TP background checker
-//
-// FIX: Previously ran trade close + balance update as two independent queries
-// with no transaction. If the balance update failed after the trade was already
-// marked closed, the account balance would be permanently wrong.
-//
-// Fix: each triggered SL/TP now runs inside its own BEGIN/COMMIT block with a
-// FOR UPDATE SKIP LOCKED lock on the trade row, preventing the floating
-// drawdown checker from racing on the same trade simultaneously.
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// FIX: Concurrency guards for background engine functions.
-// setInterval fires every 500ms, but each function makes DB queries that can
-// take longer than 500ms under load. Without guards, multiple invocations pile
-// up, issuing redundant queries and exhausting the connection pool.
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-let _checkSLTPRunning = false
-let _checkPendingOrdersRunning = false
-let _checkFloatingDrawdownRunning = false
-
-async function safeRecordViolation(payload) {
-  try {
-    await recordViolation(payload)
-  } catch (err) {
-    logger.error('[violation-engine] Failed to record violation:', { error: err.message, type: payload?.violationType })
-  }
-}
-
-async function safeRecordEnforcement(payload) {
-  try {
-    await recordEnforcementEvent(payload)
-  } catch (err) {
-    logger.error('[violation-engine] Failed to record enforcement event:', { error: err.message, action: payload?.action })
-  }
-}
-
-async function checkSLTP(io) {
-  if (_checkSLTPRunning) return
-  _checkSLTPRunning = true
-  try {
-    await ensureTradeExperienceInfrastructure()
-    const openTrades = await pool.query(
-      `SELECT t.id, t.account_id, t.instrument, t.direction, t.lot_size, t.open_price,
-              t.stop_loss, t.take_profit, t.status, t.open_time, t.demo_trade_id,
-              t.commission,
-              a.user_id
-       FROM trades t
-       JOIN accounts a ON t.account_id = a.id
-       WHERE t.status = 'open'
-       AND (
-         t.stop_loss IS NOT NULL
-         OR t.take_profit IS NOT NULL
-       )`
-    )
-
-    const priceMap = await getLivePriceMap()
-    const rules = await getTradingRules()
-
-    for (const trade of openTrades.rows) {
-      const price = priceMap[trade.instrument]
-      if (!price) continue
-
-      // BUY trades close at BID. SELL trades close at ASK.
-      const currentPrice = trade.direction === 'buy'
-        ? parseFloat(price.bid)
-        : parseFloat(price.ask)
-
-      let triggered   = false
-      let closeReason = ''
-
-      if (trade.stop_loss) {
-        const sl = parseFloat(trade.stop_loss)
-        if (trade.direction === 'buy'  && currentPrice <= sl) { triggered = true; closeReason = 'Stop Loss' }
-        if (trade.direction === 'sell' && currentPrice >= sl) { triggered = true; closeReason = 'Stop Loss' }
-      }
-
-      if (!triggered && trade.take_profit) {
-        const tp = parseFloat(trade.take_profit)
-        if (trade.direction === 'buy'  && currentPrice >= tp) { triggered = true; closeReason = 'Take Profit' }
-        if (trade.direction === 'sell' && currentPrice <= tp) { triggered = true; closeReason = 'Take Profit' }
-      }
-
-      if (!triggered) continue
-
-      // FIX (Bug 5): Use admin-configurable min hold time instead of hardcoded 60s
-      if (trade.open_time) {
-        const secondsOpen = (new Date() - new Date(trade.open_time)) / 1000
-        if (secondsOpen < rules.minHoldSeconds) continue
-      }
-
-      // FIX: wrap close + balance update in a transaction with row-level lock
-      const client = await pool.connect()
-      try {
-        await client.query('BEGIN')
-
-        // Lock the trade row â€” skip if already being processed elsewhere
-        const lockResult = await client.query(
-          `SELECT id FROM trades WHERE id = $1 AND status = 'open' FOR UPDATE SKIP LOCKED`,
-          [trade.id]
-        )
-        if (lockResult.rows.length === 0) {
-          await client.query('ROLLBACK')
-          continue
-        }
-
-        const demo_pnl = calculatePnL(
-          trade.direction,
-          parseFloat(trade.open_price),
-          currentPrice,
-          parseFloat(trade.lot_size),
-          trade.instrument,
-          parseFloat(trade.commission || 0)
-        )
-
-        await client.query(
-          `UPDATE trades SET
-             status = 'closed',
-             close_price = $1,
-             close_time = NOW(),
-             demo_pnl = $2,
-             close_reason = $3
-           WHERE id = $4`,
-          [currentPrice, demo_pnl, closeReason, trade.id]
-        )
-
-        await client.query(
-          `UPDATE accounts SET
-             current_balance = current_balance + $1,
-             peak_balance    = GREATEST(peak_balance, current_balance + $1)
-           WHERE id = $2`,
-          [demo_pnl, trade.account_id]
-        )
-
-        await client.query('COMMIT')
-
-        if (io) {
-          io.to(String(trade.user_id)).emit('account_update', {
-            message: `${closeReason} triggered on ${trade.instrument}`,
-            pnl: demo_pnl
-          })
-        }
-      } catch (err) {
-        await client.query('ROLLBACK')
-        logger.error(`checkSLTP: transaction failed for trade ${trade.id}:`, { error: err.message })
-      } finally {
-        client.release()
-      }
-    }
-  } catch (error) {
-    logger.error('SL/TP check error:', { error: error.message })
-  } finally {
-    _checkSLTPRunning = false
-  }
-}
-
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Pending orders background checker
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-async function cancelPendingOrder(orderId, reason) {
-  await pool.query(
-    `UPDATE trades SET
-       status = 'cancelled',
-       close_time = NOW(),
-       close_reason = $1
-     WHERE id = $2`,
-    [reason, orderId]
-  )
-}
-
-async function validatePendingTrigger(client, order, rules, livePrices) {
-  const lotsNum = parseFloat(order.lot_size)
-  if (isNaN(lotsNum) || lotsNum <= 0) {
-    return 'Invalid lot size on pending order'
-  }
-
-  // Fetch the fresh account balance inside the transaction (account_type/
-  // scaling_multiplier come from the batch join in checkPendingOrders since
-  // they don't change mid-tick the way balance can).
-  const accountResult = await client.query(
-    `SELECT current_balance FROM accounts WHERE id = $1`,
-    [order.account_id]
-  )
-  if (accountResult.rows.length === 0) {
-    return 'Account not found during pending order trigger'
-  }
-  const current_balance = parseFloat(accountResult.rows[0].current_balance)
-
-  // Funded accounts' scaling-plan multiplier raises risk capacity (lot caps)
-  // proportionally, matching the same check in POST /open.
-  const scalingMultiplier = order.account_type === 'funded' && order.scaling_multiplier != null
-    ? parseFloat(order.scaling_multiplier)
-    : 1
-  const accountSizeK = (parseFloat(order.account_size) / 1000) * (Number.isFinite(scalingMultiplier) ? scalingMultiplier : 1)
-
-  if (COMMODITY_INSTRUMENTS.includes(order.instrument)) {
-    const maxCommodityLots = parseFloat((accountSizeK * rules.commodityLotsPer1k).toFixed(4))
-    const existingResult = await client.query(
-      `SELECT COALESCE(SUM(lot_size), 0) as total_lots
-       FROM trades
-       WHERE account_id = $1
-         AND instrument = ANY($2::text[])
-         AND status IN ('open', 'pending')
-         AND id <> $3`,
-      [order.account_id, COMMODITY_INSTRUMENTS, order.id]
-    )
-    const currentLots = parseFloat(existingResult.rows[0].total_lots)
-    if (parseFloat((currentLots + lotsNum).toFixed(4)) > maxCommodityLots) {
-      return `Pending order exceeds combined commodity exposure limit (${maxCommodityLots} lots)`
-    }
-  } else if (FOREX_INSTRUMENTS.includes(order.instrument)) {
-    const maxForexLots = parseFloat((accountSizeK * rules.forexLotsPer1k).toFixed(4))
-    const existingResult = await client.query(
-      `SELECT COALESCE(SUM(lot_size), 0) as total_lots
-       FROM trades
-       WHERE account_id = $1
-         AND instrument = ANY($2::text[])
-         AND status IN ('open', 'pending')
-         AND id <> $3`,
-      [order.account_id, FOREX_INSTRUMENTS, order.id]
-    )
-    const currentLots = parseFloat(existingResult.rows[0].total_lots)
-    if (parseFloat((currentLots + lotsNum).toFixed(4)) > maxForexLots) {
-      return `Pending order exceeds combined forex exposure limit (${maxForexLots} lots)`
-    }
-  }
-
-  const maxOpenTrades = rules.maxOpenPositions
-  const openTradeCountResult = await client.query(
-    `SELECT COUNT(*) FROM trades WHERE account_id = $1 AND status IN ('open', 'pending') AND id <> $2`,
-    [order.account_id, order.id]
-  )
-  const currentOpenCount = parseInt(openTradeCountResult.rows[0].count)
-  if ((currentOpenCount + 1) > maxOpenTrades) {
-    return `Pending order exceeds max open trades (${maxOpenTrades})`
-  }
-
-  const margin = calculateMargin(order.instrument, lotsNum)
-  let floatingPnl = new Decimal(0)
-  const openTradesResult = await client.query(
-    `SELECT t.direction, t.open_price, t.lot_size, t.instrument, t.commission
-     FROM trades t
-     WHERE t.account_id = $1 AND t.status = 'open' AND t.id <> $2`,
-    [order.account_id, order.id]
-  )
-  for (const t of openTradesResult.rows) {
-    const livePrice = livePrices[t.instrument]
-    if (!livePrice) continue
-    const currentPrice = t.direction === 'buy' ? parseFloat(livePrice.bid) : parseFloat(livePrice.ask)
-    floatingPnl = floatingPnl.plus(calculatePnL(t.direction, parseFloat(t.open_price), currentPrice, parseFloat(t.lot_size), t.instrument, parseFloat(t.commission || 0)))
-  }
-  const equity = new Decimal(current_balance).plus(floatingPnl)
-  const requiredMargin = new Decimal(calculateUsedMargin(openTradesResult.rows)).plus(margin)
-  if (requiredMargin.gt(equity)) {
-    return `Insufficient equity at trigger. Required margin: $${requiredMargin.toFixed(2)}`
-  }
-
-  return null
-}
-
-async function checkPendingOrders(io) {
-  if (_checkPendingOrdersRunning) return
-  _checkPendingOrdersRunning = true
-  try {
-    await ensureTradeExperienceInfrastructure()
-    const pendingOrders = await pool.query(
-      `SELECT t.id, t.account_id, t.instrument, t.direction, t.lot_size, t.order_type,
-              t.pending_price, t.status, a.user_id, a.current_balance, a.peak_balance,
-              a.status as account_status, a.account_size, a.phase_end_date,
-              a.account_type, a.scaling_multiplier, t.oco_group_id
-       FROM trades t
-       JOIN accounts a ON t.account_id = a.id
-       WHERE t.status = 'pending'`
-    )
-
-    const priceMap = await getLivePriceMap()
-    const rules = await getTradingRules()
-
-    for (const order of pendingOrders.rows) {
-      if (order.account_status !== 'active') {
-        await cancelPendingOrder(order.id, 'Account inactive')
-        continue
-      }
-
-      if (order.phase_end_date && new Date(order.phase_end_date) <= new Date()) {
-        await cancelPendingOrder(order.id, 'Challenge phase expired')
-        continue
-      }
-
-      const pendingMarketStatus = getMarketStatus(order.instrument, { purpose: 'open' })
-      if (!pendingMarketStatus.open) {
-        continue
-      }
-
-      const price = priceMap[order.instrument]
-      if (!price) continue
-
-      const bid           = parseFloat(price.bid)
-      const ask           = parseFloat(price.ask)
-      const pending_price = parseFloat(order.pending_price)
-
-      let triggered = false
-
-      if (order.order_type === 'buy_limit'  && ask <= pending_price) triggered = true
-      if (order.order_type === 'sell_limit' && bid >= pending_price) triggered = true
-      if (order.order_type === 'buy_stop'   && ask >= pending_price) triggered = true
-      if (order.order_type === 'sell_stop'  && bid <= pending_price) triggered = true
-
-      if (triggered) {
-        // FIX (Bug 4): Wrap activation in a transaction with row lock to prevent
-        // double-triggering and concurrent limit violations
-        const client = await pool.connect()
-        try {
-          await client.query('BEGIN')
-          let cancelledSiblingRows = []
-
-          // Lock the order row — skip if already being processed elsewhere
-          const lockResult = await client.query(
-            `SELECT id FROM trades WHERE id = $1 AND status = 'pending' FOR UPDATE SKIP LOCKED`,
-            [order.id]
-          )
-          if (lockResult.rows.length === 0) {
-            await client.query('ROLLBACK')
-            continue
-          }
-
-          const limitError = await validatePendingTrigger(client, order, rules, priceMap)
-          if (limitError) {
-            await client.query(
-              `UPDATE trades SET status = 'cancelled', close_time = NOW(), close_reason = $1 WHERE id = $2`,
-              [limitError, order.id]
-            )
-            await client.query('COMMIT')
-            continue
-          }
-
-          const open_price = order.direction === 'buy' ? ask : bid
-
-          await client.query(
-            `UPDATE trades SET
-               status = 'open',
-               open_price = $1,
-               open_time = NOW(),
-               close_reason = NULL
-             WHERE id = $2`,
-            [open_price, order.id]
-          )
-
-          if (order.oco_group_id) {
-            const siblingCancelResult = await client.query(
-              `UPDATE trades
-               SET status = 'cancelled',
-                   close_time = NOW(),
-                   close_reason = 'OCO sibling triggered'
-               WHERE oco_group_id = $1
-                 AND id <> $2
-                 AND status = 'pending'
-               RETURNING id, instrument, direction, lot_size, order_type, pending_price, stop_loss, take_profit, status, close_reason`,
-              [order.oco_group_id, order.id]
-            )
-            cancelledSiblingRows = siblingCancelResult.rows
-          }
-
-          await client.query('COMMIT')
-
-          if (io) {
-            io.to(String(order.user_id)).emit('account_update', {
-              message: `${order.order_type.replace(/_/g, ' ').toUpperCase()} triggered on ${order.instrument} at ${open_price}`,
-              pnl: null
-            })
-          }
-
-          logger.info(`Pending order ${order.id} triggered: ${order.order_type} ${order.instrument} at ${open_price}`)
-        } catch (txErr) {
-          await client.query('ROLLBACK').catch(() => {})
-          logger.error(`checkPendingOrders: transaction error for order ${order.id}:`, { error: txErr.message })
-        } finally {
-          client.release()
-        }
-      }
-    }
-  } catch (error) {
-    logger.error('Pending orders check error:', { error: error.message })
-  } finally {
-    _checkPendingOrdersRunning = false
-  }
-}
-
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// autoCloseAndFail â€” balance update race condition resolved.
-// Collects all trade PnLs first, then applies a single summed balance UPDATE
-// after all trades are closed inside the same transaction.
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-async function autoCloseAndFail(acc, reason, io) {
-  const client = await pool.connect()
-  try {
-    await client.query('BEGIN')
-
-    const lockResult = await client.query(
-      `SELECT id, status FROM accounts WHERE id = $1 AND status = 'active' FOR UPDATE SKIP LOCKED`,
-      [acc.id]
-    )
-    if (lockResult.rows.length === 0) {
-      await client.query('ROLLBACK')
-      return
-    }
-
-    const openTrades   = await client.query(
-      `SELECT id, account_id, instrument, direction, lot_size, open_price, status, commission
-       FROM trades WHERE account_id = $1 AND status = 'open' FOR UPDATE`,
-      [acc.id]
-    )
-    const priceMap = await getCurrentPricesForTenant()
-
-    // FIX (AUDIT): Use Decimal accumulator — native float += on many trades
-    // causes sub-penny rounding drift in the final balance update.
-    let totalPnlDec = new Decimal(0)
-
-    for (const trade of openTrades.rows) {
-      try {
-        const priceData = priceMap[trade.instrument]
-        if (!priceData) {
-          await client.query(
-            `UPDATE trades SET
-               status = 'closed',
-               close_price = open_price,
-               close_time = NOW(),
-               demo_pnl = 0,
-               close_reason = 'Account Failed'
-             WHERE id = $1`,
-            [trade.id]
-          )
-          continue
-        }
-
-        const close_price = trade.direction === 'buy'
-          ? parseFloat(priceData.bid)
-          : parseFloat(priceData.ask)
-
-        const demo_pnl = calculatePnL(
-          trade.direction,
-          parseFloat(trade.open_price),
-          close_price,
-          parseFloat(trade.lot_size),
-          trade.instrument,
-          parseFloat(trade.commission || 0)
-        )
-
-        totalPnlDec = totalPnlDec.plus(demo_pnl)
-
-        await client.query(
-          `UPDATE trades SET
-             status = 'closed',
-             close_price = $1,
-             close_time = NOW(),
-             demo_pnl = $2,
-             close_reason = 'Account Failed'
-           WHERE id = $3`,
-           [close_price, demo_pnl, trade.id]
-        )
-      } catch (err) {
-        logger.error(`Failed to close trade ${trade.id} during drawdown breach`, { error: err.message })
-      }
-    }
-
-    // FIX (BUG-C001): Convert Decimal accumulator to number — was previously
-    // referencing undefined `totalPnl` instead of `totalPnlDec`.
-    const totalPnl = totalPnlDec.toDecimalPlaces(2).toNumber()
-
-    // Single balance update after all trades are closed — no race condition
-    if (totalPnl !== 0) {
-      await client.query(
-        `UPDATE accounts SET
-           current_balance = current_balance + $1,
-           peak_balance    = GREATEST(peak_balance, current_balance + $1)
-         WHERE id = $2`,
-        [totalPnl, acc.id]
-      )
-    }
-
-    const cancelledPendingResult = await client.query(
-      `UPDATE trades SET
-         status = 'cancelled',
-         close_time = NOW(),
-         close_reason = 'Account Failed'
-       WHERE account_id = $1 AND status = 'pending'
-       RETURNING id, account_id, instrument, direction, lot_size, order_type, pending_price, stop_loss, take_profit`,
-      [acc.id]
-    )
-
-    await client.query(`UPDATE accounts SET status = 'failed' WHERE id = $1`, [acc.id])
-
-    await client.query(
-      `INSERT INTO bbook_pnl (date, accounts_failed)
-       VALUES (CURRENT_DATE, 1)
-       ON CONFLICT (date) DO UPDATE
-       SET accounts_failed = bbook_pnl.accounts_failed + 1`
-    )
-
-    await client.query('COMMIT')
-
-    await safeRecordViolation({
-      violationType: 'floating_drawdown_breach',
-      severity: 'critical',
-      accountId: acc.id,
-      userId: acc.user_id,
-      source: 'trades_engine',
-      message: reason,
-      payload: {
-        auto_status: 'failed',
-        total_closed_pnl: totalPnl
-      }
-    })
-
-    await safeRecordEnforcement({
-      accountId: acc.id,
-      userId: acc.user_id,
-      action: 'auto_fail_account',
-      status: 'applied',
-      message: `Account failed automatically: ${reason}`,
-      payload: {
-        source: 'floating_drawdown',
-        total_closed_pnl: totalPnl
-      }
-    })
-
-    if (io) {
-      io.to(String(acc.user_id)).emit('account_update', {
-        message: `âŒ Account FAILED â€” ${reason}. All trades closed automatically.`,
-        pnl: totalPnl,
-        account_id: acc.id,
-        event: 'account_failed'
-      })
-    }
-
-    logger.info(`Account ${acc.id} FAILED via floating drawdown â€” ${reason}`)
-
-  } catch (err) {
-    await client.query('ROLLBACK')
-    logger.error(`autoCloseAndFail error for account ${acc.id}:`, { error: err.message })
-  } finally {
-    client.release()
-  }
-}
-
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// autoCloseAndPass â€” same single-update pattern as autoCloseAndFail
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-async function autoCloseAndPass(acc, io) {
-  const client = await pool.connect()
-  try {
-    await client.query('BEGIN')
-
-    const lockResult = await client.query(
-      `SELECT id, status FROM accounts WHERE id = $1 AND status = 'active' FOR UPDATE SKIP LOCKED`,
-      [acc.id]
-    )
-    if (lockResult.rows.length === 0) {
-      await client.query('ROLLBACK')
-      return
-    }
-
-    // Floating pass closes open trades inside this transaction before promotion.
-    // This makes the open-trade check and the promotion atomic — eliminating the
-    // TOCTOU race where two concurrent engine cycles both saw 0 open trades and
-    // both tried to promote the same account.
-    const openTrades   = await client.query(
-      `SELECT id, account_id, instrument, direction, lot_size, open_price, status, commission
-       FROM trades WHERE account_id = $1 AND status = 'open' FOR UPDATE`,
-      [acc.id]
-    )
-    const priceMap = await getCurrentPricesForTenant()
-
-    const closeReason = acc.account_type === 'phase1' ? 'Phase 1 Passed' : 'Phase 2 Passed'
-    // FIX (AUDIT): Use Decimal accumulator — native float += on many trades
-    // causes sub-penny rounding drift in the final balance update.
-    let totalPnlDec = new Decimal(0)
-
-    for (const trade of openTrades.rows) {
-      try {
-        const priceData = priceMap[trade.instrument]
-        if (!priceData) throw new Error(`Missing live price for ${trade.instrument}`)
-
-        const close_price = trade.direction === 'buy'
-          ? parseFloat(priceData.bid)
-          : parseFloat(priceData.ask)
-
-        const demo_pnl = calculatePnL(
-          trade.direction,
-          parseFloat(trade.open_price),
-          close_price,
-          parseFloat(trade.lot_size),
-          trade.instrument,
-          parseFloat(trade.commission || 0)
-        )
-
-        totalPnlDec = totalPnlDec.plus(demo_pnl)
-
-        await client.query(
-          `UPDATE trades SET
-             status = 'closed',
-             close_price = $1,
-             close_time = NOW(),
-             demo_pnl = $2,
-             close_reason = $3
-           WHERE id = $4`,
-           [close_price, demo_pnl, closeReason, trade.id]
-        )
-      } catch (err) {
-        logger.error(`Failed to close trade ${trade.id} on profit target:`, { error: err.message })
-        throw err
-      }
-    }
-
-    const totalPnl = totalPnlDec.toDecimalPlaces(2).toNumber()
-
-    // Single balance update AND status update after all trades are closed
-    await client.query(
-      `UPDATE accounts SET
-         current_balance = current_balance + $1,
-         peak_balance    = GREATEST(peak_balance, current_balance + $1),
-         status          = 'passed'
-       WHERE id = $2`,
-      [totalPnl, acc.id]
-    )
-
-    const cancelledPendingResult = await client.query(
-      `UPDATE trades SET
-         status = 'cancelled',
-         close_time = NOW(),
-         close_reason = $1
-       WHERE account_id = $2 AND status = 'pending'
-       RETURNING id, account_id, instrument, direction, lot_size, order_type, pending_price, stop_loss, take_profit`,
-      [closeReason, acc.id]
-    )
-
-    const settings    = await fetchProgressionSettings(client)
-    const promoted    = await promotePassedAccount(client, acc, settings)
-    const newAccountId = promoted ? promoted.new_account_id : null
-
-    await client.query('COMMIT')
-
-    const passMsg = acc.account_type === 'phase1'
-      ? `ðŸ† Phase 1 PASSED! Floating profit target hit. All trades closed. Phase 2 activating shortly.`
-      : `ðŸŽ‰ Phase 2 PASSED! Floating profit target hit. All trades closed. Funded account activating shortly.`
-
-    if (io) {
-      io.to(String(acc.user_id)).emit('account_update', {
-        message: passMsg,
-        pnl: totalPnl,
-        account_id: acc.id,
-        new_account_id: newAccountId,
-        event: promoted?.event || (acc.account_type === 'phase1' ? 'phase1_passed' : 'phase2_passed')
-      })
-    }
-
-    logger.info(`Account ${acc.id} PASSED via floating equity (${acc.account_type})`)
-
-  } catch (err) {
-    await client.query('ROLLBACK')
-    logger.error(`autoCloseAndPass error for account ${acc.id}:`, { error: err.message, auto_pass_aborted: true })
-  } finally {
-    client.release()
-  }
-}
-
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// checkFloatingDrawdown
-//
-// FIX 1 (BUG 3): Funded accounts now use funded_max_drawdown_pct from
-// platform_settings instead of the stored max_drawdown_pct column, which
-// could be stale or accidentally 0 (which would instantly fail any account).
-//
-// FIX 2 (N+1 query): Previously fetched open trades per-account in a loop
-// (N accounts Ã— 1 query each). Now fetches ALL open trades and ALL prices
-// in two queries up front and groups in JS â€” O(2) queries regardless of
-// how many active accounts exist.
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-async function checkFloatingDrawdown(io) {
-  if (_checkFloatingDrawdownRunning) return
-  _checkFloatingDrawdownRunning = true
-  try {
-    // FIX: single query for all open trades across all active accounts
-    const tradesResult = await pool.query(
-      `SELECT t.id, t.account_id, t.instrument, t.direction, t.lot_size, t.open_price,
-              t.stop_loss, t.take_profit, t.status, t.open_time, t.demo_trade_id,
-              a.user_id, a.current_balance, a.starting_balance, a.peak_balance,
-              a.max_drawdown_pct, a.account_type, a.profit_target, a.account_size,
-              a.starting_balance as acc_starting,
-              a.eod_peak_equity, a.eod_trailing_floor, a.challenge_model_slug, a.daily_drawdown_pct
-       FROM trades t
-       JOIN accounts a ON t.account_id = a.id
-       WHERE t.status = 'open'
-         AND a.status = 'active'`
-    )
-
-    if (tradesResult.rows.length === 0) return
-
-    const priceMap = await getLivePriceMap()
-    const fundedModelSettingsCache = new Map()
-
-    // Group trades by account_id in JS â€” no extra queries
-    const accountTrades = {}
-    const accountMeta   = {}
-
-    for (const row of tradesResult.rows) {
-      const aid = row.account_id
-      if (!accountTrades[aid]) {
-        accountTrades[aid] = []
-        accountMeta[aid] = {
-          id:                    aid,
-          user_id:               row.user_id,
-          current_balance:       parseFloat(row.current_balance),
-          starting_balance:      parseFloat(row.acc_starting),
-          peak_balance:          parseFloat(row.peak_balance),
-          max_drawdown_pct:      parseFloat(row.max_drawdown_pct),
-          account_type:          row.account_type,
-          account_size:          parseFloat(row.account_size),
-          profit_target:         parseFloat(row.profit_target || 0),
-          eod_peak_equity:       row.eod_peak_equity,
-          eod_trailing_floor:    row.eod_trailing_floor,
-          challenge_model_slug:  row.challenge_model_slug,
-          daily_drawdown_pct:    row.daily_drawdown_pct != null ? parseFloat(row.daily_drawdown_pct) : null,
-        }
-      }
-      accountTrades[aid].push(row)
-    }
-
-    const todayRealizedMap = await tradingDaysService.getTodayRealizedPnl(pool, Object.keys(accountTrades))
-
-    for (const [aid, trades] of Object.entries(accountTrades)) {
-      const acc = accountMeta[aid]
-
-      let floatingPnl = new Decimal(0)
-      for (const trade of trades) {
-        const priceData = priceMap[trade.instrument]
-        if (!priceData) continue
-
-        const currentPrice = trade.direction === 'buy'
-          ? parseFloat(priceData.bid)
-          : parseFloat(priceData.ask)
-
-        floatingPnl = floatingPnl.plus(calculatePnL(
-          trade.direction,
-          parseFloat(trade.open_price),
-          currentPrice,
-          parseFloat(trade.lot_size),
-          trade.instrument,
-          parseFloat(trade.commission || 0)
-        ))
-      }
-
-      const equity = new Decimal(acc.current_balance).plus(floatingPnl)
-      let max_drawdown_pct = acc.max_drawdown_pct
-      let daily_drawdown_pct = acc.daily_drawdown_pct
-      let drawdownLocksAtPct = null
-
-      if (acc.account_type === 'funded' && acc.challenge_model_slug) {
-        let modelSettings = fundedModelSettingsCache.get(acc.challenge_model_slug)
-        if (!modelSettings) {
-          const model = await fetchStepModelBySlug(acc.challenge_model_slug)
-          modelSettings = model
-            ? {
-                funded_max_drawdown_pct: parseFloat(model.funded_max_drawdown_pct),
-                funded_daily_drawdown_pct: parseFloat(model.funded_daily_drawdown_pct),
-                funded_drawdown_locks_at_pct: model.funded_drawdown_locks_at_pct != null ? parseFloat(model.funded_drawdown_locks_at_pct) : null
-              }
-            : null
-          fundedModelSettingsCache.set(acc.challenge_model_slug, modelSettings || {})
-        }
-        if (modelSettings && Number.isFinite(modelSettings.funded_max_drawdown_pct)) {
-          max_drawdown_pct = modelSettings.funded_max_drawdown_pct
-          daily_drawdown_pct = modelSettings.funded_daily_drawdown_pct
-          drawdownLocksAtPct = modelSettings.funded_drawdown_locks_at_pct
-        }
-      }
-
-      if (!(max_drawdown_pct > 0)) continue
-
-      const floor = await drawdownService.getEffectiveDrawdownFloor(pool, acc, {
-        equity: equity.toNumber(),
-        maxDrawdownPct: max_drawdown_pct,
-        drawdownLocksAtPct
-      })
-
-      if (equity.lt(floor)) {
-        const drawdownPctUsed = new Decimal(acc.starting_balance).minus(equity).div(acc.starting_balance).times(100)
-        const reason = `Trailing drawdown breach — equity $${equity.toFixed(2)} fell below the $${floor.toFixed(2)} floor (${drawdownPctUsed.toFixed(2)}% of a ${max_drawdown_pct}% limit)`
-        logger.info(`Account ${aid} DRAWDOWN BREACH: ${reason}`)
-        await autoCloseAndFail(acc, reason, io)
-        continue
-      }
-
-      if (Number.isFinite(daily_drawdown_pct) && daily_drawdown_pct > 0 && acc.starting_balance > 0) {
-        const todayRealized = todayRealizedMap.get(aid) || 0
-        const todayTotalPnl = new Decimal(todayRealized).plus(floatingPnl)
-        const todayLossPct = todayTotalPnl.isNegative()
-          ? todayTotalPnl.abs().div(acc.starting_balance).times(100)
-          : new Decimal(0)
-        if (todayLossPct.gte(daily_drawdown_pct)) {
-          const reason = `Daily loss limit breach — today's loss ${todayLossPct.toFixed(2)}% reached the ${daily_drawdown_pct}% daily limit`
-          logger.info(`Account ${aid} DAILY LOSS BREACH: ${reason}`)
-          await autoCloseAndFail(acc, reason, io)
-          continue
-        }
-      }
-
-      // Competition accounts have no profit-target auto-pass — they run for a
-      // fixed window and are settled by competitionEngine.js at end_at instead.
-      if (acc.account_type === 'funded' || acc.account_type === 'competition') continue
-
-      let profit_target = acc.profit_target
-      if (profit_target <= 0) {
-        profit_target = acc.starting_balance * 0.10
-        logger.warn(`Account ${aid} had no profit_target set — defaulting to 10% = $${profit_target.toFixed(2)}`)
-      }
-
-      const equity_profit = equity.minus(acc.starting_balance)
-      if (equity_profit.gte(profit_target)) {
-        // FIX (BUG-9): Open-trade COUNT was outside the transaction so two concurrent
-        // engine cycles (floating-drawdown + challenge engine) could both read 0 and
-        // both attempt promotion simultaneously. The COUNT is now moved INSIDE
-        // autoCloseAndPass, after the FOR UPDATE lock, so only one promotion wins.
-        await autoCloseAndPass(acc, io)
-      }
-    }
-
-  } catch (error) {
-    logger.error('Floating drawdown check error:', { error: error.message })
-  } finally {
-    _checkFloatingDrawdownRunning = false
-  }
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1779,6 +755,14 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
 
         const tradeRow = newTrade.rows[0]
 
+        // Keep the engine's in-memory index in step with what was just written,
+        // so the order can be triggered on the very next price tick rather than
+        // waiting for the next reconciliation.
+        await engine().syncPendingOrder(tradeRow)
+        if (siblingTradeId) {
+          await engine().syncPendingOrder({ ...tradeRow, id: siblingTradeId, direction: ocoSiblingConfig.direction, order_type: ocoSiblingConfig.order_type, pending_price: ocoSiblingConfig.pending_price })
+        }
+
         const responseBody = {
           message: `${orderTypeFinal.replace(/_/g, ' ')} order placed`,
           trade_id: tradeRow.id,
@@ -1885,6 +869,11 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
     }
 
     const tradeRow = newTrade.rows[0]
+
+    // Index the new position (and seed its floating PnL from the current price)
+    // so it is eligible for SL/TP and drawdown checks on the next tick.
+    await engine().syncOpenedTrade(tradeRow)
+
     const responseBody = {
       message: 'Trade opened successfully',
       trade_id: tradeRow.id,
@@ -1999,6 +988,8 @@ router.post('/close', authenticateToken, tradeCloseLimiter, async function(req, 
     let isPartial = false
     let remainingLotsNum = 0
     let closedTradeId = null
+    // Captured inside the transaction, applied to the engine index after COMMIT.
+    let indexSync = null
     const requestedCloseLots = close_lots == null ? null : parseFloat(close_lots)
 
     if (requestedCloseLots != null && !Number.isFinite(requestedCloseLots)) {
@@ -2153,11 +1144,34 @@ router.post('/close', authenticateToken, tradeCloseLimiter, async function(req, 
       )
 
       await client.query('COMMIT')
+
+      indexSync = {
+        accountId: lockedTrade.account_id,
+        remainingTrade: isPartial
+          ? { ...lockedTrade, lot_size: remainingLotsNum, commission: remainingCommission }
+          : null
+      }
     } catch (txErr) {
       await client.query('ROLLBACK').catch(() => {})
       throw txErr
     } finally {
       client.release()
+    }
+
+    // Index sync — a partial close shrinks the live position rather than ending
+    // it, so the entry is refreshed (new lot size and commission) instead of
+    // dropped. Either way the realised PnL feeds the cached daily-loss total.
+    if (indexSync) {
+      if (indexSync.remainingTrade) {
+        await engine().syncOpenedTrade(indexSync.remainingTrade)
+        tradeIndex.applyRealizedPnl(indexSync.accountId, demo_pnl)
+      } else {
+        engine().syncClosedTrade(trade_id, indexSync.accountId, demo_pnl)
+      }
+      const accountEntry = tradeIndex.getAccountEntry(indexSync.accountId)
+      if (accountEntry) {
+        tradeIndex.updateAccountBalance(indexSync.accountId, accountEntry.currentBalance + demo_pnl)
+      }
     }
 
     if (req.app.get('io')) {
@@ -2216,6 +1230,8 @@ router.post('/cancel', authenticateToken, tradeCloseLimiter, async function(req,
     if (cancelResult.rowCount === 0) {
       return res.status(409).json({ error: 'Pending order was already processed' })
     }
+
+    tradeIndex.removePending(trade_id)
 
     res.json({ message: 'Order cancelled' })
 
@@ -2290,6 +1306,9 @@ router.patch('/modify-pending', authenticateToken, tradeModifyLimiter, async fun
     )
     if (updated.rowCount === 0) return res.status(409).json({ error: 'Trade was already processed' })
     const row = updated.rows[0]
+
+    // Re-index at the new trigger price, or the engine keeps watching the old one.
+    await engine().syncPendingOrder(row)
 
     res.json({ message: 'Pending order updated', trade: row })
 
@@ -2381,12 +1400,18 @@ router.patch('/modify', authenticateToken, tradeModifyLimiter, async function(re
 
     values.push(trade_id)
     const modResult = await pool.query(
-      `UPDATE trades SET ${updates.join(', ')} WHERE id = $${idx} AND status = 'open'`,
+      `UPDATE trades SET ${updates.join(', ')} WHERE id = $${idx} AND status = 'open'
+       RETURNING id, account_id, instrument, direction, lot_size, open_price,
+                 stop_loss, take_profit, commission, open_time`,
       values
     )
     if (modResult.rowCount === 0) {
       return res.status(409).json({ error: 'Trade was already processed' })
     }
+
+    // Re-index against the new SL/TP levels — the engine compares against the
+    // values it holds in memory, not the row.
+    await engine().syncOpenedTrade(modResult.rows[0])
 
     res.json({ message: 'Trade modified successfully' })
 
@@ -2563,672 +1588,7 @@ router.get('/export', authenticateToken, async function(req, res) {
   }
 })
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const ANALYTICS_WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-const ANALYTICS_WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0]
 
-function toFiniteNumber(value, fallback = 0) {
-  const parsed = parseFloat(value)
-  return Number.isFinite(parsed) ? parsed : fallback
-}
-
-function toSafeDate(value) {
-  if (!value) return null
-  const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
-}
-
-function computeDaysRemainingForAnalytics(value) {
-  const date = toSafeDate(value)
-  if (!date) return null
-  const diffMs = date.getTime() - Date.now()
-  return Math.max(0, Math.ceil(diffMs / (24 * 60 * 60 * 1000)))
-}
-
-function computeTradeDurationMinutes(trade) {
-  const openTime = toSafeDate(trade?.open_time)
-  const closeTime = toSafeDate(trade?.close_time)
-  if (!openTime || !closeTime) return null
-  const duration = (closeTime.getTime() - openTime.getTime()) / (1000 * 60)
-  return Number.isFinite(duration) && duration >= 0 ? duration : null
-}
-
-function getAnalyticsSessionMeta(value) {
-  const date = toSafeDate(value)
-  const hour = date ? date.getUTCHours() : null
-  if (!Number.isFinite(hour)) {
-    return { key: 'unknown', label: 'Unknown', order: 99 }
-  }
-  if (hour < 8) return { key: 'asia', label: 'Asia', order: 0 }
-  if (hour < 13) return { key: 'london', label: 'London', order: 1 }
-  if (hour < 21) return { key: 'new_york', label: 'New York', order: 2 }
-  return { key: 'rollover', label: 'Rollover', order: 3 }
-}
-
-function buildPerformanceBreakdown(trades, bucketFactory) {
-  const map = new Map()
-
-  for (const trade of trades) {
-    const bucket = bucketFactory(trade) || {}
-    const key = String(bucket.key || bucket.label || 'unknown')
-    const label = String(bucket.label || bucket.key || 'Unknown')
-    const pnl = toFiniteNumber(trade.demo_pnl)
-    const durationMins = computeTradeDurationMinutes(trade)
-
-    const entry = map.get(key) || {
-      key,
-      label,
-      order: Number.isFinite(bucket.order) ? bucket.order : Number.MAX_SAFE_INTEGER,
-      trades: 0,
-      wins: 0,
-      losses: 0,
-      total_pnl: 0,
-      total_hold_mins: 0,
-      hold_samples: 0
-    }
-
-    entry.trades += 1
-    if (pnl > 0) entry.wins += 1
-    if (pnl < 0) entry.losses += 1
-    entry.total_pnl += pnl
-    if (Number.isFinite(durationMins)) {
-      entry.total_hold_mins += durationMins
-      entry.hold_samples += 1
-    }
-
-    map.set(key, entry)
-  }
-
-  return Array.from(map.values())
-    .map((entry) => ({
-      key: entry.key,
-      label: entry.label,
-      order: entry.order,
-      trades: entry.trades,
-      wins: entry.wins,
-      losses: entry.losses,
-      total_pnl: parseFloat(entry.total_pnl.toFixed(2)),
-      avg_pnl: entry.trades ? parseFloat((entry.total_pnl / entry.trades).toFixed(2)) : 0,
-      win_rate: entry.trades ? parseFloat(((entry.wins / entry.trades) * 100).toFixed(1)) : 0,
-      avg_hold_mins: entry.hold_samples ? parseFloat((entry.total_hold_mins / entry.hold_samples).toFixed(1)) : null
-    }))
-    .sort((a, b) => {
-      if (a.order !== b.order) return a.order - b.order
-      if (b.total_pnl !== a.total_pnl) return b.total_pnl - a.total_pnl
-      return b.trades - a.trades
-    })
-}
-
-function buildActivityHeatmap(trades) {
-  const weekdays = ANALYTICS_WEEKDAY_ORDER.map((index) => ANALYTICS_WEEKDAY_LABELS[index])
-  const hours = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, '0'))
-  const dayMap = new Map()
-
-  for (const dayIndex of ANALYTICS_WEEKDAY_ORDER) {
-    const label = ANALYTICS_WEEKDAY_LABELS[dayIndex]
-    dayMap.set(dayIndex, {
-      day_index: dayIndex,
-      day_label: label,
-      total_trades: 0,
-      total_pnl: 0,
-      slots: hours.map((hour) => ({ hour, trades: 0, pnl: 0 }))
-    })
-  }
-
-  const hourlyTotals = hours.map((hour) => ({ hour, trades: 0, pnl: 0 }))
-
-  for (const trade of trades) {
-    const openTime = toSafeDate(trade.open_time)
-    if (!openTime) continue
-    const pnl = toFiniteNumber(trade.demo_pnl)
-    const dayIndex = openTime.getUTCDay()
-    const hourIndex = openTime.getUTCHours()
-    const dayEntry = dayMap.get(dayIndex)
-    if (!dayEntry || !dayEntry.slots[hourIndex]) continue
-
-    dayEntry.total_trades += 1
-    dayEntry.total_pnl += pnl
-    dayEntry.slots[hourIndex].trades += 1
-    dayEntry.slots[hourIndex].pnl += pnl
-    hourlyTotals[hourIndex].trades += 1
-    hourlyTotals[hourIndex].pnl += pnl
-  }
-
-  const matrix = ANALYTICS_WEEKDAY_ORDER.map((index) => {
-    const entry = dayMap.get(index)
-    return {
-      day_index: index,
-      day_label: entry.day_label,
-      total_trades: entry.total_trades,
-      total_pnl: parseFloat(entry.total_pnl.toFixed(2)),
-      slots: entry.slots.map((slot) => ({
-        hour: slot.hour,
-        trades: slot.trades,
-        pnl: parseFloat(slot.pnl.toFixed(2))
-      }))
-    }
-  })
-
-  const weekdaySummary = matrix
-    .map((row) => ({
-      label: row.day_label,
-      trades: row.total_trades,
-      total_pnl: row.total_pnl
-    }))
-    .sort((a, b) => b.total_pnl - a.total_pnl)
-
-  const hourlySummary = hourlyTotals.map((slot) => ({
-    hour: slot.hour,
-    trades: slot.trades,
-    total_pnl: parseFloat(slot.pnl.toFixed(2))
-  }))
-
-  return {
-    weekdays,
-    hours,
-    matrix,
-    weekday_summary: weekdaySummary,
-    hourly_summary: hourlySummary
-  }
-}
-
-function buildEquityCurveRanges(curve) {
-  if (!Array.isArray(curve) || curve.length === 0) {
-    return { day: [], week: [], month: [], ytd: [], full: [] }
-  }
-
-  const lastPointDate = toSafeDate(curve[curve.length - 1]?.date) || new Date()
-  const filterByDays = (days) => curve.filter((point) => {
-    const pointDate = toSafeDate(point.date)
-    if (!pointDate) return false
-    return (lastPointDate.getTime() - pointDate.getTime()) <= (days * 24 * 60 * 60 * 1000)
-  })
-  const yearStart = new Date(Date.UTC(lastPointDate.getUTCFullYear(), 0, 1)).getTime()
-  const filterYtd = () => curve.filter((point) => {
-    const pointDate = toSafeDate(point.date)
-    return pointDate && pointDate.getTime() >= yearStart
-  })
-
-  return {
-    day: filterByDays(1),
-    week: filterByDays(7),
-    month: filterByDays(30),
-    ytd: filterYtd(),
-    full: curve
-  }
-}
-
-function percentile(sortedValues, percentileValue) {
-  if (!Array.isArray(sortedValues) || sortedValues.length === 0) return null
-  const index = Math.min(sortedValues.length - 1, Math.max(0, Math.floor(percentileValue * (sortedValues.length - 1))))
-  return sortedValues[index]
-}
-
-function buildHoldTimeAnalytics(trades, symbolBreakdown, strategyBreakdown, minHoldSeconds) {
-  const durations = trades
-    .map((trade) => computeTradeDurationMinutes(trade))
-    .filter((value) => Number.isFinite(value))
-    .sort((a, b) => a - b)
-
-  if (durations.length === 0) {
-    return {
-      average_mins: 0,
-      median_mins: 0,
-      winners_average_mins: 0,
-      losers_average_mins: 0,
-      quick_exit_rate: 0,
-      overhold_rate: 0,
-      quick_exit_threshold_mins: 0,
-      overhold_threshold_mins: 0,
-      bias_label: 'No hold-time samples yet',
-      by_symbol: [],
-      by_strategy: []
-    }
-  }
-
-  const average = durations.reduce((sum, value) => sum + value, 0) / durations.length
-  const median = durations.length % 2 === 1
-    ? durations[(durations.length - 1) / 2]
-    : (durations[(durations.length / 2) - 1] + durations[durations.length / 2]) / 2
-
-  const winnerDurations = trades
-    .filter((trade) => toFiniteNumber(trade.demo_pnl) > 0)
-    .map((trade) => computeTradeDurationMinutes(trade))
-    .filter((value) => Number.isFinite(value))
-  const loserDurations = trades
-    .filter((trade) => toFiniteNumber(trade.demo_pnl) < 0)
-    .map((trade) => computeTradeDurationMinutes(trade))
-    .filter((value) => Number.isFinite(value))
-
-  const winnersAverage = winnerDurations.length
-    ? winnerDurations.reduce((sum, value) => sum + value, 0) / winnerDurations.length
-    : 0
-  const losersAverage = loserDurations.length
-    ? loserDurations.reduce((sum, value) => sum + value, 0) / loserDurations.length
-    : 0
-
-  const quickExitThreshold = Math.max(5, Math.ceil((toFiniteNumber(minHoldSeconds, 60) / 60) * 2))
-  const overholdThreshold = Math.max(240, Math.ceil(median * 1.75))
-  const quickExits = durations.filter((value) => value <= quickExitThreshold).length
-  const overholds = durations.filter((value) => value >= overholdThreshold).length
-
-  let biasLabel = 'Your hold times are balanced across winners and losers.'
-  if (winnersAverage > 0 && losersAverage > winnersAverage * 1.2) {
-    biasLabel = 'Losing trades are staying open longer than winners.'
-  } else if (losersAverage > 0 && winnersAverage > losersAverage * 1.2) {
-    biasLabel = 'Winning trades are getting more room than losing trades.'
-  } else if ((quickExits / durations.length) > 0.35) {
-    biasLabel = 'A large share of trades are being closed quickly.'
-  }
-
-  return {
-    average_mins: parseFloat(average.toFixed(1)),
-    median_mins: parseFloat(median.toFixed(1)),
-    winners_average_mins: parseFloat(winnersAverage.toFixed(1)),
-    losers_average_mins: parseFloat(losersAverage.toFixed(1)),
-    quick_exit_rate: parseFloat(((quickExits / durations.length) * 100).toFixed(1)),
-    overhold_rate: parseFloat(((overholds / durations.length) * 100).toFixed(1)),
-    quick_exit_threshold_mins: quickExitThreshold,
-    overhold_threshold_mins: overholdThreshold,
-    bias_label: biasLabel,
-    lower_quartile_mins: parseFloat((percentile(durations, 0.25) || 0).toFixed(1)),
-    upper_quartile_mins: parseFloat((percentile(durations, 0.75) || 0).toFixed(1)),
-    by_symbol: (symbolBreakdown || []).filter((entry) => entry.avg_hold_mins != null).slice(0, 8),
-    by_strategy: (strategyBreakdown || []).filter((entry) => entry.avg_hold_mins != null).slice(0, 8)
-  }
-}
-
-function calculateCoefficientOfVariation(values) {
-  if (!Array.isArray(values) || values.length < 2) return 0
-  const mean = values.reduce((sum, value) => sum + value, 0) / values.length
-  if (!Number.isFinite(mean) || mean === 0) return 0
-  const variance = values.reduce((sum, value) => sum + ((value - mean) ** 2), 0) / values.length
-  return Math.sqrt(variance) / mean
-}
-
-function clampScore(value) {
-  return Math.max(0, Math.min(100, Math.round(value)))
-}
-
-function toScoreGrade(score) {
-  if (score >= 85) return 'A'
-  if (score >= 70) return 'B'
-  if (score >= 55) return 'C'
-  if (score >= 40) return 'D'
-  return 'E'
-}
-
-function buildDisciplineScore(trades, violations, tradingRules) {
-  const maxDailyTrades = Math.max(1, parseInt(tradingRules?.max_daily_trades || 20, 10))
-  const minHoldSeconds = Math.max(0, parseInt(tradingRules?.min_hold_seconds || 60, 10))
-  const tradesByDay = new Map()
-  const orderedByOpen = [...trades].sort((a, b) => new Date(a.open_time) - new Date(b.open_time))
-
-  for (const trade of orderedByOpen) {
-    const openTime = toSafeDate(trade.open_time)
-    if (!openTime) continue
-    const key = openTime.toISOString().slice(0, 10)
-    tradesByDay.set(key, (tradesByDay.get(key) || 0) + 1)
-  }
-
-  const overtradingDays = Array.from(tradesByDay.values()).filter((count) => count > maxDailyTrades).length
-  let revengeSequences = 0
-  let impulsiveTrades = 0
-
-  for (let index = 0; index < orderedByOpen.length; index += 1) {
-    const trade = orderedByOpen[index]
-    const durationMins = computeTradeDurationMinutes(trade)
-    if (Number.isFinite(durationMins) && durationMins * 60 <= Math.max(300, minHoldSeconds * 2)) {
-      impulsiveTrades += 1
-    }
-
-    if (index === 0) continue
-    const previousTrade = orderedByOpen[index - 1]
-    const previousPnl = toFiniteNumber(previousTrade.demo_pnl)
-    if (previousPnl >= 0) continue
-
-    const previousClose = toSafeDate(previousTrade.close_time)
-    const currentOpen = toSafeDate(trade.open_time)
-    if (!previousClose || !currentOpen) continue
-
-    const gapMins = (currentOpen.getTime() - previousClose.getTime()) / (1000 * 60)
-    const previousLots = toFiniteNumber(previousTrade.lot_size)
-    const currentLots = toFiniteNumber(trade.lot_size)
-    if (gapMins >= 0 && gapMins <= 15 && currentLots > previousLots * 1.1) {
-      revengeSequences += 1
-    }
-  }
-
-  const warningHits = (violations || []).reduce((sum, violation) => sum + Math.max(1, parseInt(violation.hit_count || 1, 10)), 0)
-  const tradeCount = Math.max(1, trades.length)
-
-  const overtradingComponent = clampScore(100 - ((overtradingDays / Math.max(1, tradesByDay.size)) * 220))
-  const revengeComponent = clampScore(100 - ((revengeSequences / tradeCount) * 320))
-  const warningComponent = clampScore(100 - (warningHits * 10))
-  const patienceComponent = clampScore(100 - ((impulsiveTrades / tradeCount) * 180))
-
-  const score = clampScore(
-    (overtradingComponent * 0.3) +
-    (revengeComponent * 0.3) +
-    (warningComponent * 0.2) +
-    (patienceComponent * 0.2)
-  )
-
-  const weakestComponent = [
-    { key: 'overtrading', score: overtradingComponent },
-    { key: 'revenge_trading', score: revengeComponent },
-    { key: 'rule_warnings', score: warningComponent },
-    { key: 'patience', score: patienceComponent }
-  ].sort((a, b) => a.score - b.score)[0]
-
-  const summaryByComponent = {
-    overtrading: 'Trade frequency is pushing close to or beyond your daily limits.',
-    revenge_trading: 'There are fast re-entries after losses with larger size.',
-    rule_warnings: 'Rule warnings or enforcement events are dragging discipline down.',
-    patience: 'A high share of trades are being closed quickly.'
-  }
-
-  return {
-    score,
-    grade: toScoreGrade(score),
-    summary: summaryByComponent[weakestComponent.key] || 'Discipline is steady overall.',
-    components: {
-      overtrading: overtradingComponent,
-      revenge_trading: revengeComponent,
-      rule_warnings: warningComponent,
-      patience: patienceComponent
-    },
-    metrics: {
-      overtrading_days: overtradingDays,
-      revenge_sequences: revengeSequences,
-      warning_hits: warningHits,
-      impulsive_trades: impulsiveTrades
-    }
-  }
-}
-
-function buildRiskConsistencyScore(trades) {
-  const lotSizes = trades
-    .map((trade) => toFiniteNumber(trade.lot_size))
-    .filter((value) => value > 0)
-
-  const plannedRiskValues = trades
-    .map((trade) => {
-      const openPrice = toFiniteNumber(trade.open_price, NaN)
-      const stopLoss = toFiniteNumber(trade.stop_loss, NaN)
-      const lotSize = toFiniteNumber(trade.lot_size, NaN)
-      if (!Number.isFinite(openPrice) || !Number.isFinite(stopLoss) || !Number.isFinite(lotSize)) {
-        return null
-      }
-      const contractSize = CONTRACT_SIZES[trade.instrument] || 100000
-      return Math.abs(openPrice - stopLoss) * lotSize * contractSize
-    })
-    .filter((value) => Number.isFinite(value) && value > 0)
-
-  const lotSizeCv = calculateCoefficientOfVariation(lotSizes)
-  const plannedRiskCv = calculateCoefficientOfVariation(plannedRiskValues)
-  const stopLossUsagePct = trades.length
-    ? parseFloat(((plannedRiskValues.length / trades.length) * 100).toFixed(1))
-    : 0
-
-  const lotSizeComponent = clampScore(100 - Math.min(85, lotSizeCv * 100))
-  const plannedRiskComponent = clampScore(100 - Math.min(90, plannedRiskCv * 100))
-  const stopLossComponent = clampScore(stopLossUsagePct)
-  const score = clampScore((lotSizeComponent * 0.35) + (plannedRiskComponent * 0.4) + (stopLossComponent * 0.25))
-
-  let summary = 'Sizing is fairly controlled across the sample.'
-  if (plannedRiskComponent < 60) {
-    summary = 'Your monetary risk per trade varies a lot even when lot sizes look similar.'
-  } else if (lotSizeComponent < 60) {
-    summary = 'Lot sizes are swinging enough to make risk look random.'
-  } else if (stopLossComponent < 70) {
-    summary = 'A meaningful share of trades are still going out without a defined stop loss.'
-  }
-
-  return {
-    score,
-    grade: toScoreGrade(score),
-    summary,
-    components: {
-      lot_size_consistency: lotSizeComponent,
-      planned_risk_consistency: plannedRiskComponent,
-      stop_loss_usage: stopLossComponent
-    },
-    metrics: {
-      lot_size_cv: parseFloat(lotSizeCv.toFixed(2)),
-      planned_risk_cv: parseFloat(plannedRiskCv.toFixed(2)),
-      stop_loss_usage_pct: stopLossUsagePct
-    }
-  }
-}
-
-function buildSetupReports(symbolBreakdown, sessionBreakdown, strategyBreakdown) {
-  const candidates = [
-    ...(strategyBreakdown || []).map((entry) => ({ ...entry, setup_type: 'Strategy' })),
-    ...(symbolBreakdown || []).map((entry) => ({ ...entry, setup_type: 'Symbol' })),
-    ...(sessionBreakdown || []).map((entry) => ({ ...entry, setup_type: 'Session' }))
-  ].filter((entry) => entry.trades >= 2)
-
-  const bestSetups = [...candidates]
-    .sort((a, b) => b.total_pnl - a.total_pnl || b.win_rate - a.win_rate)
-    .slice(0, 4)
-  const worstSetups = [...candidates]
-    .sort((a, b) => a.total_pnl - b.total_pnl || a.win_rate - b.win_rate)
-    .slice(0, 4)
-
-  return {
-    best_setups: bestSetups,
-    worst_setups: worstSetups
-  }
-}
-
-function buildBreachAnalysis(account, trades, violations) {
-  const currentBalance = toFiniteNumber(account.current_balance)
-  const startingBalance = toFiniteNumber(account.starting_balance)
-  const peakBalance = toFiniteNumber(account.peak_balance || account.starting_balance)
-  const profitTarget = toFiniteNumber(account.profit_target)
-  const maxDrawdownPct = toFiniteNumber(account.max_drawdown_pct, 0)
-  const currentDrawdownPct = peakBalance > 0
-    ? parseFloat((((peakBalance - currentBalance) / peakBalance) * 100).toFixed(2))
-    : 0
-  const totalDrawdownPct = startingBalance > 0
-    ? parseFloat((Math.max(0, ((startingBalance - currentBalance) / startingBalance) * 100)).toFixed(2))
-    : 0
-  const targetProgressPct = profitTarget > 0
-    ? parseFloat((Math.max(0, ((currentBalance - startingBalance) / profitTarget) * 100).toFixed(1)))
-    : String(account.account_type || '').toLowerCase() === 'funded' ? 100 : 0
-  const latestTrade = trades[trades.length - 1] || null
-  const recentViolations = (violations || []).slice(0, 3).map((violation) => ({
-    violation_type: violation.violation_type,
-    severity: violation.severity,
-    status: violation.status,
-    message: violation.message,
-    detected_at: violation.last_detected_at
-  }))
-
-  let title = 'Challenge Health'
-  let primaryCause = 'monitoring'
-  let explanation = 'This account is still live. The key job now is balancing target progress against drawdown usage.'
-
-  if (String(account.status).toLowerCase() === 'failed') {
-    title = 'Breach Cause'
-    if (recentViolations.length > 0) {
-      primaryCause = recentViolations[0].violation_type || 'rule_violation'
-      explanation = recentViolations[0].message || 'A recorded rule violation pushed the account into failure.'
-    } else if (maxDrawdownPct > 0 && totalDrawdownPct >= maxDrawdownPct * 0.9) {
-      primaryCause = 'max_drawdown'
-      explanation = `Total drawdown reached ${totalDrawdownPct.toFixed(2)}% against a ${maxDrawdownPct.toFixed(2)}% limit.`
-    } else {
-      primaryCause = 'account_failed'
-      explanation = latestTrade?.close_reason || 'The account was closed after a failure condition was hit.'
-    }
-  } else if (String(account.status).toLowerCase() === 'expired') {
-    title = 'Expiry Cause'
-    primaryCause = 'time_limit'
-    explanation = `The account expired before the profit target was completed. Progress reached ${targetProgressPct.toFixed(1)}% of target.`
-  } else if (String(account.status).toLowerCase() === 'passed') {
-    title = 'Pass Analysis'
-    primaryCause = 'target_hit'
-    explanation = 'The profit target was completed before the risk limits were breached.'
-  } else if (maxDrawdownPct > 0 && totalDrawdownPct >= maxDrawdownPct * 0.7) {
-    primaryCause = 'drawdown_pressure'
-    explanation = `Drawdown is at ${totalDrawdownPct.toFixed(2)}% of a ${maxDrawdownPct.toFixed(2)}% max loss limit, so risk control is the main pressure right now.`
-  } else if (profitTarget > 0 && targetProgressPct < 40) {
-    primaryCause = 'target_distance'
-    explanation = `Target progress is still only ${targetProgressPct.toFixed(1)}%, so the focus is efficient target building without forcing extra trades.`
-  }
-
-  return {
-    title,
-    status: account.status,
-    primary_cause: primaryCause,
-    explanation,
-    latest_close_reason: latestTrade?.close_reason || null,
-    recent_violations: recentViolations,
-    review_flag_reason: account.review_flag_reason || null,
-    days_remaining: computeDaysRemainingForAnalytics(account.phase_end_date),
-    target_progress_pct: targetProgressPct,
-    current_drawdown_pct: currentDrawdownPct,
-    total_drawdown_pct: totalDrawdownPct,
-    drawdown_usage_pct: maxDrawdownPct > 0 ? parseFloat(((totalDrawdownPct / maxDrawdownPct) * 100).toFixed(1)) : 0
-  }
-}
-
-function buildPayoutForecast(account, userProfile, payoutRows, openTradeSummary, tenantSettings, recentTrades) {
-  const accountType = String(account.account_type || '').toLowerCase()
-  const status = String(account.status || '').toLowerCase()
-  const sharePct = toFiniteNumber(tenantSettings.profit_share_pct, 80)
-  const shareRatio = sharePct / 100
-  const minRequestAmount = toFiniteNumber(tenantSettings.min_payout_amount, 50)
-  const processingDays = Math.max(1, parseInt(tenantSettings.payout_processing_days || 3, 10))
-  const currentBalance = toFiniteNumber(account.current_balance)
-  const startingBalance = toFiniteNumber(account.starting_balance)
-  const realizedProfit = parseFloat((currentBalance - startingBalance).toFixed(2))
-  const estimatedPayable = parseFloat((Math.max(0, realizedProfit) * shareRatio).toFixed(2))
-  const pendingPayoutCount = (payoutRows || []).filter((row) => String(row.status).toLowerCase() === 'pending').length
-  const hasOpenExposure = (openTradeSummary?.open_count || 0) > 0 || (openTradeSummary?.pending_count || 0) > 0
-  const nextMilestoneProfit = shareRatio > 0 ? parseFloat((minRequestAmount / shareRatio).toFixed(2)) : minRequestAmount
-  const profitGap = parseFloat(Math.max(0, nextMilestoneProfit - realizedProfit).toFixed(2))
-  const recentTrendPnl = parseFloat(
-    (recentTrades || [])
-      .slice(-5)
-      .reduce((sum, trade) => sum + toFiniteNumber(trade.demo_pnl), 0)
-      .toFixed(2)
-  )
-  const trendLabel = recentTrendPnl > 0 ? 'improving' : recentTrendPnl < 0 ? 'cooling' : 'flat'
-
-  const blockers = []
-  if (accountType !== 'funded') blockers.push('Only funded accounts can request payouts.')
-  if (status !== 'active') blockers.push(`Account status is ${account.status}.`)
-  if ((userProfile?.kyc_status || '').toLowerCase() !== 'approved') blockers.push('KYC approval is still required.')
-  if (hasOpenExposure) blockers.push('All open and pending trades must be closed before requesting a payout.')
-  if (pendingPayoutCount > 0) blockers.push('There is already a pending payout request on this account.')
-  if (estimatedPayable < minRequestAmount) blockers.push(`You need ${parseFloat((minRequestAmount - estimatedPayable).toFixed(2))} more payable profit to clear the minimum payout.`)
-
-  return {
-    eligible_now: blockers.length === 0,
-    next_status: blockers.length === 0 ? 'Ready to request payout' : blockers[0],
-    estimated_payable: estimatedPayable,
-    realized_profit: realizedProfit,
-    profit_share_pct: sharePct,
-    min_request_amount: minRequestAmount,
-    payout_processing_days: processingDays,
-    kyc_status: userProfile?.kyc_status || 'unknown',
-    open_trade_count: parseInt(openTradeSummary?.open_count || 0, 10),
-    pending_order_count: parseInt(openTradeSummary?.pending_count || 0, 10),
-    pending_payout_count: pendingPayoutCount,
-    profit_gap_to_min_request: profitGap,
-    next_profit_milestone: nextMilestoneProfit,
-    days_remaining: computeDaysRemainingForAnalytics(account.phase_end_date),
-    trend_label: trendLabel,
-    trend_pnl_last_5_trades: recentTrendPnl,
-    blockers
-  }
-}
-
-function buildImprovementSuggestions(context) {
-  const suggestions = []
-  const {
-    breakdowns,
-    holdTime,
-    discipline,
-    riskConsistency,
-    payoutForecast,
-    setupReports
-  } = context
-
-  const weakestSession = (breakdowns?.session || [])
-    .filter((entry) => entry.trades >= 2)
-    .sort((a, b) => a.total_pnl - b.total_pnl)[0]
-  if (weakestSession && weakestSession.total_pnl < 0) {
-    suggestions.push({
-      priority: 'high',
-      title: `Trim exposure during ${weakestSession.label}`,
-      detail: `${weakestSession.label} trades are down ${Math.abs(weakestSession.total_pnl).toFixed(2)} with a ${weakestSession.win_rate.toFixed(1)}% win rate. Reduce size or tighten entry quality in that session.`,
-      metric: 'session_breakdown'
-    })
-  }
-
-  if ((holdTime?.quick_exit_rate || 0) >= 35) {
-    suggestions.push({
-      priority: 'medium',
-      title: 'Let valid trades breathe a little longer',
-      detail: `${holdTime.quick_exit_rate.toFixed(1)}% of closed trades ended inside ${holdTime.quick_exit_threshold_mins} minutes. That often points to cutting trades before the idea has time to develop.`,
-      metric: 'hold_time'
-    })
-  }
-
-  if ((discipline?.score || 100) < 70) {
-    suggestions.push({
-      priority: 'high',
-      title: 'Tighten discipline before adding more size',
-      detail: `${discipline.summary} Current discipline score is ${discipline.score}/100, so the best edge right now is cleaner execution rather than more trades.`,
-      metric: 'discipline_score'
-    })
-  }
-
-  if ((riskConsistency?.score || 100) < 70) {
-    suggestions.push({
-      priority: 'high',
-      title: 'Standardize risk per trade',
-      detail: `${riskConsistency.summary} Use consistent stop placement and lot sizing so similar ideas risk similar dollars.`,
-      metric: 'risk_consistency'
-    })
-  }
-
-  const worstSetup = setupReports?.worst_setups?.[0]
-  if (worstSetup && worstSetup.total_pnl < 0) {
-    suggestions.push({
-      priority: 'medium',
-      title: `Review the weakest ${String(worstSetup.setup_type || 'setup').toLowerCase()}`,
-      detail: `${worstSetup.label} has produced ${worstSetup.total_pnl.toFixed(2)} across ${worstSetup.trades} trades. Pause it or lower size until the edge is clearer.`,
-      metric: 'setup_report'
-    })
-  }
-
-  if (!(payoutForecast?.eligible_now)) {
-    suggestions.push({
-      priority: 'medium',
-      title: 'Clear payout blockers early',
-      detail: payoutForecast?.blockers?.[0] || 'There are still conditions to clear before the account is payout-ready.',
-      metric: 'payout_forecast'
-    })
-  }
-
-  if (suggestions.length === 0) {
-    suggestions.push({
-      priority: 'low',
-      title: 'Keep compounding what is already working',
-      detail: 'The data is relatively balanced right now. Stay selective, keep risk stable, and avoid forcing trades when the quality is not obvious.',
-      metric: 'overall'
-    })
-  }
-
-  return suggestions.slice(0, 5)
-}
-
-// GET /api/trades/analytics
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get('/analytics', authenticateToken, async function(req, res) {
   try {
     await ensureTradeExperienceInfrastructure()
@@ -3625,6 +1985,8 @@ router.post('/batch-action', authenticateToken, tradingLimiter, async function(r
               [trade.open_price, trade.id]
             )
             await client.query('COMMIT')
+            // Re-index at the moved stop so the engine watches the new level.
+            await engine().syncOpenedTrade({ ...trade, stop_loss: trade.open_price })
             affectedCount++
           } else {
             // Close trade logic
@@ -3637,6 +1999,11 @@ router.post('/batch-action', authenticateToken, tradingLimiter, async function(r
               [demo_pnl, trade.account_id]
             )
             await client.query('COMMIT')
+            engine().syncClosedTrade(trade.id, trade.account_id, demo_pnl)
+            const batchAccount = tradeIndex.getAccountEntry(trade.account_id)
+            if (batchAccount) {
+              tradeIndex.updateAccountBalance(trade.account_id, batchAccount.currentBalance + demo_pnl)
+            }
             affectedCount++
           }
         } catch (txErr) {
@@ -3687,8 +2054,6 @@ router.post('/batch-action', authenticateToken, tradingLimiter, async function(r
   }
 })
 
-
-
 router.get('/:tradeId/screenshot/:kind', authenticateToken, async function(req, res) {
   try {
     await ensureTradeExperienceInfrastructure()
@@ -3725,11 +2090,17 @@ router.get('/:tradeId/screenshot/:kind', authenticateToken, async function(req, 
   }
 })
 
+// The engine functions now live in services/tradeEngine.js and the shared
+// helpers in services/tradeShared.js. They are re-exported here so existing
+// importers (server.js, weekendCloseService, competitionEngine, admin routes)
+// keep working against the original names.
+const tradeEngine = require('../services/tradeEngine')
+
 module.exports = {
   router,
-  checkSLTP,
-  checkPendingOrders,
-  checkFloatingDrawdown,
+  checkSLTP: tradeEngine.checkSLTP,
+  checkPendingOrders: tradeEngine.checkPendingOrders,
+  checkFloatingDrawdown: tradeEngine.checkFloatingDrawdown,
   getTradingRules,
   getMarketStatus,
   ensureTradeExperienceInfrastructure,
