@@ -1,15 +1,19 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import axios from 'axios'
+import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react'
+import api from '../services/api'
 import { PageWrapper } from '../App'
 import Card from '../components/ui/Card'
-import Sparkline from '../components/ui/Sparkline'
-import EquityCurveChart from '../components/EquityCurveChart'
-import useStore from '../store/useStore'
+import ProgressBar from '../components/ui/ProgressBar'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+// recharts-based — lazy so DashboardHome's own first paint (stat cards,
+// header) isn't blocked behind parsing the ~400KB chart chunk, even though
+// this screen still needs it immediately (see Suspense fallbacks below).
+const Sparkline = lazy(() => import('../components/ui/Sparkline'))
+const EquityCurveChart = lazy(() => import('../components/EquityCurveChart'))
+import useStore from '../store/useStore'
 import { renderIcon } from '../utils/iconMap'
 import { filterVisibleTraderAccounts, isTraderAccountVisible } from '../utils/accountVisibility'
 import { calculateEquity, formatCurrency, sumMoney } from '../utils/finance'
+import { getPersistentItem, setPersistentItem } from '../utils/memoryStore'
 
 function formatMoney(value) {
   return formatCurrency(value)
@@ -25,6 +29,18 @@ const TF_TABS = [
   { label: '1M', key: 'month' },
   { label: 'YTD', key: 'ytd' },
 ]
+
+// Shared 3-tier scale for drawdown-usage gauges: comfortable well under the
+// limit, amber as it's approached, red once it's actually breached-adjacent.
+// Both the daily and overall drawdown rows must use this — they previously
+// used two different (and inconsistent) binary red/green and amber/red
+// scales, which made "overall drawdown at 5% used" read as more alarming
+// than "daily drawdown at 74% used".
+function getDrawdownTone(usedPct) {
+  if (usedPct >= 75) return 'var(--loss)'
+  if (usedPct >= 50) return 'var(--warn)'
+  return 'var(--gain)'
+}
 
 function computeMaxDrawdownPct(curve) {
   if (!Array.isArray(curve) || curve.length === 0) return 0
@@ -122,7 +138,9 @@ function KpiCard({ icon, label, value, delta, sub, tone, sparkData }) {
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: tone }}>
           {delta}<span style={{ color: 'var(--muted)' }}> {sub}</span>
         </div>
-        <Sparkline data={sparkData} tone={tone} width={74} height={26} />
+        <Suspense fallback={<div style={{ width: 74, height: 26 }} />}>
+          <Sparkline data={sparkData} tone={tone} width={74} height={26} />
+        </Suspense>
       </div>
     </Card>
   )
@@ -159,7 +177,7 @@ function ConsistencyRiskBlock({ consistency, dailyDrawdown, totalDrawdownUsedPct
       label: 'Daily drawdown',
       usedLabel: `${dailyDrawdown.used_pct.toFixed(1)}% used`,
       pct: dailyDrawdown.used_pct,
-      tone: dailyDrawdown.used_pct >= 75 ? 'var(--loss)' : 'var(--gain)',
+      tone: getDrawdownTone(dailyDrawdown.used_pct),
       foot: `${formatMoney(dailyDrawdown.amount_used)} of ${formatMoney(dailyDrawdown.limit_amount)} · resets 00:00 UTC`,
     } : {
       // No daily_drawdown_pct configured on this account — show the row
@@ -175,7 +193,7 @@ function ConsistencyRiskBlock({ consistency, dailyDrawdown, totalDrawdownUsedPct
       label: 'Overall drawdown',
       usedLabel: `${totalDrawdownUsedPct.toFixed(1)}% used`,
       pct: totalDrawdownUsedPct,
-      tone: totalDrawdownUsedPct >= 75 ? 'var(--loss)' : 'var(--warn)',
+      tone: getDrawdownTone(totalDrawdownUsedPct),
       foot: `${totalDrawdownRemainingPct.toFixed(2)}% remaining of ${maxDrawdownPct.toFixed(2)}% · static`,
     },
     profitTargetAmount > 0 && {
@@ -317,8 +335,12 @@ function SessionHeat({ matrix, hours }) {
           {(row.slots || []).map((slot) => (
             <div
               key={slot.hour}
+              tabIndex={slot.trades > 0 ? 0 : -1}
               onMouseEnter={() => setHovered({ day: row.day_label, ...slot })}
               onMouseLeave={() => setHovered(null)}
+              onFocus={() => setHovered({ day: row.day_label, ...slot })}
+              onBlur={() => setHovered(null)}
+              aria-label={slot.trades > 0 ? `${row.day_label} ${String(slot.hour).padStart(2, '0')}:00 — ${slot.trades} trade${slot.trades === 1 ? '' : 's'}, ${formatSigned(slot.pnl || 0)}` : undefined}
               style={{ height: '12px', borderRadius: '1px', background: cellColor(slot), cursor: slot.trades > 0 ? 'pointer' : 'default' }}
             />
           ))}
@@ -380,6 +402,55 @@ function PayoutCycleBanner({ payoutCycle, onRequestPayout }) {
   )
 }
 
+// ── Scaling plan progress (funded accounts on a scaling-enabled model) ─────
+// milestones_claimed/progress_pct/total_increased are all computed
+// server-side in accounts.js's GET /stats/:id, mirroring the exact milestone
+// formula challengeEngine.js's evaluateScalingPlan uses to decide when to
+// grant the next real capital increase — see that function's header comment
+// for why past increases are excluded from the "trading profit" the
+// milestone math is based on.
+function ScalingProgressCard({ scaling }) {
+  const nextMilestone = scaling.milestones_claimed + 1
+  return (
+    <Card>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--rule-soft)', paddingBottom: '10px', marginBottom: '14px' }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px' }}>Scaling Plan</div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--accent)' }}>{scaling.multiplier.toFixed(2)}x lot size</div>
+      </div>
+
+      <div style={{ display: 'flex', gap: '18px', marginBottom: '14px', flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Milestones Claimed</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '18px', marginTop: '3px' }}>{scaling.milestones_claimed}</div>
+        </div>
+        <div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Capital Added</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '18px', marginTop: '3px', color: 'var(--gain)' }}>{formatMoney(scaling.total_increased)}</div>
+        </div>
+      </div>
+
+      {scaling.headroom_reached ? (
+        <div style={{ fontSize: '12.5px', color: 'var(--muted)' }}>
+          Maximum account size reached — no further capital increases, but your lot-size multiplier can still grow.
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '4px' }}>
+            <span>Progress to milestone {nextMilestone}</span>
+            <span>{scaling.progress_pct.toFixed(0)}%</span>
+          </div>
+          <ProgressBar value={scaling.progress_pct} label={`Progress to scaling milestone ${nextMilestone}`} />
+          {scaling.per_milestone_amount > 0 && (
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)', marginTop: '9px' }}>
+              Every {scaling.target_pct}% net trading profit adds {formatMoney(scaling.per_milestone_amount)} to your balance
+            </div>
+          )}
+        </>
+      )}
+    </Card>
+  )
+}
+
 export default function DashboardHome({
   user,
   stats,
@@ -408,7 +479,7 @@ export default function DashboardHome({
   // but the order map itself is generic (matches the prototype's `ord`).
   const [blockOrder, setBlockOrder] = useState(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem('dashboard-block-order'))
+      const saved = JSON.parse(getPersistentItem('dashboard-block-order'))
       if (saved && ['equity', 'risk', 'positions', 'heat'].every((k) => typeof saved[k] === 'number')) return saved
     } catch {}
     return { equity: 1, risk: 2, positions: 3, heat: 4 }
@@ -419,11 +490,38 @@ export default function DashboardHome({
     const from = dragBlockRef.current
     dragBlockRef.current = null
     if (!from || from === key) return
+    swapBlocks(from, key)
+  }
+  function swapBlocks(keyA, keyB) {
     setBlockOrder((prev) => {
-      const next = { ...prev, [from]: prev[key], [key]: prev[from] }
-      try { localStorage.setItem('dashboard-block-order', JSON.stringify(next)) } catch {}
+      const next = { ...prev, [keyA]: prev[keyB], [keyB]: prev[keyA] }
+      setPersistentItem('dashboard-block-order', JSON.stringify(next))
       return next
     })
+  }
+  // Keyboard-accessible equivalent of drag-and-drop reordering: each block
+  // only ever swaps with its fixed row partner (equity<->risk,
+  // positions<->heat), so a single "Swap position" button per block is a
+  // complete, unambiguous alternative to dragging.
+  const BLOCK_PARTNERS = { equity: 'risk', risk: 'equity', positions: 'heat', heat: 'positions' }
+  const BLOCK_LABELS = { equity: 'Balance & Equity', risk: 'Consistency & Risk', positions: 'Open Positions', heat: 'Session Heat' }
+  function SwapBlockButton({ blockKey }) {
+    return (
+      <button
+        type="button"
+        onClick={() => swapBlocks(blockKey, BLOCK_PARTNERS[blockKey])}
+        aria-label={`Swap position of ${BLOCK_LABELS[blockKey]} with ${BLOCK_LABELS[BLOCK_PARTNERS[blockKey]]}`}
+        title="Swap block position"
+        style={{
+          position: 'absolute', top: '10px', right: '10px', zIndex: 2,
+          width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)',
+          color: 'var(--muted)', cursor: 'pointer',
+        }}
+      >
+        {renderIcon('repeat', { size: 13 })}
+      </button>
+    )
   }
 
   const rawAccounts = allAccounts.length > 0 ? allAccounts : (propAccounts || [])
@@ -455,13 +553,14 @@ export default function DashboardHome({
   // come back in one response), the Win Rate KPI, and Session Heat — same
   // /api/trades/analytics endpoint the Analytics screen uses.
   const [analytics, setAnalytics] = useState(null)
+  const [analyticsError, setAnalyticsError] = useState(false)
   const [tf, setTf] = useState('1M')
   useEffect(() => {
-    if (!selectedAccount?.id) { setAnalytics(null); return }
+    if (!selectedAccount?.id) { setAnalytics(null); setAnalyticsError(false); return }
     let cancelled = false
-    axios.get(`${API_URL}/api/trades/analytics`, { params: { account_id: selectedAccount.id } })
-      .then((res) => { if (!cancelled) setAnalytics(res.data?.analytics || null) })
-      .catch(() => { if (!cancelled) setAnalytics(null) })
+    api.get('/api/trades/analytics', { params: { account_id: selectedAccount.id } })
+      .then((res) => { if (!cancelled) { setAnalytics(res.data?.analytics || null); setAnalyticsError(false) } })
+      .catch(() => { if (!cancelled) setAnalyticsError(true) })
     return () => { cancelled = true }
   }, [selectedAccount?.id])
 
@@ -543,8 +642,10 @@ export default function DashboardHome({
   const equityBlock = (
     <div
       key="equity" draggable onDragStart={handleBlockDragStart('equity')} onDragOver={(e) => e.preventDefault()} onDrop={handleBlockDrop('equity')}
-      style={{ order: blockOrder.equity, cursor: 'grab' }}
+      role="group" aria-label={BLOCK_LABELS.equity}
+      style={{ order: blockOrder.equity, cursor: 'grab', position: 'relative' }}
     >
+      <SwapBlockButton blockKey="equity" />
       <Card
         ruled
         eyebrow={`Account ${selectedAccount.account_uid || selectedAccount.id} · equity curve`}
@@ -566,8 +667,14 @@ export default function DashboardHome({
           </div>
         )}
       >
-        {equityCurve.length > 1 ? <EquityCurveChart data={equityCurve} height={250} /> : (
-          <div style={{ height: 250, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: '13px' }}>Not enough data for this range yet</div>
+        {equityCurve.length > 1 ? (
+          <Suspense fallback={<div style={{ height: 250 }} />}>
+            <EquityCurveChart data={equityCurve} height={250} />
+          </Suspense>
+        ) : (
+          <div style={{ height: 250, display: 'flex', alignItems: 'center', justifyContent: 'center', color: analyticsError ? 'var(--warn)' : 'var(--muted)', fontSize: '13px' }}>
+            {analyticsError ? "Couldn't load performance data — try refreshing the page." : 'Not enough data for this range yet'}
+          </div>
         )}
         {equityCurve.length > 1 && (
           <div style={{ display: 'flex', gap: '22px', borderTop: '1px solid var(--rule-soft)', marginTop: '8px', padding: '11px 2px 6px', flexWrap: 'wrap' }}>
@@ -592,8 +699,10 @@ export default function DashboardHome({
   const riskBlock = (
     <div
       key="risk" draggable onDragStart={handleBlockDragStart('risk')} onDragOver={(e) => e.preventDefault()} onDrop={handleBlockDrop('risk')}
-      style={{ order: blockOrder.risk, cursor: 'grab' }}
+      role="group" aria-label={BLOCK_LABELS.risk}
+      style={{ order: blockOrder.risk, cursor: 'grab', position: 'relative' }}
     >
+      <SwapBlockButton blockKey="risk" />
       <ConsistencyRiskBlock
         consistency={stats.stats.consistency}
         dailyDrawdown={stats.stats.daily_drawdown}
@@ -610,8 +719,10 @@ export default function DashboardHome({
   const positionsBlock = (
     <div
       key="positions" draggable onDragStart={handleBlockDragStart('positions')} onDragOver={(e) => e.preventDefault()} onDrop={handleBlockDrop('positions')}
-      style={{ order: blockOrder.positions, cursor: 'grab' }}
+      role="group" aria-label={BLOCK_LABELS.positions}
+      style={{ order: blockOrder.positions, cursor: 'grab', position: 'relative' }}
     >
+      <SwapBlockButton blockKey="positions" />
       <OpenPositionsTable positions={openTrades} />
     </div>
   )
@@ -619,8 +730,10 @@ export default function DashboardHome({
   const heatBlock = (
     <div
       key="heat" draggable onDragStart={handleBlockDragStart('heat')} onDragOver={(e) => e.preventDefault()} onDrop={handleBlockDrop('heat')}
-      style={{ order: blockOrder.heat, cursor: 'grab' }}
+      role="group" aria-label={BLOCK_LABELS.heat}
+      style={{ order: blockOrder.heat, cursor: 'grab', position: 'relative' }}
     >
+      <SwapBlockButton blockKey="heat" />
       <Card eyebrow="P&L by day × hour · 30d" title="Session Heat">
         <SessionHeat matrix={activityHeatmap.matrix || []} hours={activityHeatmap.hours || []} />
       </Card>
@@ -655,6 +768,10 @@ export default function DashboardHome({
 
         {isFunded && stats.stats.payout_cycle && (
           <PayoutCycleBanner payoutCycle={stats.stats.payout_cycle} onRequestPayout={onOpenPayoutsPage} />
+        )}
+
+        {isFunded && stats.stats.scaling && (
+          <ScalingProgressCard scaling={stats.stats.scaling} />
         )}
       </div>
     </PageWrapper>

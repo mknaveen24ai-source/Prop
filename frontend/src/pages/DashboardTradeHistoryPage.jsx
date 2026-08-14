@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import axios from 'axios'
+import { tradesAPI } from '../services/api'
 import Card from '../components/ui/Card'
 import Sparkline from '../components/ui/Sparkline'
+import EquityCurveChart from '../components/EquityCurveChart'
 import ListToolbar from '../components/ui/ListToolbar'
 import FilterChips from '../components/ui/FilterChips'
 import Drawer from '../components/ui/Drawer'
@@ -10,8 +11,9 @@ import { renderIcon } from '../utils/iconMap'
 import { formatCurrency } from '../utils/finance'
 import { getStatusColor } from '../utils/constants'
 import { formatPrice } from '../utils/instruments'
+import { exportRowsToCSV } from '../utils/exportCsv'
+import { API_BASE_URL as API_URL } from '../config/apiBase'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 const PAGE_SIZE = 15
 
 function formatSigned(value) {
@@ -20,39 +22,24 @@ function formatSigned(value) {
 
 // Relocated from TradingPanel.jsx — this screen is where "export the closed
 // trade log" actually belongs now (Trade screen no longer hosts one).
+const TRADE_EXPORT_COLUMNS = [
+  { header: 'ID', value: (t) => t.id },
+  { header: 'Instrument', value: (t) => t.instrument },
+  { header: 'Direction', value: (t) => t.direction },
+  { header: 'Lots', value: (t) => parseFloat(t.lot_size).toFixed(2) },
+  { header: 'Open Price', value: (t) => (t.open_price ? formatPrice(t.open_price, t.instrument) : '') },
+  { header: 'Close Price', value: (t) => (t.close_price ? formatPrice(t.close_price, t.instrument) : '') },
+  { header: 'Open Time', value: (t) => (t.open_time ? new Date(t.open_time).toISOString() : '') },
+  { header: 'Close Time', value: (t) => (t.close_time ? new Date(t.close_time).toISOString() : '') },
+  { header: 'R-Multiple', value: (t) => (t.r_multiple != null ? t.r_multiple.toFixed(2) : '') },
+  { header: 'P&L', value: (t) => (t.demo_pnl ? parseFloat(t.demo_pnl).toFixed(2) : '0.00') },
+  { header: 'Close Reason', value: (t) => t.close_reason || 'Manual' },
+]
+
 function exportTradesToCSV(trades, accountType, accountSize) {
-  if (!trades || trades.length === 0) return
-  const headers = ['ID', 'Instrument', 'Direction', 'Lots', 'Open Price', 'Close Price', 'Open Time', 'Close Time', 'R-Multiple', 'P&L', 'Close Reason']
-  const rows = trades.map((t) => [
-    t.id,
-    t.instrument,
-    t.direction,
-    parseFloat(t.lot_size).toFixed(2),
-    t.open_price ? formatPrice(t.open_price, t.instrument) : '',
-    t.close_price ? formatPrice(t.close_price, t.instrument) : '',
-    t.open_time ? new Date(t.open_time).toISOString() : '',
-    t.close_time ? new Date(t.close_time).toISOString() : '',
-    t.r_multiple != null ? t.r_multiple.toFixed(2) : '',
-    t.demo_pnl ? parseFloat(t.demo_pnl).toFixed(2) : '0.00',
-    t.close_reason || 'Manual',
-  ])
-  function csvSafeValue(val) {
-    let str = String(val).replace(/"/g, '""')
-    if (/^[=+\-@\t\r]/.test(str)) str = "'" + str
-    return `"${str}"`
-  }
-  const csvContent = [headers, ...rows].map((row) => row.map(csvSafeValue).join(',')).join('\n')
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
   const safeAccountType = String(accountType || 'account').replace(/[^a-zA-Z0-9_-]/g, '_')
   const safeAccountSize = String(accountSize || '').replace(/[^a-zA-Z0-9_.]/g, '_')
-  link.href = url
-  link.download = `trade_history_${safeAccountType}_${safeAccountSize}_${new Date().toISOString().slice(0, 10)}.csv`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+  exportRowsToCSV(trades, TRADE_EXPORT_COLUMNS, `trade_history_${safeAccountType}_${safeAccountSize}_${new Date().toISOString().slice(0, 10)}.csv`)
 }
 
 const OUTCOME_CHIPS = [
@@ -81,7 +68,7 @@ export default function DashboardTradeHistoryPage({ selectedAccount, accountHist
     if (!selectedAccount?.id) { setTrades([]); setLoading(false); return }
     let cancelled = false
     setLoading(true)
-    axios.get(`${API_URL}/api/trades/history`, { params: { account_id: selectedAccount.id } })
+    tradesAPI.getTradeHistory(selectedAccount.id)
       .then((res) => { if (!cancelled) setTrades(Array.isArray(res.data) ? res.data : []) })
       .catch(() => { if (!cancelled) setTrades([]) })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -111,18 +98,33 @@ export default function DashboardTradeHistoryPage({ selectedAccount, accountHist
 
   const kpis = useMemo(() => {
     const total = closedTrades.length
-    const wins = closedTrades.filter((t) => parseFloat(t.demo_pnl || 0) > 0).length
+    const pnls = closedTrades.map((t) => parseFloat(t.demo_pnl || 0))
+    const winningPnls = pnls.filter((p) => p > 0)
+    const losingPnls = pnls.filter((p) => p < 0)
+    const wins = winningPnls.length
     const winRate = total > 0 ? (wins / total) * 100 : 0
-    const totalPnl = closedTrades.reduce((sum, t) => sum + parseFloat(t.demo_pnl || 0), 0)
+    const totalPnl = pnls.reduce((sum, p) => sum + p, 0)
     const rValues = closedTrades.map((t) => t.r_multiple).filter((r) => r != null)
     const avgR = rValues.length ? rValues.reduce((a, b) => a + b, 0) / rValues.length : null
-    // Decorative trend only — cumulative P&L walk in close order, oldest first.
+    const grossProfit = winningPnls.reduce((sum, p) => sum + p, 0)
+    const grossLoss = Math.abs(losingPnls.reduce((sum, p) => sum + p, 0))
+    const profitFactor = grossLoss > 0 ? grossProfit / grossLoss : (grossProfit > 0 ? Infinity : null)
+    const bestTrade = pnls.length ? Math.max(...pnls) : null
+    const worstTrade = pnls.length ? Math.min(...pnls) : null
+    const avgWin = winningPnls.length ? grossProfit / winningPnls.length : null
+    const avgLoss = losingPnls.length ? losingPnls.reduce((sum, p) => sum + p, 0) / losingPnls.length : null
+    // Cumulative P&L walk in close order, oldest first — powers both the
+    // decorative KPI sparklines and the full equity curve chart below.
     let running = 0
-    const spark = [...closedTrades].reverse().map((t) => {
+    const cumulative = [...closedTrades].reverse().map((t) => {
       running += parseFloat(t.demo_pnl || 0)
-      return { value: running }
+      return {
+        value: running,
+        label: t.close_time ? new Date(t.close_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '',
+      }
     })
-    return { total, winRate, totalPnl, avgR, spark }
+    const spark = cumulative.map((p) => ({ value: p.value }))
+    return { total, winRate, totalPnl, avgR, spark, profitFactor, bestTrade, worstTrade, avgWin, avgLoss, cumulative }
   }, [closedTrades])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
@@ -130,8 +132,6 @@ export default function DashboardTradeHistoryPage({ selectedAccount, accountHist
 
   return (
     <div>
-      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '23px', fontWeight: 500, marginBottom: '20px' }}>Trade History</h2>
-
       {!selectedAccount ? (
         <Card style={{ padding: '40px', textAlign: 'center' }}>
           <p style={{ color: 'var(--text-muted)' }}>Select an account to see its closed trades.</p>
@@ -161,7 +161,37 @@ export default function DashboardTradeHistoryPage({ selectedAccount, accountHist
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', marginTop: '8px', color: kpis.totalPnl >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{formatSigned(kpis.totalPnl)}</div>
               <Sparkline data={kpis.spark} tone={kpis.totalPnl >= 0 ? 'var(--gain)' : 'var(--loss)'} width={74} height={26} />
             </Card>
+            <Card stat tone="var(--accent)">
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Profit Factor</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', marginTop: '8px', color: 'var(--accent)' }}>
+                {kpis.profitFactor == null ? '—' : kpis.profitFactor === Infinity ? '∞' : kpis.profitFactor.toFixed(2)}
+              </div>
+            </Card>
+            <Card stat tone="var(--gain)">
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Best Trade</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', marginTop: '8px', color: 'var(--gain)' }}>{kpis.bestTrade != null ? formatSigned(kpis.bestTrade) : '—'}</div>
+            </Card>
+            <Card stat tone="var(--loss)">
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Worst Trade</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', marginTop: '8px', color: 'var(--loss)' }}>{kpis.worstTrade != null ? formatSigned(kpis.worstTrade) : '—'}</div>
+            </Card>
+            <Card stat tone="var(--gain)">
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Avg Win</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', marginTop: '8px', color: 'var(--gain)' }}>{kpis.avgWin != null ? formatSigned(kpis.avgWin) : '—'}</div>
+            </Card>
+            <Card stat tone="var(--loss)">
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Avg Loss</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', marginTop: '8px', color: 'var(--loss)' }}>{kpis.avgLoss != null ? formatSigned(kpis.avgLoss) : '—'}</div>
+            </Card>
           </div>
+
+          <Card ruled title="Equity Curve" style={{ marginBottom: '20px' }}>
+            {kpis.cumulative.length > 1 ? (
+              <EquityCurveChart data={kpis.cumulative} height={200} tone={kpis.totalPnl >= 0 ? 'var(--gain)' : 'var(--loss)'} />
+            ) : (
+              <div style={{ textAlign: 'center', padding: '48px', color: 'var(--muted)', fontSize: '13px' }}>Not enough closed trades yet for a curve.</div>
+            )}
+          </Card>
 
           <ListToolbar
             searchValue={search}

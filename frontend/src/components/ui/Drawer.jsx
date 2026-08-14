@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
 
@@ -8,6 +8,38 @@ import { X } from 'lucide-react'
  * route change"). Admin-side equivalent is components/admin/AdminEntityDrawer.jsx.
  */
 export default function Drawer({ open, onClose, title, subtitle, children }) {
+  const panelRef = useRef(null)
+  const closeBtnRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    closeBtnRef.current?.focus()
+
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') {
+        onClose?.()
+        return
+      }
+      if (e.key === 'Tab' && panelRef.current) {
+        const focusable = panelRef.current.querySelectorAll(
+          'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+        )
+        if (focusable.length === 0) return
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [open, onClose])
+
   return (
     <AnimatePresence>
       {open && (
@@ -20,6 +52,10 @@ export default function Drawer({ open, onClose, title, subtitle, children }) {
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 1800, display: 'flex', justifyContent: 'flex-end' }}
         >
           <motion.div
+            ref={panelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={title || 'Details'}
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
@@ -38,6 +74,7 @@ export default function Drawer({ open, onClose, title, subtitle, children }) {
               </div>
               <button
                 type="button"
+                ref={closeBtnRef}
                 onClick={onClose}
                 aria-label="Close"
                 style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 'var(--space-1)' }}

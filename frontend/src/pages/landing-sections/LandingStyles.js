@@ -1,12 +1,11 @@
 export const MASTERPIECE_CSS = `
   /*
    ==========================================================================
-   THE LEDGER DESK — Public Landing Page
-   Flat, hairline-ruled, printed-statement design system. No gradients, no
-   glass/blur, no glow, no 3D transforms — hierarchy comes from rules and
-   type, not elevation. Colors are sourced entirely from tokens.css so the
-   page re-themes correctly across light (Rag Cotton White) and dark
-   (Charcoal Noir).
+   THE LEDGER DESK — Public Landing Page (v3 "Noir Ledger")
+   Hairline-ruled, printed-statement structure carries the hierarchy, same
+   as before — but glass/blur/ambient glow are now allowed on top of it.
+   Colors are sourced entirely from tokens.css so the page re-themes
+   correctly across light (Rag Cotton White) and dark (Charcoal Noir).
    ==========================================================================
   */
   .mode-public,
@@ -18,17 +17,17 @@ export const MASTERPIECE_CSS = `
 
     --mp-accent: var(--ink);
     --mp-accent-bright: var(--ink);
-    --mp-accent-glow: transparent;
+    --mp-accent-glow: var(--glow-primary);
     --mp-accent-subtle: var(--paper-2);
 
     --mp-gold: var(--warn);
     --mp-gold-light: var(--warn);
-    --mp-gold-glow: transparent;
+    --mp-gold-glow: var(--glow-accent);
     --mp-gold-subtle: var(--paper-2);
 
     --mp-emerald: var(--gain);
     --mp-emerald-light: var(--gain);
-    --mp-emerald-glow: transparent;
+    --mp-emerald-glow: var(--glow-success);
 
     --mp-lavender: var(--muted);
     --mp-lavender-glow: transparent;
@@ -55,17 +54,15 @@ export const MASTERPIECE_CSS = `
   }
 
   /* ══ RESET & BASE ══ */
-  /* Halftone "print plate" backdrop — same device as the auth shell, so
-     glass surfaces scrolling over this page have something to frost
-     instead of a flat tint. Dot colors reuse gain/loss/warn, no new hues. */
+  /* Ambient gradient-mesh backdrop — replaces the old halftone dot plate.
+     Low-alpha radial glows anchored off-center so glass surfaces scrolling
+     over the page still have depth to frost, without reading as a texture. */
   .masterpiece-landing {
     background-color: var(--paper);
     background-image:
-      radial-gradient(circle, color-mix(in srgb, var(--warn) 70%, transparent) 1.6px, transparent 1.7px),
-      radial-gradient(circle, color-mix(in srgb, var(--gain) 55%, transparent) 1.4px, transparent 1.5px),
-      radial-gradient(circle, color-mix(in srgb, var(--loss) 55%, transparent) 1.4px, transparent 1.5px);
-    background-size: 26px 26px, 34px 34px, 40px 40px;
-    background-position: 0 0, 9px 14px, 21px 5px;
+      radial-gradient(ellipse 900px 600px at 15% 10%, var(--glow-primary), transparent),
+      radial-gradient(ellipse 700px 500px at 85% 35%, var(--glow-success), transparent),
+      radial-gradient(ellipse 800px 550px at 25% 85%, var(--glow-primary), transparent);
     background-attachment: fixed;
     color: var(--mp-text);
     font-family: var(--font-ui);
@@ -124,9 +121,14 @@ export const MASTERPIECE_CSS = `
     line-height: 1.7;
   }
 
-  /* ══ EMPHASIS TEXT (flat ink, no glow/shimmer) ══ */
+  /* ══ EMPHASIS TEXT — gold shimmer sweep ══ */
   .mp-glow-text {
-    color: var(--mp-gold);
+    background: linear-gradient(90deg, var(--mp-gold) 0%, var(--mp-gold-light) 25%, var(--mp-gold) 50%, var(--mp-gold-light) 75%, var(--mp-gold) 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: shimmer 4s linear infinite;
   }
 
   .mp-text-emerald {
@@ -148,13 +150,15 @@ export const MASTERPIECE_CSS = `
     text-transform: uppercase;
     letter-spacing: 0.08em;
     text-decoration: none;
-    transition: opacity 0.2s ease;
+    transition: opacity 0.2s ease, box-shadow 0.3s ease, transform 0.2s ease;
     border: 1px solid var(--ink);
     cursor: pointer;
   }
 
   .mp-btn-primary:hover {
-    opacity: 0.85;
+    opacity: 0.9;
+    box-shadow: 0 0 24px -6px var(--mp-gold-glow);
+    transform: translateY(-1px);
   }
 
   .mp-btn-secondary {

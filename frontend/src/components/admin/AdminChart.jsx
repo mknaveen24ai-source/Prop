@@ -6,15 +6,26 @@ export default function AdminChart({
   children,
   height = 300,
   title,
-  eyebrow
+  eyebrow,
+  empty
 }) {
   return (
     <Card title={title} eyebrow={eyebrow}>
-      <div style={{ width: '100%', height }}>
-        <ResponsiveContainer width="100%" height="100%">
-          {children}
-        </ResponsiveContainer>
-      </div>
+      {empty ? (
+        // Rendered outside ResponsiveContainer on purpose: its inner wrapper
+        // collapses to a 0×0 box (relying on `overflow: visible` for SVG
+        // charts to paint past it), which makes ordinary text wrap to one
+        // word per line instead of centering.
+        <div style={{ width: '100%', height, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+          {empty}
+        </div>
+      ) : (
+        <div style={{ width: '100%', height }}>
+          <ResponsiveContainer width="100%" height="100%">
+            {children}
+          </ResponsiveContainer>
+        </div>
+      )}
     </Card>
   );
 }

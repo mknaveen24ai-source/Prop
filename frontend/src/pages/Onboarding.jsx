@@ -33,6 +33,8 @@ const STEPS = [
             ['Profit Target',    'Set by your model'],
             ['Max Drawdown',     'Set by your model'],
             ['Time Limit',       'Set by your model'],
+            ['Min Trading Days', '5 days'],
+            ['Consistency Rule', '15% max/day'],
             ['Min Trade Time',   '60 seconds'],
             ['Forex Leverage',   '1:30'],
             ['Gold/Silver Lev.', '1:10'],
@@ -62,7 +64,7 @@ const STEPS = [
   {
     icon: '💰',
     title: 'Step 4 — Request Payouts',
-    body: `Once funded, request a payout any time. Minimum $50. You keep 80% of profits. Processed within 7 business days via USDT or your chosen method. No lock-up periods.`,
+    body: `Once funded, request a payout weekly. Minimum $50. You keep 75% of profits. Your first payout needs 10 qualifying trading days and 6% net profit — no lock-up after that. Processed within 7 business days via USDT or your chosen method.`,
     highlight: 'payouts'
   },
   {

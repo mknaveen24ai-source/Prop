@@ -116,13 +116,31 @@ export default function LandingFooter({ onFooterCta }) {
           ))}
 
           {/* Legal */}
+          {/* "Risk Disclosure" and "KYC Policy" used to sit here as href="/#"
+              dead links. Replaced with the two policies that actually exist and
+              that consumer law requires us to publish. */}
           <div>
             <h4 style={{ fontFamily: 'var(--font-display)', fontSize: '14px', color: 'var(--muted)', marginBottom: '24px', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Legal</h4>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <li><Link to="/terms" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '14px', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color='var(--ink)'} onMouseOut={e => e.currentTarget.style.color='var(--muted)'}>Terms of Service</Link></li>
-              <li><Link to="/privacy" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '14px', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color='var(--ink)'} onMouseOut={e => e.currentTarget.style.color='var(--muted)'}>Privacy Policy</Link></li>
-              <li><a href="/#" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '14px', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color='var(--ink)'} onMouseOut={e => e.currentTarget.style.color='var(--muted)'}>Risk Disclosure</a></li>
-              <li><a href="/#" style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '14px', transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color='var(--ink)'} onMouseOut={e => e.currentTarget.style.color='var(--muted)'}>KYC Policy</a></li>
+              {[
+                { to: '/terms', label: 'Terms of Service' },
+                { to: '/privacy', label: 'Privacy Policy' },
+                { to: '/refund-policy', label: 'Refund Policy' },
+                { to: '/cookie-policy', label: 'Cookie Policy' }
+              ].map(({ to, label }) => (
+                <li key={to}>
+                  <Link
+                    to={to}
+                    style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '14px', transition: 'color 0.2s' }}
+                    onMouseOver={e => { e.currentTarget.style.color = 'var(--ink)' }}
+                    onMouseOut={e => { e.currentTarget.style.color = 'var(--muted)' }}
+                    onFocus={e => { e.currentTarget.style.color = 'var(--ink)' }}
+                    onBlur={e => { e.currentTarget.style.color = 'var(--muted)' }}
+                  >
+                    {label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
         </div>

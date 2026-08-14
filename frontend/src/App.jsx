@@ -7,6 +7,8 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import TermsOfService from './pages/TermsOfService'
 import PrivacyPolicy from './pages/PrivacyPolicy'
+import RefundPolicy from './pages/RefundPolicy'
+import CookiePolicy from './pages/CookiePolicy'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import { useAuth } from './providers/AuthProvider'
 import './App.css'
@@ -19,7 +21,6 @@ const TraderProfile = lazy(() => import('./pages/TraderProfile'))
 const Competitions = lazy(() => import('./pages/Competitions'))
 const CompetitionDetail = lazy(() => import('./pages/CompetitionDetail'))
 const Transparency = lazy(() => import('./pages/Transparency'))
-const Chat = lazy(() => import('./pages/Chat'))
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'))
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'))
@@ -31,6 +32,8 @@ const AdminPayouts = lazy(() => import('./pages/admin/AdminPayouts'))
 const AdminPlatformPnL = lazy(() => import('./pages/admin/AdminPlatformPnL'))
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'))
 const AdminCoupons = lazy(() => import('./pages/admin/AdminCoupons'))
+const AdminGifts = lazy(() => import('./pages/admin/AdminGifts'))
+const AdminReferralSeasons = lazy(() => import('./pages/admin/AdminReferralSeasons'))
 const AdminTradingEconomics = lazy(() => import('./pages/admin/AdminTradingEconomics'))
 const AdminStepModels = lazy(() => import('./pages/admin/AdminStepModels'))
 const AdminAccess = lazy(() => import('./pages/admin/AdminAccess'))
@@ -101,6 +104,8 @@ function AnimatedRoutes({ user, login, logout }) {
           <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Landing />} />
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/refund-policy" element={<RefundPolicy />} />
+          <Route path="/cookie-policy" element={<CookiePolicy />} />
           <Route path="/checkout" element={<Checkout />} />
 
           <Route
@@ -126,7 +131,7 @@ function AnimatedRoutes({ user, login, logout }) {
           />
           <Route
             path="/chat"
-            element={user ? <Chat /> : <Navigate to="/login" replace />}
+            element={<Navigate to={user ? '/dashboard/chat' : '/login'} replace />}
           />
 
           <Route path="/admin" element={<AdminLayout />}>
@@ -144,6 +149,7 @@ function AnimatedRoutes({ user, login, logout }) {
             <Route path="pnl" element={<AdminPlatformPnL />} />
             <Route path="settings" element={<AdminSettings />} />
             <Route path="coupons" element={<AdminCoupons />} />
+            <Route path="gifts" element={<AdminGifts />} />
             <Route path="trading-economics" element={<AdminTradingEconomics />} />
             <Route path="step-models" element={<AdminStepModels />} />
             <Route path="access" element={<AdminAccess />} />
@@ -154,6 +160,7 @@ function AnimatedRoutes({ user, login, logout }) {
             <Route path="chat" element={<AdminChat />} />
             <Route path="disputes" element={<AdminDisputes />} />
             <Route path="competitions" element={<AdminCompetitions />} />
+            <Route path="referral-seasons" element={<AdminReferralSeasons />} />
             <Route path="competitions/:id" element={<AdminCompetitionDetail />} />
             <Route path="competitions/:id/analytics" element={<AdminCompetitionAnalytics />} />
             <Route path="accounts/:accountId" element={<AdminAccountDetail />} />

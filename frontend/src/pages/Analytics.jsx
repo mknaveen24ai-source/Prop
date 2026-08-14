@@ -5,8 +5,8 @@ import { PageWrapper } from '../App'
 import { renderIcon } from '../utils/iconMap'
 import { formatPrice } from '../utils/instruments'
 import Card from '../components/ui/Card'
+import { API_BASE_URL as API_URL } from '../config/apiBase'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 const CURVE_RANGES = [
   { id: 'day', label: '1D' },

@@ -2,8 +2,9 @@ import React from 'react'
 import { useBranding } from '../../BrandingContext'
 
 // Purely decorative — not wired to a live price feed. There's no public,
-// unauthenticated market-data endpoint yet, and the real TradingPriceTicker
-// needs a `prices` prop + order-form context that don't exist pre-login.
+// unauthenticated market-data endpoint yet, and the live instrument ticker
+// in TradingPanel.jsx needs a `prices` prop + order-form context that don't
+// exist pre-login.
 const TICKER_ITEMS = [
   { symbol: 'S&P 500', change: '+0.42%', up: true },
   { symbol: 'NASDAQ', change: '+0.68%', up: true },

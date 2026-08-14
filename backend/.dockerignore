@@ -8,4 +8,23 @@ uploads/
 .gitignore
 README.md
 *.md
+
+# Tests and fixtures
 test/
+coverage/
+
+# One-off repair/migration scripts. These are developer tools that mutate the
+# database directly; they have no business being reachable inside a production
+# image alongside live credentials.
+tools/
+scripts/v2_migrate.js
+scripts/v2_upgrade_db.js
+generate_audit_pdf.js
+MIGRATION_INSTALL_SUMMARY.js
+seed_quotas.js
+setup_platform_settings.js
+
+# Stray artifacts
+image.png
+*.pdf
+*.docx

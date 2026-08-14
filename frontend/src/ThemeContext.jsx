@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import axios from 'axios'
+import { API_BASE_URL as API_URL } from './config/apiBase'
 
 const ThemeContext = createContext()
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 export function ThemeProvider({ children, initialTheme }) {
   // FIX: Keep theme in React state and DB preference only.

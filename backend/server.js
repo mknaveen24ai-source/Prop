@@ -79,14 +79,18 @@ const adminRoutes          = require('./routes/admin')
 const adminViolationRoutes = require('./routes/adminViolations')
 const adminAnalyticsRoutes = require('./routes/adminAnalytics')
 const adminCompetitionRoutes = require('./routes/adminCompetitions')
+const adminReferralSeasonRoutes = require('./routes/adminReferralSeasons')
 const adminTradingEconomicsRoutes = require('./routes/adminTradingEconomics')
 const competitionRoutes    = require('./routes/competitions')
+const referralSeasonRoutes = require('./routes/referralSeasons')
 const adminAffiliateRoutes = require('./routes/adminAffiliates')
 const adminCouponRoutes    = require('./routes/adminCoupons')
+const adminGiftRoutes      = require('./routes/adminGifts')
 const affiliateRoutes      = require('./routes/affiliates')
 const payoutRoutes         = require('./routes/payouts')
 const kycRoutes            = require('./routes/kyc')
 const chatRoutes           = require('./routes/chat')
+const notificationRoutes   = require('./routes/notifications')
 const swaggerRoutes        = require('./routes/swagger')
 const { router: billingRoutes, billingWebhookHandler, ensureBillingInfrastructure } = require('./routes/billing')
 const {
@@ -96,6 +100,7 @@ const {
 } = require('./routes/middleware')
 const { runChallengeEngine } = require('./challengeEngine')
 const { runCompetitionEngine } = require('./competitionEngine')
+const { runReferralSeasonEngine } = require('./referralSeasonEngine')
 const { tickCompetitionBots } = require('./services/competitionBotService')
 const { validateEnv } = require('./env')
 const { ensureChatTables } = require('./routes/chat')
@@ -454,14 +459,18 @@ app.use('/api/admin',    adminRoutes)
 app.use('/api/admin',    adminViolationRoutes)
 app.use('/api/admin',    adminAnalyticsRoutes)
 app.use('/api/admin',    adminCompetitionRoutes)
+app.use('/api/admin',    adminReferralSeasonRoutes)
 app.use('/api/admin',    adminTradingEconomicsRoutes)
 app.use('/api/admin',    adminAffiliateRoutes)
 app.use('/api/admin',    adminCouponRoutes)
+app.use('/api/admin',    adminGiftRoutes)
 app.use('/api/competitions', competitionRoutes)
+app.use('/api/referral-seasons', referralSeasonRoutes)
 app.use('/api/affiliates', affiliateRoutes)
 app.use('/api/payouts',  payoutRoutes)
 app.use('/api/kyc',      kycRoutes)
 app.use('/api/chat',     chatRoutes)
+app.use('/api/notifications', notificationRoutes)
 app.use('/api/disputes', require('./routes/disputes'))
 app.use('/api/billing',  billingRoutes)
 app.use('/api/transparency', require('./routes/transparency'))
@@ -495,6 +504,65 @@ app.get('/api/leaderboard', async function (req, res) {
   } catch (error) {
     logger.error('Leaderboard error:', { error: error.message })
     res.status(500).json({ error: 'Could not load leaderboard' })
+  }
+})
+
+// ── Public landing-page stats (public, unauthenticated) ───────────────────────
+// Backs the marketing site's "Live Payout Tracker" (LandingLiveStats.jsx) and
+// the hero's funded-trader count — real aggregates, no PII (trader names are
+// masked, same convention as routes/transparency.js).
+function maskLandingTraderName(fullName, userId) {
+  if (!fullName || typeof fullName !== 'string') {
+    return `Trader #${String(userId || '').slice(-4).padStart(4, '0')}`
+  }
+  const first = fullName.trim().split(/\s+/)[0]
+  if (!first) return `Trader #${String(userId || '').slice(-4).padStart(4, '0')}`
+  return `${first[0].toUpperCase()}${'*'.repeat(Math.min(4, Math.max(2, first.length - 1)))}`
+}
+
+app.get('/api/public/landing-stats', async function (req, res) {
+  try {
+    const [payoutsResult, fundedResult, countryResult, sameDayResult, recentResult] = await Promise.all([
+      pool.query(`SELECT COALESCE(SUM(amount_payable), 0) AS total, COUNT(*)::int AS count FROM payouts WHERE status = 'paid'`),
+      pool.query(`SELECT COUNT(*)::int AS count FROM accounts WHERE account_type = 'funded' AND status NOT IN ('failed', 'locked')`),
+      pool.query(`SELECT COUNT(DISTINCT NULLIF(TRIM(country), ''))::int AS count FROM users WHERE country IS NOT NULL AND TRIM(country) <> ''`),
+      pool.query(`
+        SELECT
+          COUNT(*)::float AS total,
+          COUNT(*) FILTER (WHERE paid_at IS NOT NULL AND requested_at IS NOT NULL AND paid_at - requested_at <= INTERVAL '24 hours')::float AS same_day
+        FROM payouts WHERE status = 'paid'
+      `),
+      pool.query(`
+        SELECT p.id, p.amount_payable, p.paid_at, u.full_name, u.country, u.id AS user_id
+        FROM payouts p
+        JOIN users u ON u.id::text = p.user_id::text
+        WHERE p.status = 'paid' AND p.paid_at IS NOT NULL
+        ORDER BY p.paid_at DESC
+        LIMIT 6
+      `),
+    ])
+
+    const sdRow = sameDayResult.rows[0] || {}
+    const sameDayTotal = parseFloat(sdRow.total) || 0
+    const sameDayRate = sameDayTotal > 0 ? Math.round((parseFloat(sdRow.same_day) / sameDayTotal) * 1000) / 10 : 0
+
+    res.json({
+      total_paid_out: parseFloat(payoutsResult.rows[0]?.total) || 0,
+      paid_payout_count: payoutsResult.rows[0]?.count || 0,
+      funded_trader_count: fundedResult.rows[0]?.count || 0,
+      country_count: countryResult.rows[0]?.count || 0,
+      same_day_payout_rate: sameDayRate,
+      recent_payouts: recentResult.rows.map((row) => ({
+        id: row.id,
+        amount: parseFloat(row.amount_payable) || 0,
+        trader_name: maskLandingTraderName(row.full_name, row.user_id),
+        country: row.country || null,
+        paid_at: row.paid_at,
+      })),
+    })
+  } catch (error) {
+    logger.error('Public landing stats error:', { error: error.message })
+    res.status(500).json({ error: 'Could not load landing stats' })
   }
 })
 
@@ -813,6 +881,7 @@ startAllSchedulers(io, {
   checkFloatingDrawdown,
   runChallengeEngine,
   runCompetitionEngine,
+  runReferralSeasonEngine,
   tickCompetitionBots,
   checkNewsForceClose,
   weekendForceCloseByTenant,

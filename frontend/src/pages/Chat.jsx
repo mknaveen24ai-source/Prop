@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import io from 'socket.io-client'
 import { getStatusToneColor } from '../utils/statusTone'
+import { API_BASE_URL as API_URL, SOCKET_URL } from '../config/apiBase'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 // FIX (HIGH #8): Use module-level ref tracking to prevent socket connection leaks
 // when component mounts/unmounts rapidly during navigation.
@@ -46,7 +46,7 @@ function Chat() {
     // FIX (HIGH #8): Use reference counting to prevent connection leaks
     socketRefCount++
     if (!socketInstance) {
-      socketInstance = io(API_URL, {
+      socketInstance = io(SOCKET_URL, {
         withCredentials: true,
         transports: ['websocket', 'polling']
       })

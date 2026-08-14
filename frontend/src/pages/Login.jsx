@@ -1,23 +1,15 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useBranding } from '../BrandingContext'
 import { authAPI } from '../services/api'
 import AuthMasthead from '../components/auth/AuthMasthead'
+import EyeIcon from '../components/common/EyeIcon'
+import OtpInput from '../components/common/OtpInput'
 
 // Cosmetic/local-only "remember me" — pre-fills the email field on return
 // visits. authAPI.login() has no session-duration param, so this doesn't
 // extend the actual server session, just spares a retype.
 const REMEMBER_EMAIL_KEY = 'propfirm:remembered-email'
-
-function EyeIcon({ hidden }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      {hidden && <path d="M4 20 20 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />}
-    </svg>
-  )
-}
 
 // ── Same password strength checker as Register.js ─────────────────────────────
 function getPasswordStrength(password) {
@@ -35,55 +27,24 @@ function getPasswordStrength(password) {
   return { score, label, color, checks }
 }
 
-// ── 6-digit TOTP input component ──────────────────────────────────────────────
+// ── 6-digit TOTP verification screen ──────────────────────────────────────────
 function TotpInput({ onSubmit, onBack, loading, error }) {
-  const [digits, setDigits] = useState(['', '', '', '', '', ''])
-  const refs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()]
-
-  useEffect(() => {
-    refs[0].current?.focus()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  function handleDigit(index, value) {
-    const d = value.replace(/\D/g, '').slice(0, 1)
-    const next = [...digits]
-    next[index] = d
-    setDigits(next)
-    if (d && index < 5) {
-      refs[index + 1].current?.focus()
-    }
-    // Auto-submit when all 6 filled
-    if (d && index === 5) {
-      const code = [...next.slice(0, 5), d].join('')
-      if (code.length === 6) onSubmit(code)
-    }
-  }
-
-  function handleKeyDown(index, e) {
-    if (e.key === 'Backspace' && !digits[index] && index > 0) {
-      refs[index - 1].current?.focus()
-    }
-    if (e.key === 'Enter') {
-      const code = digits.join('')
-      if (code.length === 6) onSubmit(code)
-    }
-  }
-
-  function handlePaste(e) {
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
-    if (pasted.length === 6) {
-      setDigits(pasted.split(''))
-      onSubmit(pasted)
-    }
-  }
-
-  const code = digits.join('')
+  const [code, setCode] = useState('')
 
   return (
     <div>
       <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-        <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔐</div>
+        <div style={{
+          width: '48px', height: '48px', margin: '0 auto 16px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'var(--glass-2)', border: '1px solid var(--rule-soft)',
+          backdropFilter: 'blur(16px) saturate(140%)', WebkitBackdropFilter: 'blur(16px) saturate(140%)',
+        }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <rect x="5" y="10" width="14" height="10" rx="1.5" stroke="var(--accent)" strokeWidth="1.6" />
+            <path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="var(--accent)" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        </div>
         <h2 style={{ color: 'var(--text)', fontSize: '20px', margin: '0 0 6px' }}>
           Two-Factor Authentication
         </h2>
@@ -97,44 +58,14 @@ function TotpInput({ onSubmit, onBack, loading, error }) {
         <div className="error" style={{ marginBottom: '16px' }}>{error}</div>
       )}
 
-      {/* 6-box digit input */}
-      <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '20px' }}
-           onPaste={handlePaste}>
-        {digits.map((d, i) => (
-          <input
-            key={i}
-            ref={refs[i]}
-            id={`totp-digit-${i}`}
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            maxLength={1}
-            value={d}
-            onChange={e => handleDigit(i, e.target.value)}
-            onKeyDown={e => handleKeyDown(i, e)}
-            style={{
-              width: '44px',
-              height: '52px',
-              textAlign: 'center',
-              fontSize: '22px',
-              fontFamily: 'monospace',
-              fontWeight: 700,
-              background: 'var(--navy-hover)',
-              border: `2px solid ${d ? 'var(--accent)' : 'var(--navy-border)'}`,
-              color: 'var(--text)',
-              outline: 'none',
-              transition: 'border-color 0.2s',
-            }}
-          />
-        ))}
-      </div>
+      <OtpInput idPrefix="totp-digit" onChange={setCode} onComplete={onSubmit} disabled={loading} />
 
       <button
         id="totp-verify-btn"
         className="btn btn-accent"
         onClick={() => onSubmit(code)}
         disabled={loading || code.length < 6}
-        style={{ width: '100%', marginBottom: '12px', opacity: (loading || code.length < 6) ? 0.5 : 1 }}
+        style={{ width: '100%', marginBottom: '12px', marginTop: '8px', opacity: (loading || code.length < 6) ? 0.5 : 1 }}
       >
         {loading ? 'Verifying…' : 'Verify Code'}
       </button>
@@ -304,7 +235,7 @@ function Login({ onLogin, initialMode = 'login' }) {
 
       {mode !== 'totp' && <AuthMasthead eyebrow="Section A · Members" maxWidth={420} />}
 
-      <div className="lx-card auth-glass-card" style={{ width: '420px', zIndex: 10, animation: 'fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+      <div className="lx-card auth-glass-card" style={{ width: 'min(100%, 420px)', zIndex: 10, animation: 'fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1)' }}>
 
         {/* ── HEADER ── */}
         {mode !== 'totp' && (
@@ -350,6 +281,7 @@ function Login({ onLogin, initialMode = 'login' }) {
                 onChange={e => setEmail(e.target.value)}
                 placeholder="your@email.com"
                 required
+                autoComplete="email"
               />
             </div>
 
@@ -363,6 +295,7 @@ function Login({ onLogin, initialMode = 'login' }) {
                   onChange={e => setPassword(e.target.value)}
                   placeholder="Enter password"
                   required
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
@@ -384,7 +317,7 @@ function Login({ onLogin, initialMode = 'login' }) {
                   onChange={e => setRememberMe(e.target.checked)}
                   style={{ accentColor: 'var(--accent)', cursor: 'pointer' }}
                 />
-                Keep me on the floor
+                Remember me
               </label>
               <button
                 type="button"

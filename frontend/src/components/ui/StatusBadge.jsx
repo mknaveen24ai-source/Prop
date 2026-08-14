@@ -2,11 +2,12 @@ import React from 'react'
 import { ACCOUNT_STATUSES, getStatusColor, getStatusLabel } from '../../utils/constants.js'
 
 /**
- * Trader-side status pill. Single source of truth: ACCOUNT_STATUSES in
- * utils/constants.js — every status pill, dot and colored figure for
- * account/challenge/payout/affiliate status reads off that one map, per the
- * Modern Gazette handoff spec ("one map, every representation"). Admin-side
- * equivalent is components/admin/AdminBadge.jsx.
+ * Trader-side status pill. Colors resolve through utils/statusTone.js (the
+ * app's one 5-tone gain/accent/warn/muted/loss map, per the Modern Gazette
+ * handoff spec "one map, every representation"); ACCOUNT_STATUSES in
+ * utils/constants.js layers curated trader-facing labels on top of that same
+ * map and falls through to it for any status the curated table doesn't list.
+ * Admin-side equivalent is components/admin/AdminBadge.jsx.
  */
 export default function StatusBadge({ status, label, className = '', style }) {
   const color = getStatusColor(status)

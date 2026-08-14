@@ -1,0 +1,17 @@
+# TLS certificates are mounted read-only into the nginx container from here.
+#
+# Place two files in this directory before `docker compose up`:
+#   fullchain.pem
+#   privkey.pem
+#
+# Issue them with certbot in standalone mode BEFORE starting nginx, because
+# nginx claims port 80:
+#
+#   docker run --rm -p 80:80 \
+#     -v "$(pwd)/deploy/certs:/etc/letsencrypt/live/your-domain.com" \
+#     certbot/certbot certonly --standalone -d your-domain.com \
+#     --email you@your-domain.com --agree-tos --no-eff-email
+#
+# Renewal: re-run with `renew` on a cron, then `docker compose restart nginx`.
+#
+# The .pem files themselves are gitignored — never commit private keys.

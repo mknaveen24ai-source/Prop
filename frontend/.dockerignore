@@ -1,0 +1,19 @@
+# Without these, `COPY . .` in the Dockerfile overwrites the clean alpine
+# `npm ci` install with the host's node_modules (wrong platform binaries) and
+# copies a stale build/ over the fresh one.
+node_modules
+build
+dist
+.env
+.env.*
+.git
+.gitignore
+coverage
+e2e
+playwright-report
+test-results
+*.log
+npm-debug.log*
+.DS_Store
+Dockerfile
+.dockerignore

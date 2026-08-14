@@ -113,7 +113,8 @@ async function fetchAffiliateSummary(userId) {
     paid_total: parseFloat(balances.rows[0]?.paid_total || 0),
     pending_payout_amount: parseFloat(pendingPayout.rows[0]?.pending_amount || 0),
     current_tier: currentTier ? { ...currentTier, commission_pct: parseFloat(currentTier.commission_pct) } : null,
-    next_tier: nextTier ? { ...nextTier, commission_pct: parseFloat(nextTier.commission_pct) } : null
+    next_tier: nextTier ? { ...nextTier, commission_pct: parseFloat(nextTier.commission_pct) } : null,
+    all_tiers: tiers.rows.map((t) => ({ ...t, commission_pct: parseFloat(t.commission_pct) }))
   }
 }
 

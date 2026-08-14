@@ -148,6 +148,7 @@ export default function AdminSidebar({
             <NavItem to="/admin/payouts" icon="payouts" label="Payouts" badge={counts.payouts > 0 ? { val: counts.payouts, color: 'amber' } : null} />
             <NavItem to="/admin/affiliates" icon="affiliate" label="Affiliates" />
             <NavItem to="/admin/affiliates/payouts" icon="affiliate" label="Affiliate Payouts" />
+            <NavItem to="/admin/referral-seasons" icon="leaderboard" label="Referral Seasons" />
             {isSuperAdmin && <NavItem to="/admin/pnl" icon="pnl" label="Platform P&L" />}
           </NavGroup>
 
@@ -156,6 +157,7 @@ export default function AdminSidebar({
             <NavItem to="/admin/access" icon="key" label="Access & Security" />
             <NavItem to="/admin/settings" icon="settings" label="Settings" />
             <NavItem to="/admin/coupons" icon="wallet" label="Coupons" />
+            <NavItem to="/admin/gifts" icon="wallet" label="Gift Vouchers" />
             <NavItem to="/admin/trading-economics" icon="settings" label="Trading Economics" />
             {isSuperAdmin && <NavItem to="/admin/step-models" icon="challenges" label="Challenge Models" />}
           </NavGroup>

@@ -167,27 +167,6 @@ export function calculateDrawdown(currentBalance, peakBalance, startingBalance) 
 }
 
 /**
- * Get risk level based on drawdown
- * @param {number} drawdownPct - Current drawdown percentage
- * @param {number} maxDrawdownPct - Maximum allowed drawdown
- * @returns {{level: string, color: string, label: string}} Risk level info
- */
-export function getRiskLevel(drawdownPct, maxDrawdownPct) {
-  const percentage = maxDrawdownPct > 0 ? (drawdownPct / maxDrawdownPct) * 100 : 0
-  
-  if (percentage >= 90) {
-    return { level: 'critical', color: '#F44336', label: 'Critical' }
-  } else if (percentage >= 75) {
-    return { level: 'high', color: '#FF9800', label: 'High' }
-  } else if (percentage >= 50) {
-    return { level: 'medium', color: '#FFC107', label: 'Medium' }
-  } else if (percentage >= 25) {
-    return { level: 'low', color: '#4CAF50', label: 'Low' }
-  }
-  return { level: 'safe', color: '#2196F3', label: 'Safe' }
-}
-
-/**
  * Validate email format
  * @param {string} email - Email to validate
  * @returns {boolean} Whether email is valid

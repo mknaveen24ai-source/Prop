@@ -1,9 +1,15 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../ThemeContext'
-import { Headset, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
+import { Headset, ChevronLeft, ChevronRight, ChevronDown, X, MoreHorizontal } from 'lucide-react'
 import { renderIcon } from '../utils/iconMap'
+
+// Mobile bottom bar shows these 4 first, plus a persistent "More" tab and
+// the Profile tab — everything else (Compare, Competitions, Rules, New
+// Challenge, KYC, Payouts, Affiliate, Live Chat, Appeal, Support, Public
+// Site) lives in the More sheet instead of a 15-wide scrollable row.
+const MOBILE_PRIMARY_IDS = ['dashboard', 'trade', 'analytics', 'history']
 
 // Grouped nav (Modern Gazette handoff spec: "grouped, collapsible sections
 // — Desk, Programme, Account, Help, Reference"), mirroring AdminSidebar's
@@ -16,6 +22,10 @@ const NAV_GROUPS = [
       { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
       { id: 'trade', icon: 'trade', label: 'Trade' },
       { id: 'analytics', icon: 'analytics', label: 'Analytics' },
+      // Not in the Modern Gazette handoff spec's 26-screen prototype — real
+      // product functionality, appended last so it doesn't reorder the
+      // spec'd items (same rationale as "New Challenge" below).
+      { id: 'compare', icon: 'analytics', label: 'Compare Accounts' },
     ],
   },
   {
@@ -92,6 +102,22 @@ export default function Sidebar({
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const [collapsedGroups, setCollapsedGroups] = useState(loadCollapsedGroups)
+  const [showMoreSheet, setShowMoreSheet] = useState(false)
+  const moreSheetRef = useRef(null)
+
+  useEffect(() => {
+    if (!showMoreSheet) return
+    function handleEscape(e) { if (e.key === 'Escape') setShowMoreSheet(false) }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [showMoreSheet])
+
+  const mobilePrimaryItems = NAV_ITEMS.filter((item) => MOBILE_PRIMARY_IDS.includes(item.id))
+  const mobileOverflowGroups = NAV_GROUPS
+    .map((group) => ({ ...group, items: group.items.filter((item) => !MOBILE_PRIMARY_IDS.includes(item.id)) }))
+    .filter((group) => group.items.length > 0)
+  const kycNeedsAttention = kycStatus === 'pending' || kycStatus === 'not_submitted' || kycStatus === 'rejected'
+  const hasOverflowAlert = kycNeedsAttention || pendingPayouts > 0
 
   function toggleGroup(id) {
     setCollapsedGroups((prev) => {
@@ -444,9 +470,10 @@ export default function Sidebar({
         </button>
       )}
 
-      {/* Mobile bottom nav — unchanged */}
+      {/* Mobile bottom nav — 4 primary tabs + More (everything else) + Profile,
+          instead of all ~15 items in a horizontally-scrollable row. */}
       <nav className="sidebar-mobile-bottom">
-        {NAV_ITEMS.map(item => {
+        {mobilePrimaryItems.map(item => {
           const isActive = activePage === item.id
           return (
             <button
@@ -492,6 +519,33 @@ export default function Sidebar({
           )
         })}
 
+        {/* More — opens a sheet with everything not in mobilePrimaryItems */}
+        <button
+          onClick={() => setShowMoreSheet(true)}
+          className="mobile-tab-btn"
+          aria-haspopup="dialog"
+          aria-expanded={showMoreSheet}
+          style={{
+            color: showMoreSheet ? 'var(--accent)' : 'var(--text-muted)',
+            borderTop: showMoreSheet ? '2px solid var(--accent)' : '2px solid transparent',
+            background: 'transparent',
+          }}
+        >
+          <span style={{ position: 'relative', display: 'inline-flex', lineHeight: 1 }}>
+            <MoreHorizontal size={18} color={showMoreSheet ? 'var(--accent)' : 'var(--text-muted)'} />
+            {hasOverflowAlert && (
+              <span style={{
+                position: 'absolute', top: '-3px', right: '-5px',
+                width: '7px', height: '7px', borderRadius: '50%',
+                background: 'var(--red)', border: '1px solid var(--navy)'
+              }} />
+            )}
+          </span>
+          <span style={{ fontSize: '10px', fontWeight: showMoreSheet ? '600' : '400', marginTop: '3px' }}>
+            More
+          </span>
+        </button>
+
         {/* Profile — mobile-only entry point (desktop reaches it via the
             sidebar footer avatar instead, so it's intentionally not in
             NAV_ITEMS/the desktop list). */}
@@ -512,6 +566,92 @@ export default function Sidebar({
           </span>
         </button>
       </nav>
+
+      {/* Mobile "More" sheet — everything not promoted to a primary tab */}
+      <AnimatePresence>
+        {showMoreSheet && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 200 }}>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              onClick={() => setShowMoreSheet(false)}
+              style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }}
+            />
+            <motion.div
+              ref={moreSheetRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="More navigation"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              style={{
+                position: 'absolute', left: 0, right: 0, bottom: 0,
+                maxHeight: '72vh', overflowY: 'auto',
+                background: 'var(--paper)', borderTop: '1px solid var(--rule)',
+                borderRadius: 0, padding: '8px 0 max(8px, env(safe-area-inset-bottom))',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid var(--rule-soft)' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>
+                  More
+                </span>
+                <button
+                  onClick={() => setShowMoreSheet(false)}
+                  aria-label="Close"
+                  style={{ background: 'transparent', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: '4px', display: 'flex' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              {mobileOverflowGroups.map((group) => (
+                <div key={group.id} style={{ padding: '10px 16px 4px' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '6px' }}>
+                    {group.label}
+                  </div>
+                  {group.items.map((item) => {
+                    const isActive = activePage === item.id
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => { handleNavClick(item); setShowMoreSheet(false) }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '12px', width: '100%',
+                          padding: '11px 4px', border: 'none', background: 'transparent',
+                          borderBottom: '1px solid var(--rule-soft)', cursor: 'pointer', textAlign: 'left',
+                          color: isActive ? 'var(--accent)' : 'var(--ink)',
+                        }}
+                      >
+                        <span style={{ position: 'relative', display: 'inline-flex', flexShrink: 0 }}>
+                          {item.id === 'support'
+                            ? <Headset size={17} color={isActive ? 'var(--accent)' : 'var(--muted)'} />
+                            : renderIcon(item.icon, { size: 17, color: isActive ? 'var(--accent)' : 'var(--muted)' })}
+                          {item.id === 'kyc' && kycNeedsAttention && (
+                            <span style={{
+                              position: 'absolute', top: '-2px', right: '-4px',
+                              width: '7px', height: '7px', borderRadius: '50%',
+                              background: kycStatus === 'pending' ? 'var(--warning)' : 'var(--danger)',
+                            }} />
+                          )}
+                        </span>
+                        <span style={{ flex: 1, fontSize: '14px' }}>{item.label}</span>
+                        {item.id === 'payouts' && pendingPayouts > 0 && (
+                          <span className="badge badge-danger" style={{ padding: '2px 6px', fontSize: '10px', borderRadius: 'var(--radius-pill)' }}>
+                            {pendingPayouts}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              ))}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </>
   )
 }

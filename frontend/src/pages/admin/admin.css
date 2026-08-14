@@ -133,6 +133,7 @@
   border-right: 1px solid var(--admin-border);
   backdrop-filter: blur(20px) saturate(140%);
   -webkit-backdrop-filter: blur(20px) saturate(140%);
+  box-shadow: 1px 0 40px -20px var(--glow-primary);
   z-index: var(--admin-z-sidebar);
   display: flex;
   flex-direction: column;
@@ -148,6 +149,7 @@
   display: flex;
   align-items: center;
   padding: 0 20px;
+  border-top: 2px solid var(--admin-accent);
   border-bottom: 1px solid var(--admin-border);
   flex-shrink: 0;
 }
@@ -244,6 +246,7 @@
 .admin-nav-item.active {
   background: var(--admin-accent-bg);
   color: var(--admin-accent);
+  box-shadow: inset 0 0 0 1px var(--admin-accent-glow), 0 0 16px -8px var(--admin-accent-glow);
 }
 
 .admin-nav-item.active::before {
@@ -256,6 +259,7 @@
   width: 3px;
   background: var(--admin-accent);
   border-radius: 0 3px 3px 0;
+  box-shadow: 0 0 8px 0 var(--admin-accent-glow);
 }
 
 .admin-sidebar.collapsed .admin-nav-item.active::before {
@@ -502,6 +506,15 @@
 /* .admin-card and .admin-stat-card are retired — every former admin-card
    surface now uses .lx-card / <Card> (components/ui/Card.jsx,
    components/ui/ui.css). */
+
+/* Stat card hover — subtle lift + glow, scoped to admin so the rest of the
+   app's .lx-card--stat usage (unaffected by ledger-desk-overrides.css'
+   flat .card-stat rule, which targets a different class) stays as-is. */
+.admin-content .lx-card--stat:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--elev), 0 0 24px -14px var(--admin-accent-glow);
+  transition: transform var(--motion-base), box-shadow var(--motion-base);
+}
 
 .admin-stat-header {
   display: flex;
@@ -1063,6 +1076,110 @@
 }
 .admin-dropdown-item:hover { background: var(--admin-elevated); color: var(--admin-accent); }
 .admin-dropdown-item.danger:hover { color: var(--admin-danger); background: color-mix(in srgb, var(--admin-danger) 10%, transparent); }
+
+/* ==========================================================================
+   NOTIFICATION DRAWER (AdminNotificationDrawer.jsx)
+   ========================================================================== */
+.admin-notif-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-base);
+  z-index: var(--admin-z-modal);
+}
+.admin-notif-drawer-backdrop.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.admin-notif-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(100%, 380px);
+  background: var(--admin-elevated);
+  border-left: 1px solid var(--admin-border-strong);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  box-shadow: var(--elev-lg), 0 0 60px -30px var(--admin-accent-glow);
+  z-index: calc(var(--admin-z-modal) + 1);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform var(--motion-slow);
+}
+.admin-notif-drawer.is-open {
+  transform: translateX(0);
+}
+
+.admin-notif-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--admin-border);
+  flex-shrink: 0;
+}
+
+.admin-notif-drawer-mark-all {
+  background: none;
+  border: none;
+  color: var(--admin-accent);
+  font-size: 12px;
+  font-family: var(--admin-font-mono);
+  cursor: pointer;
+  padding: 0;
+}
+.admin-notif-drawer-mark-all:hover { text-decoration: underline; }
+
+.admin-notif-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.admin-notif-drawer-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--admin-border);
+  padding: 14px 20px;
+  cursor: pointer;
+  transition: background var(--motion-fast);
+}
+.admin-notif-drawer-item:hover { background: var(--admin-bg); }
+
+.admin-notif-drawer-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-top: 5px;
+  flex-shrink: 0;
+  background: transparent;
+}
+.admin-notif-drawer-dot.is-unread {
+  background: var(--admin-accent);
+  box-shadow: 0 0 6px 0 var(--admin-accent-glow);
+}
+
+.admin-notif-drawer-kicker {
+  font-family: var(--admin-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.admin-notif-drawer-text {
+  font-size: 12.5px;
+  margin-top: 4px;
+  line-height: 1.4;
+  color: var(--admin-text);
+}
 
 /* ==========================================================================
    TOAST NOTIFICATIONS

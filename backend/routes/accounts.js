@@ -29,6 +29,8 @@ const {
 } = require('../utils/stepModels')
 const { validateCouponForCheckout, recordCouponRedemption } = require('../utils/coupons')
 const { generateAccountUid } = require('../utils/accountIds')
+const { issueGiftVoucherForOrder, redeemGiftVoucher } = require('../utils/giftVouchers')
+const { isValidEmail } = require('../utils/validation')
 
 const createAccountLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,     // 1 hour
@@ -174,6 +176,11 @@ router.get('/rules/:account_id', authenticateToken, async function(req, res) {
       if (fundedModel && Number.isFinite(parseFloat(fundedModel.funded_daily_drawdown_pct))) {
         resolvedDailyDrawdownPct = parseFloat(fundedModel.funded_daily_drawdown_pct)
       }
+      if (fundedModel && fundedModel.scaling_enabled) {
+        rules.scaling_target_pct = parseFloat(fundedModel.scaling_target_pct)
+        rules.scaling_increase_per_milestone_pct = parseFloat(fundedModel.scaling_increase_per_milestone_pct || 0)
+        rules.scaling_max_account_size = fundedModel.scaling_max_account_size != null ? parseFloat(fundedModel.scaling_max_account_size) : null
+      }
     }
     rules.daily_drawdown_pct = resolvedDailyDrawdownPct
 
@@ -245,10 +252,18 @@ router.get('/step-models', authenticateToken, async function(req, res) {
         max_drawdown_pct: parseFloat(m.max_drawdown_pct),
         time_limits_days: m.time_limits_days,
         min_trading_days: m.min_trading_days,
+        min_daily_profit_pct: parseFloat(m.min_daily_profit_pct),
         consistency_max_day_pct_by_phase: m.consistency_max_day_pct_by_phase,
         profit_split_pct: parseFloat(m.profit_split_pct),
         funded_max_drawdown_pct: parseFloat(m.funded_max_drawdown_pct),
         funded_daily_drawdown_pct: parseFloat(m.funded_daily_drawdown_pct),
+        funded_drawdown_locks_at_pct: m.funded_drawdown_locks_at_pct != null ? parseFloat(m.funded_drawdown_locks_at_pct) : null,
+        funded_min_trading_days_for_payout: m.funded_min_trading_days_for_payout,
+        funded_payout_min_net_profit_pct: m.funded_payout_min_net_profit_pct != null ? parseFloat(m.funded_payout_min_net_profit_pct) : null,
+        funded_consistency_max_day_pct: m.funded_consistency_max_day_pct != null ? parseFloat(m.funded_consistency_max_day_pct) : null,
+        scaling_target_pct: m.scaling_target_pct != null ? parseFloat(m.scaling_target_pct) : null,
+        scaling_multiplier: m.scaling_multiplier != null ? parseFloat(m.scaling_multiplier) : null,
+        scaling_max_account_size: m.scaling_max_account_size != null ? parseFloat(m.scaling_max_account_size) : null,
         pricing: m.pricing
       }))
     })
@@ -282,10 +297,18 @@ router.get('/step-models-public', async function(req, res) {
         max_drawdown_pct: parseFloat(m.max_drawdown_pct),
         time_limits_days: m.time_limits_days,
         min_trading_days: m.min_trading_days,
+        min_daily_profit_pct: parseFloat(m.min_daily_profit_pct),
         consistency_max_day_pct_by_phase: m.consistency_max_day_pct_by_phase,
         profit_split_pct: parseFloat(m.profit_split_pct),
         funded_max_drawdown_pct: parseFloat(m.funded_max_drawdown_pct),
         funded_daily_drawdown_pct: parseFloat(m.funded_daily_drawdown_pct),
+        funded_drawdown_locks_at_pct: m.funded_drawdown_locks_at_pct != null ? parseFloat(m.funded_drawdown_locks_at_pct) : null,
+        funded_min_trading_days_for_payout: m.funded_min_trading_days_for_payout,
+        funded_payout_min_net_profit_pct: m.funded_payout_min_net_profit_pct != null ? parseFloat(m.funded_payout_min_net_profit_pct) : null,
+        funded_consistency_max_day_pct: m.funded_consistency_max_day_pct != null ? parseFloat(m.funded_consistency_max_day_pct) : null,
+        scaling_target_pct: m.scaling_target_pct != null ? parseFloat(m.scaling_target_pct) : null,
+        scaling_multiplier: m.scaling_multiplier != null ? parseFloat(m.scaling_multiplier) : null,
+        scaling_max_account_size: m.scaling_max_account_size != null ? parseFloat(m.scaling_max_account_size) : null,
         pricing: m.pricing
       }))
     })
@@ -522,6 +545,7 @@ router.get('/my-accounts', authenticateToken, async function(req, res) {
       `SELECT a.id, a.user_id, a.account_type, a.account_size, a.current_balance, a.starting_balance,
               a.peak_balance, a.status, a.profit_target, a.max_drawdown_pct, a.created_at,
               a.phase_start_date, a.phase_end_date, a.account_uid, a.updated_at,
+              a.challenge_model_slug, a.scaling_multiplier, a.scaling_milestones_claimed,
               c.title AS competition_title
          FROM accounts a
          LEFT JOIN competition_entries ce ON ce.account_id = a.id
@@ -576,7 +600,8 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
     const result = await pool.query(
       `SELECT id, user_id, account_type, account_size, current_balance, starting_balance,
               peak_balance, status, profit_target, max_drawdown_pct, phase_end_date,
-              consistency_max_day_pct, daily_drawdown_pct, challenge_model_slug, created_at
+              consistency_max_day_pct, daily_drawdown_pct, challenge_model_slug, created_at,
+              scaling_multiplier, scaling_milestones_claimed
        FROM accounts WHERE id = $1 AND user_id = $2`,
       [accountIdStr, req.user.userId]
     )
@@ -730,6 +755,46 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
       }
     }
 
+    // Scaling-plan progress — mirrors challengeEngine.js's evaluateScalingPlan
+    // milestone math exactly (net trading profit excludes past scaling
+    // injections, see that function's header comment) so the dashboard shows
+    // the same "% to next milestone" the engine itself uses to decide when to
+    // grant the next one. Server-computed (not left to the client) so the
+    // ledger-subtraction logic isn't duplicated/exposed on the frontend.
+    let scaling = null
+    if (account.account_type === 'funded' && account.challenge_model_slug) {
+      const scalingModel = await fetchStepModelBySlug(account.challenge_model_slug)
+      if (scalingModel && scalingModel.scaling_enabled) {
+        const targetPct = parseFloat(scalingModel.scaling_target_pct)
+        const increasePerMilestonePct = parseFloat(scalingModel.scaling_increase_per_milestone_pct || 0)
+        const maxAccountSize = parseFloat(scalingModel.scaling_max_account_size || 0)
+        if (targetPct > 0 && starting > 0) {
+          const injectedResult = await pool.query(
+            `SELECT COALESCE(SUM(amount), 0) AS total FROM balance_adjustments
+              WHERE account_id = $1 AND source = 'scaling_capital_increase'`,
+            [accountIdStr]
+          )
+          const totalIncreased = parseFloat(injectedResult.rows[0].total || 0)
+          const netTradingProfitPct = ((current - starting - totalIncreased) / starting) * 100
+          const milestonesClaimed = parseInt(account.scaling_milestones_claimed || 0, 10)
+          const progressWithinMilestonePct = Math.max(0, netTradingProfitPct - milestonesClaimed * targetPct)
+          const headroomReached = maxAccountSize > 0 && (starting + totalIncreased + (starting * increasePerMilestonePct / 100)) > maxAccountSize
+
+          scaling = {
+            multiplier: parseFloat(account.scaling_multiplier || 1),
+            milestones_claimed: milestonesClaimed,
+            target_pct: targetPct,
+            increase_per_milestone_pct: increasePerMilestonePct,
+            per_milestone_amount: parseFloat((starting * increasePerMilestonePct / 100).toFixed(2)),
+            max_account_size: maxAccountSize || null,
+            total_increased: parseFloat(totalIncreased.toFixed(2)),
+            progress_pct: headroomReached ? 100 : Math.max(0, Math.min(100, parseFloat(((progressWithinMilestonePct / targetPct) * 100).toFixed(1)))),
+            headroom_reached: headroomReached
+          }
+        }
+      }
+    }
+
     res.json({
       account,
       rules,
@@ -749,7 +814,8 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
         trades_today,
         last_trade_at,
         consistency,
-        payout_cycle
+        payout_cycle,
+        scaling
       }
     })
 
@@ -759,80 +825,109 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
   }
 })
 
+// Shared by the competition-prize-voucher and referral-season-prize-voucher
+// branches below (both are the same "code + user_id -> pre-paid order" shape;
+// gift_vouchers is different enough — email-scoped, recipient may not have
+// existed at issuance — that it stays its own function in utils/giftVouchers.js).
+// Caller must already be inside an open transaction on `client`.
+async function redeemUserScopedVoucherRow(client, { table, voucher, userId, paidVia, metadata }) {
+  if (voucher.status === 'issued' && voucher.expires_at && new Date(voucher.expires_at) < new Date()) {
+    await client.query(`UPDATE ${table} SET status = 'expired', updated_at = NOW() WHERE id = $1`, [voucher.id])
+    return { ok: false, status: 410, error: 'This voucher has expired' }
+  }
+  if (voucher.status !== 'issued') {
+    return { ok: false, status: 409, error: 'This voucher has already been used or is no longer valid' }
+  }
+
+  const stepModel = await fetchStepModelBySlug(voucher.challenge_model_slug)
+  if (!stepModel) {
+    return { ok: false, status: 400, error: 'The challenge model for this voucher is no longer available. Please contact support.' }
+  }
+
+  const orderInsert = await client.query(
+    `INSERT INTO challenge_orders (
+       user_id, account_size, amount, currency, status, checkout_mode, payment_provider, paid_via, paid_at,
+       challenge_model_id, challenge_model_slug, metadata_json
+     ) VALUES (
+       $1, $2, 0, 'USD', 'paid', 'voucher', NULL, $3, NOW(), $4, $5, $6::jsonb
+     )
+     RETURNING *`,
+    [userId, voucher.account_size, paidVia, stepModel.id, voucher.challenge_model_slug, JSON.stringify(metadata)]
+  )
+
+  await client.query(
+    `UPDATE ${table} SET status = 'redeemed', redeemed_at = NOW(), redeemed_order_id = $1, updated_at = NOW() WHERE id = $2`,
+    [orderInsert.rows[0].id, voucher.id]
+  )
+
+  return { ok: true, order: orderInsert.rows[0] }
+}
+
 router.post('/orders', authenticateToken, async function(req, res) {
   const client = await pool.connect()
   try {
     await ensureChallengeOrderInfrastructure()
     await ensureStepModelInfrastructure()
 
-    // ── Competition prize voucher redemption ──────────────────────────────────
+    // ── Prize/gift voucher redemption ──────────────────────────────────────────
     // Bypasses pricing/Stripe entirely: turns the voucher directly into a
     // pre-paid challenge_orders row so the existing POST /accounts/create gate
     // (which only checks for a challenge_orders row belonging to this user with
-    // matching account_size and status='paid') needs zero changes.
+    // matching account_size and status='paid') needs zero changes. Tries three
+    // independently-owned voucher tables in turn — competition prizes
+    // (competitionEngine.js), referral-season prizes (referralSeasonEngine.js),
+    // then gift-a-challenge (utils/giftVouchers.js, email-scoped rather than
+    // user_id-scoped since a gift's recipient may not exist yet at issuance).
     const voucherCode = String(req.body?.voucher_code || '').trim()
     if (voucherCode) {
       try {
         await client.query('BEGIN')
         await client.query(`SELECT pg_advisory_xact_lock(hashtext('competition_voucher'), hashtext($1))`, [voucherCode])
 
-        const voucherResult = await client.query(
+        const competitionVoucherResult = await client.query(
           `SELECT * FROM competition_prize_vouchers WHERE code = $1 AND user_id = $2 FOR UPDATE`,
           [voucherCode, req.user.userId]
         )
-        const voucher = voucherResult.rows[0]
-        if (!voucher) {
-          await client.query('ROLLBACK')
-          return res.status(404).json({ error: 'Voucher not found' })
-        }
-
-        if (voucher.status === 'issued' && voucher.expires_at && new Date(voucher.expires_at) < new Date()) {
-          await client.query(
-            `UPDATE competition_prize_vouchers SET status = 'expired', updated_at = NOW() WHERE id = $1`,
-            [voucher.id]
-          )
-          await client.query('COMMIT')
-          return res.status(410).json({ error: 'This voucher has expired' })
-        }
-
-        if (voucher.status !== 'issued') {
-          await client.query('ROLLBACK')
-          return res.status(409).json({ error: 'This voucher has already been used or is no longer valid' })
-        }
-
-        const stepModel = await fetchStepModelBySlug(voucher.challenge_model_slug)
-        if (!stepModel) {
-          await client.query('ROLLBACK')
-          return res.status(400).json({ error: 'The challenge model for this voucher is no longer available. Please contact support.' })
-        }
-
-        const orderInsert = await client.query(
-          `INSERT INTO challenge_orders (
-             user_id, account_size, amount, currency, status, checkout_mode, payment_provider, paid_via, paid_at,
-             challenge_model_id, challenge_model_slug, metadata_json
-           ) VALUES (
-             $1, $2, 0, 'USD', 'paid', 'voucher', NULL, 'competition_voucher', NOW(), $3, $4, $5::jsonb
-           )
-           RETURNING *`,
-          [
-            req.user.userId,
-            voucher.account_size,
-            stepModel.id,
-            voucher.challenge_model_slug,
-            JSON.stringify({ voucher_code: voucher.code, competition_id: voucher.competition_id })
-          ]
+        const seasonVoucherResult = competitionVoucherResult.rows[0] ? null : await client.query(
+          `SELECT * FROM referral_season_prize_vouchers WHERE code = $1 AND user_id = $2 FOR UPDATE`,
+          [voucherCode, req.user.userId]
         )
 
-        await client.query(
-          `UPDATE competition_prize_vouchers
-              SET status = 'redeemed', redeemed_at = NOW(), redeemed_order_id = $1, updated_at = NOW()
-            WHERE id = $2`,
-          [orderInsert.rows[0].id, voucher.id]
-        )
+        let redemption
+        if (competitionVoucherResult.rows[0]) {
+          const voucher = competitionVoucherResult.rows[0]
+          redemption = await redeemUserScopedVoucherRow(client, {
+            table: 'competition_prize_vouchers',
+            voucher,
+            userId: req.user.userId,
+            paidVia: 'competition_voucher',
+            metadata: { voucher_code: voucher.code, competition_id: voucher.competition_id }
+          })
+        } else if (seasonVoucherResult.rows[0]) {
+          const voucher = seasonVoucherResult.rows[0]
+          redemption = await redeemUserScopedVoucherRow(client, {
+            table: 'referral_season_prize_vouchers',
+            voucher,
+            userId: req.user.userId,
+            paidVia: 'referral_season_voucher',
+            metadata: { voucher_code: voucher.code, referral_season_id: voucher.season_id }
+          })
+        } else {
+          redemption = await redeemGiftVoucher(client, {
+            code: voucherCode,
+            userEmail: req.user.email,
+            userId: req.user.userId
+          })
+        }
+
+        if (!redemption.ok) {
+          await client.query(redemption.status === 410 ? 'COMMIT' : 'ROLLBACK')
+          return res.status(redemption.status || 404).json({ error: redemption.error || 'Voucher not found' })
+        }
 
         await client.query('COMMIT')
         return res.status(201).json({
-          order: orderInsert.rows[0],
+          order: redemption.order,
           requires_payment: false,
           payment_configured: true,
           checkout_url: null,
@@ -841,7 +936,7 @@ router.post('/orders', authenticateToken, async function(req, res) {
         })
       } catch (voucherErr) {
         await client.query('ROLLBACK').catch(() => {})
-        logger.error('Redeem competition voucher error:', { error: voucherErr.message })
+        logger.error('Redeem voucher error:', { error: voucherErr.message })
         return res.status(500).json({ error: 'Could not redeem voucher' })
       }
     }
@@ -851,6 +946,19 @@ router.post('/orders', authenticateToken, async function(req, res) {
 
     if (!Number.isFinite(accountSize) || !STEP_MODEL_ACCOUNT_SIZES.includes(accountSize)) {
       return res.status(400).json({ error: 'Invalid account size' })
+    }
+
+    // Gift-a-challenge: buyer pays as normal below, but the resulting paid
+    // order issues a gift_vouchers row (see utils/giftVouchers.js) instead of
+    // the buyer's own POST /accounts/create ever being called for it.
+    const isGift = !!req.body?.is_gift
+    const giftRecipientEmail = isGift ? String(req.body?.recipient_email || '').trim().toLowerCase() : null
+    const giftMessage = isGift ? String(req.body?.gift_message || '').trim().slice(0, 500) : null
+    if (isGift && !isValidEmail(giftRecipientEmail)) {
+      return res.status(400).json({ error: 'A valid recipient email is required to send this as a gift' })
+    }
+    if (isGift && req.user.email && giftRecipientEmail === String(req.user.email).trim().toLowerCase()) {
+      return res.status(400).json({ error: "You can't gift a challenge to your own email address" })
     }
 
     const stepModel = await fetchStepModelBySlug(stepModelSlug)
@@ -940,6 +1048,9 @@ router.post('/orders', authenticateToken, async function(req, res) {
       metadata.coupon_code = couponApplied.code
       metadata.coupon_discount_amount = couponApplied.discount_amount
     }
+    if (isGift && giftMessage) {
+      metadata.gift_message = giftMessage
+    }
     const metadataJson = JSON.stringify(metadata)
 
     // A referral discount and/or coupon can bring the price to $0 — treat that
@@ -951,9 +1062,9 @@ router.post('/orders', authenticateToken, async function(req, res) {
     const orderInsert = await client.query(
       `INSERT INTO challenge_orders (
          user_id, account_size, amount, currency, status, checkout_mode, payment_provider, paid_via, paid_at,
-         challenge_model_id, challenge_model_slug, metadata_json
+         challenge_model_id, challenge_model_slug, metadata_json, is_gift, gift_recipient_email
        ) VALUES (
-         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb
+         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14
        )
        RETURNING *`,
       [
@@ -968,7 +1079,9 @@ router.post('/orders', authenticateToken, async function(req, res) {
         isFreeOrder ? new Date() : null,
         stepModel.id,
         stepModelSlug,
-        metadataJson
+        metadataJson,
+        isGift,
+        giftRecipientEmail
       ]
     )
 
@@ -979,6 +1092,14 @@ router.post('/orders', authenticateToken, async function(req, res) {
         orderId: orderInsert.rows[0].id,
         discountAmount: couponApplied.discount_amount
       })
+    }
+
+    // Free (fully discounted) gift orders are already "paid" — issue the
+    // voucher now, inside the same transaction, instead of waiting on a
+    // Stripe webhook that will never come for a $0 order. Paid gift orders
+    // going through Stripe are handled in billing.js's markChallengeOrderPaid.
+    if (isFreeOrder && isGift) {
+      await issueGiftVoucherForOrder(client, orderInsert.rows[0])
     }
 
     await client.query('COMMIT')
@@ -1061,6 +1182,41 @@ router.get('/coupons/validate/:code', authenticateToken, async function(req, res
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// GET /api/accounts/gift-vouchers/:code/preview
+// Public (no auth) — lets Register.jsx and Checkout.jsx show what a gift code
+// is worth before the recipient logs in or creates an account.
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/gift-vouchers/:code/preview', async function(req, res) {
+  try {
+    const code = String(req.params.code || '').trim().toUpperCase()
+    if (!code) return res.status(400).json({ valid: false, error: 'Invalid code' })
+
+    const result = await pool.query(
+      `SELECT status, account_size, challenge_model_slug, expires_at, recipient_email
+         FROM gift_vouchers WHERE code = $1`,
+      [code]
+    )
+    const voucher = result.rows[0]
+    if (!voucher) return res.json({ valid: false, error: 'Gift code not found' })
+    if (voucher.status !== 'issued') return res.json({ valid: false, error: 'This gift has already been claimed or is no longer valid' })
+    if (voucher.expires_at && new Date(voucher.expires_at) < new Date()) {
+      return res.json({ valid: false, error: 'This gift has expired' })
+    }
+
+    res.json({
+      valid: true,
+      account_size: parseFloat(voucher.account_size),
+      challenge_model_slug: voucher.challenge_model_slug,
+      expires_at: voucher.expires_at,
+      recipient_email: voucher.recipient_email
+    })
+  } catch (error) {
+    logger.error('Gift voucher preview error:', { error: error.message })
+    res.status(500).json({ valid: false, error: 'Could not check this gift code' })
+  }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GET /api/accounts/orders/:id
 // Lets the frontend poll an order's payment status after returning from Stripe
 // checkout (webhook delivery can lag a few seconds behind the redirect).
@@ -1072,7 +1228,8 @@ router.get('/orders/:id', authenticateToken, async function(req, res) {
       return res.status(400).json({ error: 'Invalid order id' })
     }
     const result = await pool.query(
-      `SELECT id, account_size, amount, currency, status, challenge_model_slug, created_at, paid_at
+      `SELECT id, account_size, amount, currency, status, challenge_model_slug, created_at, paid_at,
+              is_gift, gift_recipient_email
          FROM challenge_orders
         WHERE id = $1 AND user_id = $2`,
       [orderId, req.user.userId]

@@ -12,12 +12,12 @@ const {
   getPipSize,
 } = require('../constants')
 
-test('instrument catalog exposes the full 32-symbol rollout', () => {
-  assert.equal(INSTRUMENTS.length, 32)
-  assert.equal(new Set(INSTRUMENTS).size, 32)
+test('instrument catalog exposes the full 45-symbol rollout', () => {
+  assert.equal(INSTRUMENTS.length, 45)
+  assert.equal(new Set(INSTRUMENTS).size, 45)
   assert.equal(FOREX_INSTRUMENTS.length, 28)
-  assert.deepEqual(COMMODITY_INSTRUMENTS, ['XAUUSD', 'XAGUSD'])
-  assert.deepEqual(INDEX_INSTRUMENTS, ['US30', 'NAS100'])
+  assert.deepEqual(COMMODITY_INSTRUMENTS, ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD'])
+  assert.deepEqual(INDEX_INSTRUMENTS, ['US30', 'USTEC', 'US500', 'UK100', 'AUS200', 'JP225', 'HK50', 'DE40', 'FRA40', 'EUSTX50'])
 })
 
 test('JPY, commodity, and index metadata use the intended precision rules', () => {
@@ -38,11 +38,11 @@ test('JPY, commodity, and index metadata use the intended precision rules', () =
 test('catalog includes cross-pair and index configuration', () => {
   const eurCad = getInstrumentConfig('EURCAD')
   const gbpJpy = getInstrumentConfig('GBPJPY')
-  const nas100 = getInstrumentConfig('NAS100')
+  const ustec = getInstrumentConfig('USTEC')
 
   assert.equal(eurCad?.group, 'forex')
   assert.equal(gbpJpy?.group, 'forex')
   assert.equal(gbpJpy?.decimals, 3)
-  assert.equal(nas100?.group, 'index')
-  assert.equal(nas100?.leverage, 10)
+  assert.equal(ustec?.group, 'index')
+  assert.equal(ustec?.leverage, 100)
 })

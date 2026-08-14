@@ -1,12 +1,12 @@
 import React, { Suspense, lazy, useState, useEffect, useMemo, useRef } from 'react'
 import axios from 'axios'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import toast from 'react-hot-toast'
 import MarketStatusPill from '../components/MarketStatusPill'
 import CommandPaletteTrigger from '../components/CommandPaletteTrigger'
 import Sidebar, { NAV_GROUPS } from '../components/Sidebar'
 import CommandPalette from '../components/CommandPalette'
-import KYCUploadForm from '../components/dashboard/KYCUploadForm'
 import Card from '../components/ui/Card'
 import DashboardHome from './DashboardHome'
 import ChallengeRules from './ChallengeRules'
@@ -15,26 +15,31 @@ import Support from './Support'
 import Dispute from './Dispute'
 import Chat from './Chat'
 import { calculatePnL } from '../utils/instruments'
-import { createIdempotencyHeaders, normalizeApiError, authAPI } from '../services/api'
+import { createIdempotencyHeaders, normalizeApiError, authAPI, notificationsAPI } from '../services/api'
 import { useAuth } from '../providers/AuthProvider'
 import useStore from '../store/useStore'
 import { renderIcon } from '../utils/iconMap'
-import { calculatePayoutPreview, calculateRealizedProfit, formatCurrency, toMoneyNumber } from '../utils/finance'
+import { calculatePayoutPreview, calculateRealizedProfit, formatCurrency } from '../utils/finance'
 import { filterVisibleTraderAccounts, isTraderAccountVisible } from '../utils/accountVisibility'
 import { getStatusColor } from '../utils/constants'
-import Pagination from '../components/Pagination'
+import { getPersistentItem, setPersistentItem, removePersistentItem } from '../utils/memoryStore'
 import DashboardKYCPage from './DashboardKYCPage'
-import DashboardPayoutsPage from './DashboardPayoutsPage'
-import DashboardAffiliatePage from './DashboardAffiliatePage'
 import DashboardCompetitionsPage from './DashboardCompetitionsPage'
 import DashboardProfilePage from './DashboardProfilePage'
-import DashboardTradeHistoryPage from './DashboardTradeHistoryPage'
+import DashboardComparePage from './DashboardComparePage'
 import GetChallenge from './GetChallenge'
 import ErrorBoundary from '../ErrorBoundary'
+import { API_BASE_URL as API_URL, SOCKET_URL } from '../config/apiBase'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 const TradingPanel = lazy(() => import('../components/TradingPanel'))
 const Analytics = lazy(() => import('./Analytics'))
+// recharts-based — lazy so a trader who never opens these tabs never pulls
+// the chart chunk into their first /dashboard load (unlike DashboardHome,
+// which needs its charts immediately, these can show a fallback while the
+// chunk loads on demand).
+const DashboardPayoutsPage = lazy(() => import('./DashboardPayoutsPage'))
+const DashboardAffiliatePage = lazy(() => import('./DashboardAffiliatePage'))
+const DashboardTradeHistoryPage = lazy(() => import('./DashboardTradeHistoryPage'))
 
 // Header breadcrumb + page title per screen (Modern Gazette handoff spec
 // TITLES map — breadcrumb is a separate, narrower label than the sidebar
@@ -44,6 +49,7 @@ const PAGE_TITLES = {
   dashboard: ['Trader Desk', null], // title is the personalized greeting, built at render time
   trade: ['Trading Desk', 'Order Ticket & Chart'],
   analytics: ['Trader Desk', 'Performance Analytics'],
+  compare: ['Trader Desk', 'Compare Accounts'],
   competitions: ['Programme', 'Competitions & Leaderboard'],
   rules: ['Programme', 'Challenge Rules'],
   history: ['Programme', 'Trade History'],
@@ -91,10 +97,6 @@ function enrichTradesWithPrices(trades = [], currentPrices = {}) {
   })
 }
 
-function formatMoney(value) {
-  return toMoneyNumber(value).toFixed(2)
-}
-
 function DashboardSectionFallback({ label = 'Loading module...' }) {
   return (
     <div
@@ -112,6 +114,15 @@ function DashboardSectionFallback({ label = 'Loading module...' }) {
 
 function Dashboard({ user, onLogout }) {
   const { login } = useAuth()
+  // Dashboard views are URL-addressable (/dashboard/<view>) so back/forward,
+  // refresh, and bookmarking all work — activePage derives from the current
+  // route instead of being local-only state. setActivePage keeps its old
+  // signature (a page id string) so every existing caller (Sidebar,
+  // CommandPalette, Onboarding, child pages) needed no changes.
+  const location = useLocation()
+  const navigate = useNavigate()
+  const activePage = location.pathname.replace(/^\/dashboard\/?/, '').split('/')[0] || 'dashboard'
+  const setActivePage = (page) => navigate(page === 'dashboard' ? '/dashboard' : `/dashboard/${page}`)
   const [profileForm, setProfileForm] = useState({
     full_name: user?.full_name || '',
     country: user?.country || '',
@@ -129,7 +140,6 @@ function Dashboard({ user, onLogout }) {
   const [connected, setConnected] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
-  const [activePage, setActivePage] = useState('dashboard')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try { return localStorage.getItem('sidebarCollapsed') === 'true' } catch { return false }
   })
@@ -162,8 +172,6 @@ function Dashboard({ user, onLogout }) {
   const [tradeSubmitting, setTradeSubmitting] = useState(false)
   const [closingTradeIds, setClosingTradeIds] = useState([])
   const [payoutSubmitting, setPayoutSubmitting] = useState(false)
-  const [historyPage, setHistoryPage] = useState(1)
-  const HISTORY_PAGE_SIZE = 8
 
   // ── Quota state: set when the backend returns quota_full on account creation ──
   const [quotaFull, setQuotaFull] = useState(false)
@@ -171,9 +179,54 @@ function Dashboard({ user, onLogout }) {
 
   // ── Notification centre ──
   const [notifications, setNotifications] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('notifications') || '[]') } catch { return [] }
+    try { return JSON.parse(getPersistentItem('notifications') || '[]') } catch { return [] }
   })
   const [showNotifications, setShowNotifications] = useState(false)
+  const notifRef = useRef(null)
+  const notifButtonRef = useRef(null)
+
+  useEffect(() => {
+    if (!showNotifications) return
+    function handleClickOutside(e) {
+      if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotifications(false)
+    }
+    function handleEscape(e) {
+      if (e.key === 'Escape') {
+        setShowNotifications(false)
+        notifButtonRef.current?.focus()
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [showNotifications])
+
+  // Seed with persisted history (currently: admin broadcasts) so the bell
+  // survives a localStorage clear and syncs across devices/tabs — merged
+  // with, not replacing, whatever's already local (live trade/account
+  // events pushed via pushNotification() are still client-only).
+  useEffect(() => {
+    notificationsAPI.getMine()
+      .then((res) => {
+        const serverNotifs = (res.data || []).map((n) => ({
+          id: `srv-${n.id}`,
+          message: n.title ? `${n.title}: ${n.message}` : n.message,
+          type: n.type,
+          time: n.created_at,
+          read: n.read,
+        }))
+        setNotifications((prev) => {
+          const existingIds = new Set(prev.map((n) => n.id))
+          const merged = [...prev, ...serverNotifs.filter((n) => !existingIds.has(n.id))]
+          merged.sort((a, b) => new Date(b.time) - new Date(a.time))
+          return merged.slice(0, 50)
+        })
+      })
+      .catch(() => {})
+  }, [])
 
   // ── Account history ──
   const [accountHistory, setAccountHistory] = useState([])
@@ -250,7 +303,7 @@ function Dashboard({ user, onLogout }) {
   useEffect(() => {
     // FIX: include 'polling' as fallback — works behind proxies/firewalls that
     // block WebSocket upgrades. Socket.IO prefers WebSocket, falls back automatically.
-    const socket = io(API_URL, { transports: ['websocket', 'polling'], withCredentials: true })
+    const socket = io(SOCKET_URL, { transports: ['websocket', 'polling'], withCredentials: true })
     socketRef.current = socket
     socket.on('connect', () => {
       setConnected(true)
@@ -287,7 +340,7 @@ function Dashboard({ user, onLogout }) {
       const pnl = Number(data?.pnl ?? data?.demo_pnl ?? 0)
       const profit = pnl >= 0
       toast(
-        `${instrument} closed ${profit ? '+' : ''}$${formatMoney(pnl)}`,
+        `${instrument} closed ${formatCurrency(pnl, { signed: true })}`,
         {
           icon: renderIcon(profit ? 'approve' : 'reject', { size: 16, color: profit ? 'var(--accent-green)' : 'var(--accent-red)' }),
           style: {
@@ -314,11 +367,27 @@ function Dashboard({ user, onLogout }) {
       })
     })
     socket.on('payout_approved', (data) => {
-      toast.success(`Payout of $${formatMoney(data?.amount)} approved!`, {
+      toast.success(`Payout of ${formatCurrency(data?.amount)} approved!`, {
         duration: 8000,
         icon: renderIcon('payouts', { size: 16, color: 'var(--accent-gold)' }),
         style: { borderLeft: '3px solid var(--warn)' }
       })
+    })
+    socket.on('kyc_status_changed', (data) => {
+      if (!data?.status) return
+      setKycStatus(data.status)
+      if (data.status === 'approved') {
+        toast.success('Your identity verification was approved!', {
+          duration: 8000,
+          icon: renderIcon('kyc', { size: 16, color: 'var(--accent-gold)' }),
+          style: { borderLeft: '3px solid var(--gain)' }
+        })
+      } else if (data.status === 'rejected') {
+        toast.error(data.reason ? `Identity verification rejected: ${data.reason}` : 'Identity verification was rejected.', {
+          duration: 8000,
+          style: { borderLeft: '3px solid var(--loss)' }
+        })
+      }
     })
     socket.on('sl_triggered', (data) => {
       const slipMsg = Number(data?.slippage_pips || 0) > 0
@@ -330,7 +399,7 @@ function Dashboard({ user, onLogout }) {
       })
     })
     socket.on('tp_triggered', (data) => {
-      toast.success(`TP hit on ${data?.instrument || 'trade'}! +$${formatMoney(data?.pnl)}`, {
+      toast.success(`TP hit on ${data?.instrument || 'trade'}! ${formatCurrency(data?.pnl, { signed: true })}`, {
         icon: renderIcon('target', { size: 16, color: 'var(--accent-green)' }),
         style: { borderLeft: '3px solid var(--gain)' }
       })
@@ -338,8 +407,9 @@ function Dashboard({ user, onLogout }) {
     socket.on('account_update', (data) => {
       const isPhasePassedEvent = /^phase\d+_passed$/.test(data?.event || '')
       if (data?.message) {
-        setSuccess(data.message + (data.pnl != null ? ` P&L: $${data.pnl}` : ''))
-        pushNotification(data.message + (data.pnl != null ? ` P&L: $${data.pnl}` : ''),
+        const pnlSuffix = data.pnl != null ? ` P&L: ${formatCurrency(data.pnl, { signed: true })}` : ''
+        setSuccess(data.message + pnlSuffix)
+        pushNotification(data.message + pnlSuffix,
           data.event === 'account_failed' ? 'error' : isPhasePassedEvent ? 'success' : 'info')
       }
       if (isPhasePassedEvent) {
@@ -425,6 +495,13 @@ function Dashboard({ user, onLogout }) {
           const res = await axios.get(`${API_URL}/api/accounts/orders/${orderId}`)
           const order = res.data?.order
           if (order?.status === 'paid') {
+            if (order.is_gift) {
+              // Gift orders never create an account for the buyer — a
+              // redemption voucher was issued to the recipient instead
+              // (see backend/utils/giftVouchers.js).
+              setSuccess(`Gift sent to ${order.gift_recipient_email}! They'll receive an email with a redemption code.`)
+              return
+            }
             await createAccount(parseFloat(order.account_size), { challengeOrderId: order.id })
             return
           }
@@ -566,7 +643,7 @@ function Dashboard({ user, onLogout }) {
     }
     setNotifications(prev => {
       const updated = [notif, ...prev].slice(0, 50)
-      localStorage.setItem('notifications', JSON.stringify(updated))
+      setPersistentItem('notifications', JSON.stringify(updated))
       return updated
     })
   }
@@ -574,14 +651,16 @@ function Dashboard({ user, onLogout }) {
   function markAllRead() {
     setNotifications(prev => {
       const updated = prev.map(n => ({ ...n, read: true }))
-      localStorage.setItem('notifications', JSON.stringify(updated))
+      setPersistentItem('notifications', JSON.stringify(updated))
       return updated
     })
+    notificationsAPI.markAllRead().catch(() => {})
   }
 
   function clearNotifications() {
     setNotifications([])
-    localStorage.removeItem('notifications')
+    removePersistentItem('notifications')
+    notificationsAPI.clearAll().catch(() => {})
   }
 
   async function fetchAccountHistory() {
@@ -672,7 +751,7 @@ function Dashboard({ user, onLogout }) {
       const payload = { trade_id: tradeId }
       if (options.closeLots) payload.close_lots = options.closeLots
       const res = await axios.post(`${API_URL}/api/trades/close`, payload)
-      setSuccess(`${options.closeLots ? 'Partial close executed' : 'Trade closed'}. P&L: $${res.data.pnl}`)
+      setSuccess(`${options.closeLots ? 'Partial close executed' : 'Trade closed'}. P&L: ${formatCurrency(res.data.pnl, { signed: true })}`)
       fetchOpenTrades(selectedAccount.id)
       fetchStats(selectedAccount.id)
       fetchTradeHistory(selectedAccount.id)
@@ -727,6 +806,30 @@ function Dashboard({ user, onLogout }) {
       setSelfie(null)
     } catch (err) {
       setError(err.response?.data?.error || 'Upload failed')
+    } finally {
+      setKycUploading(false)
+    }
+  }
+
+  // Lets a trader replace a single rejected KYC document (e.g. just the
+  // selfie) instead of resubmitting all three files via uploadKYC() above —
+  // backend's POST /api/kyc/upload accepts any subset of the three fields
+  // and keeps whatever isn't resent as-is.
+  const KYC_DOC_FIELD_NAMES = { id: 'id_document', id_back: 'id_document_back', selfie: 'selfie' }
+  async function uploadSingleKycDocument(docType, file) {
+    const fieldName = KYC_DOC_FIELD_NAMES[docType]
+    if (!fieldName || !file) return false
+    try {
+      setKycUploading(true)
+      const formData = new FormData()
+      formData.append(fieldName, file)
+      await axios.post(`${API_URL}/api/kyc/upload`, formData)
+      setKycStatus('pending')
+      setSuccess('Document replaced! Admin will review within 24 hours.')
+      return true
+    } catch (err) {
+      setError(err.response?.data?.error || 'Upload failed')
+      return false
     } finally {
       setKycUploading(false)
     }
@@ -842,7 +945,9 @@ function Dashboard({ user, onLogout }) {
         results={NAV_GROUPS.flatMap((group) => group.items.map((item) => ({
           label: item.label,
           group: group.label,
-          action: () => setActivePage(item.id),
+          action: item.externalPath
+            ? () => (item.openInNewTab ? window.open(item.externalPath, '_blank', 'noopener') : navigate(item.externalPath))
+            : () => setActivePage(item.id),
         })))}
       />
 
@@ -883,14 +988,18 @@ function Dashboard({ user, onLogout }) {
         <MarketStatusPill />
 
         {/* ── Notification Bell ── */}
-        <div style={{ position: 'relative' }}>
+        <div style={{ position: 'relative' }} ref={notifRef}>
           <button
+            ref={notifButtonRef}
             onClick={() => {
               setShowNotifications(p => {
                 if (!p) markAllRead()
                 return !p
               })
             }}
+            aria-label={`Notifications${notifications.filter(n => !n.read).length > 0 ? ` (${notifications.filter(n => !n.read).length} unread)` : ''}`}
+            aria-haspopup="true"
+            aria-expanded={showNotifications}
             style={{ display: 'flex', alignItems: 'center', padding: '8px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)', color: 'var(--muted)' }}
           >
             {renderIcon('bell', { size: 15, color: 'var(--muted)' })}
@@ -904,7 +1013,7 @@ function Dashboard({ user, onLogout }) {
             )}
           </button>
           {showNotifications && (
-            <div style={{
+            <div role="dialog" aria-label="Notifications" style={{
               position: 'absolute', right: 0, top: '42px', width: '320px', maxHeight: '400px',
               background: 'var(--glass-2)', backdropFilter: 'blur(24px) saturate(160%)', WebkitBackdropFilter: 'blur(24px) saturate(160%)',
               border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', boxShadow: 'var(--elev-lg)', zIndex: 999,
@@ -939,8 +1048,8 @@ function Dashboard({ user, onLogout }) {
       </div>
 
       <div className="dashboard-page-content dashboard-page-stack">
-        {error && <div className="error">{error}</div>}
-        {success && <div className="success">{success}</div>}
+        {error && <div className="error" role="alert" aria-live="assertive">{error}</div>}
+        {success && <div className="success" role="status" aria-live="polite">{success}</div>}
 
         {/* Dashboard Page */}
         {activePage === 'dashboard' && (
@@ -969,6 +1078,7 @@ function Dashboard({ user, onLogout }) {
             setProfileForm={setProfileForm}
             updateProfile={updateProfile}
             profileSaving={profileSaving}
+            API_URL={API_URL}
           />
         )}
 
@@ -1044,6 +1154,11 @@ function Dashboard({ user, onLogout }) {
           </ErrorBoundary>
         )}
 
+        {/* Compare Accounts Page */}
+        {activePage === 'compare' && (
+          <DashboardComparePage accounts={visibleAccounts} />
+        )}
+
         {/* KYC Page */}
         {activePage === 'kyc' && (
           <DashboardKYCPage
@@ -1063,28 +1178,35 @@ function Dashboard({ user, onLogout }) {
             selfie={selfie}
             setSelfie={setSelfie}
             kycUploading={kycUploading}
+            uploadSingleKycDocument={uploadSingleKycDocument}
           />
         )}
 
         {/* Payouts Page */}
         {activePage === 'payouts' && (
-          <DashboardPayoutsPage
-            user={user}
-            fundedAccount={fundedAccount}
-            payouts={payouts}
-            payoutForm={payoutForm}
-            setPayoutForm={setPayoutForm}
-            requestPayout={requestPayout}
-            availableProfit={availableProfit}
-            profitSharePct={profitSharePct}
-            API_URL={API_URL}
-          />
+          <ErrorBoundary variant="section" label="Payouts">
+            <Suspense fallback={<DashboardSectionFallback label="Loading payouts..." />}>
+              <DashboardPayoutsPage
+                user={user}
+                fundedAccount={fundedAccount}
+                payouts={payouts}
+                payoutForm={payoutForm}
+                setPayoutForm={setPayoutForm}
+                requestPayout={requestPayout}
+                availableProfit={availableProfit}
+                profitSharePct={profitSharePct}
+                API_URL={API_URL}
+              />
+            </Suspense>
+          </ErrorBoundary>
         )}
 
         {/* Affiliate Page */}
         {activePage === 'affiliate' && (
           <ErrorBoundary variant="section" label="Affiliate">
-            <DashboardAffiliatePage />
+            <Suspense fallback={<DashboardSectionFallback label="Loading affiliate program..." />}>
+              <DashboardAffiliatePage />
+            </Suspense>
           </ErrorBoundary>
         )}
 
@@ -1095,10 +1217,13 @@ function Dashboard({ user, onLogout }) {
           </ErrorBoundary>
         )}
 
-      </div>
         {/* Account History Page */}
         {activePage === 'history' && (
-          <DashboardTradeHistoryPage selectedAccount={selectedAccount} accountHistory={accountHistory} />
+          <ErrorBoundary variant="section" label="Trade History">
+            <Suspense fallback={<DashboardSectionFallback label="Loading trade history..." />}>
+              <DashboardTradeHistoryPage selectedAccount={selectedAccount} accountHistory={accountHistory} />
+            </Suspense>
+          </ErrorBoundary>
         )}
 
         {/* Support Page */}
@@ -1116,6 +1241,7 @@ function Dashboard({ user, onLogout }) {
           <Chat />
         )}
 
+      </div>
       </div>
     </div>
   )

@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { renderIcon } from '../utils/iconMap'
 import Button from './ui/Button'
 import {
   CONTRACT_SIZES,
+  INSTRUMENT_GROUPS,
   SUPPORTED_INSTRUMENTS,
   getInputStepString,
   getPriceDecimals,
@@ -80,8 +81,23 @@ export default function OrderPanel({
   const [pendingType, setPendingType] = useState('buy_limit')
   const [pendingPrice, setPendingPrice] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [symbolCategory, setSymbolCategory] = useState('all')
 
   const updateForm = (patch) => setOrderForm((current) => ({ ...current, ...patch }))
+
+  const filteredInstruments = useMemo(() => {
+    if (symbolCategory === 'all') return availableInstruments
+    const group = INSTRUMENT_GROUPS[symbolCategory] || []
+    return availableInstruments.filter((item) => group.includes(item))
+  }, [symbolCategory, availableInstruments])
+
+  useEffect(() => {
+    if (filteredInstruments.length === 0) return
+    if (!filteredInstruments.includes(orderForm.instrument)) {
+      updateForm({ instrument: filteredInstruments[0], stop_loss: '', take_profit: '' })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredInstruments])
 
   const instrument = orderForm.instrument
   const priceData = prices[instrument]
@@ -186,7 +202,7 @@ export default function OrderPanel({
   }
 
   return (
-    <div className="lx-card order-panel" style={{ padding: '20px' }}>
+    <div className="order-panel" style={{ padding: '20px' }}>
       {!marketStatus.open && (
         <div style={{
           background: 'var(--danger-bg)',
@@ -226,6 +242,37 @@ export default function OrderPanel({
 
       <div style={{ marginBottom: '16px' }}>
         <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>INSTRUMENT</label>
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '8px' }}>
+          {[
+            { key: 'all', label: 'All', color: 'var(--accent)' },
+            { key: 'FOREX_MAJORS', label: 'FX Majors', color: 'var(--accent)' },
+            { key: 'FOREX_MINORS', label: 'FX Minors', color: 'var(--accent)' },
+            { key: 'COMMODITY_METALS', label: 'Metals', color: 'var(--accent-gold)' },
+            { key: 'ENERGIES', label: 'Energies', color: 'var(--accent-gold)' },
+            { key: 'INDICES_SPOT', label: 'Indices Spot', color: 'var(--accent-green)' },
+            { key: 'INDICES_MAJOR', label: 'Indices Major', color: 'var(--accent-green)' },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setSymbolCategory(tab.key)}
+              style={{
+                padding: '3px 9px',
+                fontSize: '10px',
+                fontWeight: 700,
+                borderRadius: 'var(--radius-pill)',
+                cursor: 'pointer',
+                border: `1px solid ${symbolCategory === tab.key ? tab.color : 'var(--navy-border)'}`,
+                background: symbolCategory === tab.key
+                  ? `color-mix(in srgb, ${tab.color} 15%, transparent)`
+                  : 'transparent',
+                color: symbolCategory === tab.key ? tab.color : 'var(--text-muted)',
+                transition: 'all 0.15s',
+                letterSpacing: '0.04em'
+              }}
+            >{tab.label}</button>
+          ))}
+        </div>
         <select
           className="select-field order-panel-select"
           value={instrument}
@@ -233,7 +280,7 @@ export default function OrderPanel({
           disabled={availableInstruments.length === 0}
           style={{ width: '100%', fontSize: '14px', fontWeight: '700' }}
         >
-          {availableInstruments.map((item) => (
+          {filteredInstruments.map((item) => (
             <option key={item} value={item}>{item}</option>
           ))}
         </select>

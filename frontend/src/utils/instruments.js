@@ -1,6 +1,6 @@
 import { decimalToNumber, toDecimal } from './finance.js'
 
-const FOREX_INSTRUMENTS = [
+const FOREX_MAJORS = [
   'EURUSD',
   'GBPUSD',
   'USDJPY',
@@ -8,6 +8,9 @@ const FOREX_INSTRUMENTS = [
   'AUDUSD',
   'USDCAD',
   'NZDUSD',
+]
+
+const FOREX_MINORS = [
   'EURGBP',
   'EURJPY',
   'GBPJPY',
@@ -31,17 +34,27 @@ const FOREX_INSTRUMENTS = [
   'NZDCHF',
 ]
 
-const COMMODITY_INSTRUMENTS = ['XAUUSD', 'XAGUSD']
-const INDEX_INSTRUMENTS = ['US30', 'NAS100']
+const FOREX_INSTRUMENTS = [...FOREX_MAJORS, ...FOREX_MINORS]
+const COMMODITY_METALS = ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD']
+const ENERGIES = ['XTIUSD', 'XBRUSD', 'XNGUSD']
+const INDICES_SPOT = ['US30', 'USTEC', 'US500', 'UK100', 'AUS200', 'JP225', 'HK50']
+const INDICES_MAJOR = ['DE40', 'FRA40', 'EUSTX50']
 
-function buildForexDefinition(symbol) {
+const COMMODITY_INSTRUMENTS = [...COMMODITY_METALS]
+const INDEX_INSTRUMENTS = [...INDICES_SPOT, ...INDICES_MAJOR]
+
+// Flat 1:100 leverage across every instrument (IC Markets demo default).
+const LEVERAGE_FLAT = 100
+
+function buildForexDefinition(symbol, subCategory) {
   const isJpy = symbol.endsWith('JPY')
 
   return {
     symbol,
     group: 'forex',
+    subCategory,
     contractSize: 100000,
-    leverage: 30,
+    leverage: LEVERAGE_FLAT,
     decimals: isJpy ? 3 : 5,
     step: isJpy ? 0.001 : 0.00001,
     pipSize: isJpy ? 0.01 : 0.0001,
@@ -51,12 +64,14 @@ function buildForexDefinition(symbol) {
 }
 
 export const INSTRUMENT_DEFINITIONS = [
-  ...FOREX_INSTRUMENTS.map(buildForexDefinition),
+  ...FOREX_MAJORS.map((symbol) => buildForexDefinition(symbol, 'major')),
+  ...FOREX_MINORS.map((symbol) => buildForexDefinition(symbol, 'minor')),
   {
     symbol: 'XAUUSD',
     group: 'commodity',
+    subCategory: 'metal',
     contractSize: 100,
-    leverage: 10,
+    leverage: LEVERAGE_FLAT,
     decimals: 2,
     step: 0.01,
     pipSize: 0.1,
@@ -66,8 +81,9 @@ export const INSTRUMENT_DEFINITIONS = [
   {
     symbol: 'XAGUSD',
     group: 'commodity',
+    subCategory: 'metal',
     contractSize: 5000,
-    leverage: 10,
+    leverage: LEVERAGE_FLAT,
     decimals: 2,
     step: 0.01,
     pipSize: 0.01,
@@ -75,10 +91,71 @@ export const INSTRUMENT_DEFINITIONS = [
     pointMultiplier: 100,
   },
   {
+    symbol: 'XPTUSD',
+    group: 'commodity',
+    subCategory: 'metal',
+    contractSize: 100,
+    leverage: LEVERAGE_FLAT,
+    decimals: 2,
+    step: 0.01,
+    pipSize: 0.01,
+    minDistance: 0.5,
+    pointMultiplier: 100,
+  },
+  {
+    symbol: 'XPDUSD',
+    group: 'commodity',
+    subCategory: 'metal',
+    contractSize: 100,
+    leverage: LEVERAGE_FLAT,
+    decimals: 2,
+    step: 0.01,
+    pipSize: 0.01,
+    minDistance: 0.5,
+    pointMultiplier: 100,
+  },
+  {
+    symbol: 'XTIUSD',
+    group: 'energy',
+    subCategory: 'energy',
+    contractSize: 1000,
+    leverage: LEVERAGE_FLAT,
+    decimals: 2,
+    step: 0.01,
+    pipSize: 0.01,
+    minDistance: 0.05,
+    pointMultiplier: 100,
+  },
+  {
+    symbol: 'XBRUSD',
+    group: 'energy',
+    subCategory: 'energy',
+    contractSize: 1000,
+    leverage: LEVERAGE_FLAT,
+    decimals: 2,
+    step: 0.01,
+    pipSize: 0.01,
+    minDistance: 0.05,
+    pointMultiplier: 100,
+  },
+  {
+    symbol: 'XNGUSD',
+    group: 'energy',
+    subCategory: 'energy',
+    contractSize: 10000,
+    leverage: LEVERAGE_FLAT,
+    decimals: 3,
+    step: 0.001,
+    pipSize: 0.001,
+    minDistance: 0.005,
+    pointMultiplier: 1000,
+  },
+  {
     symbol: 'US30',
     group: 'index',
+    subCategory: 'spot',
     contractSize: 1,
-    leverage: 10,
+    leverage: LEVERAGE_FLAT,
     decimals: 1,
     step: 0.1,
     pipSize: 0.1,
@@ -86,10 +163,107 @@ export const INSTRUMENT_DEFINITIONS = [
     pointMultiplier: 10,
   },
   {
-    symbol: 'NAS100',
+    symbol: 'USTEC',
     group: 'index',
+    subCategory: 'spot',
     contractSize: 1,
-    leverage: 10,
+    leverage: LEVERAGE_FLAT,
+    decimals: 1,
+    step: 0.1,
+    pipSize: 0.1,
+    minDistance: 1,
+    pointMultiplier: 10,
+  },
+  {
+    symbol: 'US500',
+    group: 'index',
+    subCategory: 'spot',
+    contractSize: 1,
+    leverage: LEVERAGE_FLAT,
+    decimals: 1,
+    step: 0.1,
+    pipSize: 0.1,
+    minDistance: 1,
+    pointMultiplier: 10,
+  },
+  {
+    symbol: 'UK100',
+    group: 'index',
+    subCategory: 'spot',
+    contractSize: 1,
+    leverage: LEVERAGE_FLAT,
+    decimals: 1,
+    step: 0.1,
+    pipSize: 0.1,
+    minDistance: 1,
+    pointMultiplier: 10,
+  },
+  {
+    symbol: 'AUS200',
+    group: 'index',
+    subCategory: 'spot',
+    contractSize: 1,
+    leverage: LEVERAGE_FLAT,
+    decimals: 1,
+    step: 0.1,
+    pipSize: 0.1,
+    minDistance: 1,
+    pointMultiplier: 10,
+  },
+  {
+    symbol: 'JP225',
+    group: 'index',
+    subCategory: 'spot',
+    contractSize: 1,
+    leverage: LEVERAGE_FLAT,
+    decimals: 0,
+    step: 1,
+    pipSize: 1,
+    minDistance: 5,
+    pointMultiplier: 1,
+  },
+  {
+    symbol: 'HK50',
+    group: 'index',
+    subCategory: 'spot',
+    contractSize: 1,
+    leverage: LEVERAGE_FLAT,
+    decimals: 0,
+    step: 1,
+    pipSize: 1,
+    minDistance: 5,
+    pointMultiplier: 1,
+  },
+  {
+    symbol: 'DE40',
+    group: 'index',
+    subCategory: 'major',
+    contractSize: 1,
+    leverage: LEVERAGE_FLAT,
+    decimals: 1,
+    step: 0.1,
+    pipSize: 0.1,
+    minDistance: 1,
+    pointMultiplier: 10,
+  },
+  {
+    symbol: 'FRA40',
+    group: 'index',
+    subCategory: 'major',
+    contractSize: 1,
+    leverage: LEVERAGE_FLAT,
+    decimals: 1,
+    step: 0.1,
+    pipSize: 0.1,
+    minDistance: 1,
+    pointMultiplier: 10,
+  },
+  {
+    symbol: 'EUSTX50',
+    group: 'index',
+    subCategory: 'major',
+    contractSize: 1,
+    leverage: LEVERAGE_FLAT,
     decimals: 1,
     step: 0.1,
     pipSize: 0.1,
@@ -105,7 +279,11 @@ export const INSTRUMENT_CATALOG = Object.freeze(
   }, {})
 )
 
-const PRIORITY_INSTRUMENTS = ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCHF', 'AUDUSD', 'USDCAD', 'NZDUSD', 'XAUUSD', 'XAGUSD', 'US30', 'NAS100']
+const PRIORITY_INSTRUMENTS = [
+  'EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD',
+  'XAUUSD', 'XAGUSD',
+  'US30', 'USTEC', 'US500', 'DE40', 'UK100',
+]
 
 export const SUPPORTED_INSTRUMENTS = Object.freeze([
   ...PRIORITY_INSTRUMENTS,
@@ -126,17 +304,20 @@ export const LEVERAGE = Object.freeze(
   }, {})
 )
 export const INSTRUMENT_GROUPS = Object.freeze({
-  FOREX: Object.freeze([...FOREX_INSTRUMENTS]),
-  COMMODITIES: Object.freeze([...COMMODITY_INSTRUMENTS]),
-  INDICES: Object.freeze([...INDEX_INSTRUMENTS]),
+  FOREX_MAJORS: Object.freeze([...FOREX_MAJORS]),
+  FOREX_MINORS: Object.freeze([...FOREX_MINORS]),
+  COMMODITY_METALS: Object.freeze([...COMMODITY_METALS]),
+  ENERGIES: Object.freeze([...ENERGIES]),
+  INDICES_SPOT: Object.freeze([...INDICES_SPOT]),
+  INDICES_MAJOR: Object.freeze([...INDICES_MAJOR]),
 })
 
-export const TRADABLE_INSTRUMENTS_SUMMARY = '28 forex pairs + XAUUSD, XAGUSD, US30, NAS100'
+export const TRADABLE_INSTRUMENTS_SUMMARY = '28 forex pairs + 4 metals + 3 energies + 10 global indices'
 
 // Maps this platform's instrument codes to TradingView's public widget
 // tickers (OANDA feed — the standard free/no-key data source their embed
-// widget resolves). Forex pairs match 1:1; the commodity/index tickers are
-// the standard OANDA CFD convention and worth a manual spot-check against
+// widget resolves). Forex pairs match 1:1; the commodity/index/energy
+// tickers are best-effort and worth a manual spot-check against
 // TradingView's symbol search since this environment can't verify them live.
 export const TRADINGVIEW_SYMBOL_MAP = Object.freeze({
   ...FOREX_INSTRUMENTS.reduce((acc, symbol) => {
@@ -145,8 +326,21 @@ export const TRADINGVIEW_SYMBOL_MAP = Object.freeze({
   }, {}),
   XAUUSD: 'OANDA:XAUUSD',
   XAGUSD: 'OANDA:XAGUSD',
+  XPTUSD: 'TVC:PLATINUM',
+  XPDUSD: 'TVC:PALLADIUM',
+  XTIUSD: 'TVC:USOIL',
+  XBRUSD: 'TVC:UKOIL',
+  XNGUSD: 'TVC:NATURALGAS',
   US30: 'OANDA:US30USD',
-  NAS100: 'OANDA:NAS100USD',
+  USTEC: 'OANDA:NAS100USD',
+  US500: 'SP:SPX',
+  UK100: 'SPREADEX:UK100',
+  AUS200: 'ASX:XJO',
+  JP225: 'TVC:NI225',
+  HK50: 'TVC:HSI',
+  DE40: 'XETR:DAX',
+  FRA40: 'EURONEXT:PX1',
+  EUSTX50: 'TVC:SX5E',
 })
 
 export function getTradingViewSymbol(instrument) {
@@ -232,7 +426,7 @@ export function calculatePnL(direction, openPrice, currentPrice, lots, instrumen
 
 export function calculateMargin(instrument, lots) {
   const contractSize = toDecimal(CONTRACT_SIZES[instrument] || 100000)
-  const leverage = toDecimal(LEVERAGE[instrument] || 30)
+  const leverage = toDecimal(LEVERAGE[instrument] || 100)
   return decimalToNumber(
     toDecimal(lots).mul(contractSize).div(leverage).toDecimalPlaces(2),
     2

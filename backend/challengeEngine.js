@@ -21,6 +21,8 @@ const {
 const drawdownService = require('./services/drawdownService')
 const tradingDaysService = require('./services/tradingDaysService')
 const { fetchStepModelBySlug } = require('./utils/stepModels')
+const { applyBalanceAdjustment } = require('./utils/balanceAdjustments')
+const { createUserNotification } = require('./utils/userNotifications')
 
 let reviewFlagColumnsReady = false
 
@@ -486,58 +488,140 @@ async function passAccount(acc, platformSettings, io) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // evaluateScalingPlan — funded accounts only. Every `scaling_target_pct` net
-// profit milestone doubles (`scaling_multiplier`x) the account's risk-capacity
-// multiplier, i.e. multiplier = scaling_multiplier ^ milestonesEarned, capped so
-// starting_balance * multiplier never exceeds `scaling_max_account_size`.
-// The multiplier is not currently wired into lot/exposure caps or the
-// account's literal balance — it's computed and persisted for visibility only.
+// TRADING profit milestone: (a) raises the account's risk-capacity multiplier
+// (scaling_multiplier ^ milestonesEarned, capped so starting_balance *
+// multiplier never exceeds `scaling_max_account_size` — enforced as a lot-size
+// cap in routes/trades.js's accountSizeK calc), AND (b) injects real capital
+// into current_balance: `scaling_increase_per_milestone_pct`% of the account's
+// ORIGINAL starting_balance per milestone, via the ledger-backed
+// applyBalanceAdjustment() (utils/balanceAdjustments.js) — never a raw UPDATE.
+//
+// Milestone detection deliberately excludes this function's own past
+// injections: it reads prior 'scaling_capital_increase' balance_adjustments
+// back out of current_balance before computing net trading profit. Without
+// this, an injection would itself read as "trading profit" on the very next
+// tick and trigger another injection — a runaway cascade. This mirrors the
+// invariant documented on the balance_adjustments migration: current_balance
+// = starting_balance + trading P&L + SUM(balance_adjustments.amount).
+//
+// starting_balance itself is never touched — the trailing drawdown floor
+// (services/drawdownService.js) is based on eod_peak_equity, not
+// starting_balance, so it self-recalibrates to the new (higher) balance on
+// the next tick once eod_peak_equity catches up; there's no fixed-floor/
+// growing-balance mismatch to worry about.
 // ─────────────────────────────────────────────────────────────────────────────
 async function evaluateScalingPlan(acc, io) {
   if (!acc.challenge_model_slug) return
+  const model = await fetchStepModelBySlug(acc.challenge_model_slug)
+  if (!model || !model.scaling_enabled) return
+
+  const milestonePct = parseFloat(model.scaling_target_pct)
+  const doublingFactor = parseFloat(model.scaling_multiplier || 1)
+  const maxAccountSize = parseFloat(model.scaling_max_account_size || 0)
+  const increasePerMilestonePct = parseFloat(model.scaling_increase_per_milestone_pct || 0)
+  if (!(milestonePct > 0) || !(doublingFactor > 1)) return
+
+  const client = await pool.connect()
   try {
-    const model = await fetchStepModelBySlug(acc.challenge_model_slug)
-    if (!model || !model.scaling_enabled) return
+    await client.query('BEGIN')
 
-    const startingBalance = parseFloat(acc.starting_balance)
-    const currentBalance = parseFloat(acc.current_balance)
-    if (!(startingBalance > 0)) return
+    // Lock the row for the whole evaluation — a concurrent tick for the same
+    // account (unlikely but possible under scheduler overlap) must not read
+    // a stale scaling_milestones_claimed and double-grant a milestone.
+    const lockedResult = await client.query(
+      `SELECT id, user_id, starting_balance, current_balance, scaling_milestones_claimed
+         FROM accounts WHERE id = $1 FOR UPDATE`,
+      [acc.id]
+    )
+    const locked = lockedResult.rows[0]
+    if (!locked) { await client.query('ROLLBACK'); return }
 
-    const milestonePct = parseFloat(model.scaling_target_pct)
-    const doublingFactor = parseFloat(model.scaling_multiplier || 1)
-    const maxAccountSize = parseFloat(model.scaling_max_account_size || 0)
-    if (!(milestonePct > 0) || !(doublingFactor > 1)) return
+    const startingBalance = parseFloat(locked.starting_balance)
+    if (!(startingBalance > 0)) { await client.query('ROLLBACK'); return }
 
-    const netProfitPct = ((currentBalance - startingBalance) / startingBalance) * 100
-    if (netProfitPct <= 0) return
+    const injectedResult = await client.query(
+      `SELECT COALESCE(SUM(amount), 0) AS total FROM balance_adjustments
+        WHERE account_id = $1 AND source = 'scaling_capital_increase'`,
+      [acc.id]
+    )
+    const cumulativeInjected = parseFloat(injectedResult.rows[0].total || 0)
+    const currentBalance = parseFloat(locked.current_balance)
+    const netTradingProfit = currentBalance - startingBalance - cumulativeInjected
+    const netProfitPct = (netTradingProfit / startingBalance) * 100
+    if (netProfitPct <= 0) { await client.query('ROLLBACK'); return }
 
     const milestonesEarned = Math.floor(netProfitPct / milestonePct)
-    const prevMilestones = parseInt(acc.scaling_milestones_claimed || 0, 10)
-    if (milestonesEarned <= prevMilestones) return
+    const prevMilestones = parseInt(locked.scaling_milestones_claimed || 0, 10)
+    if (milestonesEarned <= prevMilestones) { await client.query('ROLLBACK'); return }
 
     const rawMultiplier = Math.pow(doublingFactor, milestonesEarned)
     const capMultiplier = maxAccountSize > 0 ? (maxAccountSize / startingBalance) : rawMultiplier
     const nextMultiplier = Math.min(rawMultiplier, capMultiplier)
 
-    const result = await pool.query(
+    // Real capital injection — one balance_adjustments row per newly earned
+    // milestone, stopping early (not partial-filling) once a full milestone's
+    // worth of headroom under scaling_max_account_size runs out. The
+    // multiplier above is capped independently and keeps advancing even if
+    // capital headroom is exhausted.
+    let totalInjected = new Decimal(0)
+    let latestBalance = new Decimal(currentBalance)
+    if (increasePerMilestonePct > 0) {
+      const perMilestoneAmount = new Decimal(startingBalance).times(increasePerMilestonePct).div(100)
+      for (let milestone = prevMilestones + 1; milestone <= milestonesEarned; milestone++) {
+        if (maxAccountSize > 0 && latestBalance.plus(perMilestoneAmount).greaterThan(maxAccountSize)) break
+        const adjustment = await applyBalanceAdjustment(client, {
+          accountId: acc.id,
+          amount: perMilestoneAmount.toNumber(),
+          source: 'scaling_capital_increase',
+          reason: `Scaling milestone ${milestone} reached (${milestonePct}% net trading profit increments)`,
+          createdBy: 'system',
+          metadata: { milestone, model_slug: acc.challenge_model_slug }
+        })
+        latestBalance = new Decimal(adjustment.balanceAfter)
+        totalInjected = totalInjected.plus(perMilestoneAmount)
+      }
+    }
+
+    const result = await client.query(
       `UPDATE accounts
           SET scaling_multiplier = $2, scaling_milestones_claimed = $3
         WHERE id = $1 AND scaling_milestones_claimed < $3
         RETURNING scaling_multiplier`,
       [acc.id, nextMultiplier, milestonesEarned]
     )
-    if (result.rows.length === 0) return
+    if (result.rows.length === 0) { await client.query('ROLLBACK'); return }
 
-    logger.info(`Challenge engine: account ${acc.id} scaling upgraded to ${nextMultiplier}x (milestone ${milestonesEarned})`)
+    await client.query('COMMIT')
+
+    const injectedThisTick = totalInjected.greaterThan(0)
+    logger.info(`Challenge engine: account ${acc.id} scaling upgraded to ${nextMultiplier}x (milestone ${milestonesEarned})${injectedThisTick ? `, capital +$${totalInjected.toFixed(2)}` : ''}`)
 
     if (io) {
       io.to(String(acc.user_id)).emit('account_update', {
         event: 'scaling_upgrade',
         account_id: acc.id,
-        message: `🚀 Scaling milestone reached! Your risk allocation just increased to ${nextMultiplier.toFixed(2)}x.`
+        message: injectedThisTick
+          ? `🚀 Scaling milestone reached! Your account balance increased by $${totalInjected.toFixed(2)} and risk allocation increased to ${nextMultiplier.toFixed(2)}x.`
+          : `🚀 Scaling milestone reached! Your risk allocation just increased to ${nextMultiplier.toFixed(2)}x.`
       })
     }
+
+    if (injectedThisTick) {
+      try {
+        await createUserNotification(io, locked.user_id, {
+          type: 'success',
+          title: 'Capital increase!',
+          message: `Your account balance increased by $${totalInjected.toFixed(2)} for reaching a scaling milestone. New balance: $${latestBalance.toFixed(2)}.`
+        })
+      } catch (notifyErr) {
+        logger.warn(`Challenge engine: failed to create scaling notification for account ${acc.id}:`, { error: notifyErr.message })
+      }
+    }
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {})
     logger.error(`evaluateScalingPlan error for account ${acc.id}:`, { error: err.message })
+  } finally {
+    client.release()
   }
 }
 

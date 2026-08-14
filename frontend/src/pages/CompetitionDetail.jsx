@@ -9,8 +9,21 @@ import { useAuth } from '../providers/AuthProvider'
 import Card from '../components/ui/Card'
 import Sparkline from '../components/ui/Sparkline'
 import { renderActiveDonutArc, dimUnlessActive } from '../components/admin/AdminChart'
+import Pagination from '../components/Pagination'
+import { renderIcon } from '../utils/iconMap'
+import { exportRowsToCSV } from '../utils/exportCsv'
 
 const LEADERBOARD_POLL_MS = 15000
+const STANDINGS_PAGE_SIZE = 20
+
+const STANDINGS_EXPORT_COLUMNS = [
+  { header: 'Rank', value: (r) => r.rank },
+  { header: 'Trader', value: (r) => r.full_name },
+  { header: 'Country', value: (r) => r.country || '' },
+  { header: 'Return %', value: (r) => r.profit_pct.toFixed(2) },
+  { header: 'P&L', value: (r) => r.profit_usd.toFixed(2) },
+  { header: 'Status', value: (r) => r.status || '' },
+]
 const PODIUM_TONES = ['var(--accent)', 'var(--ink)', 'var(--warn)']
 const PRIZE_TONES = ['var(--accent)', 'var(--gain)', 'var(--warn)', 'var(--muted)', 'var(--loss)']
 
@@ -65,6 +78,7 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
   const [lastUpdated, setLastUpdated] = useState(null)
   const [showTerms, setShowTerms] = useState(false)
   const [hoveredPrize, setHoveredPrize] = useState(null)
+  const [standingsPage, setStandingsPage] = useState(1)
 
   const loadCompetition = useCallback(async () => {
     try {
@@ -88,6 +102,7 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
   }, [slug])
 
   useEffect(() => { loadCompetition() }, [loadCompetition])
+  useEffect(() => { setStandingsPage(1) }, [slug])
   useEffect(() => {
     loadLeaderboard()
     const interval = setInterval(loadLeaderboard, LEADERBOARD_POLL_MS)
@@ -147,6 +162,8 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
   const allPrizesNumeric = prizeAmounts.length > 0 && prizeAmounts.every((a) => a != null)
   const prizeTotal = allPrizesNumeric ? prizeAmounts.reduce((a, b) => a + b, 0) : null
   const podium = leaders.slice(0, 3)
+  const standingsTotalPages = Math.max(1, Math.ceil(leaders.length / STANDINGS_PAGE_SIZE))
+  const pagedLeaders = leaders.slice((standingsPage - 1) * STANDINGS_PAGE_SIZE, standingsPage * STANDINGS_PAGE_SIZE)
 
   const compStats = [
     { label: 'Entry', value: competition.entry_fee > 0 ? `$${competition.entry_fee}` : 'Free', tone: 'var(--accent)' },
@@ -331,45 +348,63 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
       )}
 
       {/* Standings */}
-      <Card ruled flush title="Standings" actions={<span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--muted)' }}>Updated {lastUpdated ? formatTime(lastUpdated) : '—'}</span>}>
+      <Card ruled flush title="Standings" actions={
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--muted)' }}>Updated {lastUpdated ? formatTime(lastUpdated) : '—'}</span>
+          {leaders.length > 0 && (
+            <button
+              onClick={() => exportRowsToCSV(leaders, STANDINGS_EXPORT_COLUMNS, `${slug}_standings_${new Date().toISOString().slice(0, 10)}.csv`)}
+              className="lx-btn"
+              style={{ padding: '6px 10px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              {renderIcon('download', { size: 12 })} Export
+            </button>
+          )}
+        </div>
+      }>
         {leaders.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '48px', color: 'var(--muted)' }}>No entries yet. Be the first to join!</div>
         ) : (
-          <table className="lx-table">
-            <thead>
-              <tr>
-                <th>Rank</th>
-                <th>Trader</th>
-                <th>Country</th>
-                <th>Return</th>
-                <th>P&amp;L</th>
-              </tr>
-            </thead>
-            <tbody>
-              {leaders.map((row) => (
-                <tr
-                  key={row.entry_id}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => (onSelectTrader ? onSelectTrader(row.user_id) : navigate(`/trader/${row.user_id}`))}
-                >
-                  <td style={{ fontFamily: 'var(--font-mono)' }}>#{row.rank}</td>
-                  <td>
-                    {row.full_name}
-                    {row.status === 'disqualified' && (
-                      <span className="lx-badge" style={{ color: 'var(--loss)', marginLeft: '8px' }}>Disqualified</span>
-                    )}
-                  </td>
-                  <td style={{ color: 'var(--muted)' }}>{row.country || 'Unknown'}</td>
-                  <td style={{ fontFamily: 'var(--font-mono)', color: row.profit_pct >= 0 ? 'var(--gain)' : 'var(--loss)' }}>
-                    {row.profit_pct >= 0 ? '+' : ''}{row.profit_pct.toFixed(2)}%
-                  </td>
-                  <td style={{ fontFamily: 'var(--font-mono)', color: row.profit_usd >= 0 ? 'var(--gain)' : 'var(--loss)' }}>
-                    {row.profit_usd >= 0 ? '+' : ''}${row.profit_usd.toFixed(2)}
-                  </td>
+          <>
+            <table className="lx-table">
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Trader</th>
+                  <th>Country</th>
+                  <th>Return</th>
+                  <th>P&amp;L</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {pagedLeaders.map((row) => (
+                  <tr
+                    key={row.entry_id}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => (onSelectTrader ? onSelectTrader(row.user_id) : navigate(`/trader/${row.user_id}`))}
+                  >
+                    <td style={{ fontFamily: 'var(--font-mono)' }}>#{row.rank}</td>
+                    <td>
+                      {row.full_name}
+                      {row.status === 'disqualified' && (
+                        <span className="lx-badge" style={{ color: 'var(--loss)', marginLeft: '8px' }}>Disqualified</span>
+                      )}
+                    </td>
+                    <td style={{ color: 'var(--muted)' }}>{row.country || 'Unknown'}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)', color: row.profit_pct >= 0 ? 'var(--gain)' : 'var(--loss)' }}>
+                      {row.profit_pct >= 0 ? '+' : ''}{row.profit_pct.toFixed(2)}%
+                    </td>
+                    <td style={{ fontFamily: 'var(--font-mono)', color: row.profit_usd >= 0 ? 'var(--gain)' : 'var(--loss)' }}>
+                      {row.profit_usd >= 0 ? '+' : ''}${row.profit_usd.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ padding: '10px 18px' }}>
+              <Pagination page={standingsPage} totalPages={standingsTotalPages} onPageChange={setStandingsPage} pageSize={STANDINGS_PAGE_SIZE} total={leaders.length} />
+            </div>
+          </>
         )}
       </Card>
     </div>

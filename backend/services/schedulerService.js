@@ -61,6 +61,7 @@ function runLockedSchedulerJob(lockName, label, fn) {
  *   checkFloatingDrawdown: Function,
  *   runChallengeEngine: Function,
  *   runCompetitionEngine: Function,
+ *   runReferralSeasonEngine: Function,
  *   tickCompetitionBots: Function,
  *   checkNewsForceClose: Function,
  *   weekendForceCloseByTenant: Function,
@@ -77,6 +78,7 @@ function startAllSchedulers(io, deps) {
     checkFloatingDrawdown,
     runChallengeEngine,
     runCompetitionEngine,
+    runReferralSeasonEngine,
     tickCompetitionBots,
     checkNewsForceClose,
     weekendForceCloseByTenant,
@@ -116,6 +118,16 @@ function startAllSchedulers(io, deps) {
   registerTrackedInterval(() => {
     runLockedSchedulerJob('jobs:competition_engine', 'competition_engine', () => runCompetitionEngine(io))
   }, 30000)
+
+  // ── Referral season engine ──────────────────────────────────────────────────
+  // Same cadence as the competition engine — both are lightweight period
+  // state machines (upcoming/active/completed) with no per-tick trading work.
+  if (runReferralSeasonEngine) {
+    runLockedSchedulerJob('jobs:referral_season_engine', 'referral_season_engine', () => runReferralSeasonEngine(io))
+    registerTrackedInterval(() => {
+      runLockedSchedulerJob('jobs:referral_season_engine', 'referral_season_engine', () => runReferralSeasonEngine(io))
+    }, 30000)
+  }
 
   // ── Competition bot P&L tick ─────────────────────────────────────────────────
   // Slower than the 30s challenge/competition cadence so bot leaderboard

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import axios from 'axios'
 import { renderIcon } from '../utils/iconMap'
 import Card from '../components/ui/Card'
+import { API_BASE_URL as API_URL } from '../config/apiBase'
 
 
 
@@ -14,7 +15,6 @@ function formatTime(dstr) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 const CATEGORIES = [
   { value: 'account',   label: 'Account Issue' },

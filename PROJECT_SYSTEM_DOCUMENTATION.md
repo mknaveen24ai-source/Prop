@@ -115,7 +115,7 @@ The frontend provides a heavily responsive, professional-grade trading terminal 
   - `AdminLayout` encompasses all administrative views (`AdminUsers`, `AdminTrades`, `AdminPayouts`). It explicitly maintains its own authentication validation flow separate from the trader components.
 - **State & Context Layers:**
   - `ThemeContext`: Governs Dark/Light mode tracking, injecting specific CSS variables across the DOM dynamically based on the current user setting.
-  - `BrandingContext`: Allows multi-tenant layout customization (logos, base colors) dependent on the firm currently driving the URL (utilizing `getTenantHeaders()`).
+  - `BrandingContext`: Supplies the platform's logo and base colors from static config (`src/config/branding.js`) for the single firm this deployment serves.
 - **Global Network Handlers:** Uses an `Axios` interceptor globally injected in `App.js`. This captures all outbound REST traffic. If the backend returns a `401 Unauthorized` or `403 Forbidden`, the interceptor instantly flushes local user state, redirecting them to the Login boundary. Crucially, it exempts `/api/admin` calls to prevent destroying an administrator's session if a non-critical trader query fails.
 - **Data Visualization:** Employs `lightweight-charts` and `Recharts` for high-performance canvas-based candlestick rendering, preventing DOM bloat during rapid tick events.
 

@@ -5,14 +5,67 @@
     <link rel="icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#131211" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://s3.tradingview.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://s3.tradingview.com; frame-src https://www.tradingview.com https://s.tradingview.com https://www.tradingview-widget.com; connect-src 'self' http://localhost:5000 ws://localhost:5000 https: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" />
+
+    <!--
+      Content-Security-Policy.
+
+      connect-src intentionally allows https: and wss: broadly: the SPA is
+      white-labelled and talks to whatever origin it is served from, which is
+      not known at build time. The backend sends its own stricter,
+      origin-specific CSP via helmet (server.js) for API responses.
+
+      If you deploy to a single fixed domain, tighten connect-src to
+      'self' https://your-domain.com wss://your-domain.com and drop the
+      wildcards.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self';
+               script-src 'self' https://s3.tradingview.com;
+               style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+               font-src 'self' https://fonts.gstatic.com data:;
+               img-src 'self' data: blob: https:;
+               connect-src 'self' https: wss:;
+               frame-src https://www.tradingview.com https://s.tradingview.com https://www.tradingview-widget.com;
+               object-src 'none';
+               frame-ancestors 'none';
+               base-uri 'self';
+               form-action 'self'"
+    />
+
+    <title>Funded Trading Challenges | Trade Our Capital</title>
     <meta
       name="description"
-      content="Web site created using create-react-app"
+      content="Prove your edge on a funded trading challenge and keep up to 90% of the profits. Real-time MT5 pricing, transparent rules, and fast payouts across forex, indices, metals and crypto."
     />
+    <!--
+      No <link rel="canonical"> here: the public domain is not known at build
+      time, and a relative canonical is meaningless. If you serve a single fixed
+      domain, add an absolute one via nginx sub_filter or a build-time replace.
+    -->
+
+    <!-- Open Graph — controls how links render on Discord, WhatsApp, LinkedIn, Slack -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Funded Trading Challenges" />
+    <meta property="og:title" content="Funded Trading Challenges | Trade Our Capital" />
+    <meta
+      property="og:description"
+      content="Prove your edge on a funded trading challenge and keep up to 90% of the profits. Real-time MT5 pricing, transparent rules, and fast payouts."
+    />
+    <meta property="og:image" content="/logo512.png" />
+    <meta property="og:image:alt" content="Funded trading challenge platform dashboard" />
+
+    <!-- Twitter/X card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Funded Trading Challenges | Trade Our Capital" />
+    <meta
+      name="twitter:description"
+      content="Prove your edge on a funded trading challenge and keep up to 90% of the profits."
+    />
+    <meta name="twitter:image" content="/logo512.png" />
+
     <link rel="apple-touch-icon" href="/logo192.png" />
     <link rel="manifest" href="/manifest.json" />
-    <title>React App</title>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

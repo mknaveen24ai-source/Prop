@@ -5,12 +5,17 @@ import { renderIcon } from '../../utils/iconMap'
 import ThemeToggle from '../ThemeToggle'
 import MarketStatusPill from '../MarketStatusPill'
 import CommandPaletteTrigger from '../CommandPaletteTrigger'
+import AdminNotificationDrawer from './AdminNotificationDrawer'
+import { ALERT_ROUTES } from './dashboard/AdminDashboardSections'
 
-export default function AdminTopBar({ onMobileMenuClick, onLogout, session }) {
+const ALERTS_POLL_MS = 60000
+
+export default function AdminTopBar({ adminAxios, onMobileMenuClick, onLogout, session }) {
   const location = useLocation()
   const navigate = useNavigate()
   const [showNotifications, setShowNotifications] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
+  const [alerts, setAlerts] = useState([])
 
   const notifRef = useRef()
   const profileRef = useRef()
@@ -24,6 +29,27 @@ export default function AdminTopBar({ onMobileMenuClick, onLogout, session }) {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  useEffect(() => {
+    if (!adminAxios) return undefined
+
+    let cancelled = false
+    const fetchAlerts = async () => {
+      try {
+        const res = await adminAxios.get('/api/admin/overview')
+        if (!cancelled) setAlerts(Array.isArray(res.data?.alerts) ? res.data.alerts : [])
+      } catch {
+        // Non-critical chrome — leave the last known alerts in place on failure.
+      }
+    }
+
+    fetchAlerts()
+    const interval = setInterval(fetchAlerts, ALERTS_POLL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [adminAxios])
 
   const paths = location.pathname.split('/').filter((part) => part !== 'admin' && part !== '')
   const currentPage = paths.length > 0
@@ -89,20 +115,32 @@ export default function AdminTopBar({ onMobileMenuClick, onLogout, session }) {
         </button>
 
         <div style={{ position: 'relative' }} ref={notifRef}>
-          <button className="admin-icon-btn" onClick={() => setShowNotifications((visible) => !visible)}>
+          <button className="admin-icon-btn" style={{ position: 'relative' }} onClick={() => setShowNotifications((visible) => !visible)}>
             {renderIcon('bell', { size: 16, color: 'var(--admin-text)' })}
+            {alerts.length > 0 && (
+              <span
+                style={{
+                  position: 'absolute', top: '2px', right: '2px',
+                  minWidth: '14px', height: '14px', padding: '0 3px',
+                  borderRadius: '999px', background: 'var(--admin-danger)',
+                  color: 'var(--paper)', fontSize: '9px', lineHeight: '14px',
+                  textAlign: 'center', fontFamily: 'var(--font-mono)',
+                }}
+              >
+                {alerts.length}
+              </span>
+            )}
           </button>
 
-          {showNotifications && (
-            <div className="admin-dropdown" style={{ width: '320px', padding: 0 }}>
-              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--admin-border)' }}>
-                <strong style={{ fontSize: '13px' }}>Notifications</strong>
-              </div>
-              <div className="admin-empty-state" style={{ padding: '24px 16px' }}>
-                Nothing yet.
-              </div>
-            </div>
-          )}
+          <AdminNotificationDrawer
+            open={showNotifications}
+            onClose={() => setShowNotifications(false)}
+            alerts={alerts}
+            onNavigate={(alert) => {
+              setShowNotifications(false)
+              navigate(ALERT_ROUTES[alert.go] || `/admin/${alert.go}`)
+            }}
+          />
         </div>
 
         <div style={{ position: 'relative' }} ref={profileRef}>

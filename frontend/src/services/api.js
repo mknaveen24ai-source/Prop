@@ -5,8 +5,8 @@
 
 import axios from 'axios'
 import { setMemoryItem } from '../utils/memoryStore'
+import { API_BASE_URL as API_URL } from '../config/apiBase'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 function randomToken() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -285,6 +285,24 @@ export const affiliateAPI = {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Referral Season API — time-boxed referral leaderboard with prize vouchers,
+// separate from the lifetime affiliate program above (see affiliateAPI).
+// ─────────────────────────────────────────────────────────────────────────────
+export const referralSeasonAPI = {
+  list: (params) =>
+    api.get('/api/referral-seasons', { params }),
+
+  getBySlug: (slug) =>
+    api.get(`/api/referral-seasons/${encodeURIComponent(slug)}`),
+
+  getLeaderboard: (slug) =>
+    api.get(`/api/referral-seasons/${encodeURIComponent(slug)}/leaderboard`),
+
+  getMyVouchers: () =>
+    api.get('/api/referral-seasons/vouchers/mine')
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // KYC API
 // ─────────────────────────────────────────────────────────────────────────────
 export const kycAPI = {
@@ -310,8 +328,22 @@ export const chatAPI = {
   getMessages: (conversationId) => 
     api.get(`/api/chat/conversations/${conversationId}`),
   
-  sendMessage: (conversationId, message) => 
+  sendMessage: (conversationId, message) =>
     api.post(`/api/chat/conversations/${conversationId}/messages`, { message })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Notifications API — the trader's own persisted notification history
+// ─────────────────────────────────────────────────────────────────────────────
+export const notificationsAPI = {
+  getMine: () =>
+    api.get('/api/notifications'),
+
+  markAllRead: () =>
+    api.post('/api/notifications/mark-all-read'),
+
+  clearAll: () =>
+    api.delete('/api/notifications')
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

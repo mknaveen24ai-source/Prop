@@ -29,6 +29,7 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
   const [couponResult, setCouponResult] = useState(null)
   const [couponError, setCouponError]   = useState('')
   const [validatingCoupon, setValidatingCoupon] = useState(false)
+  const [purchaseLimit, setPurchaseLimit] = useState(null)
 
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -48,6 +49,12 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
     affiliateAPI.getMyDiscountEligibility()
       .then(res => setDiscountEligibility(res.data))
       .catch(() => setDiscountEligibility(null))
+  }, [])
+
+  useEffect(() => {
+    accountsAPI.getPurchaseLimit()
+      .then(res => setPurchaseLimit(res.data))
+      .catch(() => setPurchaseLimit(null))
   }, [])
 
   // Reset any applied coupon whenever the confirm target changes (new size
@@ -206,6 +213,26 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
               {renderIcon('arrow', { size: 14, color: 'currentColor' })}
             </span>
           </button>
+        </div>
+      )}
+
+      {/* ── Purchase Quota ── */}
+      {purchaseLimit?.limited && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '16px',
+          padding: '14px 22px', borderRadius: '0', marginBottom: '28px',
+          background: purchaseLimit.used >= purchaseLimit.max ? 'var(--warning-bg)' : 'var(--bg-surface)',
+          border: `1px solid ${purchaseLimit.used >= purchaseLimit.max ? 'var(--warn)' : 'var(--border)'}`,
+        }}>
+          <span style={{ display: 'inline-flex' }}>
+            {renderIcon('info', { size: 20, color: purchaseLimit.used >= purchaseLimit.max ? 'var(--warn)' : 'var(--text-muted)' })}
+          </span>
+          <div style={{ flex: 1, fontSize: '13px', color: purchaseLimit.used >= purchaseLimit.max ? 'var(--warn)' : 'var(--text-secondary)' }}>
+            {purchaseLimit.used >= purchaseLimit.max
+              ? `You've used all ${purchaseLimit.max} challenge purchase${purchaseLimit.max === 1 ? '' : 's'} allowed in this ${purchaseLimit.period_days}-day period.`
+              : `You've used ${purchaseLimit.used} of ${purchaseLimit.max} challenge purchases allowed in this ${purchaseLimit.period_days}-day period.`}
+            {purchaseLimit.resets_at && ` Resets ${new Date(purchaseLimit.resets_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.`}
+          </div>
         </div>
       )}
 

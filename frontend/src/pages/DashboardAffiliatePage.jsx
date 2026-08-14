@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
-import { affiliateAPI, normalizeApiError } from '../services/api'
+import { affiliateAPI, referralSeasonAPI, normalizeApiError } from '../services/api'
 import { renderIcon } from '../utils/iconMap'
 import Pagination from '../components/Pagination'
 import { formatCurrency } from '../utils/finance'
@@ -8,15 +9,36 @@ import Card from '../components/ui/Card'
 import StatCell from '../components/ui/StatCell'
 import Table from '../components/ui/Table'
 import StatusBadge from '../components/ui/StatusBadge'
+import ProgressBar from '../components/ui/ProgressBar'
 import AdminChart, { chartThemeProps } from '../components/admin/AdminChart'
+import { CRYPTO_CURRENCIES, USDT_NETWORKS } from '../utils/paymentMethods'
+import { exportRowsToCSV } from '../utils/exportCsv'
 
 const PAGE_SIZE = 10
 
-const USDT_NETWORKS = [
-  { id: 'trc20', label: 'TRC20 (Tron)' },
-  { id: 'bep20', label: 'BEP20 (BNB Smart Chain)' },
-  { id: 'erc20', label: 'ERC20 (Ethereum)' },
-  { id: 'polygon', label: 'Polygon' },
+const REFERRAL_EXPORT_COLUMNS = [
+  { header: 'Name', value: (r) => r.full_name },
+  { header: 'Country', value: (r) => r.country || '' },
+  { header: 'Joined', value: (r) => new Date(r.referred_at).toISOString() },
+  { header: 'Status', value: (r) => (r.is_paying ? 'Paying' : 'Not yet purchased') },
+  { header: 'Commission Generated', value: (r) => parseFloat(r.total_commission_generated || 0).toFixed(2) },
+]
+
+const COMMISSION_EXPORT_COLUMNS = [
+  { header: 'From', value: (c) => c.referred_full_name || (c.order_id ? '' : 'Manual adjustment') },
+  { header: 'Order Amount', value: (c) => (c.order_amount != null ? parseFloat(c.order_amount).toFixed(2) : '') },
+  { header: 'Rate %', value: (c) => (c.commission_rate_pct != null ? c.commission_rate_pct : '') },
+  { header: 'Commission', value: (c) => parseFloat(c.commission_amount || 0).toFixed(2) },
+  { header: 'Status', value: (c) => c.status },
+  { header: 'Earned', value: (c) => new Date(c.earned_at).toISOString() },
+]
+
+const PAYOUT_EXPORT_COLUMNS = [
+  { header: 'Amount', value: (p) => parseFloat(p.amount_requested || 0).toFixed(2) },
+  { header: 'Method', value: (p) => p.payment_method },
+  { header: 'Status', value: (p) => p.status },
+  { header: 'Requested', value: (p) => new Date(p.requested_at).toISOString() },
+  { header: 'Paid', value: (p) => (p.paid_at ? new Date(p.paid_at).toISOString() : '') },
 ]
 
 const TABS = [
@@ -25,9 +47,8 @@ const TABS = [
   { key: 'referrals', label: 'Referrals' },
   { key: 'commissions', label: 'Commissions' },
   { key: 'payouts', label: 'Payouts' },
+  { key: 'season', label: 'Referral Season' },
 ]
-
-const EMPTY_CHART_STYLE = { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '260px', color: 'var(--text-muted)', fontSize: '13px' }
 
 /**
  * AffiliateAnalysisTab — referral performance + earnings breakdown for the
@@ -72,8 +93,8 @@ function AffiliateAnalysisTab({ summary }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-        <AdminChart title="Referrals by Month">
-          {referralsByMonth.length > 0 ? (
+        <AdminChart title="Referrals by Month" empty={referralsByMonth.length === 0 ? 'No referrals in the last 6 months' : null}>
+          {referralsByMonth.length > 0 && (
             <BarChart data={referralsByMonth}>
               <CartesianGrid {...chartThemeProps.grid} />
               <XAxis dataKey="month" {...chartThemeProps.xAxis} />
@@ -83,13 +104,11 @@ function AffiliateAnalysisTab({ summary }) {
               <Bar dataKey="total" fill="var(--accent)" name="Total Referrals" radius={[4, 4, 0, 0]} />
               <Bar dataKey="paying" fill="var(--green)" name="Paying Referrals" radius={[4, 4, 0, 0]} />
             </BarChart>
-          ) : (
-            <div style={EMPTY_CHART_STYLE}>No referrals in the last 6 months</div>
           )}
         </AdminChart>
 
-        <AdminChart title="Commission Earned by Month">
-          {commissionByMonth.length > 0 ? (
+        <AdminChart title="Commission Earned by Month" empty={commissionByMonth.length === 0 ? 'No commission earned in the last 6 months' : null}>
+          {commissionByMonth.length > 0 && (
             <BarChart data={commissionByMonth}>
               <CartesianGrid {...chartThemeProps.grid} />
               <XAxis dataKey="month" {...chartThemeProps.xAxis} />
@@ -99,11 +118,117 @@ function AffiliateAnalysisTab({ summary }) {
               <Bar dataKey="paid" stackId="commission" fill="var(--green)" name="Paid" />
               <Bar dataKey="pending" stackId="commission" fill="var(--muted)" name="Pending" radius={[4, 4, 0, 0]} />
             </BarChart>
-          ) : (
-            <div style={EMPTY_CHART_STYLE}>No commission earned in the last 6 months</div>
           )}
         </AdminChart>
       </div>
+    </>
+  )
+}
+
+/**
+ * ReferralSeasonTab — a time-boxed referral leaderboard (see
+ * backend/referralSeasonEngine.js), separate from the lifetime commission
+ * tier ladder shown on the Overview tab. Picks the most relevant season
+ * (active > upcoming > most recently completed) and shows the standings plus
+ * the trader's own rank, self-contained like AffiliateAnalysisTab above.
+ */
+function ReferralSeasonTab() {
+  const [season, setSeason] = useState(undefined) // undefined = loading, null = none found
+  const [myEntry, setMyEntry] = useState(null)
+  const [leaderboard, setLeaderboard] = useState([])
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    referralSeasonAPI.list()
+      .then(async (res) => {
+        const seasons = Array.isArray(res.data) ? res.data : []
+        const chosen = seasons.find(s => s.status === 'active')
+          || seasons.find(s => s.status === 'upcoming')
+          || seasons.find(s => s.status === 'completed')
+          || null
+        if (cancelled) return
+        setSeason(chosen)
+        if (!chosen) return
+
+        const [detailRes, leaderboardRes] = await Promise.all([
+          referralSeasonAPI.getBySlug(chosen.slug),
+          referralSeasonAPI.getLeaderboard(chosen.slug)
+        ])
+        if (cancelled) return
+        setMyEntry(detailRes.data?.my_entry || null)
+        setLeaderboard(Array.isArray(leaderboardRes.data) ? leaderboardRes.data : [])
+      })
+      .catch(err => { if (!cancelled) setError(normalizeApiError(err, 'Could not load the referral season').message) })
+    return () => { cancelled = true }
+  }, [])
+
+  if (season === undefined) {
+    return <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>Loading...</div>
+  }
+  if (error) {
+    return <Card style={{ padding: '24px', color: 'var(--red)' }}>{error}</Card>
+  }
+  if (!season) {
+    return (
+      <Card style={{ maxWidth: '700px' }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0 }}>
+          No referral season is running right now — check back soon. Seasons rank affiliates by new paying
+          referrals over a set period, with free challenge accounts for the top finishers.
+        </p>
+      </Card>
+    )
+  }
+
+  const myRank = myEntry?.final_rank ?? null
+
+  return (
+    <>
+      <Card style={{ marginBottom: '20px', maxWidth: '700px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '8px', marginBottom: '6px' }}>
+          <span style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-secondary)' }}>{season.title}</span>
+          <StatusBadge status={season.status} />
+        </div>
+        {season.description && (
+          <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '10px' }}>{season.description}</p>
+        )}
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
+          {new Date(season.start_at).toLocaleDateString()} – {new Date(season.end_at).toLocaleDateString()}
+        </p>
+        {season.prize_pool?.length > 0 && (
+          <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--rule-soft, var(--navy-border))' }}>
+            <div style={{ fontSize: '11px', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '8px' }}>Prizes</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {season.prize_pool.map((p, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Rank #{p.rank}</span>
+                  <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{p.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {myEntry && (
+          <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--rule-soft, var(--navy-border))', display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Your standing</span>
+            <span style={{ fontSize: '13px', fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>
+              {myRank ? `#${myRank}` : 'Unranked'} · {myEntry.new_paying_referrals} new paying referral{myEntry.new_paying_referrals === 1 ? '' : 's'}
+            </span>
+          </div>
+        )}
+      </Card>
+
+      <Card title="Leaderboard" style={{ maxWidth: '700px' }}>
+        <Table
+          columns={[
+            { key: 'rank', header: 'Rank', render: r => `#${r.rank}` },
+            { key: 'full_name', header: 'Trader', render: r => r.full_name || 'Trader' },
+            { key: 'new_paying_referrals', header: 'New Paying Referrals', align: 'right' },
+          ]}
+          rows={leaderboard}
+          emptyMessage="No referrals recorded yet this season."
+        />
+      </Card>
     </>
   )
 }
@@ -115,8 +240,21 @@ function AffiliateAnalysisTab({ summary }) {
  * server-backed lists. Internal sub-tabs (Overview/Analysis/Referrals/
  * Commissions/Payouts) use the .service-tabs pattern from Support.jsx.
  */
+const TAB_KEYS = ['overview', 'analysis', 'referrals', 'commissions', 'payouts', 'season']
+
 export default function DashboardAffiliatePage() {
-  const [activeTab, setActiveTab] = useState('overview')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const activeTab = TAB_KEYS.includes(tabParam) ? tabParam : 'overview'
+  const setActiveTab = (tab) => setSearchParams(
+    (prev) => {
+      const next = new URLSearchParams(prev)
+      if (tab === 'overview') next.delete('tab')
+      else next.set('tab', tab)
+      return next
+    },
+    { replace: true }
+  )
   const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -129,6 +267,8 @@ export default function DashboardAffiliatePage() {
   const [submitting, setSubmitting] = useState(false)
   const [payoutMessage, setPayoutMessage] = useState(null)
   const [copied, setCopied] = useState(false)
+  const [copyFailed, setCopyFailed] = useState(false)
+  const referralLinkRef = useRef(null)
 
   const loadSummary = useCallback(() => {
     return affiliateAPI.getMe()
@@ -162,10 +302,28 @@ export default function DashboardAffiliatePage() {
 
   function copyReferralLink() {
     if (!summary?.referral_link) return
+    setCopyFailed(false)
+    if (!navigator.clipboard) {
+      selectReferralLinkText()
+      setCopyFailed(true)
+      return
+    }
     navigator.clipboard.writeText(summary.referral_link).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-    }).catch(() => {})
+    }).catch(() => {
+      selectReferralLinkText()
+      setCopyFailed(true)
+    })
+  }
+
+  function selectReferralLinkText() {
+    if (!referralLinkRef.current || !window.getSelection) return
+    const selection = window.getSelection()
+    const range = document.createRange()
+    range.selectNodeContents(referralLinkRef.current)
+    selection.removeAllRanges()
+    selection.addRange(range)
   }
 
   async function requestPayout(e) {
@@ -208,6 +366,7 @@ export default function DashboardAffiliatePage() {
 
   const currentTier = summary?.current_tier
   const nextTier = summary?.next_tier
+  const allTiers = summary?.all_tiers || []
   const payingReferrals = summary?.paying_referrals || 0
   const progressPct = nextTier
     ? Math.min(100, Math.round((payingReferrals / nextTier.min_referrals) * 100))
@@ -277,7 +436,7 @@ export default function DashboardAffiliatePage() {
               commission on every challenge they ever purchase — for life.
             </p>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <code style={{
+              <code ref={referralLinkRef} style={{
                 flex: '1 1 300px', padding: '10px 14px', background: 'var(--bg-surface)',
                 border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px',
                 color: 'var(--text-secondary)', overflowX: 'auto', whiteSpace: 'nowrap'
@@ -291,6 +450,11 @@ export default function DashboardAffiliatePage() {
                 </span>
               </button>
             </div>
+            {copyFailed && (
+              <p style={{ marginTop: '8px', fontSize: '12px', color: 'var(--warn)' }} role="alert">
+                Couldn't copy automatically — the link is selected above, press Ctrl/Cmd+C to copy it.
+              </p>
+            )}
             <p style={{ marginTop: '10px', fontSize: '12px', color: 'var(--text-muted)' }}>
               Referral code: <strong style={{ color: 'var(--text-secondary)' }}>{summary?.affiliate_code || '—'}</strong>
             </p>
@@ -315,12 +479,42 @@ export default function DashboardAffiliatePage() {
               )}
             </div>
             {nextTier && (
-              <div style={{ height: '8px', borderRadius: '4px', background: 'var(--bg-surface)', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${progressPct}%`, background: 'var(--accent)', transition: 'width 0.3s' }} />
-              </div>
+              <ProgressBar
+                value={progressPct}
+                label={`Progress to ${nextTier.label || `Tier ${nextTier.tier_rank}`}`}
+              />
             )}
             {!nextTier && currentTier && (
               <p style={{ fontSize: '12px', color: 'var(--green)', margin: 0 }}>You've reached the highest tier.</p>
+            )}
+
+            {allTiers.length > 0 && (
+              <div style={{ marginTop: '18px', paddingTop: '14px', borderTop: '1px solid var(--rule-soft, var(--navy-border))' }}>
+                <div style={{ fontSize: '11px', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '10px' }}>Full Tier Ladder</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {allTiers.map((t) => {
+                    const isCurrent = currentTier && t.tier_rank === currentTier.tier_rank
+                    return (
+                      <div
+                        key={t.tier_rank}
+                        style={{
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                          padding: '8px 12px', borderRadius: '4px',
+                          background: isCurrent ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'transparent',
+                          border: isCurrent ? '1px solid var(--accent)' : '1px solid transparent',
+                        }}
+                      >
+                        <span style={{ fontSize: '13px', fontWeight: isCurrent ? 700 : 400, color: isCurrent ? 'var(--accent)' : 'var(--text-secondary)' }}>
+                          {t.label || `Tier ${t.tier_rank}`}{isCurrent ? ' (current)' : ''}
+                        </span>
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                          {t.min_referrals}+ referrals · {t.commission_pct}%
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             )}
           </Card>
         </>
@@ -328,8 +522,18 @@ export default function DashboardAffiliatePage() {
 
       {activeTab === 'analysis' && <AffiliateAnalysisTab summary={summary} />}
 
+      {activeTab === 'season' && <ReferralSeasonTab />}
+
       {activeTab === 'referrals' && (
-        <Card title="Your Referrals" style={{ maxWidth: '900px' }}>
+        <Card title="Your Referrals" style={{ maxWidth: '900px' }} actions={referrals.rows.length > 0 && (
+          <button
+            onClick={() => exportRowsToCSV(referrals.rows, REFERRAL_EXPORT_COLUMNS, `referrals_${new Date().toISOString().slice(0, 10)}.csv`)}
+            className="lx-btn"
+            style={{ padding: '6px 10px', border: '1px solid var(--rule, var(--navy-border))', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2, var(--navy-hover))', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            {renderIcon('download', { size: 12 })} Export
+          </button>
+        )}>
           <Table
             columns={referralColumns}
             rows={referrals.rows}
@@ -346,7 +550,15 @@ export default function DashboardAffiliatePage() {
       )}
 
       {activeTab === 'commissions' && (
-        <Card title="Commission Ledger" style={{ maxWidth: '900px' }}>
+        <Card title="Commission Ledger" style={{ maxWidth: '900px' }} actions={commissions.rows.length > 0 && (
+          <button
+            onClick={() => exportRowsToCSV(commissions.rows, COMMISSION_EXPORT_COLUMNS, `commissions_${new Date().toISOString().slice(0, 10)}.csv`)}
+            className="lx-btn"
+            style={{ padding: '6px 10px', border: '1px solid var(--rule, var(--navy-border))', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2, var(--navy-hover))', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            {renderIcon('download', { size: 12 })} Export
+          </button>
+        )}>
           <Table
             columns={commissionColumns}
             rows={commissions.rows}
@@ -378,9 +590,10 @@ export default function DashboardAffiliatePage() {
               </div>
             )}
             <form onSubmit={requestPayout}>
-              <div style={{ marginBottom: '16px' }}>
-                <label>Amount (USD)</label>
+              <div className="input-group">
+                <label className="input-label">Amount (USD)</label>
                 <input
+                  className="input-field"
                   type="number"
                   value={payoutForm.amount_requested}
                   onChange={e => setPayoutForm({ ...payoutForm, amount_requested: e.target.value })}
@@ -406,22 +619,24 @@ export default function DashboardAffiliatePage() {
               </div>
               <div className="grid-2 payout-form-grid">
                 <div>
-                  <label>Cryptocurrency</label>
-                  <select
-                    value={payoutCurrency}
-                    onChange={e => {
-                      const currency = e.target.value
-                      setPayoutForm({ ...payoutForm, payment_method: currency === 'usdt' ? `usdt_${payoutNetwork}` : currency })
-                    }}
-                  >
-                    <option value="usdt">USDT</option>
-                    <option value="btc">Bitcoin (BTC)</option>
-                    <option value="ltc">Litecoin (LTC)</option>
-                  </select>
+                  <div className="input-group">
+                    <label className="input-label">Cryptocurrency</label>
+                    <select
+                      className="select-field"
+                      value={payoutCurrency}
+                      onChange={e => {
+                        const currency = e.target.value
+                        setPayoutForm({ ...payoutForm, payment_method: currency === 'usdt' ? `usdt_${payoutNetwork}` : currency })
+                      }}
+                    >
+                      {CRYPTO_CURRENCIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                    </select>
+                  </div>
                   {payoutCurrency === 'usdt' && (
-                    <div style={{ marginTop: '12px' }}>
-                      <label>Network</label>
+                    <div className="input-group">
+                      <label className="input-label">Network</label>
                       <select
+                        className="select-field"
                         value={payoutNetwork}
                         onChange={e => setPayoutForm({ ...payoutForm, payment_method: `usdt_${e.target.value}` })}
                       >
@@ -430,9 +645,10 @@ export default function DashboardAffiliatePage() {
                     </div>
                   )}
                 </div>
-                <div>
-                  <label>Payment Details</label>
+                <div className="input-group">
+                  <label className="input-label">Payment Details</label>
                   <textarea
+                    className="textarea-field"
                     value={payoutForm.payment_details}
                     onChange={e => setPayoutForm({ ...payoutForm, payment_details: e.target.value })}
                     placeholder="Enter your wallet address"
@@ -456,7 +672,15 @@ export default function DashboardAffiliatePage() {
             </form>
           </Card>
 
-          <Card title="Payout History" style={{ maxWidth: '900px' }}>
+          <Card title="Payout History" style={{ maxWidth: '900px' }} actions={payouts.rows.length > 0 && (
+            <button
+              onClick={() => exportRowsToCSV(payouts.rows, PAYOUT_EXPORT_COLUMNS, `affiliate_payouts_${new Date().toISOString().slice(0, 10)}.csv`)}
+              className="lx-btn"
+              style={{ padding: '6px 10px', border: '1px solid var(--rule, var(--navy-border))', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2, var(--navy-hover))', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              {renderIcon('download', { size: 12 })} Export
+            </button>
+          )}>
             <Table
               columns={payoutColumns}
               rows={payouts.rows}

@@ -8,7 +8,7 @@ const fs = require('fs')
 const pool = require('../db')
 const { authenticateToken } = require('./middleware')
 const logger = require('../utils/logger')
-const { encryptFileAtRest } = require('../utils/secureKycStorage')
+const { encryptFileAtRest, readKycFileBuffer, getKycContentType } = require('../utils/secureKycStorage')
 const { sanitizeString } = require('../utils/validation')
 
 // Ensure upload directory exists
@@ -157,78 +157,91 @@ router.post('/upload',
     const uploadedFiles = []
     try {
       const files = req.files
-      if (!files || !files.id_document || !files.id_document_back || !files.selfie) {
-        return res.status(400).json({ error: 'ID document (front and back) and a selfie are required' })
+      if (!files || Object.keys(files).length === 0) {
+        return res.status(400).json({ error: 'At least one document is required' })
       }
 
-      const idDoc     = files.id_document[0]
-      const idDocBack = files.id_document_back[0]
-      const selfie    = files.selfie[0]
-      uploadedFiles.push(idDoc.path, idDocBack.path, selfie.path)
+      // Fetch existing paths/metadata first — a resubmission after rejection
+      // may only replace one of the three documents; whatever isn't resent
+      // here falls back to what's already on file (must exist for a
+      // first-time submission, where nothing is on file yet).
+      const existingResult = await pool.query(
+        `SELECT id_document_path, id_document_back_path, selfie_path,
+                kyc_document_country, kyc_document_type, kyc_document_number
+           FROM users WHERE id = $1`,
+        [req.user.userId]
+      )
+      const existing = existingResult.rows[0] || {}
+
+      const idDoc     = files.id_document?.[0] || null
+      const idDocBack = files.id_document_back?.[0] || null
+      const selfie    = files.selfie?.[0] || null
+      if (idDoc) uploadedFiles.push(idDoc.path)
+      if (idDocBack) uploadedFiles.push(idDocBack.path)
+      if (selfie) uploadedFiles.push(selfie.path)
+
+      if (!idDoc && !existing.id_document_path) {
+        return res.status(400).json({ error: 'ID document (front) is required' })
+      }
+      if (!idDocBack && !existing.id_document_back_path) {
+        return res.status(400).json({ error: 'ID document (back) is required' })
+      }
+      if (!selfie && !existing.selfie_path) {
+        return res.status(400).json({ error: 'A selfie is required' })
+      }
 
       // ── FIX (Bug 13): Magic byte validation ────────────────────────────────
       // Check actual file contents, not just the header/extension.
       // Normalize 'jpeg' → 'jpg' so .jpeg files are accepted.
-      const idDocExt     = path.extname(idDoc.originalname).toLowerCase().replace('.', '').replace('jpeg', 'jpg')
-      const idDocBackExt = path.extname(idDocBack.originalname).toLowerCase().replace('.', '').replace('jpeg', 'jpg')
-      const selfieExt    = path.extname(selfie.originalname).toLowerCase().replace('.', '').replace('jpeg', 'jpg')
-
-      const idAllowed      = ['jpg', 'png', 'pdf'].includes(idDocExt)
-      const idMagicOk      = idAllowed && validateMagicBytes(idDoc.path, ['jpg', 'png', 'pdf'])
-      const idBackAllowed  = ['jpg', 'png', 'pdf'].includes(idDocBackExt)
-      const idBackMagicOk  = idBackAllowed && validateMagicBytes(idDocBack.path, ['jpg', 'png', 'pdf'])
-
-      const selfieAllowed = ['jpg', 'png'].includes(selfieExt)
-      const selfieMagicOk = selfieAllowed && validateMagicBytes(selfie.path, ['jpg', 'png'])
-
-      if (!idMagicOk) {
-        // Clean up the uploaded files before returning the error
-        uploadedFiles.forEach(f => { try { fs.unlinkSync(f) } catch (_) {} })
-        return res.status(400).json({ error: 'ID document file content does not match declared type' })
+      function extOf(file) {
+        return path.extname(file.originalname).toLowerCase().replace('.', '').replace('jpeg', 'jpg')
       }
 
-      if (!idBackMagicOk) {
-        uploadedFiles.forEach(f => { try { fs.unlinkSync(f) } catch (_) {} })
-        return res.status(400).json({ error: 'ID document back file content does not match declared type' })
+      if (idDoc) {
+        const ok = ['jpg', 'png', 'pdf'].includes(extOf(idDoc)) && validateMagicBytes(idDoc.path, ['jpg', 'png', 'pdf'])
+        if (!ok) {
+          uploadedFiles.forEach(f => { try { fs.unlinkSync(f) } catch (_) {} })
+          return res.status(400).json({ error: 'ID document file content does not match declared type' })
+        }
+      }
+      if (idDocBack) {
+        const ok = ['jpg', 'png', 'pdf'].includes(extOf(idDocBack)) && validateMagicBytes(idDocBack.path, ['jpg', 'png', 'pdf'])
+        if (!ok) {
+          uploadedFiles.forEach(f => { try { fs.unlinkSync(f) } catch (_) {} })
+          return res.status(400).json({ error: 'ID document back file content does not match declared type' })
+        }
+      }
+      if (selfie) {
+        const ok = ['jpg', 'png'].includes(extOf(selfie)) && validateMagicBytes(selfie.path, ['jpg', 'png'])
+        if (!ok) {
+          uploadedFiles.forEach(f => { try { fs.unlinkSync(f) } catch (_) {} })
+          return res.status(400).json({ error: 'Selfie file content does not match declared type' })
+        }
       }
 
-      if (!selfieMagicOk) {
-        uploadedFiles.forEach(f => { try { fs.unlinkSync(f) } catch (_) {} })
-        return res.status(400).json({ error: 'Selfie file content does not match declared type' })
-      }
-
-      // Encrypt all three files at rest before persisting their paths. encryptFileAtRest
-      // writes a sibling `.enc` file and removes the plaintext original, so from here
-      // on the tracked paths (for cleanup and for the DB) must be the `.enc` ones.
-      let idDocStoragePath
-      let idDocBackStoragePath
-      let selfieStoragePath
+      // Encrypt only the files actually submitted this request. encryptFileAtRest
+      // writes a sibling `.enc` file and removes the plaintext original, so from
+      // here on the tracked paths (for cleanup and for the DB) must be the
+      // `.enc` ones. Anything not resubmitted keeps its existing stored path.
+      let idDocRelPath = existing.id_document_path
+      let idDocBackRelPath = existing.id_document_back_path
+      let selfieRelPath = existing.selfie_path
       try {
-        idDocStoragePath     = encryptFileAtRest(idDoc.path)
-        idDocBackStoragePath = encryptFileAtRest(idDocBack.path)
-        selfieStoragePath    = encryptFileAtRest(selfie.path)
+        if (idDoc) idDocRelPath = toRelativePath(encryptFileAtRest(idDoc.path))
+        if (idDocBack) idDocBackRelPath = toRelativePath(encryptFileAtRest(idDocBack.path))
+        if (selfie) selfieRelPath = toRelativePath(encryptFileAtRest(selfie.path))
       } catch (encError) {
         logger.error('[kyc] Failed to encrypt uploaded documents:', { error: encError.message })
         uploadedFiles.forEach(f => { try { fs.unlinkSync(f) } catch (_) {} })
         return res.status(500).json({ error: 'Document storage is temporarily unavailable. Please try again later.' })
       }
-      uploadedFiles.length = 0
-      uploadedFiles.push(idDocStoragePath, idDocBackStoragePath, selfieStoragePath)
 
-      // Fetch existing paths before overwriting (for cleanup)
-      const existingResult = await pool.query(
-        'SELECT id_document_path, id_document_back_path, selfie_path FROM users WHERE id = $1',
-        [req.user.userId]
-      )
-      const existing = existingResult.rows[0] || {}
-
-      const idDocRelPath     = toRelativePath(idDocStoragePath)
-      const idDocBackRelPath = toRelativePath(idDocBackStoragePath)
-      const selfieRelPath    = toRelativePath(selfieStoragePath)
-
-      const country        = sanitizeString(String(req.body.country || ''), 100) || null
-      const documentType   = sanitizeString(String(req.body.document_type || ''), 40) || null
-      const documentNumber = sanitizeString(String(req.body.document_number || ''), 64) || null
+      // Metadata fields (country/document type/number) are optional on a
+      // partial resubmission — fall back to what's already on file rather
+      // than clobbering them with blanks.
+      const country        = sanitizeString(String(req.body.country || ''), 100) || existing.kyc_document_country || null
+      const documentType   = sanitizeString(String(req.body.document_type || ''), 40) || existing.kyc_document_type || null
+      const documentNumber = sanitizeString(String(req.body.document_number || ''), 64) || existing.kyc_document_number || null
 
       await pool.query(
         `UPDATE users SET
@@ -244,7 +257,7 @@ router.post('/upload',
         [idDocRelPath, idDocBackRelPath, selfieRelPath, country, documentType, documentNumber, req.user.userId]
       )
 
-      // Delete old files AFTER successful DB update
+      // Delete old files AFTER successful DB update — only the ones actually replaced.
       if (existing.id_document_path && existing.id_document_path !== idDocRelPath) {
         deleteOldKycFile(existing.id_document_path)
       }
@@ -280,6 +293,60 @@ router.get('/status', authenticateToken, async function(req, res) {
     res.json(result.rows[0])
   } catch (error) {
     res.status(500).json({ error: 'Could not fetch KYC status' })
+  }
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/kyc/document/:type
+// A trader viewing one of their own submitted KYC documents (real preview,
+// not the decorative placeholder DashboardKYCPage used to show). Scoped to
+// req.user.userId only — mirrors the admin viewer at
+// admin.js's GET /kyc/document/:userId/:type but without the admin
+// capability gate, since a trader is always allowed to see their own file.
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/document/:type', authenticateToken, async function(req, res) {
+  try {
+    const { type } = req.params
+    const columnName = type === 'selfie' ? 'selfie_path' : type === 'id_back' ? 'id_document_back_path' : 'id_document_path'
+    if (!['id', 'id_back', 'selfie'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid document type' })
+    }
+
+    const userRow = await pool.query(
+      `SELECT ${columnName} AS doc_path FROM users WHERE id = $1`,
+      [req.user.userId]
+    )
+
+    if (userRow.rows.length === 0 || !userRow.rows[0].doc_path) {
+      return res.status(404).json({ error: 'Document not found' })
+    }
+
+    const rawPath = userRow.rows[0].doc_path
+    const relPath = rawPath.replace(/^[/\\]?uploads[/\\]/, '')
+    const uploadsRoot = path.resolve(__dirname, '..', 'uploads')
+    const absoluteFilePath = path.resolve(uploadsRoot, relPath)
+
+    if (!absoluteFilePath.startsWith(uploadsRoot + path.sep)) {
+      logger.warn('[kyc-doc] Path traversal attempt blocked:', { rawPath, userId: req.user.userId })
+      return res.status(400).json({ error: 'Invalid document path' })
+    }
+
+    if (!fs.existsSync(absoluteFilePath)) {
+      return res.status(404).json({ error: 'File physically missing from server disk' })
+    }
+
+    let buffer
+    try {
+      buffer = readKycFileBuffer(absoluteFilePath).buffer
+    } catch (decryptErr) {
+      logger.error('[kyc-doc] Failed to decrypt document:', { error: decryptErr.message, userId: req.user.userId, type })
+      return res.status(500).json({ error: 'Failed to retrieve document' })
+    }
+    res.setHeader('Content-Type', getKycContentType(absoluteFilePath))
+    res.send(buffer)
+  } catch (error) {
+    logger.error('[kyc-doc] Error serving document:', { error: error.message })
+    res.status(500).json({ error: 'Failed to retrieve document' })
   }
 })
 

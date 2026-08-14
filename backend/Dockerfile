@@ -23,8 +23,13 @@ USER propfirm
 
 EXPOSE 5000
 
-# Use dumb-init as PID 1 to forward signals correctly
+# Use dumb-init as PID 1 to forward signals correctly.
+# server.js installs SIGTERM/SIGINT handlers that drain HTTP sockets and close
+# Redis/Kafka/pg before exiting, so signal forwarding must work.
 ENTRYPOINT ["dumb-init", "--"]
 
-# Run migrations then start server
-CMD ["sh", "-c", "npm run migrate && node server.js"]
+# Start the server only. Migrations run in the dedicated one-shot `migrate`
+# service in docker-compose.yml, which backend waits on via
+# `service_completed_successfully`. Running them here instead would race itself
+# as soon as this service is scaled beyond a single replica.
+CMD ["node", "server.js"]

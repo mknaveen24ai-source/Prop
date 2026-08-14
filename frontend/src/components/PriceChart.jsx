@@ -7,8 +7,8 @@ import {
   DEFAULT_CHART_TIMEFRAME,
   getChartTimeframeMinutes
 } from '../utils/chartTimeframes'
+import { API_BASE_URL as API_URL } from '../config/apiBase'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 function PriceChart({ instrument, prices }) {
   const chartContainerRef = useRef(null)

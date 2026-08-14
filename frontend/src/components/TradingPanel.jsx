@@ -14,6 +14,7 @@ import {
   formatPrice,
   getInputStepString,
   getPriceDecimals,
+  INSTRUMENT_GROUPS,
 } from '../utils/instruments'
 import {
   calculateEquity,
@@ -23,13 +24,13 @@ import {
   sumMoney,
 } from '../utils/finance'
 import { filterVisibleTraderAccounts, isTraderAccountVisible } from '../utils/accountVisibility'
-import { getMemoryItem, setMemoryItem } from '../utils/memoryStore'
+import { getMemoryItem, setMemoryItem, getPersistentItem, setPersistentItem } from '../utils/memoryStore'
 import Pagination from './Pagination'
 import Button from './ui/Button'
 
 const TRADING_SPLIT_MIN = 50
 const TRADING_SPLIT_MAX = 85
-const TRADING_SPLIT_DEFAULT = 70
+const TRADING_SPLIT_DEFAULT = 74
 const TRADING_SPLIT_STORAGE_KEY = 'tradingSplitPct'
 const WATCHLIST_STORAGE_KEY = 'tradingWatchlist'
 
@@ -163,7 +164,7 @@ const TradeRow = React.memo(function TradeRow({
         }
       </td>
       <td>
-        <div className="trade-actions" style={{ display: 'flex', gap: '6px' }}>
+        <div className="trade-actions" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           {isPending ? (
             <>
               <Button
@@ -276,7 +277,7 @@ export default function TradingPanel({
   // ── Watchlist (pinned instruments) ──────────────────────────────────────────
   const [pinnedInstruments, setPinnedInstruments] = useState(() => {
     try {
-      const saved = JSON.parse(getMemoryItem(WATCHLIST_STORAGE_KEY) || '[]')
+      const saved = JSON.parse(getPersistentItem(WATCHLIST_STORAGE_KEY) || '[]')
       return Array.isArray(saved) ? saved : []
     } catch {
       return []
@@ -287,10 +288,13 @@ export default function TradingPanel({
       const next = current.includes(instrument)
         ? current.filter((sym) => sym !== instrument)
         : [...current, instrument]
-      setMemoryItem(WATCHLIST_STORAGE_KEY, JSON.stringify(next))
+      setPersistentItem(WATCHLIST_STORAGE_KEY, JSON.stringify(next))
       return next
     })
   }, [])
+
+  // ── Ticker category filter ──────────────────────────────────────────────────
+  const [tickerCategory, setTickerCategory] = useState('all')
 
   const prices = Object.keys(storePrices || {}).length > 0 ? storePrices : (propPrices || {})
 
@@ -307,9 +311,12 @@ export default function TradingPanel({
     for (const [instrument, data] of entries) {
       const mid = data?.bid != null && data?.ask != null ? (parseFloat(data.bid) + parseFloat(data.ask)) / 2 : parseFloat(data?.bid ?? data?.ask)
       if (!Number.isFinite(mid)) continue
-      const history = priceHistoryRef.current[instrument] || (priceHistoryRef.current[instrument] = [])
-      history.push({ value: mid })
-      if (history.length > 30) history.shift()
+      // Build a new array rather than mutating in place — the previous array
+      // reference is handed straight to Recharts via <Sparkline data={history}/>,
+      // which can freeze it internally, making a later .push()/.shift() throw.
+      const nextHistory = [...(priceHistoryRef.current[instrument] || []), { value: mid }]
+      if (nextHistory.length > 30) nextHistory.shift()
+      priceHistoryRef.current[instrument] = nextHistory
     }
   }, [prices])
   useEffect(() => {
@@ -325,6 +332,11 @@ export default function TradingPanel({
     const pinnedSet = new Set(pinnedInstruments)
     return [...availableInstruments].sort((a, b) => (pinnedSet.has(b) ? 1 : 0) - (pinnedSet.has(a) ? 1 : 0))
   }, [availableInstruments, pinnedInstruments])
+  const tickerInstruments = useMemo(() => {
+    if (tickerCategory === 'all') return sortedInstruments
+    const group = INSTRUMENT_GROUPS[tickerCategory] || []
+    return sortedInstruments.filter((instrument) => group.includes(instrument))
+  }, [sortedInstruments, tickerCategory])
 
   // ── Auto-scrolling symbol ticker ────────────────────────────────────────────
   const symbolRowRef = useRef(null)
@@ -662,6 +674,39 @@ export default function TradingPanel({
         </div>
       )}
 
+      {/* Symbol Selector category filter chips */}
+      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '8px' }}>
+        {[
+          { key: 'all', label: 'All', color: 'var(--accent)' },
+          { key: 'FOREX_MAJORS', label: 'FX Majors', color: 'var(--accent)' },
+          { key: 'FOREX_MINORS', label: 'FX Minors', color: 'var(--accent)' },
+          { key: 'COMMODITY_METALS', label: 'Metals', color: 'var(--accent-gold)' },
+          { key: 'ENERGIES', label: 'Energies', color: 'var(--accent-gold)' },
+          { key: 'INDICES_SPOT', label: 'Indices Spot', color: 'var(--accent-green)' },
+          { key: 'INDICES_MAJOR', label: 'Indices Major', color: 'var(--accent-green)' },
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setTickerCategory(tab.key)}
+            style={{
+              padding: '3px 9px',
+              fontSize: '10px',
+              fontWeight: 700,
+              borderRadius: 'var(--radius-pill)',
+              cursor: 'pointer',
+              border: `1px solid ${tickerCategory === tab.key ? tab.color : 'var(--navy-border)'}`,
+              background: tickerCategory === tab.key
+                ? `color-mix(in srgb, ${tab.color} 15%, transparent)`
+                : 'transparent',
+              color: tickerCategory === tab.key ? tab.color : 'var(--text-muted)',
+              transition: 'all 0.15s',
+              letterSpacing: '0.04em'
+            }}
+          >{tab.label}</button>
+        ))}
+      </div>
+
       {/* Symbol Selector — auto-scrolling live ticker (pauses on hover/touch) */}
       <div
         ref={symbolRowRef}
@@ -681,7 +726,7 @@ export default function TradingPanel({
       }}>
         {/* Rendered twice back-to-back so the auto-scroll loop can reset at the
             halfway point with no visible jump — see the rAF loop above. */}
-        {[0, 1].flatMap(copy => sortedInstruments.map(instrument => {
+        {[0, 1].flatMap(copy => tickerInstruments.map(instrument => {
           const data = prices[instrument]
           const isSelected = orderForm.instrument === instrument
           const isPinned = pinnedInstruments.includes(instrument)
@@ -697,7 +742,6 @@ export default function TradingPanel({
                 padding:     '10px 12px',
                 cursor:      'pointer',
                 transition:  'all 0.15s',
-                boxShadow:   isSelected ? '0 0 12px color-mix(in srgb, var(--muted) 20%, transparent)' : 'none',
                 minHeight:   '78px',
                 flexShrink:  0,
                 minWidth:    '96px',
@@ -771,45 +815,47 @@ export default function TradingPanel({
               existing resizable chart/order-panel split, not replacing it —
               the ⭐ toggle on the symbol ticker below already pins instruments
               here. */}
-          <div style={{ width: '212px', flex: '0 0 212px', position: 'sticky', top: '84px' }}>
-            <Card ruled flush title="Watchlist">
-              {pinnedInstruments.length === 0 ? (
-                <div style={{ padding: '14px 16px', fontSize: '11.5px', color: 'var(--muted)', lineHeight: 1.5 }}>
-                  Star an instrument below to pin it here.
-                </div>
-              ) : pinnedInstruments.map((instrument) => {
-                const data = prices[instrument]
-                const isSelected = orderForm.instrument === instrument
-                const history = priceHistoryRef.current[instrument] || []
-                const first = history[0]?.value
-                const last = history[history.length - 1]?.value
-                const changePct = first ? ((last - first) / first) * 100 : 0
-                const tone = changePct >= 0 ? 'var(--gain)' : 'var(--loss)'
-                return (
-                  <button
-                    key={instrument}
-                    onClick={() => setOrderForm((f) => ({ ...f, instrument, stop_loss: '', take_profit: '' }))}
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%',
-                      padding: '9px 14px', border: 'none', borderBottom: '1px solid var(--rule-soft)',
-                      background: isSelected ? 'var(--accent-dim)' : 'transparent', cursor: 'pointer', textAlign: 'left',
-                    }}
-                  >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '13px', color: 'var(--ink)' }}>{instrument}</div>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11.5px', color: 'var(--muted)', marginTop: '2px' }}>
-                        {data ? formatPrice(data.bid, instrument) : '—'}
+          <div className="watchlist-rail" style={{ width: '212px', flex: '0 0 212px', position: 'sticky', top: '84px', maxHeight: '500px' }}>
+            <Card ruled flush title="Watchlist" style={{ display: 'flex', flexDirection: 'column', maxHeight: '500px' }}>
+              <div style={{ overflowY: 'auto' }}>
+                {pinnedInstruments.length === 0 ? (
+                  <div style={{ padding: '14px 16px', fontSize: '11.5px', color: 'var(--muted)', lineHeight: 1.5 }}>
+                    Star an instrument below to pin it here.
+                  </div>
+                ) : pinnedInstruments.map((instrument) => {
+                  const data = prices[instrument]
+                  const isSelected = orderForm.instrument === instrument
+                  const history = priceHistoryRef.current[instrument] || []
+                  const first = history[0]?.value
+                  const last = history[history.length - 1]?.value
+                  const changePct = first ? ((last - first) / first) * 100 : 0
+                  const tone = changePct >= 0 ? 'var(--gain)' : 'var(--loss)'
+                  return (
+                    <button
+                      key={instrument}
+                      onClick={() => setOrderForm((f) => ({ ...f, instrument, stop_loss: '', take_profit: '' }))}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%',
+                        padding: '9px 14px', border: 'none', borderBottom: '1px solid var(--rule-soft)',
+                        background: isSelected ? 'var(--accent-dim)' : 'transparent', cursor: 'pointer', textAlign: 'left',
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '13px', color: 'var(--ink)' }}>{instrument}</div>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11.5px', color: 'var(--muted)', marginTop: '2px' }}>
+                          {data ? formatPrice(data.bid, instrument) : '—'}
+                        </div>
                       </div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11.5px', color: tone }}>{changePct >= 0 ? '+' : ''}{changePct.toFixed(2)}%</div>
-                      <div style={{ width: '52px', height: '18px', marginTop: '3px' }}>
-                        <Sparkline data={history} tone={tone} width={52} height={18} />
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11.5px', color: tone }}>{changePct >= 0 ? '+' : ''}{changePct.toFixed(2)}%</div>
+                        <div style={{ width: '52px', height: '18px', marginTop: '3px' }}>
+                          <Sparkline data={history} tone={tone} width={52} height={18} />
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                )
-              })}
+                    </button>
+                  )
+                })}
+              </div>
             </Card>
           </div>
 
@@ -832,7 +878,6 @@ export default function TradingPanel({
               <div style={{ width: '100%', height: '500px', marginBottom: '16px' }}>
                 <TradingViewWidget symbol={orderForm.instrument} theme={theme} />
               </div>
-
             <div className="trade-desk-stack">
             {openTrades.length > 0 && (
               <Card className="trade-section-card">
@@ -898,8 +943,7 @@ export default function TradingPanel({
                         className="terminal-filter-btn"
                         style={{
                           background: positionView === view.id ? 'var(--accent)' : 'var(--navy-card)',
-                          color: positionView === view.id ? 'var(--navy)' : 'var(--text-muted)',
-                          boxShadow: positionView === view.id ? '0 10px 24px rgba(var(--brand-primary-rgb), 0.22)' : 'none'
+                          color: positionView === view.id ? 'var(--navy)' : 'var(--text-muted)'
                         }}
                       >
                         {view.label}
@@ -947,7 +991,7 @@ export default function TradingPanel({
                                       <span style={{ fontSize: '12px', color: 'var(--text)' }}>Close Fraction (Current: {parseFloat(trade.lot_size).toFixed(2)}):</span>
                                       <input type="number" step="0.01" max={Math.max(parseFloat(trade.lot_size) - 0.01, 0.01).toFixed(2)} value={partialForm.val || ''} onChange={e => setPartialForm({ ...partialForm, val: e.target.value })} style={{ width: '80px', padding: '4px 8px', fontSize: '12px' }} />
                                       <button onClick={() => handlePartialClose(trade.id, trade.lot_size, partialForm.val)} disabled={closingTradeSet.has(trade.id)} className="btn btn-accent" style={{ padding: '4px 12px', fontSize: '11px', opacity: closingTradeSet.has(trade.id) ? 0.6 : 1, cursor: closingTradeSet.has(trade.id) ? 'not-allowed' : 'pointer' }}>{closingTradeSet.has(trade.id) ? 'Closing...' : 'Confirm Partial Close'}</button>
-                                      <button onClick={() => setPartialForm(null)} className="btn" style={{ padding: '4px 12px', fontSize: '11px', background: 'transparent', border: '1px solid var(--navy-border)' }}>Cancel</button>
+                                      <Button variant="secondary" size="sm" onClick={() => setPartialForm(null)}>Cancel</Button>
                                     </div>
                                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                       {[0.25, 0.5, 0.75].map((ratio) => {
@@ -1030,9 +1074,7 @@ export default function TradingPanel({
                                       <button className="btn btn-accent" onClick={() => submitModify(trade)} style={{ padding: '7px 20px', fontSize: '12px' }}>
                                         Save
                                       </button>
-                                      <button className="btn" onClick={cancelModify} style={{ padding: '7px 16px', fontSize: '12px', border: '1px solid var(--navy-border)' }}>
-                                        Cancel
-                                      </button>
+                                      <Button variant="secondary" size="sm" onClick={cancelModify}>Cancel</Button>
                                     </div>
                                     {modifyError && (
                                       <div style={{ color: 'var(--red)', fontSize: '12px', marginTop: '8px' }}>{modifyError}</div>
@@ -1097,18 +1139,14 @@ export default function TradingPanel({
                                           style={{ padding: '7px 20px', fontSize: '12px' }}>
                                           Save
                                         </button>
-                                        <button
-                                          className="btn"
+                                        <Button
+                                          variant="secondary"
+                                          size="sm"
                                           onClick={() => moveTradeToBreakeven(trade)}
-                                          style={{ padding: '7px 16px', fontSize: '12px', border: '1px solid var(--accent)', color: 'var(--accent)' }}>
+                                          style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}>
                                           Move To BE
-                                        </button>
-                                        <button
-                                          className="btn"
-                                          onClick={cancelModify}
-                                          style={{ padding: '7px 16px', fontSize: '12px', border: '1px solid var(--navy-border)' }}>
-                                          Cancel
-                                        </button>
+                                        </Button>
+                                        <Button variant="secondary" size="sm" onClick={cancelModify}>Cancel</Button>
                                       </div>
                                     </div>
                                     {modifyError && (
@@ -1143,6 +1181,7 @@ export default function TradingPanel({
             )}
 
             </div>
+
           </div>
 
           {/* Drag handle to resize chart/order-panel split */}

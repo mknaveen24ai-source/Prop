@@ -1,4 +1,4 @@
-# Prop-Firm Platform — Full Overview for Design Handoff
+ # Prop-Firm Platform — Full Overview for Design Handoff
 
 Snapshot: 2026-07-31 · Baseline: post multi-tenant removal, commit `5366dc4` · Purpose: everything this platform *has* (routes, pages, nav, design system, API wiring, known issues) assembled as one reference to hand to Claude for a visual redesign pass — without dropping any existing functionality.
 

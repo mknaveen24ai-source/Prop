@@ -1,11 +1,14 @@
-const FOREX_INSTRUMENTS = [
+const FOREX_MAJORS = [
   'EURUSD',
   'GBPUSD',
   'USDJPY',
   'USDCHF',
   'AUDUSD',
   'USDCAD',
-  'NZDUSD',
+  'NZDUSD'
+]
+
+const FOREX_MINORS = [
   'EURGBP',
   'EURJPY',
   'GBPJPY',
@@ -29,22 +32,32 @@ const FOREX_INSTRUMENTS = [
   'NZDCHF'
 ]
 
-const COMMODITY_INSTRUMENTS = ['XAUUSD', 'XAGUSD']
-const INDEX_INSTRUMENTS = ['US30', 'NAS100']
+const FOREX_INSTRUMENTS = [...FOREX_MAJORS, ...FOREX_MINORS]
+const COMMODITY_METALS = ['XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD']
+const ENERGIES = ['XTIUSD', 'XBRUSD', 'XNGUSD']
+const INDICES_SPOT = ['US30', 'USTEC', 'US500', 'UK100', 'AUS200', 'JP225', 'HK50']
+const INDICES_MAJOR = ['DE40', 'FRA40', 'EUSTX50']
+
+const COMMODITY_INSTRUMENTS = [...COMMODITY_METALS]
+const INDEX_INSTRUMENTS = [...INDICES_SPOT, ...INDICES_MAJOR]
+
+// Flat 1:100 leverage across every instrument (IC Markets demo default).
+const LEVERAGE_FLAT = 100
 
 function splitForexSymbol(symbol) {
   return [symbol.slice(0, 3), symbol.slice(3)]
 }
 
-function buildForexDefinition(symbol) {
-  const [, quote] = splitForexSymbol(symbol)
+function buildForexDefinition(symbol, subCategory) {
+  const [base, quote] = splitForexSymbol(symbol)
   const isJpy = quote === 'JPY'
 
   return {
     symbol,
     group: 'forex',
+    subCategory,
     contractSize: 100000,
-    leverage: 30,
+    leverage: LEVERAGE_FLAT,
     decimals: isJpy ? 3 : 5,
     step: isJpy ? 0.001 : 0.00001,
     pipSize: isJpy ? 0.01 : 0.0001,
@@ -52,18 +65,24 @@ function buildForexDefinition(symbol) {
     pointMultiplier: isJpy ? 1000 : 100000,
     wideSpreadThreshold: 4.5,
     quickMoveThreshold: 20,
-    marketDataSymbol: `${symbol.slice(0, 3)}/${quote}`,
+    marketDataSymbol: `${base}/${quote}`,
     defaultSpread: isJpy ? 0.012 : 0.00012
   }
 }
 
+// NOTE: marketDataSymbol values below (Twelve Data feed convention) for the
+// newly added metals/energies/indices are best-effort placeholders and need
+// a manual spot-check, same caveat as the existing TradingView map on the
+// frontend — this environment can't verify third-party symbol conventions live.
 const INSTRUMENT_DEFINITIONS = [
-  ...FOREX_INSTRUMENTS.map(buildForexDefinition),
+  ...FOREX_MAJORS.map((symbol) => buildForexDefinition(symbol, 'major')),
+  ...FOREX_MINORS.map((symbol) => buildForexDefinition(symbol, 'minor')),
   {
     symbol: 'XAUUSD',
     group: 'commodity',
+    subCategory: 'metal',
     contractSize: 100,
-    leverage: 10,
+    leverage: LEVERAGE_FLAT,
     decimals: 2,
     step: 0.01,
     pipSize: 0.1,
@@ -77,8 +96,9 @@ const INSTRUMENT_DEFINITIONS = [
   {
     symbol: 'XAGUSD',
     group: 'commodity',
+    subCategory: 'metal',
     contractSize: 5000,
-    leverage: 10,
+    leverage: LEVERAGE_FLAT,
     decimals: 2,
     step: 0.01,
     pipSize: 0.01,
@@ -90,10 +110,91 @@ const INSTRUMENT_DEFINITIONS = [
     defaultSpread: 0.03
   },
   {
+    symbol: 'XPTUSD',
+    group: 'commodity',
+    subCategory: 'metal',
+    contractSize: 100,
+    leverage: LEVERAGE_FLAT,
+    decimals: 2,
+    step: 0.01,
+    pipSize: 0.01,
+    minDistance: 0.5,
+    pointMultiplier: 100,
+    wideSpreadThreshold: 80,
+    quickMoveThreshold: 120,
+    marketDataSymbol: 'XPT/USD',
+    defaultSpread: 0.5
+  },
+  {
+    symbol: 'XPDUSD',
+    group: 'commodity',
+    subCategory: 'metal',
+    contractSize: 100,
+    leverage: LEVERAGE_FLAT,
+    decimals: 2,
+    step: 0.01,
+    pipSize: 0.01,
+    minDistance: 0.5,
+    pointMultiplier: 100,
+    wideSpreadThreshold: 80,
+    quickMoveThreshold: 120,
+    marketDataSymbol: 'XPD/USD',
+    defaultSpread: 0.6
+  },
+  {
+    symbol: 'XTIUSD',
+    group: 'energy',
+    subCategory: 'energy',
+    contractSize: 1000,
+    leverage: LEVERAGE_FLAT,
+    decimals: 2,
+    step: 0.01,
+    pipSize: 0.01,
+    minDistance: 0.05,
+    pointMultiplier: 100,
+    wideSpreadThreshold: 6,
+    quickMoveThreshold: 25,
+    marketDataSymbol: 'WTI/USD',
+    defaultSpread: 0.04
+  },
+  {
+    symbol: 'XBRUSD',
+    group: 'energy',
+    subCategory: 'energy',
+    contractSize: 1000,
+    leverage: LEVERAGE_FLAT,
+    decimals: 2,
+    step: 0.01,
+    pipSize: 0.01,
+    minDistance: 0.05,
+    pointMultiplier: 100,
+    wideSpreadThreshold: 6,
+    quickMoveThreshold: 25,
+    marketDataSymbol: 'BRENT/USD',
+    defaultSpread: 0.04
+  },
+  {
+    symbol: 'XNGUSD',
+    group: 'energy',
+    subCategory: 'energy',
+    contractSize: 10000,
+    leverage: LEVERAGE_FLAT,
+    decimals: 3,
+    step: 0.001,
+    pipSize: 0.001,
+    minDistance: 0.005,
+    pointMultiplier: 1000,
+    wideSpreadThreshold: 6,
+    quickMoveThreshold: 25,
+    marketDataSymbol: 'NATGAS/USD',
+    defaultSpread: 0.005
+  },
+  {
     symbol: 'US30',
     group: 'index',
+    subCategory: 'spot',
     contractSize: 1,
-    leverage: 10,
+    leverage: LEVERAGE_FLAT,
     decimals: 1,
     step: 0.1,
     pipSize: 0.1,
@@ -105,10 +206,11 @@ const INSTRUMENT_DEFINITIONS = [
     defaultSpread: 2
   },
   {
-    symbol: 'NAS100',
+    symbol: 'USTEC',
     group: 'index',
+    subCategory: 'spot',
     contractSize: 1,
-    leverage: 10,
+    leverage: LEVERAGE_FLAT,
     decimals: 1,
     step: 0.1,
     pipSize: 0.1,
@@ -118,6 +220,134 @@ const INSTRUMENT_DEFINITIONS = [
     quickMoveThreshold: 50,
     marketDataSymbol: 'NDX',
     defaultSpread: 1.5
+  },
+  {
+    symbol: 'US500',
+    group: 'index',
+    subCategory: 'spot',
+    contractSize: 1,
+    leverage: LEVERAGE_FLAT,
+    decimals: 1,
+    step: 0.1,
+    pipSize: 0.1,
+    minDistance: 1,
+    pointMultiplier: 10,
+    wideSpreadThreshold: 20,
+    quickMoveThreshold: 25,
+    marketDataSymbol: 'SPX',
+    defaultSpread: 0.6
+  },
+  {
+    symbol: 'UK100',
+    group: 'index',
+    subCategory: 'spot',
+    contractSize: 1,
+    leverage: LEVERAGE_FLAT,
+    decimals: 1,
+    step: 0.1,
+    pipSize: 0.1,
+    minDistance: 1,
+    pointMultiplier: 10,
+    wideSpreadThreshold: 20,
+    quickMoveThreshold: 25,
+    marketDataSymbol: 'UKX',
+    defaultSpread: 1
+  },
+  {
+    symbol: 'AUS200',
+    group: 'index',
+    subCategory: 'spot',
+    contractSize: 1,
+    leverage: LEVERAGE_FLAT,
+    decimals: 1,
+    step: 0.1,
+    pipSize: 0.1,
+    minDistance: 1,
+    pointMultiplier: 10,
+    wideSpreadThreshold: 20,
+    quickMoveThreshold: 25,
+    marketDataSymbol: 'AS51',
+    defaultSpread: 2
+  },
+  {
+    symbol: 'JP225',
+    group: 'index',
+    subCategory: 'spot',
+    contractSize: 1,
+    leverage: LEVERAGE_FLAT,
+    decimals: 0,
+    step: 1,
+    pipSize: 1,
+    minDistance: 5,
+    pointMultiplier: 1,
+    wideSpreadThreshold: 20,
+    quickMoveThreshold: 30,
+    marketDataSymbol: 'NKY',
+    defaultSpread: 8
+  },
+  {
+    symbol: 'HK50',
+    group: 'index',
+    subCategory: 'spot',
+    contractSize: 1,
+    leverage: LEVERAGE_FLAT,
+    decimals: 0,
+    step: 1,
+    pipSize: 1,
+    minDistance: 5,
+    pointMultiplier: 1,
+    wideSpreadThreshold: 20,
+    quickMoveThreshold: 30,
+    marketDataSymbol: 'HSI',
+    defaultSpread: 8
+  },
+  {
+    symbol: 'DE40',
+    group: 'index',
+    subCategory: 'major',
+    contractSize: 1,
+    leverage: LEVERAGE_FLAT,
+    decimals: 1,
+    step: 0.1,
+    pipSize: 0.1,
+    minDistance: 1,
+    pointMultiplier: 10,
+    wideSpreadThreshold: 20,
+    quickMoveThreshold: 30,
+    marketDataSymbol: 'DE40',
+    defaultSpread: 1.2
+  },
+  {
+    symbol: 'FRA40',
+    group: 'index',
+    subCategory: 'major',
+    contractSize: 1,
+    leverage: LEVERAGE_FLAT,
+    decimals: 1,
+    step: 0.1,
+    pipSize: 0.1,
+    minDistance: 1,
+    pointMultiplier: 10,
+    wideSpreadThreshold: 20,
+    quickMoveThreshold: 25,
+    marketDataSymbol: 'PX1',
+    defaultSpread: 1
+  },
+  {
+    symbol: 'EUSTX50',
+    group: 'index',
+    subCategory: 'major',
+    contractSize: 1,
+    leverage: LEVERAGE_FLAT,
+    decimals: 1,
+    step: 0.1,
+    pipSize: 0.1,
+    minDistance: 1,
+    pointMultiplier: 10,
+    wideSpreadThreshold: 20,
+    quickMoveThreshold: 25,
+    marketDataSymbol: 'SX5E',
+    defaultSpread: 1
   }
 ]
 
@@ -129,6 +359,15 @@ const INSTRUMENT_CATALOG = Object.freeze(
 )
 
 const INSTRUMENTS = Object.freeze(INSTRUMENT_DEFINITIONS.map((instrument) => instrument.symbol))
+
+const INSTRUMENT_GROUPS = Object.freeze({
+  FOREX_MAJORS: Object.freeze([...FOREX_MAJORS]),
+  FOREX_MINORS: Object.freeze([...FOREX_MINORS]),
+  COMMODITY_METALS: Object.freeze([...COMMODITY_METALS]),
+  ENERGIES: Object.freeze([...ENERGIES]),
+  INDICES_SPOT: Object.freeze([...INDICES_SPOT]),
+  INDICES_MAJOR: Object.freeze([...INDICES_MAJOR])
+})
 
 const CONTRACT_SIZES = Object.freeze(
   INSTRUMENT_DEFINITIONS.reduce((acc, instrument) => {
@@ -215,6 +454,13 @@ module.exports = {
   INSTRUMENT_DEFINITIONS,
   INSTRUMENT_CATALOG,
   INSTRUMENTS,
+  FOREX_MAJORS,
+  FOREX_MINORS,
+  COMMODITY_METALS,
+  ENERGIES,
+  INDICES_SPOT,
+  INDICES_MAJOR,
+  INSTRUMENT_GROUPS,
   FOREX_INSTRUMENTS,
   COMMODITY_INSTRUMENTS,
   INDEX_INSTRUMENTS,

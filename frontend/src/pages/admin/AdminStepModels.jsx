@@ -124,9 +124,64 @@ function PricingRow({ model, sizeInfo, onSave, saving }) {
   )
 }
 
-function StepModelCard({ model, onToggle, onSavePhase, onSavePricing }) {
+function ScalingSection({ model, onSave, saving }) {
+  const [draft, setDraft] = useState({
+    scaling_enabled: model.scaling_enabled,
+    scaling_target_pct: model.scaling_target_pct,
+    scaling_multiplier: model.scaling_multiplier,
+    scaling_increase_per_milestone_pct: model.scaling_increase_per_milestone_pct ?? 0,
+    scaling_max_account_size: model.scaling_max_account_size
+  })
+
+  function update(key, value) {
+    setDraft((d) => ({ ...d, [key]: value }))
+  }
+
+  const inputStyle = { width: '110px', padding: '6px 8px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }
+
+  return (
+    <div style={{ marginTop: '18px', paddingTop: '16px', borderTop: '1px solid var(--admin-border)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+        <h4 style={{ margin: 0, fontSize: '14px' }}>Scaling Plan (funded stage)</h4>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
+          <input type="checkbox" checked={!!draft.scaling_enabled} onChange={(e) => update('scaling_enabled', e.target.checked)} />
+          Enabled
+        </label>
+      </div>
+      <p style={{ fontSize: '12px', opacity: 0.7, marginBottom: '10px' }}>
+        Every milestone injects real capital into the trader's balance (via the ledger-backed balance-adjustment
+        path) and raises their lot-size multiplier. Set the capital increase to 0 to keep the multiplier-only
+        behavior with no balance change.
+      </p>
+      <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <label>
+          <div style={{ fontSize: '11px', opacity: 0.7, marginBottom: '4px' }}>Milestone Every (% net profit)</div>
+          <input type="number" min="0.1" step="0.1" style={inputStyle} value={draft.scaling_target_pct} onChange={(e) => update('scaling_target_pct', e.target.value)} />
+        </label>
+        <label>
+          <div style={{ fontSize: '11px', opacity: 0.7, marginBottom: '4px' }}>Lot-Size Multiplier (x per milestone)</div>
+          <input type="number" min="1.01" step="0.1" style={inputStyle} value={draft.scaling_multiplier} onChange={(e) => update('scaling_multiplier', e.target.value)} />
+        </label>
+        <label>
+          <div style={{ fontSize: '11px', opacity: 0.7, marginBottom: '4px' }}>Capital Increase per Milestone (%)</div>
+          <input type="number" min="0" step="1" style={inputStyle} value={draft.scaling_increase_per_milestone_pct} onChange={(e) => update('scaling_increase_per_milestone_pct', e.target.value)} />
+        </label>
+        <label>
+          <div style={{ fontSize: '11px', opacity: 0.7, marginBottom: '4px' }}>Max Account Size ($)</div>
+          <input type="number" min="1" step="1000" style={inputStyle} value={draft.scaling_max_account_size} onChange={(e) => update('scaling_max_account_size', e.target.value)} />
+        </label>
+        <button className="admin-btn admin-btn-sm" disabled={saving} onClick={() => onSave(model.slug, draft)}>
+          {saving ? 'Saving...' : 'Save Scaling'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function StepModelCard({ model, onToggle, onSavePhase, onSavePricing, onSaveScaling }) {
   const [savingPhase, setSavingPhase] = useState(null)
   const [savingSize, setSavingSize] = useState(null)
+  const [savingScaling, setSavingScaling] = useState(false)
   const [toggling, setToggling] = useState(false)
 
   async function handleToggle() {
@@ -153,6 +208,15 @@ function StepModelCard({ model, onToggle, onSavePhase, onSavePricing }) {
       await onSavePricing(model.slug, accountSize, draft)
     } finally {
       setSavingSize(null)
+    }
+  }
+
+  async function handleSaveScaling(slug, draft) {
+    setSavingScaling(true)
+    try {
+      await onSaveScaling(slug, draft)
+    } finally {
+      setSavingScaling(false)
     }
   }
 
@@ -226,6 +290,8 @@ function StepModelCard({ model, onToggle, onSavePhase, onSavePricing }) {
           </tbody>
         </table>
       </div>
+
+      <ScalingSection model={model} onSave={handleSaveScaling} saving={savingScaling} />
     </Card>
   )
 }
@@ -280,6 +346,16 @@ export default function AdminStepModels() {
     }
   }
 
+  async function handleSaveScaling(slug, draft) {
+    try {
+      await adminAxios.patch(`/api/admin/step-models/${slug}/scaling`, draft)
+      toast.success('Scaling plan saved')
+      loadModels()
+    } catch (error) {
+      toast.error(error?.response?.data?.error || 'Could not save scaling plan')
+    }
+  }
+
   if (loading) {
     return <div style={{ padding: '32px', opacity: 0.7 }}>Loading challenge models...</div>
   }
@@ -300,6 +376,7 @@ export default function AdminStepModels() {
           onToggle={handleToggle}
           onSavePhase={handleSavePhase}
           onSavePricing={handleSavePricing}
+          onSaveScaling={handleSaveScaling}
         />
       ))}
     </div>

@@ -1,9 +1,14 @@
-version: '3.9'
-
 # ─────────────────────────────────────────────────────────────────────────────
 # PropFirm Platform — Docker Compose
-# Usage: docker-compose up -d
-# Prerequisites: copy .env.template → .env and fill in all values
+# Usage: docker compose up -d
+# Prerequisites:
+#   1. copy .env.template → .env and fill in all values
+#   2. place fullchain.pem + privkey.pem in deploy/certs/
+#   3. point MT5_BRIDGE_PATH at the host directory your MetaTrader 5 DWX
+#      terminal writes into (see the price-feed note in DEPLOYMENT_CHECKLIST.md)
+#
+# The `version:` key is intentionally absent — it is obsolete under Compose v2
+# and emits a deprecation warning.
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
@@ -43,6 +48,30 @@ services:
     networks:
       - internal
 
+  # ── Migrations (one-shot) ────────────────────────────────────────────────────
+  # Runs to completion, then exits. Backend waits on it via
+  # `condition: service_completed_successfully`, so schema changes are applied
+  # exactly once no matter how many backend replicas you run. Previously the
+  # backend's own CMD ran `npm run migrate` on every container start, which
+  # races itself the moment you scale past one.
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: propfirm_migrate
+    restart: "no"
+    env_file: .env
+    environment:
+      NODE_ENV:     production
+      DATABASE_URL: postgresql://${DB_USER:-propfirm}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-propfirm}
+    entrypoint: ["dumb-init", "--"]
+    command: ["npm", "run", "migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+
   # ── Backend API ──────────────────────────────────────────────────────────────
   backend:
     build:
@@ -56,14 +85,29 @@ services:
       TRUST_PROXY:  ${TRUST_PROXY:-1}
       DATABASE_URL: postgresql://${DB_USER:-propfirm}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-propfirm}
       REDIS_URL:    redis://:${REDIS_PASSWORD:-redispass}@redis:6379
+      # Where the MT5/DWX bridge files are mounted inside the container.
+      DWX_PATH:     /app/mt5-bridge
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     volumes:
       - uploads:/app/uploads
       - logs:/app/logs
+      # ── MT5 price-feed bridge ────────────────────────────────────────────────
+      # The price feed is FILE-BASED ONLY (priceFeed.js reads DWX_Market_Data.txt
+      # etc.; price_feed_sources.source_type accepts only 'shared_env' and
+      # 'dwx_path'). There is no HTTP/WebSocket market-data provider, and this
+      # alpine container has no MetaTrader. A MetaTrader 5 terminal must run
+      # OUTSIDE these containers — a Windows host or Wine — writing its DWX
+      # files into MT5_BRIDGE_PATH on the host.
+      #
+      # Read-write: the backend also writes DWX_Commands_*.txt to subscribe to
+      # symbols. Set MT5_BRIDGE_PATH in .env.
+      - ${MT5_BRIDGE_PATH:-./deploy/mt5-bridge}:/app/mt5-bridge
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:5000/api/health >/dev/null 2>&1 || exit 1"]
       interval: 15s
@@ -100,10 +144,14 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        REACT_APP_API_URL:       ${FRONTEND_URL:-http://localhost}/api
-        REACT_APP_FIRM_NAME:     ${PLATFORM_NAME:-PropFirm}
-        REACT_APP_PRIMARY_COLOR: ${BRAND_PRIMARY_COLOR:-#0066ff}
-        REACT_APP_SUPPORT_EMAIL: ${SUPPORT_EMAIL:-support@propfirm.com}
+        # MUST stay empty. services/api.js uses VITE_API_URL as the axios
+        # baseURL, and every call path already starts with /api/... — so behind
+        # the same-origin nginx proxy an empty baseURL resolves correctly to
+        # /api/...  Setting it to a full URL produces /api/api/... and breaks
+        # every request. Only override this if the API is on another origin.
+        VITE_API_URL:     "${VITE_API_URL-}"
+        VITE_APP_VERSION: ${APP_VERSION:-1.0.0}
+        VITE_SENTRY_DSN:  ${FRONTEND_SENTRY_DSN:-}
     container_name: propfirm_frontend
     restart: unless-stopped
     healthcheck:

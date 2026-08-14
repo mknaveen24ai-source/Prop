@@ -10,7 +10,7 @@ import {
   calculatePnL,
   calculateMargin,
 } from './instruments.js'
-import { getStatusToneColor } from './statusTone.js'
+import { getStatusToneColor, getStatusToneLabel } from './statusTone.js'
 
 export { CONTRACT_SIZES, LEVERAGE, INSTRUMENT_GROUPS }
 
@@ -39,13 +39,6 @@ export const ACCOUNT_STATUSES = {
   rejected: { label: 'Rejected', color: getStatusToneColor('rejected') },
   locked: { label: 'Locked', color: getStatusToneColor('locked') },
   expired: { label: 'Expired', color: getStatusToneColor('expired') }
-}
-
-export const DRAWDOWN_THRESHOLDS = {
-  CRITICAL: 90,
-  HIGH: 75,
-  MEDIUM: 50,
-  LOW: 25
 }
 
 export const TRADING_LIMITS = {
@@ -77,13 +70,6 @@ export const TIME_INTERVALS = {
   SOCKET_RECONNECT: 5000
 }
 
-export const RISK_LEVELS = {
-  LOW: { threshold: 25, color: '#4CAF50', label: 'Low' },
-  MEDIUM: { threshold: 50, color: '#FFC107', label: 'Medium' },
-  HIGH: { threshold: 75, color: '#FF9800', label: 'High' },
-  CRITICAL: { threshold: 90, color: '#F44336', label: 'Critical' }
-}
-
 export const VALID_ACCOUNT_SIZES = [5000, 10000, 25000, 50000, 100000, 200000, 400000]
 
 export const DEFAULT_PLATFORM_SETTINGS = {
@@ -97,20 +83,17 @@ export const DEFAULT_PLATFORM_SETTINGS = {
   funded_max_drawdown_pct: 5
 }
 
+// Falls through to the full statusTone.js keyword map for any status not in
+// the curated table above, instead of a hardcoded muted gray — otherwise a
+// status this table doesn't happen to list (e.g. "cancelled", "resolved")
+// would silently render gray here while getStatusToneColor() elsewhere
+// resolves it to its correct tone, splitting the "one map" invariant.
 export function getStatusColor(status) {
-  return ACCOUNT_STATUSES[status]?.color || 'var(--muted)'
+  return ACCOUNT_STATUSES[status]?.color || getStatusToneColor(status)
 }
 
 export function getStatusLabel(status) {
-  return ACCOUNT_STATUSES[status]?.label || status
+  return ACCOUNT_STATUSES[status]?.label || getStatusToneLabel(status)
 }
 
 export { calculatePnL, calculateMargin }
-
-export function getRiskLevel(percentage) {
-  if (percentage >= DRAWDOWN_THRESHOLDS.CRITICAL) return RISK_LEVELS.CRITICAL
-  if (percentage >= DRAWDOWN_THRESHOLDS.HIGH) return RISK_LEVELS.HIGH
-  if (percentage >= DRAWDOWN_THRESHOLDS.MEDIUM) return RISK_LEVELS.MEDIUM
-  if (percentage >= DRAWDOWN_THRESHOLDS.LOW) return RISK_LEVELS.LOW
-  return { threshold: 0, color: '#4CAF50', label: 'Safe' }
-}

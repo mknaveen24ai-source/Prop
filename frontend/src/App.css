@@ -75,35 +75,6 @@ h1, h2, h3, h4, h5, h6 {
   border-color: var(--border-strong);
 }
 
-.card-stat {
-  background: var(--bg-surface);
-  border: 1px solid var(--rule-soft);
-  border-radius: var(--radius-md);
-  padding: 16px 20px;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  overflow: hidden;
-  backdrop-filter: blur(14px) saturate(140%);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
-  transition: var(--transition);
-}
-.card-stat-title {
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: 700;
-  margin-bottom: 8px;
-}
-.card-stat-value {
-  font-family: var(--font-mono);
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
 .card-admin { border-left: 3px solid var(--admin-accent); }
 
 /* Buttons */
@@ -127,15 +98,14 @@ h1, h2, h3, h4, h5, h6 {
 
 .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
 
-.btn-primary { 
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
-  color: #fff; 
-  box-shadow: 0 4px 15px var(--accent-glow);
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: var(--elev);
   border: 1px solid rgba(255,255,255,0.1);
 }
-.btn-primary:hover:not(:disabled) { 
-  transform: translateY(-2px); 
-  box-shadow: 0 8px 25px var(--accent-glow);
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
   filter: brightness(1.1);
 }
 
@@ -146,18 +116,17 @@ h1, h2, h3, h4, h5, h6 {
 .btn-ghost:hover:not(:disabled) { background: var(--bg-hover); }
 
 .btn-accent {
-  background: linear-gradient(135deg, var(--info) 0%, var(--accent) 100%);
+  background: var(--info);
   color: #fff;
   border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 8px 24px rgba(var(--brand-accent-rgb), 0.2);
+  box-shadow: var(--elev);
 }
 .btn-accent:hover:not(:disabled) {
   transform: translateY(-2px);
   filter: brightness(1.08);
-  box-shadow: 0 12px 28px rgba(var(--brand-primary-rgb), 0.24);
 }
 
-.btn-danger { background: var(--danger); color: #fff; box-shadow: 0 4px 16px var(--danger-bg); }
+.btn-danger { background: var(--danger); color: #fff; box-shadow: var(--elev); }
 .btn-danger:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
 
 /* Badges */
@@ -201,41 +170,62 @@ h1, h2, h3, h4, h5, h6 {
 .progress-danger  { background: var(--danger); }
 
 /* Form Elements */
-/* Halftone "print plate" backdrop — gives the frosted card behind it
-   something to actually frost, instead of a flat color reading as a plain
-   tint. Dot colors reuse the existing gain/loss/warn tokens, no new hues. */
 .auth-shell {
   isolation: isolate;
+  position: relative;
   padding: clamp(18px, 4vw, 40px);
   background-color: var(--paper);
   background-image:
-    radial-gradient(circle, color-mix(in srgb, var(--warn) 70%, transparent) 1.6px, transparent 1.7px),
-    radial-gradient(circle, color-mix(in srgb, var(--gain) 55%, transparent) 1.4px, transparent 1.5px),
-    radial-gradient(circle, color-mix(in srgb, var(--loss) 55%, transparent) 1.4px, transparent 1.5px);
-  background-size: 26px 26px, 34px 34px, 40px 40px;
-  background-position: 0 0, 9px 14px, 21px 5px;
-}
-
-.auth-shell::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse 70% 60% at 50% 38%, transparent 40%, var(--paper) 100%);
-  pointer-events: none;
+    radial-gradient(ellipse 600px 400px at 20% 40%, var(--glow-primary), transparent),
+    radial-gradient(ellipse 400px 300px at 80% 60%, var(--glow-success), transparent);
+  overflow: hidden;
 }
 
 .auth-ambient {
-  display: none;
+  display: block;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.auth-ambient-primary,
+.auth-ambient-secondary {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+}
+.auth-ambient-primary {
+  width: 500px;
+  height: 500px;
+  top: -20%;
+  left: -10%;
+  background: radial-gradient(circle, var(--glow-accent), transparent 70%);
+  opacity: 0.4;
+  animation: auth-float 8s ease-in-out infinite alternate;
+}
+.auth-ambient-secondary {
+  width: 400px;
+  height: 400px;
+  bottom: -15%;
+  right: -5%;
+  background: radial-gradient(circle, var(--glow-success), transparent 70%);
+  opacity: 0.3;
+  animation: auth-float 10s ease-in-out infinite alternate-reverse;
 }
 
 .auth-glass-card {
   position: relative;
+  z-index: 10;
   width: min(100%, 440px) !important;
   background: var(--glass);
   border: 1px solid var(--rule-soft);
   border-top: 3px double var(--ink);
-  backdrop-filter: blur(24px) saturate(140%);
-  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  box-shadow: var(--elev), 0 0 60px -30px var(--glow-primary);
 }
 .auth-glass-card::before {
   content: '';
@@ -375,6 +365,19 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .input-group { margin-bottom: 20px; position: relative; }
+
+/* Staggered entrance for auth form fields — only the first handful of
+   direct-child input-groups get a delay; later ones (past nth 5) just
+   inherit the last stagger step via the base rule below. */
+.auth-glass-card form > .input-group {
+  opacity: 0;
+  animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: 0.4s;
+}
+.auth-glass-card form > .input-group:nth-of-type(1) { animation-delay: 0.08s; }
+.auth-glass-card form > .input-group:nth-of-type(2) { animation-delay: 0.16s; }
+.auth-glass-card form > .input-group:nth-of-type(3) { animation-delay: 0.24s; }
+.auth-glass-card form > .input-group:nth-of-type(4) { animation-delay: 0.32s; }
 .input-label {
   display: block; font-size: 11px; font-weight: 700;
   color: var(--text-secondary); margin-bottom: 8px;
@@ -526,7 +529,7 @@ h1, h2, h3, h4, h5, h6 {
 .service-tab.is-active {
   background: var(--accent);
   color: #fff;
-  box-shadow: var(--shadow-accent);
+  box-shadow: var(--elev);
 }
 
 .service-table-card {
@@ -752,17 +755,78 @@ h1, h2, h3, h4, h5, h6 {
 @keyframes fadeInDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes slideInLeft { from { transform: translateX(-100%); } to { transform: translateX(0); } }
 @keyframes modalIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-@keyframes gradientShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
 /* Uses currentColor so each badge (funded=warning, active=info) pulses its
-   own color instead of a hardcoded green baked into a shared keyframe. */
+   own color instead of a hardcoded green baked into a shared keyframe.
+   Capped to whisper intensity (max 20% opacity, 6px spread) to match --elev. */
 @keyframes pulse-glow {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 40%, transparent); }
-  70% { box-shadow: 0 0 0 10px color-mix(in srgb, currentColor 0%, transparent); }
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 20%, transparent); }
+  70% { box-shadow: 0 0 0 6px color-mix(in srgb, currentColor 0%, transparent); }
   100% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent); }
 }
 @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
 
+/* Noir Ledger premium pass — ambient/shimmer keyframes. Named distinctly
+   from pulse-glow/float above since those serve different components
+   (badge pulse, generic float) and shouldn't change behavior here. */
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes auth-float {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(30px, -20px) scale(1.05); }
+}
+@keyframes glow-pulse { 0% { opacity: 0.4; } 100% { opacity: 0.7; } }
+
 .animate-fade-up { animation: fadeInUp 0.4s ease forwards; }
+
+/* Premium button shimmer sweep — opt-in via ::after so it layers on top of
+   the ledger-desk-overrides.css flat fill/hover-glow without fighting it. */
+.btn-primary { overflow: hidden; }
+.btn-primary::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+.btn-primary:hover:not(:disabled)::after { opacity: 1; }
+
+/* Focus ring — first keyboard-visible affordance beyond border-color. */
+.input-field:focus, .select-field:focus, .textarea-field:focus {
+  box-shadow: var(--ring);
+}
+
+/* Shared OTP digit boxes (components/common/OtpInput.jsx) */
+.otp-input-group {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin: 20px 0;
+}
+.otp-digit-box {
+  width: 44px;
+  height: 52px;
+  text-align: center;
+  font-size: 22px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  background: var(--glass-2);
+  border: 1.5px solid var(--rule);
+  color: var(--text-primary);
+  outline: none;
+  border-radius: var(--radius-sm);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
+}
+.otp-digit-box.is-filled {
+  border-color: var(--accent);
+}
+.otp-digit-box:focus {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
 
 /* ── 7. Component Specific Styles ── */
 
@@ -910,16 +974,22 @@ h1, h2, h3, h4, h5, h6 {
 
 .trading-layout {
   display: grid;
-  /* --trading-split (a %, default 70%) drives the chart column; the drag
+  /* --trading-split (a %, default 74%) drives the chart column; the drag
      handle occupies a fixed 20px in between (replacing what used to be a
      plain grid `gap`) and the order panel fills the remainder. */
-  grid-template-columns: minmax(0, var(--trading-split, 70%)) 20px minmax(280px, 1fr);
+  grid-template-columns: minmax(0, var(--trading-split, 74%)) 20px minmax(280px, 1fr);
   align-items: start;
 }
 
 .trading-main-column,
 .trading-side-column {
   min-width: 0;
+}
+
+/* Watchlist rail: flush cards have zero padding, so the "Watchlist" title
+   sits flat against the card's top-left border with no breathing room. */
+.watchlist-rail .lx-card__head {
+  padding: 14px 16px 10px;
 }
 
 .trading-split-handle {
@@ -947,12 +1017,14 @@ h1, h2, h3, h4, h5, h6 {
 .order-panel-sticky {
   position: sticky;
   top: 84px;
+  max-width: 420px;
 }
 
 .order-panel {
   overflow: hidden;
   background: var(--glass);
   border: 1px solid var(--rule-soft);
+  border-radius: var(--radius-sm);
   box-shadow: inset 0 1px 0 var(--glass-hi);
   backdrop-filter: blur(16px) saturate(140%);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
@@ -978,21 +1050,6 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 0;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-}
-
-.order-panel-select {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--text-secondary) 50%),
-    linear-gradient(135deg, var(--text-secondary) 50%, transparent 50%);
-  background-position:
-    calc(100% - 18px) calc(50% - 3px),
-    calc(100% - 12px) calc(50% - 3px);
-  background-size: 6px 6px, 6px 6px;
-  background-repeat: no-repeat;
-  padding-right: 36px;
 }
 
 .order-panel-price-card {
@@ -1182,12 +1239,14 @@ h1, h2, h3, h4, h5, h6 {
 
 .trade-desk-stack {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 26px;
   margin-top: 24px;
 }
 
 .trade-section-card {
   padding: 24px;
+  min-width: 0;
 }
 
 .trade-history-card {
@@ -1261,7 +1320,7 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text-secondary);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 6px 10px;
   cursor: pointer;
   font-size: 11px;
@@ -1308,7 +1367,7 @@ h1, h2, h3, h4, h5, h6 {
 .trade-note-btn {
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 5px 8px;
   cursor: pointer;
   font-size: 11px;
@@ -1339,7 +1398,7 @@ h1, h2, h3, h4, h5, h6 {
   .grid-6 { grid-template-columns: repeat(3, 1fr); }
   .dashboard-topbar {
     margin: 8px 4px 16px !important;
-    border-radius: 18px !important;
+    border-radius: var(--radius-lg) !important;
   }
   .dashboard-topbar-right {
     width: 100%;

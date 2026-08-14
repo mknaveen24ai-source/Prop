@@ -1,16 +1,11 @@
 /* ── The Ledger Desk: global structural enforcement ───────────────────────────
-   v2 "Modern Gazette": depth comes back in a controlled way — translucent
-   glass surfaces (--glass/--elev from tokens.css) and a 4px radius cap, never
-   above 5px. Corners/shadows/blur are no longer force-zeroed globally; only
-   gradients and text-shadow stay banned everywhere (no component in this
-   codebase uses background-image for real image content, only decorative
-   gradients, so resetting it globally has no functional side effects).
+   v3 "Noir Ledger": ambient glow, gradients, and text-shadow are no longer
+   force-zeroed globally — the premium/futuristic pass depends on them
+   (auth ambient orbs, button glow, shimmer text). Structural discipline
+   (double-rule mastheads, flat stat cards, table typography, radius cap
+   from tokens.css) is what actually keeps this feeling like the Ledger
+   Desk, not the presence/absence of gradients.
 ──────────────────────────────────────────────────────────────────────────── */
-
-*, *::before, *::after {
-  text-shadow: none !important;
-  background-image: none !important;
-}
 
 /* ── Masthead: heavy double rule, like a printed statement header ── */
 .navbar, .mp-nav, nav {
@@ -97,19 +92,25 @@ td {
 }
 tr:nth-child(even) td { background: transparent !important; }
 
-/* ── Buttons: flat ink-filled blocks, inverted per theme, no gradient/glow ── */
+/* ── Buttons: ink-filled blocks, inverted per theme — hover now lifts and
+   glows instead of being flat-forced. ── */
 .btn-primary, .btn-accent, .btn-admin {
   background: var(--accent) !important;
-  color: var(--paper) !important;
+  color: var(--on-primary) !important;
   border: 1px solid var(--accent) !important;
+  position: relative;
+  transition: background var(--motion-base), border-color var(--motion-base), box-shadow var(--motion-base), transform var(--motion-fast);
 }
 .btn-primary:hover:not(:disabled),
 .btn-accent:hover:not(:disabled),
 .btn-admin:hover:not(:disabled) {
   background: var(--accent-hover) !important;
   border-color: var(--accent-hover) !important;
-  transform: none !important;
-  filter: none !important;
+  color: var(--on-primary) !important;
+}
+.btn-primary:hover:not(:disabled) {
+  box-shadow: 0 0 20px -4px var(--glow-accent);
+  transform: translateY(-1px);
 }
 .btn-secondary, .btn-ghost {
   background: transparent !important;

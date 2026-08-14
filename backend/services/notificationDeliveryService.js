@@ -3,6 +3,7 @@
 const pool = require('../db')
 const logger = require('../utils/logger')
 const mailer = require('../mailer')
+const { createUserNotification } = require('../utils/userNotifications')
 
 const BATCH_SIZE = 20
 
@@ -47,13 +48,13 @@ async function deliverNotification(io, notification) {
   }
 
   if (channel === 'web') {
-    const payload = { id: notification.id, type: notification.type, title, message, created_at: notification.created_at }
-    if (resolvedAs === 'all') {
-      io.emit('platform_notification', payload)
-      return { status: 'sent', note: 'Broadcast to all connected sessions' }
-    }
-    recipients.forEach((recipient) => io.to(String(recipient.id)).emit('platform_notification', payload))
-    return { status: 'sent', note: `Broadcast to ${recipients.length} recipient(s)` }
+    // Persisted per-recipient (not a raw io.emit broadcast) so the trader's
+    // notification history survives a localStorage clear and syncs across
+    // devices — see GET /api/notifications and utils/userNotifications.js.
+    await Promise.all(recipients.map((recipient) =>
+      createUserNotification(io, recipient.id, { type: notification.type, title, message })
+    ))
+    return { status: 'sent', note: `Delivered to ${recipients.length} recipient(s)` }
   }
 
   if (channel === 'email') {

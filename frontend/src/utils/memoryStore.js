@@ -48,3 +48,52 @@ export function removeMemoryItem(key) {
   }
   delete fallbackStore[key]
 }
+
+// Backed by localStorage, for state that should survive a closed tab and a
+// logout/login cycle (e.g. a pinned watchlist) rather than just a reload.
+const fallbackPersistentStore = {}
+let persistentStorageAvailable = true
+
+try {
+  const probeKey = '__memoryStore_persistent_probe__'
+  window.localStorage.setItem(probeKey, '1')
+  window.localStorage.removeItem(probeKey)
+} catch {
+  persistentStorageAvailable = false
+}
+
+export function getPersistentItem(key) {
+  if (persistentStorageAvailable) {
+    try {
+      return window.localStorage.getItem(key)
+    } catch {
+      // fall through to in-memory store
+    }
+  }
+  return Object.prototype.hasOwnProperty.call(fallbackPersistentStore, key) ? fallbackPersistentStore[key] : null
+}
+
+export function setPersistentItem(key, value) {
+  const stringValue = String(value)
+  if (persistentStorageAvailable) {
+    try {
+      window.localStorage.setItem(key, stringValue)
+      return
+    } catch {
+      // fall through to in-memory store
+    }
+  }
+  fallbackPersistentStore[key] = stringValue
+}
+
+export function removePersistentItem(key) {
+  if (persistentStorageAvailable) {
+    try {
+      window.localStorage.removeItem(key)
+      return
+    } catch {
+      // fall through to in-memory store
+    }
+  }
+  delete fallbackPersistentStore[key]
+}

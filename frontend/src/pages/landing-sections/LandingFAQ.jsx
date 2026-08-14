@@ -28,19 +28,34 @@ export default function LandingFAQ() {
       a: "No — you can have one active evaluation and one funded account at a time. If your evaluation fails, you may claim a new one when spots are available."
     },
     {
+      category: "General",
+      q: "What account sizes are available?",
+      a: "Seven sizes, from $5,000 to $400,000, across every model — 1-Step, 2-Step, and 3-Step. The same rules apply at every size; only the price and the dollar value of the targets change."
+    },
+    {
       category: "Rules",
       q: "What are the evaluation rules?",
-      a: "Every phase of your chosen model has identical core rules: hit that phase's profit target within its time limit without breaching the maximum drawdown limit. The rules are exactly the same across every phase — no surprises."
+      a: "Every phase of your chosen model has identical core rules: hit that phase's profit target within its time limit without breaching the maximum drawdown limit. Currently: 1-Step is a 16% target in 45 days; 2-Step is 10% then 8%, 45 days per phase; 3-Step is 8%, 6%, then 6%, 45 days per phase. The rules are exactly the same across every phase — no surprises."
     },
     {
       category: "Rules",
       q: "What is the drawdown limit?",
-      a: "The drawdown limits are set relative to your account size and model, and are clearly displayed on your dashboard before you start. They stay the same across every phase of your challenge."
+      a: "Currently 4% maximum trailing drawdown and 2% daily drawdown, on every model and every phase, evaluation and funded alike. The trailing floor only ever rises as you profit — it never resets against you. Exact dollar figures for your account are on your dashboard before you start."
     },
     {
       category: "Rules",
       q: "What is the time limit?",
-      a: "Each phase has its own time limit, shown before you start. If you do not reach the profit target in time, the evaluation is failed and you may start a new challenge when spots are available."
+      a: "Each phase has its own time limit, shown before you start — currently 45 days per phase on every model. If you do not reach the profit target in time, the evaluation is failed and you may start a new challenge when spots are available."
+    },
+    {
+      category: "Rules",
+      q: "Is there a minimum number of trading days?",
+      a: "Yes — 5 qualifying trading days per evaluation phase, even if you hit the profit target sooner. A day only counts once you're up at least 0.75% of your starting balance on that day."
+    },
+    {
+      category: "Rules",
+      q: "What is the consistency rule?",
+      a: "No single day's profit can make up more than 15% of your total profit when you hit the target. If it does, you're not failed — it's a soft hold. Keep trading to bring the ratio down and you'll pass automatically."
     },
     {
       category: "Rules",
@@ -55,7 +70,7 @@ export default function LandingFAQ() {
     {
       category: "Rules",
       q: "Can I hold trades over the weekend?",
-      a: "During the evaluation phases, weekend holding is allowed. On funded accounts, all positions must be closed before the market closes on Friday to avoid weekend gap risk."
+      a: "Weekend holding is currently enabled for every account, evaluation and funded alike — it's a single platform-wide setting, not something that changes when you get funded. If that setting is ever disabled, positions are flattened automatically before the weekend close."
     },
     {
       category: "Rules",
@@ -75,7 +90,17 @@ export default function LandingFAQ() {
     {
       category: "Funded",
       q: "How do payouts work?",
-      a: "Payouts are available on a Weekly basis. The minimum payout threshold and profit split details are displayed on your funded account dashboard."
+      a: "Payouts are available on a weekly basis. You keep 75% of your profits, with a $50 minimum payout request. Before your first payout, you need at least 10 qualifying trading days and 6% net profit on the account — after that, there's no further lock-up period."
+    },
+    {
+      category: "Funded",
+      q: "Does my drawdown protection improve as I profit?",
+      a: "Yes. Once your funded account's equity reaches 2% above your starting balance, your drawdown floor locks in at that level for good — it won't drop back below it even if your equity pulls back later."
+    },
+    {
+      category: "Funded",
+      q: "Is there a scaling plan?",
+      a: "Yes. Every time your funded account reaches a new 6% net-profit milestone, your risk-capacity multiplier doubles — compounding with every milestone you hit."
     },
     {
       category: "Funded",

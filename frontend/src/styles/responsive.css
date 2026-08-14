@@ -251,7 +251,7 @@
 
   .mode-trader .dashboard-topbar {
     margin: 8px 0 16px !important;
-    border-radius: 18px !important;
+    border-radius: var(--radius-lg) !important;
     padding: 12px !important;
   }
 
@@ -296,18 +296,13 @@
     scroll-snap-align: start;
   }
 
-  .mode-trader .card,
-  .mode-trader .card-stat {
+  .mode-trader .card {
     padding: 16px;
-    border-radius: 16px;
-  }
-
-  .mode-trader .card-stat-value {
-    font-size: clamp(21px, 8vw, 30px);
+    border-radius: var(--radius-lg);
   }
 
   .mode-trader .chart-workspace-shell {
-    border-radius: 18px;
+    border-radius: var(--radius-lg);
   }
 
   .mode-trader .chart-workspace-toolbar {

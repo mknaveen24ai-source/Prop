@@ -18,6 +18,7 @@ import { useBranding } from '../BrandingContext'
 import ThemeToggle from '../components/ThemeToggle'
 import { useTheme } from '../ThemeContext'
 import './Transparency.css'
+import { API_BASE_URL as API_URL } from '../config/apiBase'
 
 // Register Chart.js components
 ChartJS.register(
@@ -31,7 +32,6 @@ ChartJS.register(
   Legend
 )
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 const REFRESH_INTERVAL_MS = 60 * 1000 // 60 seconds
 
 // ── Helpers ────────────────────────────────────────────────────────────────────

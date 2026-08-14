@@ -3735,7 +3735,6 @@ module.exports = {
   ensureTradeExperienceInfrastructure,
   calculatePnL,
   getLivePriceMap,
-  computeRMultiple,
   computeRMultiple
 }
 

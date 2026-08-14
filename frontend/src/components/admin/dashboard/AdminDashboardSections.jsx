@@ -40,7 +40,7 @@ function EmptyChartState({ height, message }) {
 // Alerts row — Modern Gazette handoff spec: the top 1-3 most urgent
 // conditions only, distinct from the fuller "Needs Attention" queue below.
 // Renders nothing when there's nothing urgent (no fabricated filler cards).
-const ALERT_ROUTES = {
+export const ALERT_ROUTES = {
   violations: '/admin/violations',
   payouts: '/admin/payouts',
   disputes: '/admin/disputes',

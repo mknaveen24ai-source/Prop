@@ -47,7 +47,7 @@ class ErrorBoundary extends React.Component {
           >
             Try Again
           </button>
-          {process.env.NODE_ENV === 'development' && this.state.error && (
+          {import.meta.env.DEV && this.state.error && (
             <pre style={{ marginTop: '18px', textAlign: 'left', fontSize: '11px', color: 'var(--danger)', overflowX: 'auto', maxWidth: '100%' }}>
               {this.state.error.toString()}
               {'\n'}
@@ -87,7 +87,7 @@ class ErrorBoundary extends React.Component {
               Go Home
             </button>
           </div>
-          {process.env.NODE_ENV === 'development' && this.state.error && (
+          {import.meta.env.DEV && this.state.error && (
             <div style={{ marginTop: '40px', padding: '20px', background: 'var(--paper-2, #1f1f1f)', border: '1px solid var(--loss, #f87171)', width: '80%', maxWidth: '800px', overflowX: 'auto' }}>
               <pre style={{ color: 'var(--loss, #f87171)', fontSize: '12px', margin: 0 }}>
                 {this.state.error.toString()}

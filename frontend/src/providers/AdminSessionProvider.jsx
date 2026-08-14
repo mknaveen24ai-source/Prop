@@ -1,8 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import axios from 'axios'
 import { io } from 'socket.io-client'
+import { API_BASE_URL as API_URL, SOCKET_URL } from '../config/apiBase'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 const adminAxios = axios.create({
   baseURL: API_URL,
@@ -87,7 +87,7 @@ export function AdminSessionProvider({ children }) {
       return undefined
     }
 
-    const socketInstance = io(API_URL, {
+    const socketInstance = io(SOCKET_URL, {
       transports: ['websocket', 'polling'],
       withCredentials: true
     })

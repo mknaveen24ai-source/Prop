@@ -1,5 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+// Sentry must initialize before anything else renders, so that errors thrown
+// during the first paint are captured too. No-op when VITE_SENTRY_DSN is unset.
+import { initSentry } from './utils/sentry';
 import './index.css';
 import App from './App';
 import ErrorBoundary from './ErrorBoundary';
@@ -8,6 +11,8 @@ import { BrandingProvider } from './BrandingContext';
 import { AuthProvider } from './providers/AuthProvider';
 import { AdminSessionProvider } from './providers/AdminSessionProvider';
 import reportWebVitals from './reportWebVitals';
+
+initSentry();
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 

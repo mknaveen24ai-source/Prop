@@ -21,7 +21,9 @@ const EMAIL_TEMPLATE_KEYS = Object.freeze([
   'affiliate_payout_requested',
   'affiliate_payout_approved',
   'affiliate_payout_rejected',
-  'competition_prize_voucher'
+  'competition_prize_voucher',
+  'gift_challenge_voucher',
+  'referral_season_prize_voucher'
 ])
 
 let transporter = null
@@ -611,6 +613,57 @@ function buildCompetitionPrizeVoucherEmail(payload) {
   }
 }
 
+function buildGiftChallengeVoucherEmail(payload) {
+  const to = String(payload?.toEmail || '').trim()
+  const fullName = String(payload?.fullName || 'Trader')
+  const purchaserName = String(payload?.purchaserName || 'A friend')
+  const voucherCode = String(payload?.voucherCode || '')
+  const accountSize = Number(payload?.accountSize || 0)
+  const giftMessage = payload?.giftMessage ? String(payload.giftMessage) : ''
+  const expiresAt = payload?.expiresAt ? new Date(payload.expiresAt) : null
+  const context = resolveMailContext()
+  const expiryText = expiresAt && !Number.isNaN(expiresAt.getTime())
+    ? ` before ${expiresAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
+    : ''
+  return {
+    to,
+    subject: `${context.firmName} - ${purchaserName} sent you a challenge account!`,
+    html: htmlWrap(`Hi ${fullName}!`, `
+      <p><strong>${purchaserName}</strong> sent you a free <strong style="color:#c9a84c;">$${accountSize.toLocaleString()}</strong> challenge account.</p>
+      ${giftMessage ? `<div style="background:#0d1b2a;border-left:3px solid #c9a84c;padding:12px 16px;border-radius:4px;margin:16px 0;color:#e5e5e5;font-size:14px;font-style:italic;">"${giftMessage}"</div>` : ''}
+      <p>Redeem it at checkout with this code${expiryText}:</p>
+      <p style="margin:24px 0;font-size:20px;font-weight:700;letter-spacing:0.08em;color:#c9a84c;">${voucherCode}</p>
+      <p style="margin:24px 0;"><a href="${context.baseUrl}/register?gift=${encodeURIComponent(voucherCode)}" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">Claim Your Gift</a></p>
+      <p style="font-size:12px;color:#8a8a8a;">Already have an account? Log in and enter this code at checkout instead.</p>
+    `),
+    text: `${purchaserName} sent you a free $${accountSize.toLocaleString()} challenge account. Redeem code ${voucherCode} at checkout${expiryText}.`
+  }
+}
+
+function buildReferralSeasonPrizeVoucherEmail(payload) {
+  const to = String(payload?.toEmail || '').trim()
+  const fullName = String(payload?.fullName || 'Trader')
+  const seasonTitle = String(payload?.seasonTitle || 'the referral season')
+  const voucherCode = String(payload?.voucherCode || '')
+  const accountSize = Number(payload?.accountSize || 0)
+  const expiresAt = payload?.expiresAt ? new Date(payload.expiresAt) : null
+  const context = resolveMailContext()
+  const expiryText = expiresAt && !Number.isNaN(expiresAt.getTime())
+    ? ` before ${expiresAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
+    : ''
+  return {
+    to,
+    subject: `${context.firmName} - You Won the Referral Season!`,
+    html: htmlWrap(`Congratulations ${fullName}!`, `
+      <p>You placed in <strong>${seasonTitle}</strong> and won a free <strong style="color:#c9a84c;">$${accountSize.toLocaleString()}</strong> challenge account.</p>
+      <p>Redeem it at checkout with this code${expiryText}:</p>
+      <p style="margin:24px 0;font-size:20px;font-weight:700;letter-spacing:0.08em;color:#c9a84c;">${voucherCode}</p>
+      <p style="margin:24px 0;"><a href="${context.baseUrl}/dashboard" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">Claim Your Prize</a></p>
+    `),
+    text: `You won a free $${accountSize.toLocaleString()} challenge account in ${seasonTitle}. Redeem code ${voucherCode} at checkout${expiryText}.`
+  }
+}
+
 function buildEmailMessage(templateKey, payload = {}) {
   const normalizedKey = String(templateKey || '').trim().toLowerCase()
 
@@ -651,6 +704,10 @@ function buildEmailMessage(templateKey, payload = {}) {
       return buildAffiliatePayoutRejectedEmail(payload)
     case 'competition_prize_voucher':
       return buildCompetitionPrizeVoucherEmail(payload)
+    case 'gift_challenge_voucher':
+      return buildGiftChallengeVoucherEmail(payload)
+    case 'referral_season_prize_voucher':
+      return buildReferralSeasonPrizeVoucherEmail(payload)
     default:
       throw new Error(`Unsupported email template: ${normalizedKey || 'unknown'}`)
   }
@@ -770,6 +827,14 @@ async function sendAffiliatePayoutRejectedEmail(toEmail, fullName, amountRequest
   return sendWithTemplate('affiliate_payout_rejected', { toEmail, fullName, amountRequested, reason }, options)
 }
 
+async function sendGiftChallengeVoucherEmail(toEmail, fullName, purchaserName, voucherCode, accountSize, giftMessage, expiresAt, options = {}) {
+  return sendWithTemplate('gift_challenge_voucher', { toEmail, fullName, purchaserName, voucherCode, accountSize, giftMessage, expiresAt }, options)
+}
+
+async function sendReferralSeasonPrizeVoucherEmail(toEmail, fullName, seasonTitle, voucherCode, accountSize, expiresAt, options = {}) {
+  return sendWithTemplate('referral_season_prize_voucher', { toEmail, fullName, seasonTitle, voucherCode, accountSize, expiresAt }, options)
+}
+
 module.exports = {
   EMAIL_TEMPLATE_KEYS,
   getMailTransporter,
@@ -799,6 +864,8 @@ module.exports = {
   sendAffiliatePayoutApprovedEmail,
   sendAffiliatePayoutRejectedEmail,
   sendCompetitionPrizeVoucherEmail,
+  sendGiftChallengeVoucherEmail,
+  sendReferralSeasonPrizeVoucherEmail,
   hasConfiguredSendGridKey,
   __resetMailTransporterForTests() {
     transporter = null

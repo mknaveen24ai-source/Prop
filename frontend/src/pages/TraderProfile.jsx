@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import axios from 'axios'
+import { analyticsAPI } from '../services/api'
 import ThemeToggle from '../components/ThemeToggle'
 import Card from '../components/ui/Card'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+import { renderIcon } from '../utils/iconMap'
 
 // Pure content — no page chrome, so it can be embedded inside the dashboard
 // (DashboardCompetitionsPage.jsx, when viewing a trader from a competition
@@ -19,7 +18,7 @@ export function TraderProfileContent({ userId, onBack }) {
     if (!userId) { setNotFound(true); setLoading(false); return }
     setLoading(true)
     setNotFound(false)
-    axios.get(`${API_URL}/api/auth/profile/${userId}`)
+    analyticsAPI.getTraderStats(userId)
       .then(res => setProfile(res.data))
       .catch(err => {
         if (err.response?.status === 404) setNotFound(true)
@@ -39,7 +38,9 @@ export function TraderProfileContent({ userId, onBack }) {
   if (notFound || !profile) {
     return (
       <div style={{ textAlign: 'center', padding: '80px 24px' }}>
-        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+          {renderIcon('search', { size: 40, color: 'var(--accent)' })}
+        </div>
         <h2 style={{ color: 'var(--accent)', marginBottom: '12px' }}>Profile Not Found</h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: '24px' }}>This trader profile is private or does not exist.</p>
         <button onClick={goBack} className="btn" style={{ border: '1px solid var(--navy-border)', padding: '10px 24px', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
@@ -90,21 +91,22 @@ export function TraderProfileContent({ userId, onBack }) {
               {trader.full_name}
             </h1>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
-                📍 {trader.country || 'Unknown'}
+              <span style={{ fontSize: '12px', color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                {renderIcon('location', { size: 12 })} {trader.country || 'Unknown'}
               </span>
               <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>·</span>
-              <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
-                🗓 Joined {joinDate}
+              <span style={{ fontSize: '12px', color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                {renderIcon('calendar', { size: 12 })} Joined {joinDate}
               </span>
               {trader.is_funded && (
                 <span style={{
                   padding: '2px 10px', borderRadius: 'var(--radius-pill)',
                   background: 'color-mix(in srgb, var(--muted) 12%, transparent)',
                   border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)',
-                  fontSize: '11px', color: 'var(--cyan)', fontWeight: '600'
+                  fontSize: '11px', color: 'var(--cyan)', fontWeight: '600',
+                  display: 'inline-flex', alignItems: 'center', gap: '4px'
                 }}>
-                  ✦ FUNDED TRADER
+                  {renderIcon('star', { size: 11 })} FUNDED TRADER
                 </span>
               )}
               {trader.total_phases_passed > 0 && (
@@ -112,9 +114,10 @@ export function TraderProfileContent({ userId, onBack }) {
                   padding: '2px 10px', borderRadius: 'var(--radius-pill)',
                   background: 'color-mix(in srgb, var(--muted) 10%, transparent)',
                   border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)',
-                  fontSize: '11px', color: 'var(--accent)', fontWeight: '600'
+                  fontSize: '11px', color: 'var(--accent)', fontWeight: '600',
+                  display: 'inline-flex', alignItems: 'center', gap: '4px'
                 }}>
-                  🏆 {trader.total_phases_passed} Phase{trader.total_phases_passed !== 1 ? 's' : ''} Passed
+                  {renderIcon('leaderboard', { size: 11 })} {trader.total_phases_passed} Phase{trader.total_phases_passed !== 1 ? 's' : ''} Passed
                 </span>
               )}
             </div>

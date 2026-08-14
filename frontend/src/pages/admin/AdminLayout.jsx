@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import './admin.css'
 import { AdminToastProvider, useToast } from '../../components/admin/AdminToast'
 import AdminSidebar from '../../components/admin/AdminSidebar'
@@ -9,6 +9,8 @@ import AdminTopBar from '../../components/admin/AdminTopBar'
 import { useAdminSession } from '../../providers/AdminSessionProvider'
 import ErrorBoundary from '../../ErrorBoundary'
 import ThemeToggle from '../../components/ThemeToggle'
+import EyeIcon from '../../components/common/EyeIcon'
+import OtpInput from '../../components/common/OtpInput'
 
 function formatViolationLabel(value) {
   return String(value || 'critical violation')
@@ -16,12 +18,20 @@ function formatViolationLabel(value) {
     .replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
-function EyeIcon({ hidden }) {
+function AdminShieldIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      {hidden && <path d="M4 20 20 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />}
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6l7-3Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M9 12l2 2 4-4.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function AdminLockIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect x="5" y="10" width="14" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   )
 }
@@ -64,17 +74,9 @@ export function AdminLoginScreen({ onLoginSuccess }) {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [pre2faToken, setPre2faToken] = useState('')
-  const [totpDigits, setTotpDigits] = useState(['', '', '', '', '', ''])
+  const [totpCode, setTotpCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
-
-  const tr0 = useRef(null)
-  const tr1 = useRef(null)
-  const tr2 = useRef(null)
-  const tr3 = useRef(null)
-  const tr4 = useRef(null)
-  const tr5 = useRef(null)
-  const totpRefs = [tr0, tr1, tr2, tr3, tr4, tr5]
 
   const handlePasswordSubmit = async (event) => {
     event.preventDefault()
@@ -90,7 +92,6 @@ export function AdminLoginScreen({ onLoginSuccess }) {
       if (response.data.requires2FA) {
         setPre2faToken(response.data.pre2faToken)
         setStep('totp')
-        setTimeout(() => totpRefs[0]?.current?.focus(), 50)
       } else {
         await onLoginSuccess()
       }
@@ -119,38 +120,30 @@ export function AdminLoginScreen({ onLoginSuccess }) {
     }
   }
 
-  const handleTotpInput = (index, value) => {
-    const digit = value.replace(/\D/g, '').slice(0, 1)
-    const next = [...totpDigits]
-    next[index] = digit
-    setTotpDigits(next)
-
-    if (digit && index < 5) totpRefs[index + 1].current?.focus()
-    if (digit && index === 5) {
-      const code = [...next.slice(0, 5), digit].join('')
-      if (code.length === 6) handleTotpVerify(code)
-    }
-  }
-
-  const handleTotpKeyDown = (index, event) => {
-    if (event.key === 'Backspace' && !totpDigits[index] && index > 0) {
-      totpRefs[index - 1].current?.focus()
-    }
-    if (event.key === 'Enter') {
-      const code = totpDigits.join('')
-      if (code.length === 6) handleTotpVerify(code)
-    }
-  }
-
   return (
-    <div className="mode-operator admin-layout" style={{ justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
+    <div className="mode-operator admin-layout auth-shell" style={{ justifyContent: 'center', alignItems: 'center', position: 'relative', overflow: 'hidden' }}>
+      <div className="auth-ambient auth-ambient-primary" />
+      <div className="auth-ambient auth-ambient-secondary" />
+
+      <Link
+        to="/"
+        className="auth-secondary-button"
+        style={{ position: 'absolute', top: '24px', left: '24px', width: 'auto', display: 'inline-block', textDecoration: 'none', zIndex: 20 }}
+      >
+        ← Return to main site
+      </Link>
+
       <div style={{ position: 'absolute', top: '24px', right: '24px', zIndex: 20 }}>
         <ThemeToggle />
       </div>
-      <div className="lx-card ui-surface ui-auth-card" style={{ position: 'relative', zIndex: 10 }}>
+      <div className="lx-card ui-surface ui-auth-card auth-glass-card" style={{ position: 'relative', zIndex: 10, width: 'min(100%, 420px)' }}>
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <div style={{ width: '48px', height: '48px', background: 'var(--admin-accent-bg)', color: 'var(--admin-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: '24px' }}>
-            {step === 'totp' ? '🔐' : '⚡'}
+          <div style={{
+            width: '48px', height: '48px', background: 'var(--admin-accent-bg)', color: 'var(--admin-accent)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px',
+            border: '1px solid var(--rule-soft)',
+          }}>
+            {step === 'totp' ? <AdminLockIcon /> : <AdminShieldIcon />}
           </div>
           <h1 className="admin-h1">Admin Portal</h1>
           <p style={{ color: 'var(--admin-text-muted)' }}>
@@ -209,45 +202,11 @@ export function AdminLoginScreen({ onLoginSuccess }) {
 
         {step === 'totp' && (
           <div>
-            <div
-              style={{ display: 'flex', gap: '8px', justifyContent: 'center', margin: '24px 0' }}
-              onPaste={(event) => {
-                const pasted = event.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
-                if (pasted.length === 6) {
-                  setTotpDigits(pasted.split(''))
-                  handleTotpVerify(pasted)
-                }
-              }}
-            >
-              {totpDigits.map((digit, index) => (
-                <input
-                  key={index}
-                  ref={totpRefs[index]}
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={1}
-                  value={digit}
-                  onChange={(event) => handleTotpInput(index, event.target.value)}
-                  onKeyDown={(event) => handleTotpKeyDown(index, event)}
-                  style={{
-                    width: '44px',
-                    height: '52px',
-                    textAlign: 'center',
-                    fontSize: '24px',
-                    fontFamily: 'var(--admin-font-mono)',
-                    fontWeight: 700,
-                    background: 'var(--admin-bg)',
-                    border: `1px solid ${digit ? 'var(--admin-accent)' : 'var(--admin-border)'}`,
-                    color: 'var(--admin-text)',
-                    outline: 'none'
-                  }}
-                />
-              ))}
-            </div>
+            <OtpInput idPrefix="admin-totp-digit" onChange={setTotpCode} onComplete={handleTotpVerify} disabled={loading} />
             <button
               className="admin-btn admin-btn-primary"
-              onClick={() => handleTotpVerify(totpDigits.join(''))}
-              disabled={loading || totpDigits.join('').length < 6}
+              onClick={() => handleTotpVerify(totpCode)}
+              disabled={loading || totpCode.length < 6}
               style={{ width: '100%' }}
             >
               {loading ? 'Verifying...' : 'Verify Code'}
@@ -300,6 +259,7 @@ export default function AdminLayout() {
 
         <div className="admin-main-wrapper">
           <AdminTopBar
+            adminAxios={adminAxios}
             session={session}
             onLogout={logout}
             onMobileMenuClick={() => setMobileMenuOpen(true)}

@@ -44,6 +44,7 @@ const { sendEmailMessage, htmlWrap, resolveMailContext } = require('../mailer')
 const { computeRMultiple } = require('./trades')
 const { CURRENT_TOS_VERSION } = require('../utils/tosVersion')
 const { readKycFileBuffer, getKycContentType, getOriginalKycExtension } = require('../utils/secureKycStorage')
+const { createUserNotification } = require('../utils/userNotifications')
 const { ensureViolationTables } = require('../services/violationEngine')
 const { getTenantSettings } = require('../services/tenantPolicyService')
 const { getPriceForTenant } = require('../priceFeed')
@@ -2003,46 +2004,18 @@ router.post('/login', adminLoginLimiter, async function(req, res) {
       }
     })
 
-    // Check if admin 2FA is set up
-    let admin2faEnabled = false
-    let admin2faSecret  = null
-    try {
-      const s2fa = await pool.query(
-        `SELECT value FROM platform_settings WHERE key = 'admin_totp_secret'`
-      )
-      if (s2fa.rows.length > 0 && s2fa.rows[0].value) {
-        admin2faEnabled = true
-        admin2faSecret  = s2fa.rows[0].value
-      }
-    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
-
-    if (admin2faEnabled) {
-      // Step 1 of 2 — password OK, but issue a short-lived pre_2fa_admin token
-      const pre2faToken = jwt.sign(
-        { role: 'super_admin', type: 'pre_2fa_admin', atv: adminTokenVersion },
-        process.env.ADMIN_JWT_SECRET,
-        { expiresIn: '5m' }
-      )
-      return res.json({ requires2FA: true, pre2faToken })
-    }
-
-    // No 2FA configured — issue full admin token (unchanged original flow)
-    const legacyToken = jwt.sign(
-      { role: 'super_admin', atv: adminTokenVersion },
-      process.env.ADMIN_JWT_SECRET,
-      { expiresIn: '24h' }
-    )
-
-    // FIX (BUG-L5): Hardened admin cookie with sameSite: 'strict' (was 'lax').
-    res.cookie('admin_token', legacyToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 24 * 60 * 60 * 1000,
-      path: '/'
-    })
-
-    res.json({ message: 'Admin login successful', token: legacyToken, admin: { role: 'super_admin' } })
+    // NOTE: ~40 lines of legacy `admin_totp_secret` 2FA handling used to sit
+    // here, after the `return res.json(...)` above — permanently unreachable,
+    // and flagged by eslint's no-unreachable.
+    //
+    // It was safe to delete rather than restore. This env-fallback branch is
+    // reachable only when `activePlatformAdminCount === 0` (see the guard
+    // above), i.e. first-boot bootstrap before any DB-backed admin exists —
+    // there is no admin account for 2FA to protect yet, and the response says
+    // `requires_platform_admin_bootstrap: true` precisely to push the operator
+    // into creating one. Real 2FA lives on the `platform_admins` path above and
+    // is enforced there. `deploy-preflight` additionally refuses to pass unless
+    // at least one active DB-backed admin exists with TOTP enrolled.
 
   } catch (error) {
     logger.error('[admin/login] error:', { error: error.message })
@@ -2190,12 +2163,12 @@ async function verifyAdmin2faTokenOrBackup(record, token) {
 
   const backupCodes = parseStoredBackupCodes(record.totp_backup_codes)
   if (backupCodes.length === 0) {
-    return { ok: false, used_backup_code: false, backup_codes }
+    return { ok: false, used_backup_code: false, backup_codes: backupCodes }
   }
 
   const consumed = await totp.consumeBackupCode(token, backupCodes)
   if (!consumed.matched) {
-    return { ok: false, used_backup_code: false, backup_codes }
+    return { ok: false, used_backup_code: false, backup_codes: backupCodes }
   }
 
   return {
@@ -4526,6 +4499,16 @@ router.post('/kyc/approve', authenticateAdmin, requireAdminCapability('kyc:revie
       userId: result.rows[0].id
     })
 
+    const io = req.app.get('io')
+    if (io) {
+      io.to(String(user_id)).emit('kyc_status_changed', { status: 'approved' })
+      await createUserNotification(io, user_id, {
+        type: 'success',
+        title: 'Identity Verified',
+        message: 'Your identity verification was approved. You can now request payouts.'
+      })
+    }
+
     res.json({ message: 'KYC approved successfully' })
   } catch (error) {
     logger.error('KYC approve error:', { error: error.message })
@@ -4564,6 +4547,16 @@ router.post('/kyc/reject', authenticateAdmin, requireAdminCapability('kyc:review
     await enqueueKycRejectedEmail(result.rows[0].email, result.rows[0].full_name, reason, {
       userId: result.rows[0].id
     })
+
+    const io = req.app.get('io')
+    if (io) {
+      io.to(String(user_id)).emit('kyc_status_changed', { status: 'rejected', reason: reason || '' })
+      await createUserNotification(io, user_id, {
+        type: 'error',
+        title: 'Identity Verification Rejected',
+        message: reason ? `Your identity verification was rejected: ${reason}` : 'Your identity verification was rejected.'
+      })
+    }
 
     res.json({ message: 'KYC rejected' })
   } catch (error) {
@@ -5547,6 +5540,16 @@ router.post('/payouts/approve', authenticateAdmin, requireAdminCapability('payou
       userId: user_id || null
     })
 
+    const io = req.app.get('io')
+    if (io && user_id) {
+      io.to(String(user_id)).emit('payout_approved', { amount: amount_payable })
+      await createUserNotification(io, user_id, {
+        type: 'success',
+        title: 'Payout Approved',
+        message: `Your payout of $${parseFloat(amount_payable).toFixed(2)} has been approved and paid.`
+      })
+    }
+
     res.json({ message: 'Payout marked as paid and user notified' })
   } catch (error) {
     if (client) await client.query('ROLLBACK').catch(() => {})
@@ -5591,6 +5594,15 @@ router.post('/payouts/reject', authenticateAdmin, requireAdminCapability('payout
     await enqueuePayoutRejectedEmail(email, full_name, amount_requested, reason, {
       userId: user_id || null
     })
+
+    const io = req.app.get('io')
+    if (io && user_id) {
+      await createUserNotification(io, user_id, {
+        type: 'error',
+        title: 'Payout Rejected',
+        message: reason ? `Your payout request was rejected: ${reason}` : 'Your payout request was rejected.'
+      })
+    }
 
     res.json({ message: 'Payout rejected and user notified' })
   } catch (error) {
@@ -7501,6 +7513,62 @@ router.patch('/step-models/:slug/phases/:phaseIndex', authenticateAdmin, require
   } catch (err) {
     logger.error('[admin] Failed to update step model phase:', { error: err.message })
     res.status(500).json({ error: 'Failed to update step model phase' })
+  }
+})
+
+// PATCH /admin/step-models/:slug/scaling
+// Funded-stage scaling-plan config: milestone size, multiplier, real capital
+// injection per milestone, and the account-size cap. Separate from
+// /phases/:phaseIndex since scaling applies to the funded stage as a whole,
+// not any one evaluation phase. Since scaling_increase_per_milestone_pct now
+// wires up real money via challengeEngine.js's evaluateScalingPlan() +
+// utils/balanceAdjustments.js, these fields are edited here explicitly rather
+// than left as seed-only constants.
+router.patch('/step-models/:slug/scaling', authenticateAdmin, requireSuperAdmin, async (req, res) => {
+  try {
+    const slug = String(req.params.slug || '').trim().toLowerCase()
+    const model = await fetchStepModelBySlug(slug)
+    if (!model) return res.status(404).json({ error: 'Step model not found' })
+
+    const body = req.body || {}
+    const scalingEnabled = body.scaling_enabled !== undefined ? !!body.scaling_enabled : model.scaling_enabled
+    const scalingTargetPct = body.scaling_target_pct !== undefined ? parseFloat(body.scaling_target_pct) : parseFloat(model.scaling_target_pct)
+    const scalingMultiplier = body.scaling_multiplier !== undefined ? parseFloat(body.scaling_multiplier) : parseFloat(model.scaling_multiplier)
+    const scalingIncreasePct = body.scaling_increase_per_milestone_pct !== undefined ? parseFloat(body.scaling_increase_per_milestone_pct) : parseFloat(model.scaling_increase_per_milestone_pct || 0)
+    const scalingMaxAccountSize = body.scaling_max_account_size !== undefined ? parseInt(body.scaling_max_account_size, 10) : parseInt(model.scaling_max_account_size, 10)
+
+    if (!(scalingTargetPct > 0)) return res.status(400).json({ error: 'scaling_target_pct must be a positive number' })
+    if (!(scalingMultiplier > 1)) return res.status(400).json({ error: 'scaling_multiplier must be greater than 1' })
+    if (scalingIncreasePct < 0) return res.status(400).json({ error: 'scaling_increase_per_milestone_pct cannot be negative' })
+    if (!(scalingMaxAccountSize > 0)) return res.status(400).json({ error: 'scaling_max_account_size must be a positive number' })
+
+    const result = await pool.query(
+      `UPDATE challenge_models SET
+         scaling_enabled = $2,
+         scaling_target_pct = $3,
+         scaling_multiplier = $4,
+         scaling_increase_per_milestone_pct = $5,
+         scaling_max_account_size = $6,
+         updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [model.id, scalingEnabled, scalingTargetPct, scalingMultiplier, scalingIncreasePct, scalingMaxAccountSize]
+    )
+
+    try {
+      await appendImmutableAudit(pool, {
+        eventType: 'step_model_scaling_updated',
+        entityType: 'step_model',
+        entityId: slug,
+        actor: getAdminActorLabel(req.admin),
+        payload: { slug, changes: body }
+      })
+    } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
+
+    res.json(result.rows[0])
+  } catch (err) {
+    logger.error('[admin] Failed to update step model scaling config:', { error: err.message })
+    res.status(500).json({ error: 'Failed to update scaling config' })
   }
 })
 

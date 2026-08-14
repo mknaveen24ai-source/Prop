@@ -3,6 +3,31 @@
 .qwen/
 node_modules/
 
+# Secrets — never commit
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+
+# TLS private keys / certs (deploy/certs/.gitkeep documents how to issue them)
+deploy/certs/*.pem
+deploy/certs/*.key
+deploy/certs/*.crt
+
+# Stray artifacts
+backend/image.png
+
+# Build output / runtime artifacts
+frontend/build/
+frontend/dist/
+logs/
+backend/logs/
+backend/uploads/
+backups/
+e2e/playwright-report/
+e2e/test-results/
+
 ALL_*.md
 BUG_ANALYSIS_REPORT.md
 CHAT_FEATURE_DOCUMENTATION.md

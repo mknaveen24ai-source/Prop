@@ -8,16 +8,22 @@ RUN npm ci
 
 COPY . .
 
-# Inject branding at build time via build args
-ARG VITE_API_URL
-ARG VITE_FIRM_NAME
-ARG VITE_PRIMARY_COLOR
-ARG VITE_SUPPORT_EMAIL
+# Build-time config. Vite inlines import.meta.env.VITE_* at build time, so these
+# must be present here — they cannot be injected at container runtime.
+#
+# VITE_API_URL is deliberately allowed to be empty: it is the axios baseURL and
+# every call path already begins with /api/..., so behind the same-origin nginx
+# proxy an empty value is the correct one.
+#
+# Branding (firm name, colours, support email) is NOT built in — it is fetched at
+# runtime from the API by BrandingContext. Do not re-add VITE_FIRM_NAME et al.
+ARG VITE_API_URL=""
+ARG VITE_APP_VERSION=1.0.0
+ARG VITE_SENTRY_DSN=""
 
 ENV VITE_API_URL=$VITE_API_URL
-ENV VITE_FIRM_NAME=$VITE_FIRM_NAME
-ENV VITE_PRIMARY_COLOR=$VITE_PRIMARY_COLOR
-ENV VITE_SUPPORT_EMAIL=$VITE_SUPPORT_EMAIL
+ENV VITE_APP_VERSION=$VITE_APP_VERSION
+ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
 
 RUN npm run build
 

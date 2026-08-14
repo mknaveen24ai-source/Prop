@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import {
   formatDate,
   calculateDrawdown,
-  getRiskLevel,
   isValidEmail,
   isValidPassword,
   sleep
@@ -40,24 +39,6 @@ describe('Utility Functions - helpers.js', () => {
 
     it('should handle zero starting balance', () => {
       expect(calculateDrawdown(1000, 1000, 0)).not.toBeUndefined()
-    })
-  })
-
-  describe('getRiskLevel', () => {
-    it('should return critical for high drawdown usage', () => {
-      expect(getRiskLevel(95, 10).level).toBe('critical')
-    })
-
-    it('should return high for moderate drawdown usage', () => {
-      expect(getRiskLevel(8, 10).level).toBe('high')
-    })
-
-    it('should return safe for very low drawdown usage', () => {
-      expect(getRiskLevel(1, 10).level).toBe('safe')
-    })
-
-    it('should handle zero max drawdown', () => {
-      expect(getRiskLevel(5, 0)).toBeTruthy()
     })
   })
 

@@ -8,8 +8,8 @@ import AdminStatCard from '../../components/admin/AdminStatCard';
 import { useToast } from '../../components/admin/AdminToast';
 import { exportAdminResource, normalizeAdminListResponse } from '../../utils/adminList';
 import Card from '../../components/ui/Card';
+import { API_BASE_URL as API_URL } from '../../config/apiBase'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const DEFAULT_FILTERS = {
   status: 'pending'

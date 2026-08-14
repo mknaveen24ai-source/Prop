@@ -5,8 +5,9 @@ import { Search } from 'lucide-react'
  * Global fuzzy nav overlay (⌘K / Ctrl+K to open, Esc to close). Shell-agnostic
  * — the trader shell (Dashboard.jsx) and admin shell (AdminLayout.jsx) each
  * mount their own instance with a `results` list built from their own nav
- * structure, since trader tabs are internal state (setActivePage) while
- * admin pages are real routes (navigate).
+ * structure. Both are real routes now (/dashboard/<view> and /admin/<page>);
+ * Dashboard.jsx's setActivePage is a thin navigate() shim kept for backwards
+ * compatibility with existing call sites, not local-only state anymore.
  */
 export default function CommandPalette({ results, placeholder = 'Jump to a page…' }) {
   const [open, setOpen] = useState(false)

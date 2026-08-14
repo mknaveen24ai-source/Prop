@@ -8,6 +8,7 @@ import { useBranding } from '../BrandingContext';
 // Import Masterpiece sections
 import { MASTERPIECE_CSS } from './landing-sections/LandingStyles';
 import LandingHero from './landing-sections/LandingHero';
+import { API_BASE_URL as API_URL } from '../config/apiBase'
 const LandingLiveStats = lazy(() => import('./landing-sections/LandingLiveStats'));
 const LandingCalculator = lazy(() => import('./landing-sections/LandingCalculator'));
 const LandingFeatures = lazy(() => import('./landing-sections/LandingFeatures'));
@@ -123,7 +124,6 @@ export default function Landing() {
     // separate from trackEvent() above, which only forwards to GA/GTM if
     // configured. Fire-and-forget, best-effort.
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       let sessionId = sessionStorage.getItem('funnel_session_id');
       if (!sessionId) {
         sessionId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
@@ -313,7 +313,7 @@ export default function Landing() {
       {/* Sections */}
       <div data-mp-section="hero" id="mp-hero">
         <LandingHero
-          onPrimaryCta={() => trackEvent('landing_cta_click', { placement: 'hero', action: 'register' })}
+          onPrimaryCta={() => trackEvent('landing_cta_click', { placement: 'hero', action: 'view_accounts_primary' })}
           onSecondaryCta={() => trackEvent('landing_cta_click', { placement: 'hero', action: 'view_accounts' })}
         />
       </div>

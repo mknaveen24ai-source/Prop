@@ -7,6 +7,7 @@ const REQUIRED_IN_PROD = [
   'JWT_SECRET',
   'ADMIN_JWT_SECRET',
   'ADMIN_PASSWORD',    // required to log into the admin panel
+  'KYC_FILE_ENCRYPTION_KEY', // secureKycStorage.js throws on first KYC upload without it — fail at startup, not on a live user action
 ]
 
 const RECOMMENDED = [
@@ -18,7 +19,6 @@ const RECOMMENDED = [
   'SMTP_HOST',
   'SMTP_USER',
   'SMTP_PASS',
-  'KYC_FILE_ENCRYPTION_KEY',
 ]
 
 function validateEnv() {
@@ -66,6 +66,21 @@ function isUnsafeDatabaseUrl(value) {
   return /:\/\/postgres:postgres@/i.test(value) || /@(localhost|127\.0\.0\.1)[:/]/i.test(value)
 }
 
+// TRUST_PROXY must agree with server.js's resolveTrustProxySetting(), which
+// accepts 'true' | '1' | 'on' | 'yes' | any integer hop count | a literal
+// address/subnet string. The only genuinely unsafe production value is one that
+// resolves to `false`, because Express would then read the client IP from the
+// socket instead of X-Forwarded-For — breaking every rate limiter behind nginx.
+//
+// This used to require the literal string 'true', which contradicted
+// docker-compose.yml's documented TRUST_PROXY=1 default and made
+// `deploy-preflight` impossible to pass on the shipped configuration.
+const TRUST_PROXY_DISABLED_VALUES = new Set(['false', '0', 'off', 'no'])
+
+function isUnsafeTrustProxy(value) {
+  return TRUST_PROXY_DISABLED_VALUES.has(String(value).trim().toLowerCase())
+}
+
 const ESP_TECHNICAL_DOMAIN_PATTERN = /@[^@]*(smtp-brevo\.com|sendgrid\.net|mailgun\.org|amazonses\.com|resend\.dev|mailtrap\.io)$/i
 
 function isUnsafeSmtpFrom(smtpFrom, smtpUser) {
@@ -92,7 +107,7 @@ function getUnsafeProductionEnvVars() {
     unsafe.push('SMTP_FROM')
   }
 
-  if (process.env.TRUST_PROXY && process.env.TRUST_PROXY.toLowerCase() !== 'true') {
+  if (process.env.TRUST_PROXY && isUnsafeTrustProxy(process.env.TRUST_PROXY)) {
     unsafe.push('TRUST_PROXY')
   }
 
@@ -103,4 +118,9 @@ function getUnsafeProductionEnvVars() {
   return unsafe
 }
 
-module.exports = { validateEnv, getMissingProductionEnvVars, getUnsafeProductionEnvVars }
+module.exports = {
+  validateEnv,
+  getMissingProductionEnvVars,
+  getUnsafeProductionEnvVars,
+  isUnsafeTrustProxy
+}

@@ -118,6 +118,13 @@ async function ensureTenantSettingsInfrastructure() {
       END$$;
     `).catch(() => {})
 
+    // Gift-a-challenge: a buyer purchases an order for someone else. Added via
+    // ALTER (not the CREATE TABLE above) because this table is bootstrapped
+    // ad-hoc rather than through a knex migration, so existing deployments
+    // need the columns backfilled onto an already-created table.
+    await pool.query(`ALTER TABLE challenge_orders ADD COLUMN IF NOT EXISTS is_gift BOOLEAN NOT NULL DEFAULT FALSE`)
+    await pool.query(`ALTER TABLE challenge_orders ADD COLUMN IF NOT EXISTS gift_recipient_email TEXT`)
+
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_challenge_orders_user_status ON challenge_orders(user_id, status, created_at DESC)`)
 
     await pool.query(`

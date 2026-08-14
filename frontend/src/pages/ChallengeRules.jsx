@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 import Card from '../components/ui/Card'
 import { renderIcon } from '../utils/iconMap'
+import { API_BASE_URL as API_URL } from '../config/apiBase'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 function formatMoney(value) {
   const amount = parseFloat(value || 0)
@@ -35,8 +35,33 @@ function RuleRow({ label, value, accent = false }) {
 // copy verbatim. No "latency arbitrage" / "copy trading" / "one free
 // reset" claims — none of that is actually enforced or offered by this
 // platform today, and this page shouldn't promise rules that don't exist.
-function buildRuleColumns(rules) {
-  return [
+function buildRuleColumns(rules, { isFundedAccount, currentModel, currentStepNumber } = {}) {
+  const allowedItems = [
+    {
+      title: 'Holding overnight and over weekends',
+      body: rules.weekend_holding_enabled ? 'Permitted — positions may be held through the weekend close. This applies platform-wide, evaluation and funded accounts alike.' : 'Currently disabled platform-wide — positions are force-closed before the weekend on every account, evaluation and funded alike.',
+      tone: 'var(--gain)', icon: 'approve',
+    },
+    {
+      title: 'Any hold time above the minimum',
+      body: `No maximum hold time. Minimum hold is ${rules.min_hold_seconds} seconds, to discourage latency-only scalps.`,
+      tone: 'var(--gain)', icon: 'approve',
+    },
+    {
+      title: 'Trading every instrument on the desk',
+      body: `Up to ${parseFloat(rules.forex_lots_per_1k || 0).toFixed(2)} forex lots and ${parseFloat(rules.commodity_lots_per_1k || 0).toFixed(2)} commodity lots per $1k of account size, minimum lot size ${parseFloat(rules.min_lot_size || 0).toFixed(2)}.`,
+      tone: 'var(--gain)', icon: 'approve',
+    },
+  ]
+  if (isFundedAccount && currentModel?.funded_drawdown_locks_at_pct != null) {
+    allowedItems.push({
+      title: 'Your drawdown floor locks in your favor',
+      body: `Once equity reaches ${currentModel.funded_drawdown_locks_at_pct}% above starting balance, your drawdown floor locks at that level for good — it won't drop back below it even if equity pulls back later.`,
+      tone: 'var(--gain)', icon: 'approve',
+    })
+  }
+
+  const columns = [
     {
       title: 'What ends the account',
       items: [
@@ -61,25 +86,70 @@ function buildRuleColumns(rules) {
     },
     {
       title: 'What is expressly allowed',
-      items: [
-        {
-          title: 'Holding overnight and over weekends',
-          body: rules.weekend_holding_enabled ? 'Permitted — positions may be held through the weekend close.' : 'Currently disabled on this account — positions are force-closed before the weekend.',
-          tone: 'var(--gain)', icon: 'approve',
-        },
-        {
-          title: 'Any hold time above the minimum',
-          body: `No maximum hold time. Minimum hold is ${rules.min_hold_seconds} seconds, to discourage latency-only scalps.`,
-          tone: 'var(--gain)', icon: 'approve',
-        },
-        {
-          title: 'Trading every instrument on the desk',
-          body: `Up to ${parseFloat(rules.forex_lots_per_1k || 0).toFixed(2)} forex lots and ${parseFloat(rules.commodity_lots_per_1k || 0).toFixed(2)} commodity lots per $1k of account size, minimum lot size ${parseFloat(rules.min_lot_size || 0).toFixed(2)}.`,
-          tone: 'var(--gain)', icon: 'approve',
-        },
-      ],
+      items: allowedItems,
     },
   ]
+
+  if (currentModel) {
+    const requirementItems = []
+    if (isFundedAccount) {
+      if (currentModel.funded_min_trading_days_for_payout != null) {
+        requirementItems.push({
+          title: 'Minimum trading days',
+          body: `${currentModel.funded_min_trading_days_for_payout} qualifying days needed before your first payout — a day counts once you're up ${currentModel.min_daily_profit_pct}% of starting balance that day.`,
+          tone: 'var(--accent)', icon: 'target',
+        })
+      }
+      if (currentModel.funded_payout_min_net_profit_pct != null) {
+        requirementItems.push({
+          title: 'Minimum net profit',
+          body: `${currentModel.funded_payout_min_net_profit_pct}% net profit required on the account before your first payout request. No further lock-up after that.`,
+          tone: 'var(--accent)', icon: 'target',
+        })
+      }
+      if (currentModel.funded_consistency_max_day_pct != null) {
+        requirementItems.push({
+          title: 'Consistency rule',
+          body: `No single day's profit can exceed ${currentModel.funded_consistency_max_day_pct}% of your total profit when you request a payout. If it does, it's a soft hold, not a fail — keep trading to bring the ratio down.`,
+          tone: 'var(--accent)', icon: 'info',
+        })
+      }
+      if (currentModel.scaling_target_pct != null && currentModel.scaling_multiplier != null) {
+        requirementItems.push({
+          title: 'Scaling plan',
+          body: `Every ${currentModel.scaling_target_pct}% net-profit milestone doubles (${currentModel.scaling_multiplier}x) your risk-capacity multiplier, compounding with every milestone you hit${currentModel.scaling_max_account_size ? ` — capped so your effective size never exceeds $${currentModel.scaling_max_account_size.toLocaleString('en-US')}.` : '.'}`,
+          tone: 'var(--accent)', icon: 'info',
+        })
+      }
+    } else {
+      const phaseIdx0 = Math.max(0, (currentStepNumber || 1) - 1)
+      const consistencyPct = Array.isArray(currentModel.consistency_max_day_pct_by_phase)
+        ? currentModel.consistency_max_day_pct_by_phase[phaseIdx0]
+        : null
+      if (currentModel.min_trading_days != null) {
+        requirementItems.push({
+          title: 'Minimum trading days',
+          body: `${currentModel.min_trading_days} qualifying days needed to pass this phase — a day counts once you're up ${currentModel.min_daily_profit_pct}% of starting balance that day. Hitting the profit target early doesn't skip this.`,
+          tone: 'var(--accent)', icon: 'target',
+        })
+      }
+      if (consistencyPct != null) {
+        requirementItems.push({
+          title: 'Consistency rule',
+          body: `No single day's profit can exceed ${consistencyPct}% of your total profit when you hit the target. If it does, it's a soft hold, not a fail — keep trading to bring the ratio down and you'll pass automatically.`,
+          tone: 'var(--accent)', icon: 'info',
+        })
+      }
+    }
+    if (requirementItems.length > 0) {
+      columns.push({
+        title: isFundedAccount ? 'Payout eligibility' : "What's required to pass",
+        items: requirementItems,
+      })
+    }
+  }
+
+  return columns
 }
 
 function PhaseTable({ model, currentStepNumber, isFundedAccount, isCurrentModel }) {
@@ -95,6 +165,7 @@ function PhaseTable({ model, currentStepNumber, isFundedAccount, isCurrentModel 
       consistency: Array.isArray(model.consistency_max_day_pct_by_phase) ? model.consistency_max_day_pct_by_phase[i] : null,
       maxDrawdown: model.max_drawdown_pct,
       dailyDrawdown: model.daily_drawdown_pct,
+      minTradingDays: model.min_trading_days,
     })
   }
   columns.push({
@@ -103,10 +174,11 @@ function PhaseTable({ model, currentStepNumber, isFundedAccount, isCurrentModel 
     isCurrent: isCurrentModel && isFundedAccount,
     profitTarget: null,
     timeLimit: null,
-    consistency: null,
+    consistency: model.funded_consistency_max_day_pct != null ? model.funded_consistency_max_day_pct : null,
     maxDrawdown: model.funded_max_drawdown_pct,
     dailyDrawdown: model.funded_daily_drawdown_pct,
     profitSplit: model.profit_split_pct,
+    minTradingDays: model.funded_min_trading_days_for_payout,
   })
 
   const rows = [
@@ -114,6 +186,7 @@ function PhaseTable({ model, currentStepNumber, isFundedAccount, isCurrentModel 
     { label: 'Max Drawdown', render: (c) => (Number.isFinite(c.maxDrawdown) ? `${c.maxDrawdown}%` : '—') },
     { label: 'Daily Drawdown', render: (c) => (Number.isFinite(c.dailyDrawdown) && c.dailyDrawdown > 0 ? `${c.dailyDrawdown}%` : 'Not set') },
     { label: 'Time Limit', render: (c) => (c.timeLimit ? `${c.timeLimit} days` : c.key === 'funded' ? 'No expiry' : '—') },
+    { label: 'Min. Trading Days', render: (c) => (Number.isFinite(c.minTradingDays) ? `${c.minTradingDays} days` : '—') },
     { label: 'Consistency', render: (c) => (Number.isFinite(c.consistency) ? `${c.consistency}%` : '—') },
     { label: 'Profit Split', render: (c) => (c.key === 'funded' && Number.isFinite(c.profitSplit) ? `${c.profitSplit}%` : '—') },
   ]
@@ -222,7 +295,8 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
     { label: 'Time limit', value: rules.time_limit_days ? `${rules.time_limit_days} days` : 'No expiry', tone: 'var(--gain)', note: 'No minimum trading days' },
   ] : []
 
-  const ruleColumns = rules ? buildRuleColumns(rules) : []
+  const currentModel = currentModelSlug ? stepModels.find((m) => m.slug === currentModelSlug) || null : null
+  const ruleColumns = rules ? buildRuleColumns(rules, { isFundedAccount, currentModel, currentStepNumber }) : []
 
   return (
     <div style={{ maxWidth: '1080px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -264,9 +338,9 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
             ))}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--glass)', boxShadow: 'var(--elev)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--glass)', boxShadow: 'var(--elev)' }}>
             {ruleColumns.map((col, colIndex) => (
-              <div key={col.title} style={{ padding: '18px 20px 8px', borderRight: colIndex === 0 ? '1px solid var(--rule)' : 'none' }}>
+              <div key={col.title} style={{ padding: '18px 20px 8px', borderRight: colIndex < ruleColumns.length - 1 ? '1px solid var(--rule)' : 'none' }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '21px', borderBottom: '1px solid var(--rule)', paddingBottom: '11px', marginBottom: '4px' }}>{col.title}</div>
                 {col.items.map((item) => (
                   <div key={item.title} style={{ display: 'flex', gap: '12px', padding: '13px 0', borderBottom: '1px solid var(--rule-soft)' }}>

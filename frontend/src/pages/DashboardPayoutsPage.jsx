@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import axios from 'axios'
+import api, { accountsAPI } from '../services/api'
 import { renderIcon } from '../utils/iconMap'
 import Pagination from '../components/Pagination'
 import Card from '../components/ui/Card'
@@ -7,20 +7,10 @@ import Sparkline from '../components/ui/Sparkline'
 import EquityCurveChart from '../components/EquityCurveChart'
 import { formatCurrency, calculatePayoutPreview } from '../utils/finance'
 import { getStatusToneColor } from '../utils/statusTone'
+import { CRYPTO_CURRENCIES, USDT_NETWORKS } from '../utils/paymentMethods'
 
 const PAYOUTS_PAGE_SIZE = 10
 const PRESET_PCTS = [0.25, 0.5, 1]
-const CRYPTO_CURRENCIES = [
-  { id: 'usdt', label: 'USDT', meta: 'Tether — select network below', tone: 'var(--gain)' },
-  { id: 'btc', label: 'Bitcoin', meta: 'BTC', tone: 'var(--warn)' },
-  { id: 'ltc', label: 'Litecoin', meta: 'LTC', tone: 'var(--accent)' },
-]
-const USDT_NETWORKS = [
-  { id: 'trc20', label: 'TRC20', meta: 'Tron — lowest fees', tone: 'var(--gain)' },
-  { id: 'bep20', label: 'BEP20', meta: 'BNB Smart Chain', tone: 'var(--warn)' },
-  { id: 'erc20', label: 'ERC20', meta: 'Ethereum', tone: 'var(--accent)' },
-  { id: 'polygon', label: 'Polygon', meta: 'Polygon PoS', tone: 'var(--muted)' },
-]
 const CURVE_RANGES = [
   { id: 'week', label: '1W' },
   { id: 'month', label: '1M' },
@@ -61,10 +51,10 @@ export default function DashboardPayoutsPage({
 
   useEffect(() => {
     if (!fundedAccount?.id) return
-    axios.get(`${API_URL}/api/accounts/stats`, { params: { account_id: fundedAccount.id } })
+    accountsAPI.getAccountStats(fundedAccount.id)
       .then((res) => setPayoutCycle(res.data?.stats?.payout_cycle || null))
       .catch(() => setPayoutCycle(null))
-    axios.get(`${API_URL}/api/trades/analytics`, { params: { account_id: fundedAccount.id } })
+    api.get('/api/trades/analytics', { params: { account_id: fundedAccount.id } })
       .then((res) => setCurveRanges(res.data?.analytics?.equity_curve_ranges || null))
       .catch(() => setCurveRanges(null))
   }, [fundedAccount?.id, API_URL])
@@ -92,7 +82,6 @@ export default function DashboardPayoutsPage({
   if (!fundedAccount) {
     return (
       <div>
-        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', marginBottom: '24px' }}>Payouts</h2>
         <Card style={{ textAlign: 'center', padding: '48px', maxWidth: '500px' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
             {renderIcon('payouts', { size: 48, color: 'var(--accent)' })}
@@ -122,8 +111,6 @@ export default function DashboardPayoutsPage({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', margin: 0 }}>Payouts</h2>
-
       {/* KPI strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: '14px' }}>
         {kpis.map((k) => (

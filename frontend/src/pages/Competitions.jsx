@@ -30,12 +30,13 @@ function formatDate(value) {
 export function CompetitionsListContent({ onSelectSlug }) {
   const [competitions, setCompetitions] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
     api.get('/api/competitions')
-      .then(res => setCompetitions(Array.isArray(res.data) ? res.data : []))
-      .catch(() => {})
+      .then(res => { setCompetitions(Array.isArray(res.data) ? res.data : []); setLoadError(false) })
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false))
   }, [])
 
@@ -60,6 +61,16 @@ export function CompetitionsListContent({ onSelectSlug }) {
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '80px', color: 'var(--muted)' }}>Loading...</div>
+      ) : loadError ? (
+        <Card style={{ textAlign: 'center', padding: '64px', border: '1px solid var(--warn)' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+            {renderIcon('warning', { size: 40, color: 'var(--warn)' })}
+          </div>
+          <p style={{ color: 'var(--warn)', marginBottom: '12px' }}>Couldn't load competitions right now.</p>
+          <button onClick={() => window.location.reload()} className="lx-btn" style={{ padding: '8px 16px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)' }}>
+            Retry
+          </button>
+        </Card>
       ) : competitions.length === 0 ? (
         <Card style={{ textAlign: 'center', padding: '64px' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>

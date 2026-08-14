@@ -34,6 +34,7 @@ export default function ComplianceAuditTab({ dateRange }) {
   const [instrumentFilter, setInstrumentFilter] = useState('All');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [chainIntegrity, setChainIntegrity] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -51,6 +52,20 @@ export default function ComplianceAuditTab({ dateRange }) {
       }
     })();
   }, [adminAxios, dateRange?.from, dateRange?.to]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        // Re-verifies the admin_immutable_audit hash chain server-side
+        // (backend/routes/admin.js GET /immutable-audit) — independent of
+        // the date-ranged log above, always checks the latest 500 entries.
+        const res = await adminAxios.get('/api/admin/immutable-audit');
+        setChainIntegrity(res.data?.integrity || null);
+      } catch {
+        setChainIntegrity(null);
+      }
+    })();
+  }, [adminAxios]);
 
   const tradeLog = data?.tradeLog || [];
   const violationHistory = data?.violationHistory || [];
@@ -90,6 +105,13 @@ export default function ComplianceAuditTab({ dateRange }) {
           label="Avg Time To Approval"
           value={formatHours(payoutMetrics.avgApprovalHours)}
           trend={`${payoutMetrics.paidCount} paid`}
+        />
+        <AdminStatCard
+          icon="lock"
+          label="Audit Chain Integrity"
+          value={chainIntegrity === null ? 'Checking…' : chainIntegrity.valid ? 'Verified' : `${chainIntegrity.broken_links} Broken`}
+          trend={chainIntegrity ? `${chainIntegrity.checked_entries} entries checked` : undefined}
+          alert={chainIntegrity !== null && !chainIntegrity.valid}
         />
       </AdminStatGrid>
 

@@ -33,6 +33,9 @@ export default function Checkout() {
   const [couponResult, setCouponResult] = useState(null)
   const [couponError, setCouponError] = useState('')
   const [validatingCoupon, setValidatingCoupon] = useState(false)
+  const [isGift, setIsGift] = useState(false)
+  const [giftRecipientEmail, setGiftRecipientEmail] = useState('')
+  const [giftMessage, setGiftMessage] = useState('')
 
   useEffect(() => {
     if (!user) return
@@ -120,8 +123,16 @@ export default function Checkout() {
     }
   }
 
+  function isValidEmail(value) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim())
+  }
+
   async function handlePay() {
     if (!model || !pending || submitting) return
+    if (isGift && !isValidEmail(giftRecipientEmail)) {
+      setError('Please enter a valid recipient email address for this gift.')
+      return
+    }
     setSubmitting(true)
     setError('')
     try {
@@ -130,7 +141,8 @@ export default function Checkout() {
         {
           account_size: pending.accountSize,
           step_model: model.slug,
-          ...(couponResult?.valid ? { coupon_code: couponResult.code } : {})
+          ...(couponResult?.valid ? { coupon_code: couponResult.code } : {}),
+          ...(isGift ? { is_gift: true, recipient_email: giftRecipientEmail.trim(), gift_message: giftMessage.trim() } : {})
         },
         { skipAuthRedirect: true }
       )
@@ -301,6 +313,42 @@ export default function Checkout() {
           </div>
         )}
 
+        {authChecked && user && dataLoaded && pending && model && (
+          <div style={{ border: '1px solid var(--rule)', padding: '16px 20px', marginBottom: '20px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={isGift}
+                onChange={(e) => setIsGift(e.target.checked)}
+              />
+              Send this as a gift to someone else
+            </label>
+            {isGift && (
+              <div style={{ marginTop: '12px' }}>
+                <input
+                  type="email"
+                  value={giftRecipientEmail}
+                  onChange={(e) => setGiftRecipientEmail(e.target.value)}
+                  placeholder="Recipient's email address"
+                  className="input"
+                  style={{ width: '100%', marginBottom: '10px' }}
+                />
+                <textarea
+                  value={giftMessage}
+                  onChange={(e) => setGiftMessage(e.target.value)}
+                  placeholder="Add a personal message (optional)"
+                  className="input"
+                  rows={2}
+                  style={{ width: '100%', resize: 'vertical' }}
+                />
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
+                  We'll email them a redemption code — no account required to receive it. You'll pay now, they claim it.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {error && <div className="error" style={{ marginBottom: '16px' }}>{error}</div>}
 
         {!dataLoaded && (
@@ -420,10 +468,10 @@ export default function Checkout() {
               <button
                 className="btn btn-primary"
                 style={{ width: '100%' }}
-                disabled={submitting || isLocked}
+                disabled={submitting || isLocked || (isGift && !isValidEmail(giftRecipientEmail))}
                 onClick={handlePay}
               >
-                {submitting ? 'Redirecting to payment…' : 'Proceed to Payment'}
+                {submitting ? 'Redirecting to payment…' : isGift ? 'Send Gift' : 'Proceed to Payment'}
               </button>
             )}
 

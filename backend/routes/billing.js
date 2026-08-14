@@ -11,6 +11,7 @@ const {
 } = require('../utils/tenantSettings')
 const { computeEffectiveTier } = require('../utils/affiliates')
 const { enqueueAffiliateCommissionEarnedEmail } = require('../utils/emailQueue')
+const { issueGiftVoucherForOrder } = require('../utils/giftVouchers')
 
 const router = express.Router()
 
@@ -264,6 +265,15 @@ async function markChallengeOrderPaid(client, { orderId, providerPaymentId, payl
       WHERE order_id = $1`,
     [order.id, JSON.stringify({ paid_at: new Date().toISOString() })]
   )
+
+  // Gift-a-challenge: a paid gift order never gets its account created by the
+  // buyer (accounts.js's post-checkout poll checks order.is_gift and skips
+  // POST /accounts/create for it) — instead it issues a redeemable voucher
+  // for the recipient. Free ($0) gift orders are handled synchronously in
+  // accounts.js POST /orders since they never reach this webhook at all.
+  if (order.is_gift) {
+    await issueGiftVoucherForOrder(client, order)
+  }
 
   // Affiliate commission — fires on EVERY paid order from a referred user, for
   // the lifetime of the referral relationship, not just their first purchase

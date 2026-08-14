@@ -27,13 +27,18 @@ We reserve the right to suspend or terminate accounts from any jurisdiction at o
     {
       id: 'evaluation',
       title: '3. Evaluation Program Rules',
-      content: `The evaluation program consists of two phases followed by a funded stage:
+      content: `The evaluation program is offered as 1-Step, 2-Step, and 3-Step models, followed by a funded stage. Every phase of a given model shares the same core rules: hit that phase's profit target within its time limit, without breaching the daily or maximum drawdown limit.
 
-Phase 1: Achieve a 10% profit target within 30 days without breaching the maximum drawdown limit of 10%.
+Current headline terms (also shown on your dashboard before you start, and subject to change per model):
 
-Phase 2: Achieve a 10% profit target within 30 days without breaching the maximum drawdown limit of 10%.
-
-Funded Account: Trade with our simulated capital. No profit target required. A 5% maximum drawdown limit applies.
+— 1-Step: 16% profit target, single phase, 45-day time limit.
+— 2-Step: 10% target in Phase 1, then 8% in Phase 2, 45 days per phase.
+— 3-Step: 8% target in Phase 1, 6% in Phase 2, then 6% in Phase 3, 45 days per phase.
+— Maximum drawdown: 4% trailing from peak equity, on every model and every phase.
+— Daily drawdown: 2% of starting-of-day equity, on every model and every phase.
+— Minimum trading days: at least 5 qualifying days per phase (a day qualifies once that day's profit reaches 0.75% of starting balance), even if the profit target is reached sooner.
+— Consistency rule: no single day's profit may exceed 15% of your total profit when you hit the target. Exceeding this is a hold, not a failure — trading continues until the ratio corrects itself.
+— Funded Account: no profit target. The same drawdown discipline continues to apply, with the drawdown floor locking in your favor once equity reaches 2% above starting balance.
 
 Failure to meet phase requirements, breaching drawdown limits, or expiry of the time limit will result in account termination. No refunds or appeals are available for failed accounts.`
     },
@@ -43,8 +48,9 @@ Failure to meet phase requirements, breaching drawdown limits, or expiry of the 
       content: `Traders who reach the funded stage and generate profits are eligible to request payouts subject to the following conditions:
 
 — Minimum payout request is $50 USD equivalent.
-— Payouts are calculated at 80% of realized profits above the starting balance.
-— Only one pending payout request is permitted at a time.
+— Payouts are calculated at 75% of realized profits above the starting balance.
+— Before your first payout, the account must have at least 10 qualifying trading days and 6% net profit; there is no further lock-up period after that.
+— Payouts are available on a weekly basis, and only one pending payout request is permitted at a time.
 — Payouts are discretionary performance bonuses paid from company capital and do not represent withdrawal of deposited funds.
 — Payouts are processed in USDT (TRC20 network). You are responsible for providing a valid wallet address and for any network fees.
 — We reserve the right to delay, withhold, or deny payouts if we have reasonable grounds to suspect manipulation, abuse, or violation of these Terms.

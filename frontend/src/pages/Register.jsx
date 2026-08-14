@@ -1,20 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { useBranding } from '../BrandingContext'
 import AuthMasthead from '../components/auth/AuthMasthead'
+import EyeIcon from '../components/common/EyeIcon'
+import OtpInput from '../components/common/OtpInput'
+import { API_BASE_URL as API_URL } from '../config/apiBase'
 
-function EyeIcon({ hidden }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-      {hidden && <path d="M4 20 20 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />}
-    </svg>
-  )
-}
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 // ── Password strength checker ─────────────────────────────────────────────────
 function getPasswordStrength(password) {
@@ -28,7 +20,7 @@ function getPasswordStrength(password) {
   ]
   const score = checks.filter(c => c.pass).length
   const label = score <= 2 ? 'Weak' : score <= 3 ? 'Fair' : score === 4 ? 'Good' : 'Strong'
-  const color = score <= 2 ? 'var(--loss)' : score <= 3 ? 'var(--warn)' : score === 4 ? 'var(--warn)' : 'var(--gain)'
+  const color = score <= 2 ? 'var(--loss)' : score <= 3 ? 'var(--warn)' : score === 4 ? 'color-mix(in srgb, var(--warn) 50%, var(--gain))' : 'var(--gain)'
   return { score, label, color, checks }
 }
 
@@ -42,6 +34,9 @@ const STEP_OTP   = 'otp'
 function Register({ onLogin }) {
   const { tenant } = useBranding()
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const giftCode = (searchParams.get('gift') || '').trim().toUpperCase()
+  const [giftPreview, setGiftPreview] = useState(null)
 
   const [step, setStep] = useState(STEP_FORM)
 
@@ -59,6 +54,7 @@ function Register({ onLogin }) {
 
   // OTP step
   const [otpCode, setOtpCode] = useState('')
+  const [otpResetKey, setOtpResetKey] = useState(0)
   const [phoneVerifiedToken, setPhoneVerifiedToken] = useState(null)
   const [otpSent, setOtpSent] = useState(false)
   const [otpCooldown, setOtpCooldown] = useState(0) // seconds until resend allowed
@@ -75,6 +71,18 @@ function Register({ onLogin }) {
   useEffect(() => {
     const ref = searchParams.get('ref')
     if (ref) setForm(f => ({ ...f, referred_by: ref.toUpperCase() }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ?gift=CODE from a gift-a-challenge email — just a display preview here;
+  // the actual redemption happens automatically right after registration
+  // succeeds (see handleRegister), reusing the same voucher_code endpoint
+  // Checkout.jsx's "have a code" field uses.
+  useEffect(() => {
+    if (!giftCode) return
+    axios.get(`${API_URL}/api/accounts/gift-vouchers/${encodeURIComponent(giftCode)}/preview`)
+      .then(res => setGiftPreview(res.data))
+      .catch(() => setGiftPreview({ valid: false }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -143,6 +151,7 @@ function Register({ onLogin }) {
     setError('')
     setSuccess('')
     setOtpCode('')
+    setOtpResetKey(k => k + 1)
     setLoading(true)
     try {
       await axios.post(
@@ -204,6 +213,27 @@ function Register({ onLogin }) {
         `${API_URL}/api/auth/register`,
         { ...form, phone_verified_token: token, terms_accepted: termsAccepted, signup_source: sessionStorage.getItem('signup_source') || 'direct' }
       )
+      // The register response already set the auth cookie (setAuthCookie in
+      // auth.js), so this authenticated call works before onLogin() even
+      // updates the parent's user state.
+      if (giftCode) {
+        try {
+          const orderRes = await axios.post(`${API_URL}/api/accounts/orders`, { voucher_code: giftCode })
+          const orderId = orderRes?.data?.order?.id
+          if (orderId) {
+            onLogin(response.data.user)
+            navigate(`/dashboard?checkout=success&order_id=${orderId}`)
+            return
+          }
+        } catch (_) {
+          // Redemption failed (wrong email on the gift, expired, etc.) —
+          // still log them in; Checkout's own "have a code" field can retry
+          // the same code (it tries gift vouchers too, see accounts.js).
+          onLogin(response.data.user)
+          navigate(`/checkout?voucher=${encodeURIComponent(giftCode)}`)
+          return
+        }
+      }
       onLogin(response.data.user)
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed. Please try again.')
@@ -227,6 +257,11 @@ function Register({ onLogin }) {
           ? `Enter the 6-digit code sent to ${form.phone}`
           : tenant?.brand?.tagline || 'Join the premium prop firm today'}
       </p>
+      {step === STEP_FORM && giftCode && giftPreview?.valid && (
+        <div style={{ marginTop: '16px', padding: '10px 16px', border: '1px solid var(--accent)', borderRadius: '6px', fontSize: '13px', color: 'var(--accent)' }}>
+          🎁 You've been sent a free ${Number(giftPreview.account_size).toLocaleString()} challenge account — sign up to claim it.
+        </div>
+      )}
     </div>
   )
 
@@ -254,7 +289,7 @@ function Register({ onLogin }) {
 
       <AuthMasthead eyebrow="Section B · New Members" maxWidth={460} />
 
-      <div className="lx-card auth-glass-card" style={{ width: '460px', zIndex: 10, animation: 'fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1)', padding: '40px 32px' }}>
+      <div className="lx-card auth-glass-card" style={{ width: 'min(100%, 460px)', zIndex: 10, animation: 'fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1)', padding: '40px 32px' }}>
 
         {cardHeader}
 
@@ -299,7 +334,7 @@ function Register({ onLogin }) {
 
             <div className="input-group">
               <label className="input-label">EMAIL</label>
-              <input type="email" name="email" className="input-field" value={form.email} onChange={handleChange} placeholder="your@email.com" required />
+              <input type="email" name="email" className="input-field" value={form.email} onChange={handleChange} placeholder="your@email.com" required autoComplete="email" />
             </div>
 
             <div className="input-group">
@@ -313,6 +348,7 @@ function Register({ onLogin }) {
                   onChange={handleChange}
                   placeholder="Min 8 chars, uppercase, number, special"
                   required
+                  autoComplete="new-password"
                 />
                 <button type="button" onClick={() => setShowPassword(p => !p)} className="password-visibility-toggle" aria-label={showPassword ? 'Hide password' : 'Show password'}>
                   <EyeIcon hidden={!showPassword} />
@@ -417,9 +453,12 @@ function Register({ onLogin }) {
                 style={{ marginTop: '2px', accentColor: 'var(--accent)', cursor: 'pointer', flexShrink: 0 }} />
               <label htmlFor="terms" style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.6', cursor: 'pointer' }}>
                 I have read and agree to the{' '}
-                <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Terms of Service</a>
-                {' '}and{' '}
-                <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Privacy Policy</a>.
+                <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Terms of Service</a>,{' '}
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Privacy Policy</a>, and{' '}
+                {/* Refund terms must be disclosed before purchase, not after —
+                    linking them at the point of consent is what makes the
+                    withdrawal-right waiver in the refund policy enforceable. */}
+                <a href="/refund-policy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Refund Policy</a>.
                 {' '}I confirm I am not a resident of the United States, Canada, or any sanctioned jurisdiction.
               </label>
             </div>
@@ -448,20 +487,12 @@ function Register({ onLogin }) {
           <form onSubmit={handleVerifyOtp}>
             {/* OTP digit input */}
             <div className="input-group" style={{ marginBottom: '8px' }}>
-              <label className="input-label">6-DIGIT VERIFICATION CODE</label>
-              <input
-                id="otp-code-input"
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                maxLength={6}
-                className="input-field"
-                value={otpCode}
-                onChange={e => { setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setError('') }}
-                placeholder="• • • • • •"
-                autoFocus
-                style={{ letterSpacing: '0.5em', fontSize: '24px', textAlign: 'center', fontWeight: 700 }}
-                required
+              <label className="input-label" style={{ textAlign: 'center', display: 'block' }}>6-DIGIT VERIFICATION CODE</label>
+              <OtpInput
+                idPrefix="register-otp"
+                resetKey={otpResetKey}
+                disabled={loading}
+                onChange={(code) => { setOtpCode(code); setError('') }}
               />
             </div>
 

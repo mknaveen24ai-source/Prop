@@ -2,6 +2,73 @@ import React, { useEffect, useState } from 'react'
 import KYCUploadForm from '../components/dashboard/KYCUploadForm'
 import Card from '../components/ui/Card'
 import { kycAPI } from '../services/api'
+import { renderIcon } from '../utils/iconMap'
+import { API_BASE_URL as API_URL } from '../config/apiBase'
+
+
+// <img> preview with a graceful fallback to an "Open document" link for
+// non-image uploads (PDFs) — the endpoint decides the real Content-Type,
+// this just reacts to whether the browser could render it as an image.
+function DocThumbnail({ docType }) {
+  const [imageFailed, setImageFailed] = useState(false)
+  const src = `${API_URL}/api/kyc/document/${docType}`
+
+  if (imageFailed) {
+    return (
+      <a
+        href={src}
+        target="_blank"
+        rel="noreferrer"
+        style={{ width: '44px', height: '56px', flex: '0 0 auto', border: '1px solid var(--rule)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--paper-2)' }}
+        title="Open document in a new tab"
+      >
+        {renderIcon('file', { size: 18, color: 'var(--muted)' })}
+      </a>
+    )
+  }
+
+  return (
+    <img
+      src={src}
+      alt="Document preview"
+      onError={() => setImageFailed(true)}
+      style={{ width: '44px', height: '56px', flex: '0 0 auto', border: '1px solid var(--rule)', objectFit: 'cover', background: 'var(--paper-2)' }}
+    />
+  )
+}
+
+// Lets a trader replace one rejected document without reopening the full
+// upload form — a hidden file input triggered by a visible button.
+function ReplaceDocButton({ docType, onUpload, uploading }) {
+  const inputRef = React.useRef(null)
+  const [submitting, setSubmitting] = useState(false)
+
+  async function handleChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setSubmitting(true)
+    await onUpload(docType, file)
+    setSubmitting(false)
+    e.target.value = ''
+  }
+
+  const busy = submitting || uploading
+
+  return (
+    <>
+      <input ref={inputRef} type="file" accept="image/jpeg,image/png,application/pdf" onChange={handleChange} style={{ display: 'none' }} />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={busy}
+        className="lx-btn"
+        style={{ marginTop: '8px', padding: '6px 12px', border: '1px solid var(--warn)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--warn)', fontSize: '11.5px', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}
+      >
+        {busy ? 'Uploading…' : 'Replace this document'}
+      </button>
+    </>
+  )
+}
 
 const STEP_LABELS = ['Country & document details', 'Documents uploaded', 'Admin review', 'Verified']
 
@@ -61,32 +128,52 @@ export default function DashboardKYCPage({
   idDocumentBack, setIdDocumentBack,
   selfie, setSelfie,
   kycUploading,
+  uploadSingleKycDocument,
 }) {
   const [detail, setDetail] = useState(null)
+  const [detailError, setDetailError] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(true)
+
+  function fetchDetail() {
+    setDetailLoading(true)
+    kycAPI.getStatus()
+      .then((res) => { setDetail(res.data); setDetailError(false) })
+      .catch(() => setDetailError(true))
+      .finally(() => setDetailLoading(false))
+  }
 
   useEffect(() => {
-    kycAPI.getStatus()
-      .then((res) => setDetail(res.data))
-      .catch(() => setDetail(null))
+    fetchDetail()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kycStatus])
 
+  const [showFullForm, setShowFullForm] = useState(false)
   const steps = computeSteps(kycStatus)
   const submittedDate = formatDate(detail?.kyc_submitted_at)
-  const showUploadForm = kycStatus !== 'approved' && kycStatus !== 'pending'
+  // On rejection, documents already exist — default to letting the trader
+  // replace just the flagged one(s) instead of forcing the full first-time
+  // upload form back open (which re-asks for country/document type/number
+  // too). "Resubmit everything" below still opens the full form for cases
+  // where those details were what was actually wrong.
+  const allowPerDocReplace = kycStatus === 'rejected' && !showFullForm
+  const showUploadForm = (kycStatus !== 'approved' && kycStatus !== 'pending' && kycStatus !== 'rejected') || (kycStatus === 'rejected' && showFullForm)
 
   const docs = [
     {
       title: 'ID Document — Front',
+      docType: 'id',
       present: Boolean(detail?.has_id_document),
       note: detail?.kyc_document_type ? `${detail.kyc_document_type.replace(/_/g, ' ')} · issued in ${detail?.kyc_document_country || 'your country'}` : 'Front side of your passport, national ID, license, or residence permit.',
     },
     {
       title: 'ID Document — Back',
+      docType: 'id_back',
       present: Boolean(detail?.has_id_document_back),
       note: 'Back side of the same document (or the ID page again, for a single-page passport).',
     },
     {
       title: 'Live Selfie',
+      docType: 'selfie',
       present: Boolean(detail?.has_selfie),
       note: 'A live photo of you holding the same document, face and document both clearly visible.',
     },
@@ -101,7 +188,21 @@ export default function DashboardKYCPage({
 
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '18px' }}>
-      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '24px', margin: 0 }}>Identity Verification</h2>
+      {detailError && (
+        <Card style={{ border: '1px solid var(--warn)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--warn)' }}>Couldn't load your document status</div>
+              <div style={{ fontSize: '12.5px', color: 'var(--muted)', marginTop: '5px' }}>
+                {detail ? 'Showing your last known status — this may be out of date.' : "The document cards below can't be confirmed right now, so they may not reflect what you've actually submitted."}
+              </div>
+            </div>
+            <button type="button" onClick={fetchDetail} className="lx-btn" style={{ padding: '8px 14px', border: '1px solid var(--warn)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--warn)', flex: '0 0 auto' }}>
+              Retry
+            </button>
+          </div>
+        </Card>
+      )}
 
       {kycStatus === 'rejected' && user?.kyc_rejection_reason && (
         <Card style={{ border: '1px solid var(--loss)' }}>
@@ -127,12 +228,19 @@ export default function DashboardKYCPage({
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.25fr) minmax(0,1fr)', gap: '16px', alignItems: 'start' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {detailLoading && !detail && !detailError && (
+            <div style={{ fontSize: '12px', color: 'var(--muted)' }}>Checking your document status…</div>
+          )}
           {docs.map((doc) => {
             const status = docStatus(doc.present)
             return (
               <Card key={doc.title}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
-                  <span style={{ width: '44px', height: '56px', flex: '0 0 auto', border: '1px solid var(--rule)', background: 'repeating-linear-gradient(45deg,var(--paper-2),var(--paper-2) 6px,var(--paper) 6px,var(--paper) 12px)' }} />
+                  {doc.present ? (
+                    <DocThumbnail docType={doc.docType} />
+                  ) : (
+                    <span style={{ width: '44px', height: '56px', flex: '0 0 auto', border: '1px solid var(--rule)', background: 'repeating-linear-gradient(45deg,var(--paper-2),var(--paper-2) 6px,var(--paper) 6px,var(--paper) 12px)' }} />
+                  )}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                       <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px' }}>{doc.title}</div>
@@ -142,11 +250,24 @@ export default function DashboardKYCPage({
                     {doc.present && submittedDate && (
                       <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)', marginTop: '7px' }}>Submitted {submittedDate}</div>
                     )}
+                    {allowPerDocReplace && (
+                      <ReplaceDocButton docType={doc.docType} onUpload={uploadSingleKycDocument} uploading={kycUploading} />
+                    )}
                   </div>
                 </div>
               </Card>
             )
           })}
+
+          {allowPerDocReplace && (
+            <button
+              type="button"
+              onClick={() => setShowFullForm(true)}
+              style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '12px', textDecoration: 'underline', cursor: 'pointer', padding: 0, textAlign: 'left' }}
+            >
+              Need to fix your country or document type too? Resubmit everything instead.
+            </button>
+          )}
 
           {showUploadForm && (
             <KYCUploadForm

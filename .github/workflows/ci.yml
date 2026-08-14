@@ -6,9 +6,15 @@ on:
   pull_request:
     branches: [main]
 
+# Cancel superseded runs on the same ref — no point burning minutes on a commit
+# that has already been replaced.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   backend:
-    name: Backend (audit + tests)
+    name: Backend (lint + audit + tests)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -25,6 +31,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint
+        # Fails on real defects (unreachable code, duplicate keys, undefined
+        # identifiers). Hygiene findings are warnings and do not block —
+        # `npm run lint:strict` treats them as blocking when you want that.
+        run: npm run lint
+
+      - name: Syntax check
+        run: npm run check
+
       - name: npm audit (high/critical only)
         run: npm audit --audit-level=high
 
@@ -32,7 +47,7 @@ jobs:
         run: npm test
 
   frontend:
-    name: Frontend (tests + build)
+    name: Frontend (lint + audit + tests + build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -49,14 +64,107 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint
+        run: npm run lint
+
       - name: npm audit (high/critical only)
-        # Non-blocking for now: vite/react-router-dom need major-version bumps
-        # (tracked separately) to clear their remaining high-severity advisories.
+        # No longer allowed to fail: the vite/esbuild advisories that forced
+        # continue-on-error were cleared by the Vite 4 -> 8 upgrade.
         run: npm audit --audit-level=high
-        continue-on-error: true
 
       - name: Run tests
         run: npm test
 
       - name: Build
         run: npm run build
+
+  deploy-config:
+    name: Deploy config validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate docker-compose
+        # Catches the class of bug that made the stack unbootable: build args
+        # that no Dockerfile declares, undefined services, bad interpolation.
+        run: |
+          cp .env.template .env
+          docker compose config --quiet
+          echo "docker compose config OK"
+
+      - name: Validate nginx config
+        # limit_req_zone in the wrong context used to crash-loop nginx and take
+        # the whole stack down. `nginx -t` catches it in CI instead of in prod.
+        run: |
+          docker run --rm \
+            -v "$PWD/deploy/nginx/propfirm.conf:/etc/nginx/conf.d/default.conf:ro" \
+            nginx:1.25-alpine \
+            sh -c "mkdir -p /etc/nginx/certs \
+                   && openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+                        -keyout /etc/nginx/certs/privkey.pem \
+                        -out /etc/nginx/certs/fullchain.pem \
+                        -subj '/CN=ci.local' 2>/dev/null \
+                   && nginx -t"
+
+      - name: Assert frontend build args match the Dockerfile
+        run: |
+          set -e
+          if grep -q 'REACT_APP_' docker-compose.yml frontend/Dockerfile; then
+            echo "::error::REACT_APP_* found. This project uses Vite — build args must be VITE_*."
+            exit 1
+          fi
+          for arg in $(grep -oP '^\s+\KVITE_[A-Z_]+(?=:)' docker-compose.yml || true); do
+            grep -q "ARG $arg" frontend/Dockerfile || {
+              echo "::error::docker-compose passes build arg $arg but frontend/Dockerfile never declares it — Docker would silently drop it."
+              exit 1
+            }
+          done
+          echo "build args OK"
+
+  migrations:
+    name: Migrations apply cleanly
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: propfirm_ci
+          POSTGRES_USER: propfirm
+          POSTGRES_PASSWORD: ci_password_not_a_secret
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql://propfirm:ci_password_not_a_secret@localhost:5432/propfirm_ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run migrations from scratch
+        run: npm run migrate
+
+      - name: Assert no migrations left pending
+        # Guards against a migration file being written but never committed —
+        # the failure mode that made a clean clone unbootable.
+        run: |
+          npx knex migrate:status
+          PENDING=$(npx knex migrate:list 2>/dev/null | grep -ci 'pending' || true)
+          if [ "$PENDING" != "0" ]; then
+            echo "::error::Migrations still pending after migrate:latest"
+            exit 1
+          fi

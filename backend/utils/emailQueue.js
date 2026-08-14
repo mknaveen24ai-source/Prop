@@ -215,6 +215,14 @@ async function enqueueCompetitionPrizeVoucherEmail(toEmail, fullName, competitio
   return enqueueTemplateEmail('competition_prize_voucher', { toEmail, fullName, competitionTitle, voucherCode, accountSize, expiresAt }, options)
 }
 
+async function enqueueGiftChallengeVoucherEmail(toEmail, fullName, purchaserName, voucherCode, accountSize, giftMessage, expiresAt, options = {}) {
+  return enqueueTemplateEmail('gift_challenge_voucher', { toEmail, fullName, purchaserName, voucherCode, accountSize, giftMessage, expiresAt }, options)
+}
+
+async function enqueueReferralSeasonPrizeVoucherEmail(toEmail, fullName, seasonTitle, voucherCode, accountSize, expiresAt, options = {}) {
+  return enqueueTemplateEmail('referral_season_prize_voucher', { toEmail, fullName, seasonTitle, voucherCode, accountSize, expiresAt }, options)
+}
+
 async function claimPendingEmailJobs(limit = 10) {
   await ensureEmailQueueInfrastructure()
   await pool.query(
@@ -556,6 +564,8 @@ module.exports = {
   enqueueAffiliatePayoutApprovedEmail,
   enqueueAffiliatePayoutRejectedEmail,
   enqueueCompetitionPrizeVoucherEmail,
+  enqueueGiftChallengeVoucherEmail,
+  enqueueReferralSeasonPrizeVoucherEmail,
   claimPendingEmailJobs,
   processEmailQueueBatch,
   runEmailAutomationPass,

@@ -3,8 +3,8 @@ import axios from 'axios'
 import { renderIcon } from '../utils/iconMap'
 import Card from '../components/ui/Card'
 import { getStatusToneColor } from '../utils/statusTone'
+import { API_BASE_URL as API_URL } from '../config/apiBase'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 const DRAFT_KEY = 'dispute-draft'
 const MAX_EVIDENCE_BYTES = 600 * 1024
 
