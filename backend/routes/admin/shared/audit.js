@@ -1,7 +1,6 @@
 // Admin actor labelling and the hash-chained immutable audit log, moved
 // verbatim from routes/admin.js during the admin modularization.
 const crypto = require('crypto')
-const pool = require('../../../db')
 const { ensureFeatureTables } = require('./schema')
 
 function getAdminActorLabel(admin) {

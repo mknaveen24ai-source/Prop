@@ -4,7 +4,6 @@
 const pool = require('../../../db')
 const { generateAccountUid } = require('../../../utils/accountIds')
 const {
-  buildKycDocumentPresencePredicate,
   buildSavedViewCapabilities,
   buildAllowedAccountActions,
   buildAllowedUserActions,

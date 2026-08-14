@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken')
 const pool = require('../../../db')
 const { emitAdminEvent } = require('../../../utils/realtime')
 const { ensureFeatureTables } = require('./schema')
+const { ensureTenantSettingsInfrastructure } = require('../../../utils/tenantSettings')
 
 const ADMIN_VALID_ACCOUNT_SIZES = [5000, 10000, 25000, 50000, 100000, 200000, 400000]
 
@@ -495,6 +496,88 @@ function serializeCsv(rows, columns) {
   return [header, ...body].join('\n')
 }
 
+function buildAdminAuditActor(admin) {
+  return String(admin?.email || admin?.full_name || admin?.role || 'admin')
+}
+
+function sanitizePlatformAdminRecord(row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    email: row.email,
+    full_name: row.full_name,
+    role: row.role || 'super_admin',
+    status: row.status || 'active',
+    token_version: row.token_version || 1,
+    totp_enabled: !!row.totp_enabled,
+    last_login_at: row.last_login_at || null,
+    created_at: row.created_at || null,
+    updated_at: row.updated_at || null
+  }
+}
+
+async function buildAdminSecurityStatus(currentAdmin) {
+  await ensureFeatureTables()
+  await ensureTenantSettingsInfrastructure()
+
+  const platformResult = await pool.query(
+    `SELECT
+       COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE status = 'active')::int AS active,
+       COUNT(*) FILTER (WHERE status = 'active' AND totp_enabled = TRUE)::int AS totp_enabled
+     FROM platform_admins`
+  )
+
+  const platformCounts = platformResult.rows[0] || {}
+  const activePlatformAdmins = parseInt(platformCounts.active || 0, 10) || 0
+
+  const base = {
+    checked_at: new Date().toISOString(),
+    current_admin: {
+      admin_id: currentAdmin?.adminId || null,
+      role: currentAdmin?.role || null,
+      email: currentAdmin?.email || null,
+      auth_source: currentAdmin?.auth_source || null,
+      totp_enabled: currentAdmin?.totp_enabled === true
+    },
+    session_revocation: {
+      supported: true,
+      token_versioned: true
+    }
+  }
+
+  if (String(currentAdmin?.role || '') !== 'super_admin') {
+    return {
+      ...base,
+      totp: {
+        current_admin_totp_enabled: currentAdmin?.totp_enabled === true
+      }
+    }
+  }
+
+  return {
+    ...base,
+    migration: {
+      platform_admin_bootstrap_complete: activePlatformAdmins > 0,
+      env_fallback_enabled: activePlatformAdmins === 0,
+      platform_admin_count: parseInt(platformCounts.total || 0, 10) || 0,
+      active_platform_admin_count: activePlatformAdmins
+    },
+    totp: {
+      platform_admins_enabled: parseInt(platformCounts.totp_enabled || 0, 10) || 0,
+      platform_admins_total: activePlatformAdmins,
+      current_admin_totp_enabled: currentAdmin?.totp_enabled === true
+    },
+    secrets: {
+      admin_password_needs_rotation: !isBcryptHash(process.env.ADMIN_PASSWORD) || looksLikeDefaultSecret(process.env.ADMIN_PASSWORD),
+      jwt_secret_needs_rotation: looksLikeDefaultSecret(process.env.JWT_SECRET),
+      admin_jwt_secret_needs_rotation: looksLikeDefaultSecret(process.env.ADMIN_JWT_SECRET),
+      totp_encryption_configured: !!String(process.env.TOTP_ENCRYPTION_KEY || '').trim() && String(process.env.TOTP_ENCRYPTION_KEY || '').trim().length >= 64,
+      node_env: String(process.env.NODE_ENV || 'development')
+    }
+  }
+}
+
 module.exports = {
   ADMIN_VALID_ACCOUNT_SIZES,
   requireReasonText,
@@ -540,5 +623,8 @@ module.exports = {
   fetchUserForAdmin,
   fetchPayoutForAdmin,
   emitSuperAdminPowerEvent,
-  serializeCsv
+  serializeCsv,
+  buildAdminAuditActor,
+  sanitizePlatformAdminRecord,
+  buildAdminSecurityStatus
 }

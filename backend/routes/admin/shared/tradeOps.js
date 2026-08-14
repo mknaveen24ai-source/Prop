@@ -1,8 +1,6 @@
 // Admin-side trade P&L, force-close/cancel helpers and the exposure report,
 // moved verbatim from routes/admin.js during the admin modularization.
 const Decimal = require('decimal.js')
-const pool = require('../../../db')
-const logger = require('../../../utils/logger')
 const { CONTRACT_SIZES } = require('../../../constants')
 const { getPriceForTenant } = require('../../../priceFeed')
 
