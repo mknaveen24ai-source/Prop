@@ -156,6 +156,7 @@ export default function AdminSidebar({
             {isSuperAdmin && <NavItem to="/admin/command-center" icon="command" label="Command Center" />}
             <NavItem to="/admin/access" icon="key" label="Access & Security" />
             <NavItem to="/admin/settings" icon="settings" label="Settings" />
+            <NavItem to="/admin/email-jobs" icon="mail" label="Email Jobs" />
             <NavItem to="/admin/coupons" icon="wallet" label="Coupons" />
             <NavItem to="/admin/gifts" icon="wallet" label="Gift Vouchers" />
             <NavItem to="/admin/trading-economics" icon="settings" label="Trading Economics" />

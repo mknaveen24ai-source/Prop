@@ -135,6 +135,15 @@ function setWebsocketConnections(count) {
 }
 
 /** Samples the point-in-time gauges. Called on scrape, not on a timer. */
+// Set by services/tradeEngine.js at load. Kept as a plain function reference
+// rather than a require() so the metrics module has no dependency on the engine
+// (M-12).
+let _engineStatsSource = null
+
+function registerEngineStatsSource(fn) {
+  _engineStatsSource = typeof fn === 'function' ? fn : null
+}
+
 function refreshGauges() {
   try {
     const pool = require('../db')
@@ -143,9 +152,18 @@ function refreshGauges() {
     dbPoolWaiting.set(pool.waitingCount ?? 0)
   } catch { /* pool not ready */ }
 
+  // FIX (M-12): this used to `require('../services/tradeEngine')` here, which
+  // closed a cycle — tradeEngine requires this module for recordEngineTick, and
+  // this module required tradeEngine back. Node tolerates it by handing out a
+  // half-built export object, so the cycle is survivable but it makes both
+  // modules untestable in isolation and the failure mode is load-order
+  // dependent.
+  //
+  // Inverted to registration: the engine hands its stats reader in (see
+  // registerEngineStatsSource, called from services/tradeEngine.js), so the
+  // dependency now runs one way only.
   try {
-    const { getEngineStats } = require('../services/tradeEngine')
-    const stats = getEngineStats() || {}
+    const stats = (_engineStatsSource && _engineStatsSource()) || {}
     openTradesGauge.set(stats.trades ?? 0)
     pendingOrdersGauge.set(stats.pending ?? 0)
     activeAccountsGauge.set(stats.accounts ?? 0)
@@ -171,6 +189,7 @@ async function getMetricsText() {
 }
 
 module.exports = {
+  registerEngineStatsSource,
   register,
   metricsMiddleware,
   recordEngineTick,

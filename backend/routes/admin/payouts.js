@@ -126,18 +126,28 @@ router.post('/payouts/approve', authenticateAdmin, requireAdminCapability('payou
 
     await client.query('COMMIT')
 
-    // Send automated email to the user
-    await enqueuePayoutApprovedEmail(email, full_name, amount_payable, payment_method, {
-      userId: user_id || null
-    })
+    // FIX (M-09): these ran outside any try/catch, so a mail or socket failure
+    // hit the outer handler and returned HTTP 500 for a payout that had already
+    // committed and already debited the balance. The admin then saw an error
+    // for successful work, retried, and got a confusing 400 from the status
+    // guard. Notification is best-effort; the money movement is not.
+    try {
+      await enqueuePayoutApprovedEmail(email, full_name, amount_payable, payment_method, {
+        userId: user_id || null
+      })
 
-    const io = req.app.get('io')
-    if (io && user_id) {
-      io.to(String(user_id)).emit('payout_approved', { amount: amount_payable })
-      await createUserNotification(io, user_id, {
-        type: 'success',
-        title: 'Payout Approved',
-        message: `Your payout of $${parseFloat(amount_payable).toFixed(2)} has been approved and paid.`
+      const io = req.app.get('io')
+      if (io && user_id) {
+        io.to(String(user_id)).emit('payout_approved', { amount: amount_payable })
+        await createUserNotification(io, user_id, {
+          type: 'success',
+          title: 'Payout Approved',
+          message: `Your payout of $${parseFloat(amount_payable).toFixed(2)} has been approved and paid.`
+        })
+      }
+    } catch (notifyErr) {
+      logger.error('Payout paid but trader could not be notified:', {
+        error: notifyErr.message, payoutId: payout_id
       })
     }
 

@@ -360,9 +360,43 @@ app.get('/api/announcement', async function (req, res) {
   }
 })
 
+// The leaderboard is two CTEs over users x accounts x trades with an unbounded
+// LEFT JOIN, served to anonymous traffic with no cache — the audit's most
+// attractive unauthenticated DoS target. A short in-process cache costs nothing
+// in freshness (this is a vanity board, not a price) and turns an arbitrary
+// number of concurrent scans into at most one per window.
+//
+// Deliberately in-process rather than Redis: it is a tiny payload, and a cache
+// that survives a Redis outage is the one you want in front of your heaviest
+// query. Per-instance duplication of one query every 30s is not worth a
+// round-trip.
+const LEADERBOARD_CACHE_MS = 30 * 1000
+let _leaderboardCache = { rows: null, at: 0, inflight: null }
+
+async function getCachedLeaderboard() {
+  const now = Date.now()
+  if (_leaderboardCache.rows && (now - _leaderboardCache.at) < LEADERBOARD_CACHE_MS) {
+    return _leaderboardCache.rows
+  }
+  // Share one in-flight query across concurrent misses, or a cold cache under
+  // load issues N identical scans instead of one.
+  if (!_leaderboardCache.inflight) {
+    _leaderboardCache.inflight = fetchLeaderboardRows({ includeHidden: false, limit: 20 })
+      .then((rows) => {
+        _leaderboardCache = { rows, at: Date.now(), inflight: null }
+        return rows
+      })
+      .catch((error) => {
+        _leaderboardCache.inflight = null
+        throw error
+      })
+  }
+  return _leaderboardCache.inflight
+}
+
 app.get('/api/leaderboard', async function (req, res) {
   try {
-    res.json(await fetchLeaderboardRows({ includeHidden: false, limit: 20 }))
+    res.json(await getCachedLeaderboard())
   } catch (error) {
     logger.error('Leaderboard error:', { error: error.message })
     res.status(500).json({ error: 'Could not load leaderboard' })
@@ -383,18 +417,21 @@ function maskLandingTraderName(fullName, userId) {
 }
 
 app.get('/api/public/landing-stats', async function (req, res) {
+  // FIX: these five aggregates ran on the WRITE pool, so anonymous marketing
+  // traffic competed with trade closes for the same 60 connections. They are
+  // pure reads with no transaction, which is exactly what readPool exists for.
   try {
     const [payoutsResult, fundedResult, countryResult, sameDayResult, recentResult] = await Promise.all([
-      pool.query(`SELECT COALESCE(SUM(amount_payable), 0) AS total, COUNT(*)::int AS count FROM payouts WHERE status = 'paid'`),
-      pool.query(`SELECT COUNT(*)::int AS count FROM accounts WHERE account_type = 'funded' AND status NOT IN ('failed', 'locked')`),
-      pool.query(`SELECT COUNT(DISTINCT NULLIF(TRIM(country), ''))::int AS count FROM users WHERE country IS NOT NULL AND TRIM(country) <> ''`),
-      pool.query(`
+      readPool.query(`SELECT COALESCE(SUM(amount_payable), 0) AS total, COUNT(*)::int AS count FROM payouts WHERE status = 'paid'`),
+      readPool.query(`SELECT COUNT(*)::int AS count FROM accounts WHERE account_type = 'funded' AND status NOT IN ('failed', 'locked')`),
+      readPool.query(`SELECT COUNT(DISTINCT NULLIF(TRIM(country), ''))::int AS count FROM users WHERE country IS NOT NULL AND TRIM(country) <> ''`),
+      readPool.query(`
         SELECT
           COUNT(*)::float AS total,
           COUNT(*) FILTER (WHERE paid_at IS NOT NULL AND requested_at IS NOT NULL AND paid_at - requested_at <= INTERVAL '24 hours')::float AS same_day
         FROM payouts WHERE status = 'paid'
       `),
-      pool.query(`
+      readPool.query(`
         SELECT p.id, p.amount_payable, p.paid_at, u.full_name, u.country, u.id AS user_id
         FROM payouts p
         JOIN users u ON u.id::text = p.user_id::text

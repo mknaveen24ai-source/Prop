@@ -339,12 +339,43 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       }
 
       // â”€â”€ Max simultaneous open trades cap (inside transaction) â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // FIX (M-01): max_trades_per_1k was stored in platform_settings, exposed
+      // in the admin settings UI, returned to traders via /api/accounts, and
+      // loaded into rules.maxTradesPer1k -- and read by no enforcement code
+      // anywhere. An admin tightening it believed they had capped position
+      // count per $1k of account size; nothing happened. A control that does
+      // nothing is worse than an absent one, so it is enforced now.
+      //
+      // Scales with the account like the lot caps above, reusing the same
+      // scaling multiplier so a funded account's raised capacity applies here
+      // too. Zero or negative disables it, matching maxDailyTrades.
       const maxOpenTrades = rules.maxOpenPositions
       const openTradeCountResult = await client.query(
         `SELECT COUNT(*) FROM trades WHERE account_id = $1 AND status IN ('open', 'pending')`,
         [accountIdStr]
       )
       const currentOpenCount = parseInt(openTradeCountResult.rows[0].count)
+
+      // FIX (M-01): max_trades_per_1k was stored in platform_settings, shown in
+      // the admin settings UI, returned to traders via /api/accounts, and loaded
+      // into rules.maxTradesPer1k -- and read by no enforcement code anywhere.
+      // An admin tightening it believed they had capped position count per $1k
+      // of account size; nothing happened. A control that silently does nothing
+      // is worse than an absent one.
+      //
+      // Reuses the count above rather than issuing its own query, and reuses
+      // accountSizeK so a funded account's scaling multiplier applies here too.
+      // Zero or negative disables it, matching maxDailyTrades.
+      if (rules.maxTradesPer1k > 0) {
+        const maxScaledTrades = Math.max(1, Math.floor(accountSizeK * rules.maxTradesPer1k))
+        if (currentOpenCount >= maxScaledTrades) {
+          await client.query('ROLLBACK')
+          return res.status(400).json({
+            error: `Maximum of ${maxScaledTrades} simultaneous positions for a $${Number(account.account_size).toLocaleString()} account (${rules.maxTradesPer1k} per $1k). You currently have ${currentOpenCount}.`
+          })
+        }
+      }
+
       if (currentOpenCount >= maxOpenTrades) {
         await client.query('ROLLBACK')
         return res.status(400).json({
@@ -494,6 +525,16 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
            VALUES ($1, $2, $3, $4, NOW())`,
           [newTrade.rows[0].id, req.user.userId, accountIdStr, tradeIp]
         )
+        // FIX (M-10): the daily-trade limit counts trade_logs rows, but only the
+        // primary leg was ever logged — so an OCO pair counted as one trade
+        // while creating two orders, letting a trader place twice the cap.
+        if (siblingTradeId) {
+          await client.query(
+            `INSERT INTO trade_logs (trade_id, user_id, account_id, ip_address, logged_at)
+             VALUES ($1, $2, $3, $4, NOW())`,
+            [siblingTradeId, req.user.userId, accountIdStr, tradeIp]
+          )
+        }
         await client.query('COMMIT')
 
         const tradeRow = newTrade.rows[0]

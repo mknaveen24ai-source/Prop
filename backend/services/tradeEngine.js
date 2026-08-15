@@ -46,7 +46,7 @@ const { getUsdRateForInstrument } = require('../utils/fxRates')
 const { fetchStepModelBySlug } = require('../utils/stepModels')
 const { fetchProgressionSettings, promotePassedAccount } = require('./progressionService')
 const { getCurrentPricesForTenant } = require('../priceFeed')
-const { recordEngineTick } = require('../utils/prometheusMetrics')
+const { recordEngineTick, registerEngineStatsSource } = require('../utils/prometheusMetrics')
 const {
   COMMODITY_INSTRUMENTS,
   FOREX_INSTRUMENTS
@@ -140,6 +140,17 @@ async function checkSLTP(io) {
       if (!triggered) continue
 
       // FIX (Bug 5): Use admin-configurable min hold time instead of hardcoded 60s
+      //
+      // M-06 (disclosure, not a code change): this suppresses SL/TP *entirely*
+      // inside the hold window rather than deferring the fill to the level. A
+      // stop hit at second 10 does not fill at second 60 at the stop price — it
+      // fills whenever the price next crosses, at whatever the price is then.
+      // If the market has moved back through, it does not fill at all.
+      //
+      // That is defensible as an anti-scalping rule, but it means "stop loss"
+      // does not mean stop loss for the first minHoldSeconds. It MUST be stated
+      // in the published trading rules; a trader discovering it from a fill is
+      // a dispute the firm loses. See docs/TRADING_RULES_DISCLOSURES.md.
       if (trade.open_time) {
         const secondsOpen = (new Date() - new Date(trade.open_time)) / 1000
         if (secondsOpen < rules.minHoldSeconds) continue
@@ -200,7 +211,10 @@ async function checkSLTP(io) {
           })
         }
       } catch (err) {
-        await client.query('ROLLBACK')
+        // FIX (M-07): .catch() because a dead connection makes ROLLBACK itself
+        // throw, and that escapes the handler and aborts the rest of the engine
+        // pass. fillPendingOrder already guarded this; these did not.
+        await client.query('ROLLBACK').catch(() => {})
         logger.error(`checkSLTP: transaction failed for trade ${trade.id}:`, { error: err.message })
       } finally {
         client.release()
@@ -502,7 +516,17 @@ async function autoCloseAndFail(acc, reason, io) {
     let totalPnlDec = new Decimal(0)
 
     for (const trade of openTrades.rows) {
-      try {
+      // FIX (M-03): this loop used to wrap each trade in its own try/catch and
+      // log-and-continue on error. That could not work: in Postgres any
+      // statement error aborts the whole transaction, so every subsequent query
+      // fails too and the COMMIT below throws anyway. The catch only created
+      // the appearance of resilience while deferring the failure — and because
+      // totalPnlDec is accumulated BEFORE the UPDATE, a swallowed error left
+      // the running total crediting a trade that was never closed.
+      //
+      // Now errors propagate to the outer handler, the transaction rolls back
+      // cleanly, and the next engine pass retries the whole account.
+      {
         const priceData = priceMap[trade.instrument]
         if (!priceData) {
           await client.query(
@@ -543,8 +567,6 @@ async function autoCloseAndFail(acc, reason, io) {
            WHERE id = $3`,
            [close_price, demo_pnl, trade.id]
         )
-      } catch (err) {
-        logger.error(`Failed to close trade ${trade.id} during drawdown breach`, { error: err.message })
       }
     }
 
@@ -628,7 +650,9 @@ async function autoCloseAndFail(acc, reason, io) {
     logger.info(`Account ${acc.id} FAILED via floating drawdown — ${reason}`)
 
   } catch (err) {
-    await client.query('ROLLBACK')
+    // FIX (M-07): see note above — an unguarded ROLLBACK on a dead connection
+    // takes down the remainder of the engine pass.
+    await client.query('ROLLBACK').catch(() => {})
     logger.error(`autoCloseAndFail error for account ${acc.id}:`, { error: err.message })
   } finally {
     client.release()
@@ -669,9 +693,33 @@ async function autoCloseAndPass(acc, io) {
     let totalPnlDec = new Decimal(0)
 
     for (const trade of openTrades.rows) {
-      try {
+      {
         const priceData = priceMap[trade.instrument]
-        if (!priceData) throw new Error(`Missing live price for ${trade.instrument}`)
+        // FIX (M-04): this used to throw, aborting the entire promotion, while
+        // autoCloseAndFail closed the same trade at open_price with zero PnL
+        // and carried on. A feed outage therefore failed accounts but could
+        // never pass them — a house-favouring asymmetry in an edge case, and
+        // one that stranded a trader who had legitimately hit their target if
+        // the instrument's feed stayed down.
+        //
+        // Both paths now settle a priceless trade the same way: flat, at the
+        // open price, so the outcome does not depend on which rule fired.
+        if (!priceData) {
+          logger.warn(`autoCloseAndPass: no live price for ${trade.instrument} — closing trade ${trade.id} flat`, {
+            accountId: acc.id, tradeId: trade.id
+          })
+          await client.query(
+            `UPDATE trades SET
+               status = 'closed',
+               close_price = open_price,
+               close_time = NOW(),
+               demo_pnl = 0,
+               close_reason = $1
+             WHERE id = $2`,
+            [closeReason, trade.id]
+          )
+          continue
+        }
 
         const close_price = trade.direction === 'buy'
           ? parseFloat(priceData.bid)
@@ -698,9 +746,6 @@ async function autoCloseAndPass(acc, io) {
            WHERE id = $4`,
            [close_price, demo_pnl, closeReason, trade.id]
         )
-      } catch (err) {
-        logger.error(`Failed to close trade ${trade.id} on profit target:`, { error: err.message })
-        throw err
       }
     }
 
@@ -754,7 +799,7 @@ async function autoCloseAndPass(acc, io) {
     logger.info(`Account ${acc.id} PASSED via floating equity (${acc.account_type})`)
 
   } catch (err) {
-    await client.query('ROLLBACK')
+    await client.query('ROLLBACK').catch(() => {})
     logger.error(`autoCloseAndPass error for account ${acc.id}:`, { error: err.message, auto_pass_aborted: true })
   } finally {
     client.release()

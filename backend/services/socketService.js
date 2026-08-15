@@ -58,13 +58,30 @@ async function assertUserSessionValid(pool, userId, tokenVersion) {
   }
 }
 
-async function assertAdminSessionValid(pool, adminTokenVersion) {
+async function assertAdminSessionValid(pool, adminTokenVersion, adminId = null) {
   const result = await pool.query(
     `SELECT value FROM platform_settings WHERE key = 'admin_token_version'`
   )
-  if (result.rows.length === 0) return
-  const serverVersion = parseInt(result.rows[0].value, 10)
-  if (!Number.isNaN(serverVersion) && (adminTokenVersion || 0) < serverVersion) {
+  if (result.rows.length > 0) {
+    const serverVersion = parseInt(result.rows[0].value, 10)
+    if (!Number.isNaN(serverVersion) && (adminTokenVersion || 0) < serverVersion) {
+      throw sessionError('Admin session expired')
+    }
+  }
+
+  // FIX (M-05): this only ever checked the GLOBAL admin_token_version, never
+  // the per-admin row that authenticateAdmin checks on every HTTP request. So
+  // deactivating an admin, or bumping just their token_version, cut off their
+  // API access while their socket stayed connected to the `admin` room —
+  // still receiving every admin event until they happened to disconnect.
+  if (!adminId) return
+  const admin = await pool.query(
+    `SELECT status, token_version FROM platform_admins WHERE id = $1`,
+    [adminId]
+  )
+  if (admin.rows.length === 0) throw sessionError('Platform admin not found')
+  if (admin.rows[0].status !== 'active') throw sessionError('Platform admin account is inactive')
+  if ((adminTokenVersion || 0) < parseInt(admin.rows[0].token_version || 1, 10)) {
     throw sessionError('Admin session expired')
   }
 }
@@ -113,9 +130,12 @@ function buildSocketAuthMiddleware(pool) {
       }
 
       if (adminDecoded) {
-        await assertAdminSessionValid(pool, adminDecoded.atv)
+        await assertAdminSessionValid(pool, adminDecoded.atv, adminDecoded.adminId)
         socket.data.isAdmin = true
         socket.data.adminTokenVersion = adminDecoded.atv
+        // Kept so the periodic re-check can consult the same platform_admins
+        // row this handshake was granted against (M-05).
+        socket.data.adminId = adminDecoded.adminId || null
         socket.join('admin')
       }
       next()
@@ -144,7 +164,7 @@ function startSessionRevalidation(pool, socket) {
         await assertUserSessionValid(pool, socket.data.userId, socket.data.tokenVersion)
       }
       if (socket.data?.isAdmin) {
-        await assertAdminSessionValid(pool, socket.data.adminTokenVersion)
+        await assertAdminSessionValid(pool, socket.data.adminTokenVersion, socket.data.adminId)
       }
     } catch (err) {
       if (!err.sessionInvalid) {

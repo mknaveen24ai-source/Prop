@@ -31,6 +31,11 @@ const AdminTrades = lazy(() => import('./pages/admin/AdminTrades'))
 const AdminPayouts = lazy(() => import('./pages/admin/AdminPayouts'))
 const AdminPlatformPnL = lazy(() => import('./pages/admin/AdminPlatformPnL'))
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'))
+// FIX (M-02): AdminEmailJobs.jsx is a complete 492-line page calling live,
+// mounted endpoints (/api/admin/email-jobs, routes/admin/index.js), but it had
+// no route and no import anywhere — so email-delivery failures could not be
+// inspected or retried by anyone.
+const AdminEmailJobs = lazy(() => import('./pages/admin/AdminEmailJobs'))
 const AdminCoupons = lazy(() => import('./pages/admin/AdminCoupons'))
 const AdminGifts = lazy(() => import('./pages/admin/AdminGifts'))
 const AdminReferralSeasons = lazy(() => import('./pages/admin/AdminReferralSeasons'))
@@ -149,6 +154,7 @@ function AnimatedRoutes({ user, login, logout }) {
             <Route path="affiliates/:userId" element={<AdminAffiliateDetail />} />
             <Route path="pnl" element={<AdminPlatformPnL />} />
             <Route path="settings" element={<AdminSettings />} />
+            <Route path="email-jobs" element={<AdminEmailJobs />} />
             <Route path="coupons" element={<AdminCoupons />} />
             <Route path="gifts" element={<AdminGifts />} />
             <Route path="trading-economics" element={<AdminTradingEconomics />} />

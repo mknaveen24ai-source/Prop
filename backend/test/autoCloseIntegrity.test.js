@@ -33,12 +33,41 @@ function routeBody(moduleName, method, pathLiteral, nextMarker) {
   return source.slice(start, end)
 }
 
-test('autoCloseAndPass is fail-fast on trade close errors', () => {
+// FIX (M-03/M-04): both of these previously asserted on the presence of a
+// per-trade try/catch inside the close loop — `throw err` in autoCloseAndPass,
+// and a "Failed to close trade ... during drawdown breach" log in
+// autoCloseAndFail.
+//
+// Those catches have been removed, because inside a Postgres transaction they
+// could not do what they appeared to: any statement error aborts the whole
+// transaction, so a caught-and-logged error still fails at COMMIT. The catch
+// only deferred the failure while making the code read as resilient — and in
+// autoCloseAndFail it was actively harmful, since totalPnlDec is accumulated
+// before the UPDATE, so a swallowed error left the running total crediting a
+// trade that was never closed.
+//
+// The invariant worth guarding is therefore the opposite of a specific catch:
+// the close loop must contain NO catch that lets the pass continue. Errors
+// propagate to the single outer handler, roll back cleanly, and retry next tick.
+
+function closeLoopBody(source) {
+  const start = source.indexOf('for (const trade of openTrades.rows)')
+  assert.ok(start !== -1, 'close loop not found')
+  const body = source.slice(start, source.indexOf('const totalPnl =', start))
+  // Strip comments: these loops are heavily annotated with *why* the catch was
+  // removed, and a bare /catch/ match would hit the explanation rather than any
+  // real handler.
+  return body.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+}
+
+// Matches the syntax, not the word.
+const CATCH_CLAUSE = /\}\s*catch\s*\(/
+
+test('autoCloseAndPass does not swallow trade close errors', () => {
   const source = functionBody('autoCloseAndPass', 'checkFloatingDrawdown', engineSource)
 
-  assert.match(source, /throw err/)
-  assert.match(source, /auto_pass_aborted/)
-  assert.doesNotMatch(source, /Error closing trade \$\{trade\.id\} on profit target hit/)
+  assert.doesNotMatch(closeLoopBody(source), CATCH_CLAUSE, 'the close loop must not catch per-trade errors')
+  assert.match(source, /auto_pass_aborted/, 'the outer handler still records an aborted pass')
 })
 
 test('autoCloseAndFail keeps Decimal PnL conversion before balance, violation, and socket use', () => {
@@ -49,8 +78,20 @@ test('autoCloseAndFail keeps Decimal PnL conversion before balance, violation, a
   assert.match(source, /total_closed_pnl: totalPnl/)
   assert.match(source, /pnl: totalPnl/)
   assert.doesNotMatch(source, /total_closed_pnl: totalPnlDec/)
-  assert.doesNotMatch(source, /Error closing trade \$\{trade\.id\} on drawdown breach/)
-  assert.match(source, /Failed to close trade \$\{trade\.id\} during drawdown breach/)
+  assert.doesNotMatch(closeLoopBody(source), CATCH_CLAUSE, 'the close loop must not catch per-trade errors')
+})
+
+test('both auto-close paths settle a priceless trade identically', () => {
+  // FIX (M-04): autoCloseAndFail closed at open_price with zero PnL and carried
+  // on, while autoCloseAndPass threw and aborted the whole promotion. A feed
+  // outage therefore failed accounts but could never pass them.
+  const failSource = functionBody('autoCloseAndFail', 'autoCloseAndPass', engineSource)
+  const passSource = functionBody('autoCloseAndPass', 'checkFloatingDrawdown', engineSource)
+
+  for (const [name, source] of [['autoCloseAndFail', failSource], ['autoCloseAndPass', passSource]]) {
+    assert.match(source, /close_price = open_price/, `${name} must settle a priceless trade flat`)
+    assert.doesNotMatch(source, /throw new Error\(`Missing live price/, `${name} must not abort on a missing price`)
+  }
 })
 
 test('challengeEngine failAccount does not swallow close failures before failing account', () => {
