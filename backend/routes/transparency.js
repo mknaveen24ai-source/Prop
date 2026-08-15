@@ -1,6 +1,9 @@
 const express = require('express')
 const router = express.Router()
-const pool = require('../db')
+// Public transparency stats are read-only and served to unauthenticated
+// traffic, which makes them the easiest thing to accidentally overload the
+// primary with. They run on the read pool.
+const { readPool: pool } = require('../db')
 const logger = require('../utils/logger')
 
 // ── Transparency API ──────────────────────────────────────────────────────────

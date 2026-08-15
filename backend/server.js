@@ -12,6 +12,7 @@ const cookieParser = require('cookie-parser')
 const path = require('path')
 const { createServer } = require('http')
 const pool = require('./db')
+const { readPool } = require('./db')
 const { Server } = require('socket.io')
 const helmet = require('helmet')
 const rateLimit = require('express-rate-limit')
@@ -130,7 +131,10 @@ async function getAnnouncementState() {
 }
 
 async function fetchLeaderboardRows({ includeHidden = false, limit = 20 }) {
-  const result = await pool.query(
+  // Public, uncached, and a full scan over users x accounts x trades — the
+  // single heaviest read the platform serves to anonymous traffic. Runs on the
+  // read pool so it cannot starve trade closes of a connection.
+  const result = await readPool.query(
     `
       WITH ranked_accounts AS (
         SELECT
@@ -278,6 +282,9 @@ app.use('/uploads', authAdm, function (req, res) {
 })
 
 wrapDatabaseQuery(pool)
+// The read pool is instrumented too, or the analytics queries most likely to
+// be slow would be the ones missing from the slow-query log.
+wrapDatabaseQuery(readPool)
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/setup',    require('./routes/setup'))

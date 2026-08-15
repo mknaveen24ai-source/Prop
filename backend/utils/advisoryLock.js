@@ -1,5 +1,9 @@
 const crypto = require('crypto')
-const pool = require('../db')
+// directPool, not the main pool: these are SESSION-scoped locks held across the
+// whole job, and a transaction pooler (PgBouncer) would hand each statement a
+// different backend — the unlock would miss and the lock would leak. See the
+// directPool comment in db.js.
+const { directPool: pool } = require('../db')
 const logger = require('./logger')
 
 function getAdvisoryLockPair(name) {

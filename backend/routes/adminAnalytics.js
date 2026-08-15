@@ -1,6 +1,9 @@
 const express = require('express')
 const router = express.Router()
-const pool = require('../db')
+// Admin analytics are read-only aggregates over large tables. They run on the
+// read pool so a slow report cannot starve trade closes of a connection, and
+// so they follow READ_DATABASE_URL to a replica when one is configured.
+const { readPool: pool } = require('../db')
 const logger = require('../utils/logger')
 const { authenticateAdmin } = require('./middleware')
 const { calcTradePnl, getExposureData } = require('./admin')._internals

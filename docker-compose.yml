@@ -55,6 +55,50 @@ services:
     networks:
       - internal
 
+  # ── PgBouncer (opt-in) ───────────────────────────────────────────────────────
+  # Connection pooler in TRANSACTION mode. Lets several hundred client
+  # connections share ~40 real Postgres backends, which is what makes running
+  # more than one backend instance affordable.
+  #
+  # OPT-IN ON PURPOSE. Enable with:
+  #     docker compose --profile pgbouncer up -d
+  #     DB_POOLER_HOST=pgbouncer DB_POOLER_PORT=6432
+  # Without those it does not start and every service connects straight to
+  # Postgres, exactly as before. Changing the connection path of a live trading
+  # system is not something to inherit silently from a git pull.
+  #
+  # Before enabling, know what transaction pooling does NOT preserve: session
+  # state. Session-level advisory locks are the one thing in this codebase that
+  # depends on it (utils/advisoryLock.js, guarding the scheduler jobs), which is
+  # why the backend below is also given DIRECT_DATABASE_URL — that pool bypasses
+  # the pooler. The pg_advisory_xact_lock calls used everywhere else are
+  # transaction-scoped and safe through a pooler.
+  pgbouncer:
+    image: bitnami/pgbouncer:latest
+    container_name: propfirm_pgbouncer
+    restart: unless-stopped
+    profiles: ["pgbouncer"]
+    environment:
+      PGBOUNCER_DATABASE:   ${DB_NAME:-propfirm}
+      POSTGRESQL_HOST:      postgres
+      POSTGRESQL_PORT:      5432
+      POSTGRESQL_USERNAME:  ${DB_USER:-propfirm}
+      POSTGRESQL_PASSWORD:  ${DB_PASSWORD}
+      PGBOUNCER_POOL_MODE:  transaction
+      PGBOUNCER_MAX_CLIENT_CONN:   500
+      PGBOUNCER_DEFAULT_POOL_SIZE: 40
+      PGBOUNCER_MIN_POOL_SIZE:     10
+      # node-postgres sends statement_timeout as a startup parameter (see the
+      # pool config in backend/db.js). PgBouncer rejects unknown startup
+      # parameters in transaction mode unless they are listed here, so without
+      # this every connection attempt fails immediately.
+      PGBOUNCER_IGNORE_STARTUP_PARAMETERS: extra_float_digits,statement_timeout
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+
   # ── Migrations (one-shot) ────────────────────────────────────────────────────
   # Runs to completion, then exits. Backend waits on it via
   # `condition: service_completed_successfully`, so schema changes are applied
@@ -70,6 +114,9 @@ services:
     env_file: .env
     environment:
       NODE_ENV:     production
+      # Always straight to Postgres, never through PgBouncer: DDL and the
+      # migration advisory lock are session-scoped and do not survive
+      # transaction pooling.
       DATABASE_URL: postgresql://${DB_USER:-propfirm}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-propfirm}
     entrypoint: ["dumb-init", "--"]
     command: ["npm", "run", "migrate"]
@@ -90,7 +137,16 @@ services:
     environment:
       NODE_ENV:     production
       TRUST_PROXY:  ${TRUST_PROXY:-1}
-      DATABASE_URL: postgresql://${DB_USER:-propfirm}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-propfirm}
+      # Defaults to postgres:5432. Set DB_POOLER_HOST=pgbouncer and
+      # DB_POOLER_PORT=6432 (with --profile pgbouncer) to route through the
+      # pooler; nothing else needs to change.
+      DATABASE_URL: postgresql://${DB_USER:-propfirm}:${DB_PASSWORD}@${DB_POOLER_HOST:-postgres}:${DB_POOLER_PORT:-5432}/${DB_NAME:-propfirm}
+      # Session-scoped advisory locks (the scheduler mutex) must bypass any
+      # pooler. See the directPool comment in backend/db.js.
+      DIRECT_DATABASE_URL: postgresql://${DB_USER:-propfirm}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-propfirm}
+      # Optional read replica for analytics, transparency and the leaderboard.
+      # Falls back to DATABASE_URL when unset.
+      READ_DATABASE_URL: ${READ_DATABASE_URL:-}
       REDIS_URL:    redis://:${REDIS_PASSWORD:-redispass}@redis:6379
       # Trade engine mode. `interval` (default) keeps the original polling loops
       # at their original cadence. `event` drives SL/TP, pending fills, drawdown
@@ -139,7 +195,9 @@ services:
     env_file: .env
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${DB_USER:-propfirm}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-propfirm}
+      # Short transactions only, so it is safe through the pooler when enabled.
+      DATABASE_URL: postgresql://${DB_USER:-propfirm}:${DB_PASSWORD}@${DB_POOLER_HOST:-postgres}:${DB_POOLER_PORT:-5432}/${DB_NAME:-propfirm}
+      DIRECT_DATABASE_URL: postgresql://${DB_USER:-propfirm}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-propfirm}
       EMAIL_WORKER_POLL_MS: ${EMAIL_WORKER_POLL_MS:-5000}
       EMAIL_WORKER_BATCH_SIZE: ${EMAIL_WORKER_BATCH_SIZE:-10}
     command: ["node", "workers/emailWorker.js"]
