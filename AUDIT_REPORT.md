@@ -580,3 +580,82 @@ I created two files while producing the executable evidence in this report and h
 - `backend/tmp-smoke/_audit_bench.js` — the hot-path benchmark (Phase 4)
 
 Both are safe to delete once you have reproduced the results. No other file in the repository was modified by this audit.
+
+---
+
+# REMEDIATION STATUS — 2026-08-15
+
+All 30 findings were worked on branch `fix/audit-2026-08-15` (8 commits off
+`deploy-readiness-remediation`). One item cannot be completed without access to
+a live database and is flagged below.
+
+## Verification after remediation
+
+| Check | Before | After |
+|---|---|---|
+| Backend tests | 267 pass | **295 pass / 0 fail** |
+| Frontend tests | 32 pass | **48 pass / 0 fail** |
+| Backend ESLint | 0 errors, 42 warnings | 0 errors, 42 warnings |
+| Frontend ESLint | 0 errors, 156 warnings | 0 errors, **151** warnings |
+| `npm audit` (both) | 0 vulnerabilities | 0 vulnerabilities |
+| `depcheck` missing deps | **3** (aws-sdk, node-vault, twilio) | **0** |
+| Circular dependencies | **1** | **0** |
+| Frontend build | green | green |
+
+## Findings status
+
+| ID | Status | Note |
+|---|---|---|
+| C-01 | **Fixed** | Contained day 0 (14 USD-quoted instruments only), then `utils/fxRates.js`. 1 lot USDJPY / 10 pips now books **$66.67**, was $10,000. |
+| C-02 | **Mechanism shipped — needs one command** | See below. |
+| C-03 | **Fixed** | All four scoped roles admitted; regression test per role. |
+| H-01 | Fixed | `t.commission` added to the 1 Hz drawdown SELECT. |
+| H-02 | Fixed | Token cache invalidated on ban/unban in both handlers. |
+| H-03 | Fixed | Idempotency mandatory on the three money scopes. |
+| H-04 | Fixed | All 23 limiters on a shared Redis store with memory fallback. |
+| H-05 | Fixed | `/payouts/reject` now has transaction, lock and status guard. |
+| H-06 | Fixed | `finiteOr` across all numeric trading rules. |
+| H-07 | Fixed | Three revocation gaps closed; `admin_token_version` seeded by migration 029. |
+| H-08 | Fixed | Socket.IO Redis adapter; `container_name` removed from scalable services. |
+| M-01…M-05, M-07, M-09…M-12 | Fixed | See commit `5524fd9`. |
+| M-06, M-08 | **Documented, not changed** | Both are deliberate house rules that were undisclosed. `docs/TRADING_RULES_DISCLOSURES.md` states each, with the alternative code change if you would rather not disclose. **These need to reach the published rules.** |
+| L-01 | **Open** | 95 `set-state-in-effect` warnings — mechanical but wide; deliberately not bundled with correctness fixes. |
+| L-02…L-07 | Fixed | See commit `abe0592`. |
+| Dead code | Fixed (confirmed scope) | 6 files deleted, 2 relocated. Medium-confidence candidates left per agreement. |
+
+## Still required from you
+
+1. **C-02 — run `npm run schema:dump`** against a known-good database and commit
+   `migrations/000_core_schema.sql`. Everything else is in place: the migration
+   that applies it, `scripts/verify-schema.js`, and the CI wiring. This needs a
+   live database, which the audit environment does not have.
+
+   The dump script also reports whether the money columns are `NUMERIC` or
+   `double precision`. **If any are float, that is a new critical** — the
+   application's Decimal.js discipline would be discarded at the storage layer.
+
+2. **A correction to this report's C-02 section.** The original text said CI had
+   no database. It does — a `migrations` job with a Postgres service has existed
+   since `878ace4`. That makes the finding *worse*: the guard exists, points at
+   the right thing, and therefore cannot have been passing. Fixed in place
+   rather than duplicated.
+
+3. **FX cutover is an operation, not a deploy.** Nothing changed behaviour on
+   merge — `FX_CONVERSION_ENABLED=false` makes every rate 1, preserving the old
+   maths exactly, per the agreed grandfathering. Run
+   `npm run fx:cutover-check` before flipping it; it refuses while any position
+   opened under the old maths is still open.
+
+4. **M-06/M-08 disclosures** need to reach `ChallengeRules.jsx`, the checkout
+   terms, and any funded-trader rulebook.
+
+## Out-of-scope finding raised during remediation
+
+**A live GitHub personal access token is embedded in the `origin` remote URL in
+`.git/config`.** Not committed, so it is not in the repository history, but it
+sits in plaintext on disk and is printed by any `git remote -v` — including CI
+logs and screen shares. **Revoke it**, then re-add the remote without embedded
+credentials and use a credential helper or SSH.
+
+The original secret scan covered tracked files and commit history, not local git
+configuration. That was a gap in the audit's method, not in the repository.
