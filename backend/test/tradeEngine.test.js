@@ -1,12 +1,15 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const pool = require('../db')
+// The engine moved out of routes/trades.js into services/tradeEngine.js — these
+// assertions are unchanged from when they covered the route-file version, which
+// is the point: they are the evidence the extraction preserved behaviour.
 const {
   checkSLTP,
   checkPendingOrders,
-  checkFloatingDrawdown,
-  getMarketStatus
-} = require('../routes/trades')
+  checkFloatingDrawdown
+} = require('../services/tradeEngine')
+const { getMarketStatus } = require('../services/tradeShared')
 
 // ─── Shared mock helpers ────────────────────────────────────────────────────
 // Every DB call in the engines ultimately goes through the shared `pool`

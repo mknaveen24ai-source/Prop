@@ -1,7 +1,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
-const { getMarketStatus } = require('../routes/trades')
+const { getMarketStatus } = require('../services/tradeShared')
 const pool = require('../db')
 
 test('open mode blocks new trades after Friday 21:00 UTC', () => {

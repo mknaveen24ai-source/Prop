@@ -14,6 +14,33 @@
 const logger = require('../utils/logger')
 const { withAdvisoryLock } = require('../utils/advisoryLock')
 
+// ─── Engine cadences ──────────────────────────────────────────────────────────
+// Under ENGINE_MODE=event the price tick itself drives SL/TP, pending fills and
+// drawdown, so these loops stop being the engine and become a safety net: they
+// keep their advisory locks and their full Decimal logic, but run rarely enough
+// to cost almost nothing. Anything the fast path misses still self-heals within
+// one fallback period.
+//
+// Under ENGINE_MODE=interval (the default) every cadence is exactly what it was.
+const INTERVAL_CADENCES = {
+  checkSLTP: 500,
+  checkPendingOrders: 500,
+  // FIX (HIGH #12): Reduced from 500ms to 1000ms to lower database query volume
+  // under heavy load with many active accounts.
+  checkFloatingDrawdown: 1000
+}
+const EVENT_FALLBACK_CADENCES = {
+  checkSLTP: 5000,
+  checkPendingOrders: 5000,
+  checkFloatingDrawdown: 10000
+}
+const PEAK_EQUITY_FLUSH_MS = 1000
+const INDEX_RECONCILE_MS = 30000
+
+function isEventMode() {
+  return String(process.env.ENGINE_MODE || 'interval').trim().toLowerCase() === 'event'
+}
+
 // ─── Timer registry ───────────────────────────────────────────────────────────
 const trackedIntervals = new Set()
 const trackedTimeouts = new Set()
@@ -90,19 +117,43 @@ function startAllSchedulers(io, deps) {
   } = deps
 
   // ── Trading engine ──────────────────────────────────────────────────────────
+  const eventMode = isEventMode()
+  const cadences = eventMode ? EVENT_FALLBACK_CADENCES : INTERVAL_CADENCES
+
   registerTrackedInterval(function () {
     runLockedSchedulerJob('jobs:check_sltp', 'check_sltp', () => checkSLTP(io))
-  }, 500)
+  }, cadences.checkSLTP)
 
   registerTrackedInterval(function () {
     runLockedSchedulerJob('jobs:check_pending_orders', 'check_pending_orders', () => checkPendingOrders(io))
-  }, 500)
+  }, cadences.checkPendingOrders)
 
-  // FIX (HIGH #12): Reduced from 500ms to 1000ms to lower database query volume
-  // under heavy load with many active accounts.
   registerTrackedInterval(function () {
     runLockedSchedulerJob('jobs:check_floating_drawdown', 'check_floating_drawdown', () => checkFloatingDrawdown(io))
-  }, 1000)
+  }, cadences.checkFloatingDrawdown)
+
+  // ── Event-engine upkeep ─────────────────────────────────────────────────────
+  if (eventMode) {
+    const tradeEngine = require('./tradeEngine')
+
+    // Peak equity / locked floors accumulated by the tick, written as one bulk
+    // statement instead of an UPDATE per account per tick.
+    registerTrackedInterval(function () {
+      tradeEngine.flushDirtyPeaks().catch((error) => {
+        logger.error('[scheduler:peak_equity_flush] execution error:', { error: error.message })
+      })
+    }, PEAK_EQUITY_FLUSH_MS)
+
+    // Drift guard. Logs whatever it corrects — in steady state this should find
+    // nothing, and a non-zero count means an incremental sync path is missing.
+    registerTrackedInterval(function () {
+      tradeEngine.reconcileIndex().catch((error) => {
+        logger.error('[scheduler:trade_index_reconcile] execution error:', { error: error.message })
+      })
+    }, INDEX_RECONCILE_MS)
+
+    logger.info('[schedulerService] ENGINE_MODE=event — trading loops demoted to safety fallbacks', cadences)
+  }
 
   // ── Challenge engine ────────────────────────────────────────────────────────
   // Run once immediately on startup, then every 30 s
@@ -180,5 +231,8 @@ module.exports = {
   registerTrackedTimeout,
   clearTrackedTimers,
   runLockedSchedulerJob,
-  startAllSchedulers
+  startAllSchedulers,
+  isEventMode,
+  INTERVAL_CADENCES,
+  EVENT_FALLBACK_CADENCES
 }

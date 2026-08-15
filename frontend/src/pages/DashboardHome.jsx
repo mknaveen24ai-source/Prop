@@ -469,6 +469,7 @@ export default function DashboardHome({
     activeAccount,
     allAccounts,
     setActiveAccount,
+    liveEquity: liveEquityMap,
   } = useStore()
   const [nowTick, setNowTick] = useState(Date.now())
 
@@ -575,13 +576,30 @@ export default function DashboardHome({
   }, [analytics, tf])
 
   const hasLivePrices = Object.keys(prices || {}).length > 0
-  const floatingPnl = hasLivePrices && openPositions.length > 0
+  // Equity pushed by the backend engine (ENGINE_MODE=event) is preferred when
+  // it's fresh: it is computed server-side against the same prices the engine
+  // trades on, so the KPI cards agree with the drawdown the engine is actually
+  // enforcing. Under ENGINE_MODE=interval no pushes arrive and this falls back
+  // to the locally-derived value, which is also the safety net if the feed
+  // stalls. `nowTick` keeps the staleness check re-evaluating.
+  const pushedEquity = selectedAccount ? liveEquityMap[selectedAccount.id] : null
+  const hasFreshPushedEquity = !!pushedEquity && (nowTick - pushedEquity.received_at) < 5000
+
+  const derivedFloatingPnl = hasLivePrices && openPositions.length > 0
     ? totalFloatingPnL
     : openTrades
       .filter((trade) => trade.status === 'open')
       .map((trade) => trade.floating_pnl || 0)
       .reduce((sum, tradePnl) => sumMoney([sum, tradePnl]), 0)
-  const liveEquity = stats ? calculateEquity(stats.account.current_balance || 0, floatingPnl) : 0
+  const floatingPnl = hasFreshPushedEquity ? pushedEquity.floating_pnl : derivedFloatingPnl
+  const liveEquity = hasFreshPushedEquity
+    ? pushedEquity.equity
+    : (stats ? calculateEquity(stats.account.current_balance || 0, floatingPnl) : 0)
+  // Realised balance also moves live — an SL/TP or drawdown close books PnL
+  // between refetches, and the push carries the post-close balance.
+  const liveBalance = hasFreshPushedEquity
+    ? pushedEquity.current_balance
+    : (stats?.account.current_balance || 0)
   const isFunded = selectedAccount?.account_type === 'funded'
 
   if (!stats || !selectedAccount) {
@@ -605,7 +623,7 @@ export default function DashboardHome({
     )
   }
 
-  const realizedProfit = Math.max(0, (stats.account.current_balance || 0) - (stats.account.starting_balance || 0))
+  const realizedProfit = Math.max(0, liveBalance - (stats.account.starting_balance || 0))
   const kpiSparkData = equityCurve.slice(-14)
   // Nullish-guarded: today_pnl / today_pnl_pct / daily_drawdown / payout_cycle
   // are new fields on GET /accounts/stats — fall back gracefully for a
@@ -613,6 +631,23 @@ export default function DashboardHome({
   const equityProfitPct = stats.stats.equity_profit_pct ?? 0
   const todayPnl = stats.stats.today_pnl ?? 0
   const todayPnlPct = stats.stats.today_pnl_pct ?? 0
+
+  // Drawdown gauges follow the same live-first / fetched-fallback rule as the
+  // KPI cards, so the bars move with the feed instead of only on refetch. The
+  // fetched `daily_drawdown` object carries the dollar amounts and the limit,
+  // which the push doesn't repeat — only the used percentage is overlaid.
+  const liveTotalDrawdownUsedPct = hasFreshPushedEquity
+    ? Math.max(0, pushedEquity.drawdown_used_pct)
+    : (stats.stats.total_drawdown_used_pct ?? 0)
+  const liveTotalDrawdownRemainingPct = hasFreshPushedEquity
+    ? Math.max(0, (stats.rules?.max_drawdown_pct || 0) - liveTotalDrawdownUsedPct)
+    : (stats.stats.total_drawdown_remaining_pct ?? 0)
+  const liveDailyDrawdown = hasFreshPushedEquity && stats.stats.daily_drawdown
+    ? {
+        ...stats.stats.daily_drawdown,
+        used_pct: Math.max(0, pushedEquity.daily_drawdown_used_pct ?? stats.stats.daily_drawdown.used_pct)
+      }
+    : stats.stats.daily_drawdown
   const kpis = [
     {
       key: 'equity', label: 'Equity', icon: 'balance', tone: 'var(--gain)',
@@ -621,7 +656,7 @@ export default function DashboardHome({
     },
     {
       key: 'balance', label: 'Balance', icon: 'wallet', tone: 'var(--accent)',
-      value: formatMoney(stats.account.current_balance),
+      value: formatMoney(liveBalance),
       delta: formatSigned(realizedProfit), sub: 'realised',
     },
     {
@@ -705,9 +740,9 @@ export default function DashboardHome({
       <SwapBlockButton blockKey="risk" />
       <ConsistencyRiskBlock
         consistency={stats.stats.consistency}
-        dailyDrawdown={stats.stats.daily_drawdown}
-        totalDrawdownUsedPct={stats.stats.total_drawdown_used_pct ?? 0}
-        totalDrawdownRemainingPct={stats.stats.total_drawdown_remaining_pct ?? 0}
+        dailyDrawdown={liveDailyDrawdown}
+        totalDrawdownUsedPct={liveTotalDrawdownUsedPct}
+        totalDrawdownRemainingPct={liveTotalDrawdownRemainingPct}
         maxDrawdownPct={stats.rules?.max_drawdown_pct || 0}
         profitProgressPct={stats.rules?.profit_target_amount > 0 ? Math.min(100, (realizedProfit / stats.rules.profit_target_amount) * 100) : 0}
         profitTargetAmount={stats.rules?.profit_target_amount || 0}

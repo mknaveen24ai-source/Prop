@@ -79,6 +79,29 @@ const useStore = create((set, get) => ({
   marketOpen: false,
   setMarketOpen: (status) => set({ marketOpen: status }),
 
+  // ── LIVE EQUITY ───────────────────────────────────────
+  // Pushed by the backend on every engine tick (ENGINE_MODE=event) via the
+  // `equity_update` socket event. Lives in the store rather than in Dashboard
+  // state because DashboardHome and TradingPanel need it too, and they have no
+  // socket of their own — this avoids threading it down through props.
+  //
+  // Under ENGINE_MODE=interval no equity_update events arrive and this stays
+  // empty, so every consumer must fall back to its fetched account values.
+  //
+  // Shape: { [accountId]: { equity, floating_pnl, current_balance,
+  //          drawdown_floor, drawdown_used_pct, daily_drawdown_used_pct,
+  //          daily_drawdown_limit_pct, profit_remaining, received_at } }
+  liveEquity: {},
+
+  updateLiveEquity: (accountId, data) => set(state => ({
+    liveEquity: {
+      ...state.liveEquity,
+      [accountId]: { ...data, received_at: Date.now() }
+    }
+  })),
+
+  clearLiveEquity: () => set({ liveEquity: {} }),
+
 }));
 
 export default useStore;

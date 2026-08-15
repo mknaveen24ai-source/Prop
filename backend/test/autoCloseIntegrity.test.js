@@ -5,6 +5,9 @@ const path = require('node:path')
 
 const tradesSource = fs.readFileSync(path.join(__dirname, '..', 'routes', 'trades.js'), 'utf8')
 const challengeSource = fs.readFileSync(path.join(__dirname, '..', 'challengeEngine.js'), 'utf8')
+// The engine functions these assertions guard now live in services/tradeEngine.js.
+// The route-level assertions below still read routes/trades.js.
+const engineSource = fs.readFileSync(path.join(__dirname, '..', 'services', 'tradeEngine.js'), 'utf8')
 
 function functionBody(name, nextName, sourceText = tradesSource) {
   const start = sourceText.indexOf(`async function ${name}`)
@@ -23,7 +26,7 @@ function routeBody(method, pathLiteral, nextMarker) {
 }
 
 test('autoCloseAndPass is fail-fast on trade close errors', () => {
-  const source = functionBody('autoCloseAndPass', 'checkFloatingDrawdown')
+  const source = functionBody('autoCloseAndPass', 'checkFloatingDrawdown', engineSource)
 
   assert.match(source, /throw err/)
   assert.match(source, /auto_pass_aborted/)
@@ -31,7 +34,7 @@ test('autoCloseAndPass is fail-fast on trade close errors', () => {
 })
 
 test('autoCloseAndFail keeps Decimal PnL conversion before balance, violation, and socket use', () => {
-  const source = functionBody('autoCloseAndFail', 'autoCloseAndPass')
+  const source = functionBody('autoCloseAndFail', 'autoCloseAndPass', engineSource)
 
   assert.match(source, /let totalPnlDec = new Decimal\(0\)/)
   assert.match(source, /const totalPnl = totalPnlDec\.toDecimalPlaces\(2\)\.toNumber\(\)/)
@@ -51,7 +54,7 @@ test('challengeEngine failAccount does not swallow close failures before failing
 })
 
 test('pending, modify, cancel, and batch action routes protect race side effects', () => {
-  const pendingSource = functionBody('checkPendingOrders', 'autoCloseAndFail')
+  const pendingSource = functionBody('checkPendingOrders', 'autoCloseAndFail', engineSource)
   assert.match(pendingSource, /FOR UPDATE SKIP LOCKED/)
   assert.match(pendingSource, /Account inactive/)
 

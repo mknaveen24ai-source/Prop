@@ -856,7 +856,19 @@ app.get('/api/prices/chart/:instrument', async function (req, res) {
 
 app.get('/api/price-status', async function (req, res) {
   try {
-    res.json(await getFeedHealthForTenant())
+    const health = await getFeedHealthForTenant()
+    // Engine counters ride along here so the feed and the engine consuming it
+    // can be read together — `ready: false` with a healthy feed means the event
+    // path is disabled or still building its index, and the interval fallbacks
+    // are carrying the load.
+    res.json({
+      ...health,
+      engine: {
+        mode: String(process.env.ENGINE_MODE || 'interval').trim().toLowerCase(),
+        event_path_armed: require('./services/priceBroadcast').isEngineEnabled(),
+        ...require('./services/tradeEngine').getEngineStats()
+      }
+    })
   } catch (error) {
     logger.error('Price status error:', { error: error.message })
     res.status(500).json({ error: 'Could not check price status', healthy: false })

@@ -18,6 +18,13 @@ services:
     image: postgres:16-alpine
     container_name: propfirm_postgres
     restart: unless-stopped
+    # The image default is max_connections=100, which the backend pool (60) plus
+    # the migrate job, email worker and admin sessions can crowd. 200 leaves room
+    # without the memory cost of going higher.
+    command: >
+      postgres
+      -c max_connections=200
+      -c shared_buffers=512MB
     environment:
       POSTGRES_DB:       ${DB_NAME:-propfirm}
       POSTGRES_USER:     ${DB_USER:-propfirm}
@@ -85,6 +92,11 @@ services:
       TRUST_PROXY:  ${TRUST_PROXY:-1}
       DATABASE_URL: postgresql://${DB_USER:-propfirm}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-propfirm}
       REDIS_URL:    redis://:${REDIS_PASSWORD:-redispass}@redis:6379
+      # Trade engine mode. `interval` (default) keeps the original polling loops
+      # at their original cadence. `event` drives SL/TP, pending fills, drawdown
+      # and profit targets off the price tick itself, demoting those loops to
+      # safety fallbacks. Flip back to `interval` and restart to roll back.
+      ENGINE_MODE:  ${ENGINE_MODE:-interval}
       # Where the MT5/DWX bridge files are mounted inside the container.
       DWX_PATH:     /app/mt5-bridge
     depends_on:
