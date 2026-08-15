@@ -35,6 +35,7 @@ const {
 const { fetchStepModelBySlug } = require('../../utils/stepModels')
 const {
   VALID_INSTRUMENTS,
+  isTradableInstrument,
   ensureTradeExperienceInfrastructure,
   getTradingRules,
   getLivePrice,
@@ -101,6 +102,16 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
     
     if (!VALID_INSTRUMENTS.includes(sanitizedInstrument)) {
       return res.status(400).json({ error: 'Invalid instrument' })
+    }
+
+    // C-01 containment: PnL is computed as priceDiff * lots * contractSize and
+    // booked as USD, which is only correct for USD-quoted instruments. Until
+    // FX conversion lands, block *opening* anything else. Existing positions on
+    // restricted instruments are unaffected — they still price, chart and close.
+    if (!isTradableInstrument(sanitizedInstrument)) {
+      return res.status(400).json({
+        error: `${sanitizedInstrument} is temporarily unavailable for new positions. Existing positions can still be managed and closed as normal.`
+      })
     }
 
     if (!['buy', 'sell'].includes(sanitizedDirection)) {

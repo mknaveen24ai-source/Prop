@@ -4,10 +4,11 @@ import Button from './ui/Button'
 import {
   CONTRACT_SIZES,
   INSTRUMENT_GROUPS,
-  SUPPORTED_INSTRUMENTS,
   getInputStepString,
   getPriceDecimals,
   getSpreadPoints,
+  getTradableInstruments,
+  isTradableInstrument,
 } from '../utils/instruments'
 import { calculateRiskRewardRatio, formatCurrency, toDecimal, toMoneyNumber } from '../utils/finance'
 
@@ -71,7 +72,9 @@ export default function OrderPanel({
   prices,
   selectedAccount,
   floatingBalance,
-  availableInstruments = SUPPORTED_INSTRUMENTS,
+  // C-01 containment: default to what may actually be opened, not the whole
+  // catalogue — otherwise this panel offers instruments the server will reject.
+  availableInstruments = getTradableInstruments(),
   onOpenTrade,
   orderForm,
   setOrderForm
@@ -139,6 +142,14 @@ export default function OrderPanel({
     const lots = Number.isFinite(parseFloat(orderForm.lots)) ? parseFloat(orderForm.lots) : null
     if (!lots || lots < 0.01 || !Number.isFinite(previewEntry) || (!stopLossNum && !takeProfitNum)) return null
 
+    // C-01: distance * lots * contractSize lands in the instrument's QUOTE
+    // currency, so labelling it USD is only honest for USD-quoted instruments.
+    // Those are the only ones that can be opened right now, so this guard is
+    // belt-and-braces — but it also means the preview stays correct rather than
+    // quietly reappearing with wrong numbers when the catalogue is re-enabled.
+    // Phase 2 replaces this guard with the same QUOTE/USD rate the server uses.
+    if (!isTradableInstrument(instrument)) return null
+
     const riskDistance = stopLossNum ? Math.abs(previewEntry - stopLossNum) : null
     const rewardDistance = takeProfitNum ? Math.abs(takeProfitNum - previewEntry) : null
 
@@ -153,7 +164,7 @@ export default function OrderPanel({
       : null
 
     return { riskUSD, rewardUSD, rr }
-  }, [contractSize, orderForm.lots, previewEntry, stopLossNum, takeProfitNum])
+  }, [contractSize, instrument, orderForm.lots, previewEntry, stopLossNum, takeProfitNum])
 
   async function submitOrder(payload) {
     if (isSubmitting) return

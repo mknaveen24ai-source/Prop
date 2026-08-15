@@ -312,6 +312,56 @@ export const INSTRUMENT_GROUPS = Object.freeze({
   INDICES_MAJOR: Object.freeze([...INDICES_MAJOR]),
 })
 
+// ─────────────────────────────────────────────────────────────────────────────
+// C-01 containment — mirrors backend/instruments.js
+// ─────────────────────────────────────────────────────────────────────────────
+// PnL is computed as priceDiff * lots * contractSize and treated as USD, which
+// is only correct where the instrument's quote currency IS USD. Until FX
+// conversion lands, only USD-quoted instruments may be opened.
+//
+// The server is the real gate (routes/trades/open.js rejects the rest). This
+// exists so the UI does not offer an instrument the server will refuse, and so
+// the client-side risk preview is never shown for a symbol it cannot value.
+// Keep VITE_FX_CONVERSION_ENABLED in step with the backend's
+// FX_CONVERSION_ENABLED.
+const NON_FOREX_QUOTE_CURRENCIES = {
+  XAUUSD: 'USD', XAGUSD: 'USD', XPTUSD: 'USD', XPDUSD: 'USD',
+  XTIUSD: 'USD', XBRUSD: 'USD', XNGUSD: 'USD',
+  US30: 'USD', USTEC: 'USD', US500: 'USD',
+  UK100: 'GBP',
+  AUS200: 'AUD',
+  JP225: 'JPY',
+  HK50: 'HKD',
+  DE40: 'EUR', FRA40: 'EUR', EUSTX50: 'EUR',
+}
+
+export function getQuoteCurrency(symbol) {
+  const normalized = String(symbol || '').toUpperCase()
+  const config = INSTRUMENT_CATALOG[normalized]
+  if (config?.group === 'forex') return normalized.slice(3)
+  return NON_FOREX_QUOTE_CURRENCIES[normalized] || 'USD'
+}
+
+// Derived from SUPPORTED_INSTRUMENTS rather than the raw definitions so the
+// picker keeps its PRIORITY_INSTRUMENTS ordering when the list is narrowed.
+export const USD_QUOTED_INSTRUMENTS = Object.freeze(
+  SUPPORTED_INSTRUMENTS.filter((symbol) => getQuoteCurrency(symbol) === 'USD')
+)
+
+export function isFxConversionEnabled() {
+  return String(import.meta.env.VITE_FX_CONVERSION_ENABLED || '').trim().toLowerCase() === 'true'
+}
+
+/** Instruments a trader may open a NEW position on right now. */
+export function getTradableInstruments() {
+  return isFxConversionEnabled() ? SUPPORTED_INSTRUMENTS : USD_QUOTED_INSTRUMENTS
+}
+
+/** True when `symbol` may be opened right now. */
+export function isTradableInstrument(symbol) {
+  return getTradableInstruments().includes(String(symbol || '').toUpperCase())
+}
+
 export const TRADABLE_INSTRUMENTS_SUMMARY = '28 forex pairs + 4 metals + 3 energies + 10 global indices'
 
 // Maps this platform's instrument codes to TradingView's public widget
@@ -347,8 +397,13 @@ export function getTradingViewSymbol(instrument) {
   return TRADINGVIEW_SYMBOL_MAP[instrument] || `OANDA:${instrument}`
 }
 
+// Drives the order-entry instrument picker. Filtered to what may actually be
+// opened (C-01 containment) so the UI never offers a symbol the server rejects.
+// Price display, charts and existing positions are unaffected — they read from
+// SUPPORTED_INSTRUMENTS / INSTRUMENT_CATALOG, which still cover all 45.
 export function getAvailableInstrumentList(prices, fallback = []) {
   const livePrices = prices && typeof prices === 'object' ? prices : {}
+  const tradable = getTradableInstruments()
   const availableSet = new Set(
     Object.entries(livePrices)
       .filter(([, value]) => {
@@ -357,14 +412,14 @@ export function getAvailableInstrumentList(prices, fallback = []) {
         return Number.isFinite(bid) && bid > 0 && Number.isFinite(ask) && ask > 0
       })
       .map(([symbol]) => String(symbol || '').toUpperCase())
-      .filter((symbol) => SUPPORTED_INSTRUMENTS.includes(symbol))
+      .filter((symbol) => tradable.includes(symbol))
   )
 
   if (availableSet.size === 0) {
-    return [...fallback]
+    return fallback.filter((symbol) => tradable.includes(String(symbol || '').toUpperCase()))
   }
 
-  return SUPPORTED_INSTRUMENTS.filter((symbol) => availableSet.has(symbol))
+  return tradable.filter((symbol) => availableSet.has(symbol))
 }
 
 export function getInstrumentConfig(symbol) {

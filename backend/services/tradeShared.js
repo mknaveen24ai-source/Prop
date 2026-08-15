@@ -26,13 +26,18 @@ const { getCurrentPrices, getCurrentPricesForTenant, getPriceForTenant } = requi
 const {
   CONTRACT_SIZES,
   LEVERAGE,
-  INSTRUMENTS
+  INSTRUMENTS,
+  isTradableInstrument
 } = require('../constants')
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Leverage: 1:30 on forex (EURUSD, GBPUSD), 1:10 on commodities (XAUUSD, XAGUSD)
 // These values must NOT be changed without also reviewing margin checks.
 // ─────────────────────────────────────────────────────────────────────────────
+// Every instrument the platform knows about — used for price lookups, charts
+// and closing existing positions. NOT the set a new position may be opened on:
+// that is isTradableInstrument(), which is narrower while the C-01 containment
+// is in force. See instruments.js.
 const VALID_INSTRUMENTS = INSTRUMENTS
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -290,6 +295,7 @@ async function safeRecordEnforcement(payload) {
 
 module.exports = {
   VALID_INSTRUMENTS,
+  isTradableInstrument,
   FOREX_LOTS_PER_1K,
   COMMODITY_LOTS_PER_1K,
   MAX_OPEN_POSITIONS,

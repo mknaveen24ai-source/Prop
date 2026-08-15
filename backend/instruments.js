@@ -56,6 +56,10 @@ function buildForexDefinition(symbol, subCategory) {
     symbol,
     group: 'forex',
     subCategory,
+    // The currency a price move is denominated in. PnL = priceDiff * lots *
+    // contractSize lands in THIS currency, not USD — see utils/pnlCalculator.js
+    // and the C-01 note below.
+    quoteCurrency: quote,
     contractSize: 100000,
     leverage: LEVERAGE_FLAT,
     decimals: isJpy ? 3 : 5,
@@ -74,7 +78,21 @@ function buildForexDefinition(symbol, subCategory) {
 // newly added metals/energies/indices are best-effort placeholders and need
 // a manual spot-check, same caveat as the existing TradingView map on the
 // frontend — this environment can't verify third-party symbol conventions live.
-const INSTRUMENT_DEFINITIONS = [
+// Quote currency for everything that is not forex. The symbol does not encode
+// it: JP225 settles in JPY, DE40 in EUR, HK50 in HKD. Metals, energies and the
+// US indices genuinely are USD-quoted.
+const NON_FOREX_QUOTE_CURRENCIES = {
+  XAUUSD: 'USD', XAGUSD: 'USD', XPTUSD: 'USD', XPDUSD: 'USD',
+  XTIUSD: 'USD', XBRUSD: 'USD', XNGUSD: 'USD',
+  US30:   'USD', USTEC:  'USD', US500:  'USD',
+  UK100:  'GBP',
+  AUS200: 'AUD',
+  JP225:  'JPY',
+  HK50:   'HKD',
+  DE40:   'EUR', FRA40:  'EUR', EUSTX50: 'EUR'
+}
+
+const RAW_INSTRUMENT_DEFINITIONS = [
   ...FOREX_MAJORS.map((symbol) => buildForexDefinition(symbol, 'major')),
   ...FOREX_MINORS.map((symbol) => buildForexDefinition(symbol, 'minor')),
   {
@@ -351,6 +369,13 @@ const INSTRUMENT_DEFINITIONS = [
   }
 ]
 
+const INSTRUMENT_DEFINITIONS = RAW_INSTRUMENT_DEFINITIONS.map((definition) => ({
+  ...definition,
+  quoteCurrency: definition.quoteCurrency
+    || NON_FOREX_QUOTE_CURRENCIES[definition.symbol]
+    || 'USD'
+}))
+
 const INSTRUMENT_CATALOG = Object.freeze(
   INSTRUMENT_DEFINITIONS.reduce((acc, instrument) => {
     acc[instrument.symbol] = Object.freeze({ ...instrument })
@@ -358,7 +383,45 @@ const INSTRUMENT_CATALOG = Object.freeze(
   }, {})
 )
 
+// Everything the platform knows about. Deliberately NOT filtered by the C-01
+// containment below: the price feed subscribes from this list (priceFeed.js
+// SUBSCRIBE_SYMBOLS), and cutting it would (a) strand any position already open
+// on a restricted instrument with no price to close against, and (b) remove the
+// very USDJPY/USDCHF/USDCAD quotes the FX conversion work needs as rate sources.
 const INSTRUMENTS = Object.freeze(INSTRUMENT_DEFINITIONS.map((instrument) => instrument.symbol))
+
+// ─────────────────────────────────────────────────────────────────────────────
+// C-01 containment — which instruments may be OPENED
+// ─────────────────────────────────────────────────────────────────────────────
+// calculatePnL() computes priceDiff * lots * contractSize and books it as USD.
+// That product is denominated in the instrument's quote currency, so it is only
+// correct where the quote currency IS USD. For the rest it is wrong by the
+// QUOTE/USD rate — about 150x on the JPY pairs and JP225.
+//
+// Until FX conversion lands, only USD-quoted instruments may be opened. This
+// gates entry only: existing positions still price, chart and close normally.
+//
+// Set FX_CONVERSION_ENABLED=true once utils/fxRates.js is in place and the
+// per-currency parity tests pass.
+const USD_QUOTED_INSTRUMENTS = Object.freeze(
+  INSTRUMENT_DEFINITIONS
+    .filter((instrument) => instrument.quoteCurrency === 'USD')
+    .map((instrument) => instrument.symbol)
+)
+
+function isFxConversionEnabled() {
+  return String(process.env.FX_CONVERSION_ENABLED || '').trim().toLowerCase() === 'true'
+}
+
+/** Instruments a trader may open a NEW position on right now. */
+function getTradableInstruments() {
+  return isFxConversionEnabled() ? INSTRUMENTS : USD_QUOTED_INSTRUMENTS
+}
+
+/** True when `symbol` may be opened right now. */
+function isTradableInstrument(symbol) {
+  return getTradableInstruments().includes(String(symbol || '').trim().toUpperCase())
+}
 
 const INSTRUMENT_GROUPS = Object.freeze({
   FOREX_MAJORS: Object.freeze([...FOREX_MAJORS]),
@@ -454,6 +517,10 @@ module.exports = {
   INSTRUMENT_DEFINITIONS,
   INSTRUMENT_CATALOG,
   INSTRUMENTS,
+  USD_QUOTED_INSTRUMENTS,
+  getTradableInstruments,
+  isTradableInstrument,
+  isFxConversionEnabled,
   FOREX_MAJORS,
   FOREX_MINORS,
   COMMODITY_METALS,
