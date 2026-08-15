@@ -185,15 +185,27 @@ async function authenticateAdmin(req, res, next) {
   let decoded
   try {
     decoded = jwt.verify(token, process.env.ADMIN_JWT_SECRET)
-    if (!['admin', 'super_admin'].includes(decoded.role)) {
-      return res.status(403).json({ error: 'Admin access required' })
-    }
   } catch {
     return res.status(403).json({ error: 'Invalid or expired admin token' })
   }
 
+  // FIX (C-03): this gate previously accepted only the literal strings 'admin'
+  // and 'super_admin', and ran BEFORE the platform_admins lookup below. Every
+  // scoped role in BUILT_IN_ROLES — kyc_reviewer, support_agent, risk_ops,
+  // finance_ops — was therefore rejected with 403 on every admin route, so the
+  // only usable admin was a super_admin holding platform:*. The capability
+  // system existed but could never be reached.
+  //
+  // Authority is decided by the platform_admins row plus
+  // requireAdminCapability(...) on each route. All this gate has to do is
+  // reject a role it does not recognise.
+  const tokenRole = normalizePermission(decoded.role)
+  if (tokenRole !== 'admin' && !BUILT_IN_ROLES.includes(tokenRole)) {
+    return res.status(403).json({ error: 'Admin access required' })
+  }
+
   try {
-    const normalizedRole = decoded.role === 'admin' ? 'super_admin' : decoded.role
+    const normalizedRole = tokenRole === 'admin' ? 'super_admin' : tokenRole
     if (decoded.adminId) {
       const platformAdmin = await getPlatformAdminById(decoded.adminId)
       if (!platformAdmin) {
@@ -235,14 +247,15 @@ async function authenticateAdmin(req, res, next) {
     return res.status(503).json({ error: 'Authentication service unavailable' })
   }
 
+  const fallbackRole = tokenRole === 'admin' ? 'super_admin' : tokenRole
   req.admin = {
     ...decoded,
-    role: decoded.role === 'admin' ? 'super_admin' : decoded.role,
+    role: fallbackRole,
     email: decoded.email || process.env.ADMIN_EMAIL || null,
     full_name: decoded.full_name || 'Platform Owner',
     auth_source: decoded.src || 'env_fallback',
     totp_enabled: false,
-    permissions: getAdminPermissionsForRole(decoded.role === 'admin' ? 'super_admin' : decoded.role)
+    permissions: getAdminPermissionsForRole(fallbackRole)
   }
   next()
 }

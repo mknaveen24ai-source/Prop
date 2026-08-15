@@ -11,6 +11,7 @@
 
 const jwt = require('jsonwebtoken')
 const logger = require('../utils/logger')
+const { BUILT_IN_ROLES } = require('../routes/middleware')
 
 // How often a live socket re-checks that its session is still good. The
 // handshake alone is not enough: a Socket.IO connection can outlive a ban or a
@@ -84,7 +85,13 @@ function buildSocketAuthMiddleware(pool) {
       if (adminToken && process.env.ADMIN_JWT_SECRET) {
         try {
           const d = jwt.verify(adminToken, process.env.ADMIN_JWT_SECRET)
-          if (['admin', 'super_admin'].includes(d?.role)) adminDecoded = d
+          // FIX (C-03): mirrors routes/middleware.js authenticateAdmin. The old
+          // literal ['admin', 'super_admin'] check denied every scoped role a
+          // realtime channel, so a kyc_reviewer or finance_ops admin got no
+          // socket at all. Recognised-role check only; per-action authority
+          // still comes from requireAdminCapability on the HTTP routes.
+          const role = String(d?.role || '').trim().toLowerCase()
+          if (role === 'admin' || BUILT_IN_ROLES.includes(role)) adminDecoded = d
         } catch {}
       }
 
