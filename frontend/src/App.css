@@ -13,6 +13,7 @@
 @import './styles/modes/operator.css';
 @import './components/ui/ui.css';
 @import './styles/ledger-desk-overrides.css';
+@import './styles/animations.css';
 
 /* ── 4. Global Setup ── */
 *, *::before, *::after {
@@ -751,29 +752,9 @@ h1, h2, h3, h4, h5, h6 {
 .direction-sell { color: var(--danger); background: var(--danger-bg); padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; }
 
 /* ── 6. CSS Animations ── */
-@keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes fadeInDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes slideInLeft { from { transform: translateX(-100%); } to { transform: translateX(0); } }
-@keyframes modalIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-/* Uses currentColor so each badge (funded=warning, active=info) pulses its
-   own color instead of a hardcoded green baked into a shared keyframe.
-   Capped to whisper intensity (max 20% opacity, 6px spread) to match --elev. */
-@keyframes pulse-glow {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 20%, transparent); }
-  70% { box-shadow: 0 0 0 6px color-mix(in srgb, currentColor 0%, transparent); }
-  100% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent); }
-}
-@keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
-
-/* Noir Ledger premium pass — ambient/shimmer keyframes. Named distinctly
-   from pulse-glow/float above since those serve different components
-   (badge pulse, generic float) and shouldn't change behavior here. */
-@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
-@keyframes auth-float {
-  0% { transform: translate(0, 0) scale(1); }
-  100% { transform: translate(30px, -20px) scale(1.05); }
-}
-@keyframes glow-pulse { 0% { opacity: 0.4; } 100% { opacity: 0.7; } }
+/* Keyframe definitions moved to styles/animations.css (imported at the top
+   of this file). Only the definitions moved; the classes using them stay
+   below, next to the components they belong to. */
 
 .animate-fade-up { animation: fadeInUp 0.4s ease forwards; }
 

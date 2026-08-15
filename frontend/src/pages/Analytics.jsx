@@ -5,6 +5,7 @@ import { PageWrapper } from '../App'
 import { renderIcon } from '../utils/iconMap'
 import { formatPrice } from '../utils/instruments'
 import Card from '../components/ui/Card'
+import { SkeletonStats, SkeletonCard, SkeletonTable } from '../components/ui/Skeleton'
 import { API_BASE_URL as API_URL } from '../config/apiBase'
 
 
@@ -430,8 +431,11 @@ export default function Analytics({ selectedAccount }) {
   if (loading) {
     return (
       <PageWrapper>
-        <div style={{ textAlign: 'center', padding: '80px', color: 'var(--text-muted)' }}>
-          Loading analytics...
+        <div role="status" aria-live="polite" aria-busy="true">
+          <span className="ui-skeleton-srlabel">Loading analytics</span>
+          <SkeletonStats count={4} style={{ marginBottom: '16px' }} />
+          <SkeletonCard lines={2} height={280} style={{ marginBottom: '16px' }} />
+          <SkeletonTable rows={6} columns={6} />
         </div>
       </PageWrapper>
     )

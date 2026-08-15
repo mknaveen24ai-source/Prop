@@ -1,12 +1,25 @@
 import { create } from 'zustand';
+import { devtools } from 'zustand/middleware';
 
-const useStore = create((set, get) => ({
+// devtools gives a named, time-travellable log of every state change, which is
+// what makes a "why did equity flicker" bug tractable. Disabled outside dev so
+// the production bundle never talks to the extension.
+//
+// Each set() below passes a third argument naming the action — without it the
+// devtools timeline is an undifferentiated list of "anonymous" entries, which
+// is most of the value gone.
+//
+// Note on immer: it was considered here and deliberately left out. These
+// reducers are already small, flat and immutable; adding immer would mean a
+// dependency plus rewriting working money-adjacent state handling to gain
+// nothing at this size. Worth revisiting if the store grows nested state.
+const useStore = create(devtools((set, get) => ({
 
   // ── ACTIVE ACCOUNT ──────────────────────────────
   activeAccount: null,
   allAccounts: [],
 
-  setActiveAccount: (account) => set({ activeAccount: account }),
+  setActiveAccount: (account) => set({ activeAccount: account }, false, 'setActiveAccount'),
 
   setAllAccounts: (accounts) => set(state => {
     // BUG-12 FIX: Preserve the user's manually-selected account when accounts
@@ -20,11 +33,11 @@ const useStore = create((set, get) => ({
       // and prevents null-access crashes in components that read activeAccount.
       activeAccount: stillExists || accounts[0] || null
     }
-  }),
+  }, false, 'setAllAccounts'),
 
   switchAccount: (accountId) => {
     const account = get().allAccounts.find(a => a.id === accountId);
-    if (account) set({ activeAccount: account });
+    if (account) set({ activeAccount: account }, false, 'switchAccount');
   },
 
   // ── LIVE PRICES ──────────────────────────────────
@@ -33,9 +46,9 @@ const useStore = create((set, get) => ({
 
   updatePrice: (instrument, priceData) => set(state => ({
     prices: { ...state.prices, [instrument]: priceData }
-  })),
+  }), false, 'updatePrice'),
 
-  updatePrices: (pricesObj) => set({ prices: pricesObj }),
+  updatePrices: (pricesObj) => set({ prices: pricesObj }, false, 'updatePrices'),
 
   // ── OPEN POSITIONS ────────────────────────────────
   openPositions: [],
@@ -43,7 +56,7 @@ const useStore = create((set, get) => ({
 
   setOpenPositions: (positions) => {
     const total = positions.reduce((sum, p) => sum + (p.floating_pnl || 0), 0);
-    set({ openPositions: positions, totalFloatingPnL: total });
+    set({ openPositions: positions, totalFloatingPnL: total }, false, 'setOpenPositions');
   },
 
   updatePositionPnL: (tradeId, floatingPnL) => set(state => {
@@ -52,7 +65,7 @@ const useStore = create((set, get) => ({
     );
     const total = updated.reduce((sum, p) => sum + (p.floating_pnl || 0), 0);
     return { openPositions: updated, totalFloatingPnL: total };
-  }),
+  }, false, 'updatePositionPnL'),
 
   // BUG-08 FIX: addPosition now recalculates totalFloatingPnL so the dashboard
   // shows the correct total immediately when a new trade is opened.
@@ -62,22 +75,22 @@ const useStore = create((set, get) => ({
     const updated = [...state.openPositions, position];
     const total = updated.reduce((sum, p) => sum + (p.floating_pnl || 0), 0);
     return { openPositions: updated, totalFloatingPnL: total };
-  }),
+  }, false, 'addPosition'),
 
   removePosition: (tradeId) => set(state => {
     const updated = state.openPositions.filter(p => p.id !== tradeId);
     const total = updated.reduce((sum, p) => sum + (p.floating_pnl || 0), 0);
     return { openPositions: updated, totalFloatingPnL: total };
-  }),
+  }, false, 'removePosition'),
 
   // ── NOTIFICATIONS ─────────────────────────────────
   unreadCount: 0,
-  incrementUnread: () => set(state => ({ unreadCount: state.unreadCount + 1 })),
-  clearUnread: () => set({ unreadCount: 0 }),
+  incrementUnread: () => set(state => ({ unreadCount: state.unreadCount + 1 }), false, 'incrementUnread'),
+  clearUnread: () => set({ unreadCount: 0 }, false, 'clearUnread'),
 
   // ── MARKET STATUS ─────────────────────────────────
   marketOpen: false,
-  setMarketOpen: (status) => set({ marketOpen: status }),
+  setMarketOpen: (status) => set({ marketOpen: status }, false, 'setMarketOpen'),
 
   // ── LIVE EQUITY ───────────────────────────────────────
   // Pushed by the backend on every engine tick (ENGINE_MODE=event) via the
@@ -98,10 +111,13 @@ const useStore = create((set, get) => ({
       ...state.liveEquity,
       [accountId]: { ...data, received_at: Date.now() }
     }
-  })),
+  }), false, 'updateLiveEquity'),
 
-  clearLiveEquity: () => set({ liveEquity: {} }),
+  clearLiveEquity: () => set({ liveEquity: {} }, false, 'clearLiveEquity'),
 
+}), {
+  name: 'PropFirmStore',
+  enabled: import.meta.env.DEV
 }));
 
 export default useStore;

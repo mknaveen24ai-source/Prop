@@ -1,0 +1,84 @@
+/* Loading skeletons.
+   The shimmer matches .admin-skeleton in pages/admin/admin.css so trader and
+   admin surfaces animate identically. Colours come from the shared tokens, so
+   this follows the active theme rather than hard-coding a grey. */
+
+@keyframes uiSkeletonShimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.ui-skeleton {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  background: var(--paper, rgba(255, 255, 255, 0.06));
+  border-radius: 2px;
+}
+
+.ui-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+  animation: uiSkeletonShimmer 1.5s infinite;
+}
+
+.ui-skeleton-stack {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.ui-skeleton-card {
+  padding: 18px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  border-radius: 4px;
+  background: var(--bg-elevated, transparent);
+}
+
+.ui-skeleton-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.ui-skeleton-table {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ui-skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.05));
+}
+
+.ui-skeleton-row--header {
+  opacity: 0.6;
+}
+
+/* Visually hidden, still announced. Skeletons are decorative to a screen
+   reader, so the status text is what actually conveys "loading". */
+.ui-skeleton-srlabel {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The shimmer is decoration; stop it for anyone who asked for less motion.
+   The placeholder still holds the layout, which is the functional part. */
+@media (prefers-reduced-motion: reduce) {
+  .ui-skeleton::after {
+    animation: none;
+  }
+}

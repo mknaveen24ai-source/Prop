@@ -3,6 +3,7 @@ import api from '../services/api'
 import { PageWrapper } from '../App'
 import Card from '../components/ui/Card'
 import ProgressBar from '../components/ui/ProgressBar'
+import { SkeletonStats, SkeletonCard, SkeletonTable } from '../components/ui/Skeleton'
 
 // recharts-based — lazy so DashboardHome's own first paint (stat cards,
 // header) isn't blocked behind parsing the ~400KB chart chunk, even though
@@ -603,10 +604,25 @@ export default function DashboardHome({
   const isFunded = selectedAccount?.account_type === 'funded'
 
   if (!stats || !selectedAccount) {
+    // "No accounts yet" is a real end state, not a wait — it keeps its message.
+    // The loading case gets a skeleton shaped like the dashboard it replaces,
+    // so the layout does not collapse and then jump when stats land.
+    if (!selectedAccount) {
+      return (
+        <PageWrapper>
+          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
+            No accounts yet.
+          </div>
+        </PageWrapper>
+      )
+    }
     return (
       <PageWrapper>
-        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
-          {selectedAccount ? 'Loading account stats…' : 'No accounts yet.'}
+        <div role="status" aria-live="polite" aria-busy="true">
+          <span className="ui-skeleton-srlabel">Loading account stats</span>
+          <SkeletonStats count={4} style={{ marginBottom: '16px' }} />
+          <SkeletonCard lines={4} style={{ marginBottom: '16px' }} />
+          <SkeletonTable rows={5} columns={5} />
         </div>
       </PageWrapper>
     )
