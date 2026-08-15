@@ -39,7 +39,7 @@ const createAccountLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: function(req) {
-    return req.user?.userId ? `user:${req.user.userId}` : ipKeyGenerator(req)
+    return req.user?.userId ? `user:${req.user.userId}` : ipKeyGenerator(req.ip)
   }
 })
 

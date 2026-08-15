@@ -5,6 +5,7 @@
 const express = require('express')
 const router = express.Router()
 const pool = require('../../db')
+const { adminModerationLimiter } = require('./shared/rateLimiters')
 const {
   authenticateAdmin,
   requireAdminCapability
@@ -304,7 +305,7 @@ router.post('/traders/invite', authenticateAdmin, requireAdminCapability('trader
   }
 })
 
-router.post('/ban', authenticateAdmin, requireAdminCapability('trader:moderate:scoped'), async function(req, res) {
+router.post('/ban', authenticateAdmin, adminModerationLimiter, requireAdminCapability('trader:moderate:scoped'), async function(req, res) {
   try {
     // FIX (BUG-H1): Added user_id validation and immutable audit log
     const user_id = normalizeEntityId(req.body.user_id)
@@ -337,7 +338,7 @@ router.post('/ban', authenticateAdmin, requireAdminCapability('trader:moderate:s
   }
 })
 
-router.post('/unban', authenticateAdmin, requireAdminCapability('trader:moderate:scoped'), async function(req, res) {
+router.post('/unban', authenticateAdmin, adminModerationLimiter, requireAdminCapability('trader:moderate:scoped'), async function(req, res) {
   try {
     // FIX (BUG-H1): Added user_id validation and immutable audit log
     const user_id = normalizeEntityId(req.body.user_id)

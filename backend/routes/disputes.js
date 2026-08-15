@@ -86,7 +86,7 @@ const disputeLimiter = rateLimit({
   message: { error: 'You can only submit 3 disputes per day. Please contact support directly if you need further assistance.' },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.userId ? `user:${String(req.user.userId)}` : ipKeyGenerator(req)
+  keyGenerator: (req) => req.user?.userId ? `user:${String(req.user.userId)}` : ipKeyGenerator(req.ip)
 })
 
 // Allowed dispute reasons (allowlist — prevents freeform injection into admin queues)

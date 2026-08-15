@@ -5,6 +5,7 @@
 const express = require('express')
 const router = express.Router()
 const pool = require('../../db')
+const { adminDeleteLimiter } = require('./shared/rateLimiters')
 const {
   authenticateAdmin,
   requireSuperAdmin
@@ -314,7 +315,7 @@ router.post('/rules/:id/toggle', authenticateAdmin, async (req, res) => {
   }
 })
 
-router.delete('/rules/:id', authenticateAdmin, async (req, res) => {
+router.delete('/rules/:id', authenticateAdmin, adminDeleteLimiter, async (req, res) => {
   try {
     await ensureFeatureTables()
     const id = parseInt(req.params.id, 10)

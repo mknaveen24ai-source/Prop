@@ -7,10 +7,17 @@ const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const logger = require('./logger');
 
-// FIX (BUG-L7 v2): express-rate-limit v7+ exports `ipKeyGenerator` as a named
-// export AND requires you to use it (not a custom req.ip function) to ensure
-// proper IPv6 address normalization. Using a custom (req) => req.ip function
-// causes ERR_ERL_KEY_GEN_IPV6 at startup. Import the real one from the library.
+// express-rate-limit v7+ exports `ipKeyGenerator` as a named export and
+// requires you to route IP keys through it rather than using a bare
+// (req) => req.ip, which trips ERR_ERL_KEY_GEN_IPV6 at startup because IPv6
+// addresses need normalising to a /56 subnet before they can be used as a key.
+//
+// IT TAKES THE IP STRING, NOT THE REQUEST. Calling ipKeyGenerator(req) returns
+// the request object itself, and because MemoryStore keys off a Map, every
+// request then lands in its own bucket under a unique object identity -- the
+// limiter accepts everything and silently enforces nothing. That is how
+// apiLimiter and passwordResetLimiter below ended up disabled. Always pass
+// req.ip; test/rateLimitKeys.test.js guards this.
 const { ipKeyGenerator } = require('express-rate-limit');
 
 // Enhanced security headers configuration
@@ -44,7 +51,7 @@ const tradingLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
-    return req.user?.userId || ipKeyGenerator(req);
+    return req.user?.userId || ipKeyGenerator(req.ip);
   }
 });
 
@@ -59,7 +66,7 @@ const apiLimiter = rateLimit({
     // Skip for static files and health checks
     return req.path.startsWith('/uploads/') || req.path === '/';
   },
-  keyGenerator: ipKeyGenerator
+  keyGenerator: (req) => ipKeyGenerator(req.ip)
 });
 
 // Password reset rate limiter
@@ -72,7 +79,7 @@ const passwordResetLimiter = rateLimit({
   // FIX: Key on IP, not email. Keying on req.body.email lets an attacker rotate
   // through different email addresses to bypass per-email limits while still
   // probing the same target. IP is the right unit of isolation here.
-  keyGenerator: ipKeyGenerator
+  keyGenerator: (req) => ipKeyGenerator(req.ip)
 });
 
 // KYC submission rate limiter
@@ -82,7 +89,7 @@ const kycLimiter = rateLimit({
   message: { error: 'Too many KYC submissions. Please wait before trying again.' },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.userId || ipKeyGenerator(req)
+  keyGenerator: (req) => req.user?.userId || ipKeyGenerator(req.ip)
 });
 
 // Payout request rate limiter
@@ -92,7 +99,7 @@ const payoutLimiter = rateLimit({
   message: { error: 'Too many payout requests. Please wait before trying again.' },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.userId || ipKeyGenerator(req)
+  keyGenerator: (req) => req.user?.userId || ipKeyGenerator(req.ip)
 });
 
 // File upload security middleware

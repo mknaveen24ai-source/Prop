@@ -111,29 +111,51 @@ async function cacheTokenData(userId, tokenVersion, isBanned) {
 }
 
 /**
- * Invalidate cached token data for a user
- * Called on logout or password reset
+ * Invalidate cached token data for a user.
+ * Called on logout, password reset, and ban.
+ *
+ * Unlike a failed read or write, a failed invalidation is not a performance
+ * problem — it is a security one. authenticateToken trusts this cache, so a
+ * DEL that silently fails leaves `banned_status:<id>` reading 'false' for the
+ * rest of CACHE_TTL and the user keeps HTTP access for up to five more minutes.
+ * That is why this logs at error level and reports success back to the caller,
+ * rather than warning like the get/set paths do.
+ *
+ * The blast radius is bounded in two ways: the entries expire on their own via
+ * CACHE_TTL, and socketService re-validates against the database directly
+ * rather than through this cache, so live WebSocket sessions are unaffected.
+ *
+ * @returns {Promise<boolean>} true if the cache is known to be clear (including
+ *   when Redis is not configured at all, where there is nothing to clear).
  */
 async function invalidateTokenCache(userId) {
-  if (!redisClient) return
+  if (!redisClient) return true
 
   try {
     await Promise.all([
       redisClient.del(`token_version:${userId}`),
       redisClient.del(`banned_status:${userId}`)
     ])
+    return true
   } catch (err) {
-    logger.warn('Failed to invalidate token cache:', { error: err.message })
+    logger.error('Failed to invalidate token cache — stale session may persist until TTL:', {
+      userId: String(userId),
+      ttlSeconds: CACHE_TTL,
+      error: err.message
+    })
+    return false
   }
 }
 
 /**
  * Invalidate all cached tokens for a user
  * Called when user logs out across all sessions
+ *
+ * @returns {Promise<boolean>} see invalidateTokenCache
  */
 async function invalidateAllUserTokens(userId) {
   // Same as invalidateTokenCache - Redis keys already per-user
-  await invalidateTokenCache(userId)
+  return invalidateTokenCache(userId)
 }
 
 /**

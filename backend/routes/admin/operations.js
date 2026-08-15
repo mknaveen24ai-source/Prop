@@ -5,6 +5,7 @@
 const express = require('express')
 const router = express.Router()
 const pool = require('../../db')
+const { adminAccountActionLimiter } = require('./shared/rateLimiters')
 const {
   authenticateAdmin,
   requireSuperAdmin
@@ -385,7 +386,7 @@ router.post('/emergency-kill/execute', authenticateAdmin, requireSuperAdmin, asy
   }
 })
 
-router.post('/emergency-kill/reset', authenticateAdmin, requireSuperAdmin, async (req, res) => {
+router.post('/emergency-kill/reset', authenticateAdmin, adminAccountActionLimiter, requireSuperAdmin, async (req, res) => {
   const client = await pool.connect()
   try {
     await ensureFeatureTables()

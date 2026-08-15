@@ -125,7 +125,7 @@ const kycUploadLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
-    return req.user?.userId ? `user:${req.user.userId}` : ipKeyGenerator(req)
+    return req.user?.userId ? `user:${req.user.userId}` : ipKeyGenerator(req.ip)
   }
 })
 

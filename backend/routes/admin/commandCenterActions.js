@@ -4,6 +4,7 @@
 const express = require('express')
 const router = express.Router()
 const pool = require('../../db')
+const { adminBulkLimiter } = require('./shared/rateLimiters')
 const {
   authenticateAdmin,
   requireAdminCapability,
@@ -40,7 +41,7 @@ const {
 // DASHBOARD ENDPOINTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-router.post('/command-center/bulk-action', authenticateAdmin, requireAdminCapability('command_center:bulk'), async (req, res) => {
+router.post('/command-center/bulk-action', authenticateAdmin, adminBulkLimiter, requireAdminCapability('command_center:bulk'), async (req, res) => {
   const client = await pool.connect()
   try {
     await ensureFeatureTables()

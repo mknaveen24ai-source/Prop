@@ -5,6 +5,7 @@
 const express = require('express')
 const router = express.Router()
 const pool = require('../../db')
+const { adminAccountActionLimiter } = require('./shared/rateLimiters')
 const {
   authenticateAdmin,
   requireSuperAdmin,
@@ -189,7 +190,7 @@ router.patch('/admin-users/:id', authenticateAdmin, requireSuperAdmin, async fun
   }
 })
 
-router.post('/admin-users/:id/reset-password', authenticateAdmin, requireSuperAdmin, async function(req, res) {
+router.post('/admin-users/:id/reset-password', authenticateAdmin, adminAccountActionLimiter, requireSuperAdmin, async function(req, res) {
   try {
     await ensureFeatureTables()
     const adminId = String(req.params.id || '').trim()

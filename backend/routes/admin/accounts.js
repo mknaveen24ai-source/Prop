@@ -5,6 +5,7 @@
 const express = require('express')
 const router = express.Router()
 const pool = require('../../db')
+const { adminAccountActionLimiter } = require('./shared/rateLimiters')
 const {
   authenticateAdmin,
   requireAdminCapability
@@ -158,7 +159,7 @@ router.post('/accounts/:accountId/adjust-balance', authenticateAdmin, requireAdm
   }
 })
 
-router.post('/accounts/:accountId/override', authenticateAdmin, requireAdminCapability('account:override'), async function(req, res) {
+router.post('/accounts/:accountId/override', authenticateAdmin, adminAccountActionLimiter, requireAdminCapability('account:override'), async function(req, res) {
   const client = await pool.connect()
   try {
     await ensureFeatureTables()

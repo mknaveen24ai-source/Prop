@@ -35,7 +35,7 @@ const affiliatePayoutRequestLimiter = rateLimit({
   message: { error: 'You can submit one affiliate payout request per 24 hours. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : ipKeyGenerator(req))
+  keyGenerator: (req) => (req.user?.userId ? `user:${req.user.userId}` : ipKeyGenerator(req.ip))
 })
 
 // Whether the CURRENT (logged-in) user is eligible for the first-purchase
