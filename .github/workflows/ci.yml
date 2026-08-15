@@ -159,6 +159,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # ── Audit finding C-02 ──────────────────────────────────────────────────
+      # This job already ran migrations against an empty database, but nothing
+      # in the repo ever created users/accounts/trades/payouts — 001 creates
+      # only platform_settings, and 002 indexes `trades` directly. So this step
+      # could not have been passing: the schema for every money table existed
+      # only inside a hand-built database.
+      #
+      # migrations/000_core_schema.js applies the committed dump and no-ops
+      # where the tables already exist. Until that dump is generated
+      # (`npm run schema:dump`) and committed, say so explicitly rather than
+      # letting a red step look like flakiness.
+      - name: Check for the committed core schema
+        id: schema
+        run: |
+          if [ -f migrations/000_core_schema.sql ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::error title=C-02 unresolved::migrations/000_core_schema.sql is missing, so a clean database cannot be provisioned and this job cannot pass. Run 'npm run schema:dump' against a known-good database and commit the result."
+          fi
+
       - name: Run migrations from scratch
         run: npm run migrate
 
@@ -172,3 +193,10 @@ jobs:
             echo "::error::Migrations still pending after migrate:latest"
             exit 1
           fi
+
+      - name: Verify core tables exist and money columns are exact
+        # migrate:latest exiting 0 does not prove the money tables were created,
+        # nor that their columns are NUMERIC rather than binary floats — a
+        # double-precision balance silently discards the precision the whole
+        # application layer is built on.
+        run: npm run schema:verify
