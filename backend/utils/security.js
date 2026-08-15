@@ -63,6 +63,8 @@ function makeSharedStore(prefix) {
   });
 
   let initOptions = null;
+  let redisReady = false;
+
   function warnOnce(error) {
     if (_warnedNoRedis) return;
     _warnedNoRedis = true;
@@ -72,35 +74,52 @@ function makeSharedStore(prefix) {
     );
   }
 
+  // RedisStore.init() loads a Lua script and caches its SHA; until that
+  // succeeds, increment() cannot work. Module load happens long before
+  // initializeRedis(), so the first attempt always fails — this retries it on
+  // demand, once Redis is actually up, instead of leaving every limiter
+  // permanently stuck on the memory fallback.
+  async function ensureRedisReady() {
+    if (redisReady) return true;
+    if (!getRedisClient()) return false;
+    await redisStore.init(initOptions);
+    redisReady = true;
+    return true;
+  }
+
   // Delegating wrapper rather than a hard choice at boot: Redis coming back
   // after a blip silently restores shared counting.
   return {
     init(options) {
       initOptions = options;
+      // MemoryStore.init() resets the window, so it is called exactly once here
+      // and never again. Re-initialising it per request (as an earlier version
+      // did) reset the counter on every call, which meant the fallback counted
+      // to one forever and enforced nothing — and tripped express-rate-limit's
+      // ERR_ERL_DOUBLE_COUNT validator.
       memoryFallback.init(options);
-      // Redis is not connected at module-load time, so this init will normally
-      // fail. That is expected and harmless — increment() re-attempts per
-      // request and the store initialises itself once Redis is up. Swallowing
-      // the rejection is required: express-rate-limit calls init() synchronously
-      // and an unhandled rejection here kills the process at require time.
-      Promise.resolve()
-        .then(() => redisStore.init(options))
-        .catch(() => {});
     },
     async increment(key) {
       try {
+        if (!(await ensureRedisReady())) throw new Error('Redis client not connected yet');
         return await redisStore.increment(key);
       } catch (error) {
+        redisReady = false;
         warnOnce(error);
-        if (initOptions) memoryFallback.init(initOptions);
         return memoryFallback.increment(key);
       }
     },
     async decrement(key) {
-      try { return await redisStore.decrement(key); } catch { return memoryFallback.decrement(key); }
+      try {
+        if (!(await ensureRedisReady())) throw new Error('redis-unavailable');
+        return await redisStore.decrement(key);
+      } catch { return memoryFallback.decrement(key); }
     },
     async resetKey(key) {
-      try { return await redisStore.resetKey(key); } catch { return memoryFallback.resetKey(key); }
+      try {
+        if (!(await ensureRedisReady())) throw new Error('redis-unavailable');
+        return await redisStore.resetKey(key);
+      } catch { return memoryFallback.resetKey(key); }
     }
   };
 }
