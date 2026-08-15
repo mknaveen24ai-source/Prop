@@ -87,6 +87,7 @@ const adminAffiliateRoutes = require('./routes/adminAffiliates')
 const adminCouponRoutes    = require('./routes/adminCoupons')
 const adminGiftRoutes      = require('./routes/adminGifts')
 const affiliateRoutes      = require('./routes/affiliates')
+const supportRoutes        = require('./routes/support')
 const payoutRoutes         = require('./routes/payouts')
 const kycRoutes            = require('./routes/kyc')
 const chatRoutes           = require('./routes/chat')
@@ -383,7 +384,6 @@ app.use(securityMonitor.checkAttackPatterns)
 
 // Rate limiters
 const authLimiter    = rateLimit({ windowMs: 1 * 60 * 1000,  max: 10, message: { error: 'Too many attempts. Wait 1 minute.' },                    standardHeaders: true, legacyHeaders: false })
-const supportLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, message: { error: 'Too many support requests. Wait before retrying.' },    standardHeaders: true, legacyHeaders: false })
 const trackLimiter   = rateLimit({ windowMs: 60 * 1000,      max: 20, message: { error: 'Too many tracking events.' },                          standardHeaders: true, legacyHeaders: false })
 
 const io = new Server(httpServer, {
@@ -472,6 +472,8 @@ app.use('/api/kyc',      kycRoutes)
 app.use('/api/chat',     chatRoutes)
 app.use('/api/notifications', notificationRoutes)
 app.use('/api/disputes', require('./routes/disputes'))
+app.use('/api/support',  supportRoutes.router)
+app.use('/api/admin',    supportRoutes.adminRouter)
 app.use('/api/billing',  billingRoutes)
 app.use('/api/transparency', require('./routes/transparency'))
 
@@ -586,231 +588,8 @@ app.post('/api/analytics/track', trackLimiter, async function (req, res) {
 })
 
 // ── Support tickets (user-facing + admin-facing) ──────────────────────────────
-app.post('/api/support/ticket', supportLimiter, function optionalAuth(req, res, next) {
-  const jwtLib = require('jsonwebtoken')
-  const token = req.cookies?.token || (req.headers.authorization || '').split(' ')[1]
-  if (token) { try { req.user = jwtLib.verify(token, process.env.JWT_SECRET) } catch {} }
-  next()
-}, async function (req, res) {
-  try {
-    const { category, email, name } = req.body
-    const subject = sanitizeString(String(req.body?.subject || ''), 200)
-    const message = sanitizeString(String(req.body?.message || ''), 5000)
-    const user_id = req.user?.userId
-    if (!subject || !message) return res.status(400).json({ error: 'Subject and message are required' })
-    await pool.query(
-      `INSERT INTO support_tickets (user_id, email, name, category, subject, message, sla_due_at) VALUES ($1, $2, $3, $4, $5, $6, NOW() + INTERVAL '24 hours')`,
-      [user_id || null, sanitizeString(String(email || ''), 200), sanitizeString(String(name || ''), 100), category || 'other', subject, message]
-    )
-    res.status(201).json({ message: 'Support ticket submitted successfully' })
-  } catch (error) {
-    logger.error('Support ticket error:', { error: error.message })
-    res.status(500).json({ error: 'Could not submit support ticket' })
-  }
-})
-
-async function loadUserSupportTickets(req, res) {
-  try {
-    const result = await pool.query(
-      `SELECT id, category, subject, message, status, created_at FROM support_tickets WHERE user_id = $1 ORDER BY created_at DESC`,
-      [req.user.userId]
-    )
-    res.json(result.rows)
-  } catch (error) {
-    logger.error('Load support tickets error:', { error: error.message })
-    res.status(500).json({ error: 'Could not fetch tickets' })
-  }
-}
-
-app.get('/api/support/tickets',    authTok, loadUserSupportTickets)
-app.get('/api/support/my-tickets', authTok, loadUserSupportTickets)
-
-app.get('/api/support/ticket/:id', authTok, async function (req, res) {
-  try {
-    const ticketId = parseInt(req.params.id, 10)
-    if (!Number.isFinite(ticketId)) return res.status(400).json({ error: 'Invalid ticket id' })
-    const ticketResult = await pool.query(
-      `SELECT id, user_id, category, subject, message, status, created_at FROM support_tickets WHERE id = $1 AND user_id = $2`,
-      [ticketId, req.user.userId]
-    )
-    if (ticketResult.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' })
-    const messagesResult = await pool.query(
-      `SELECT id, sender_type, sender_name, message, created_at FROM support_ticket_messages WHERE ticket_id = $1 ORDER BY created_at ASC, id ASC`,
-      [ticketId]
-    )
-    res.json({ ticket: ticketResult.rows[0], messages: messagesResult.rows })
-  } catch (error) {
-    logger.error('Load support ticket detail error:', { error: error.message })
-    res.status(500).json({ error: 'Could not load ticket thread' })
-  }
-})
-
-app.post('/api/support/ticket/:id/reply', authTok, async function (req, res) {
-  try {
-    const ticketId = parseInt(req.params.id, 10)
-    if (!Number.isFinite(ticketId)) return res.status(400).json({ error: 'Invalid ticket id' })
-    const message = sanitizeString(String(req.body?.message || ''), 2000)
-    if (!message) return res.status(400).json({ error: 'Reply message is required' })
-    const ticketResult = await pool.query(
-      `SELECT id, status FROM support_tickets WHERE id = $1 AND user_id = $2`,
-      [ticketId, req.user.userId]
-    )
-    if (ticketResult.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' })
-    if (ticketResult.rows[0].status === 'closed') return res.status(400).json({ error: 'Closed tickets cannot receive new replies' })
-    const replyResult = await pool.query(
-      `INSERT INTO support_ticket_messages (ticket_id, sender_type, sender_name, message) VALUES ($1, 'user', $2, $3) RETURNING id, sender_type, sender_name, message, created_at`,
-      [ticketId, 'You', message]
-    )
-    res.status(201).json({ message: 'Reply sent successfully', reply: replyResult.rows[0] })
-  } catch (error) {
-    logger.error('Support ticket reply error:', { error: error.message })
-    res.status(500).json({ error: 'Could not send reply' })
-  }
-})
-
-app.get('/api/admin/support-tickets', authAdm, async function (req, res) {
-  try {
-    const result = await pool.query(
-      `SELECT * FROM support_tickets ORDER BY created_at DESC`
-    )
-    res.json(result.rows)
-  } catch (error) { res.status(500).json({ error: 'Could not fetch tickets' }) }
-})
-
-app.patch('/api/admin/support-tickets/:id', authAdm, async function (req, res) {
-  try {
-    const { status, assigned_agent, internal_notes } = req.body
-    const sets = []
-    const values = []
-    if (status !== undefined) {
-      if (!['open', 'resolved', 'closed'].includes(status)) return res.status(400).json({ error: 'Invalid status' })
-      values.push(status)
-      sets.push(`status = $${values.length}`)
-    }
-    if (assigned_agent !== undefined) {
-      values.push(sanitizeString(String(assigned_agent || ''), 100) || null)
-      sets.push(`assigned_agent = $${values.length}`)
-    }
-    if (internal_notes !== undefined) {
-      values.push(sanitizeString(String(internal_notes || ''), 5000) || null)
-      sets.push(`internal_notes = $${values.length}`)
-    }
-    if (sets.length === 0) return res.status(400).json({ error: 'Nothing to update' })
-    values.push(req.params.id)
-    const result = await pool.query(
-      `UPDATE support_tickets SET ${sets.join(', ')} WHERE id = $${values.length} RETURNING *`,
-      values
-    )
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' })
-    res.json({ message: 'Ticket updated', ticket: result.rows[0] })
-  } catch (error) { res.status(500).json({ error: 'Could not update ticket' }) }
-})
-
-app.get('/api/admin/support-tickets/:id', authAdm, async function (req, res) {
-  try {
-    const ticketId = parseInt(req.params.id, 10)
-    if (!Number.isFinite(ticketId)) return res.status(400).json({ error: 'Invalid ticket id' })
-    const ticketResult = await pool.query(`SELECT * FROM support_tickets WHERE id = $1`, [ticketId])
-    if (ticketResult.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' })
-    const messagesResult = await pool.query(
-      `SELECT id, sender_type, sender_name, message, created_at FROM support_ticket_messages WHERE ticket_id = $1 ORDER BY created_at ASC, id ASC`,
-      [ticketId]
-    )
-    res.json({ ticket: ticketResult.rows[0], messages: messagesResult.rows })
-  } catch (error) {
-    logger.error('Admin support ticket detail error:', { error: error.message })
-    res.status(500).json({ error: 'Could not load ticket thread' })
-  }
-})
-
-app.post('/api/admin/support-tickets/:id/reply', authAdm, async function (req, res) {
-  try {
-    const ticketId = parseInt(req.params.id, 10)
-    if (!Number.isFinite(ticketId)) return res.status(400).json({ error: 'Invalid ticket id' })
-    const message = sanitizeString(String(req.body?.message || ''), 2000)
-    if (!message) return res.status(400).json({ error: 'Reply message is required' })
-    const ticketResult = await pool.query(`SELECT id FROM support_tickets WHERE id = $1`, [ticketId])
-    if (ticketResult.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' })
-    const senderName = req.admin?.full_name || req.admin?.email || 'Support'
-    const replyResult = await pool.query(
-      `INSERT INTO support_ticket_messages (ticket_id, sender_type, sender_name, message) VALUES ($1, 'admin', $2, $3) RETURNING id, sender_type, sender_name, message, created_at`,
-      [ticketId, senderName, message]
-    )
-    res.status(201).json({ message: 'Reply sent successfully', reply: replyResult.rows[0] })
-  } catch (error) {
-    logger.error('Admin support ticket reply error:', { error: error.message })
-    res.status(500).json({ error: 'Could not send reply' })
-  }
-})
-
-// ── Disputes (user-facing + admin-facing) ─────────────────────────────────────
-app.post('/api/disputes/submit', authTok, async function (req, res) {
-  try {
-    const { account_id } = req.body
-    const reason = sanitizeString(String(req.body?.reason || ''), 200)
-    const description = sanitizeString(String(req.body?.description || ''), 5000)
-    const accountId = account_id === undefined || account_id === null || account_id === '' ? null : String(account_id).trim()
-    if (!reason || !description?.trim()) return res.status(400).json({ error: 'reason and description are required' })
-    if (description.trim().length < 30) return res.status(400).json({ error: 'Description must be at least 30 characters' })
-    if (accountId !== null && !String(accountId).trim()) return res.status(400).json({ error: 'Invalid account ID' })
-    if (accountId !== null) {
-      const owned = await pool.query(`SELECT id FROM accounts WHERE id = $1 AND user_id = $2`, [accountId, req.user.userId])
-      if (owned.rows.length === 0) return res.status(404).json({ error: 'Account not found' })
-      const existing = await pool.query(`SELECT id FROM disputes WHERE user_id = $1 AND account_id = $2 AND status IN ('open','under_review')`, [req.user.userId, accountId])
-      if (existing.rows.length > 0) return res.status(400).json({ error: 'You already have an open dispute for this account' })
-    }
-    const tradeCheck = await pool.query(
-      `SELECT COUNT(*) FROM trades t JOIN accounts a ON t.account_id = a.id WHERE a.user_id = $1 AND t.status = 'closed'`,
-      [req.user.userId]
-    )
-    if (parseInt(tradeCheck.rows[0].count) < 1) return res.status(400).json({ error: 'You must have at least one completed trade before filing a dispute.' })
-    const result = await pool.query(
-      `INSERT INTO disputes (user_id, account_id, reason, description) VALUES ($1, $2, $3, $4) RETURNING *`,
-      [req.user.userId, accountId, reason, description.trim()]
-    )
-    res.status(201).json({ message: 'Dispute submitted', dispute: result.rows[0] })
-  } catch (error) {
-    logger.error('Submit dispute error:', { error: error.message })
-    res.status(500).json({ error: 'Could not submit your dispute. Please try again.' })
-  }
-})
-
-app.get('/api/disputes/my-disputes', authTok, async function (req, res) {
-  try {
-    const result = await pool.query(
-      `SELECT d.*, a.account_uid, a.account_type, a.account_size FROM disputes d LEFT JOIN accounts a ON d.account_id = a.id WHERE d.user_id = $1 ORDER BY d.created_at DESC`,
-      [req.user.userId]
-    )
-    res.json(result.rows)
-  } catch (error) { res.status(500).json({ error: 'Could not load disputes.' }) }
-})
-
-app.get('/api/disputes/all', authAdm, async function (req, res) {
-  try {
-    const result = await pool.query(
-      `SELECT d.*, u.email, u.full_name, u.trader_uid, a.account_uid, a.account_type, a.account_size, a.status as account_status FROM disputes d JOIN users u ON d.user_id = u.id LEFT JOIN accounts a ON d.account_id = a.id ORDER BY d.created_at DESC`
-    )
-    res.json(result.rows)
-  } catch (error) { res.status(500).json({ error: 'Could not load disputes.' }) }
-})
-
-app.patch('/api/disputes/:id', authAdm, async function (req, res) {
-  try {
-    const { id } = req.params
-    const { status, admin_response } = req.body
-    const valid = ['open', 'under_review', 'resolved', 'rejected']
-    if (!valid.includes(status)) return res.status(400).json({ error: `status must be one of: ${valid.join(', ')}` })
-    const result = await pool.query(
-      `UPDATE disputes SET status = $1, admin_response = $2, updated_at = NOW() WHERE id = $3 RETURNING *`,
-      [status, admin_response || null, id]
-    )
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Dispute not found' })
-    res.json({ message: 'Dispute updated', dispute: result.rows[0] })
-  } catch (error) {
-    logger.error('Update dispute error:', { error: error.message })
-    res.status(500).json({ error: 'Could not update dispute' })
-  }
-})
+// Support tickets and disputes are served entirely by routes/support.js and
+// routes/disputes.js, both mounted above.
 
 // ── Misc API ──────────────────────────────────────────────────────────────────
 app.get('/', function (req, res) {

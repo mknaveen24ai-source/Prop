@@ -3,7 +3,7 @@ const router = express.Router()
 const fs = require('fs')
 const path = require('path')
 const pool = require('../db')
-const { authenticateToken } = require('./middleware')
+const { authenticateToken, authenticateAdmin } = require('./middleware')
 const logger = require('../utils/logger')
 const rateLimit = require('express-rate-limit')
 const { ipKeyGenerator } = require('express-rate-limit')
@@ -259,6 +259,60 @@ router.get('/overturn-rates', authenticateToken, async (req, res) => {
   } catch (error) {
     logger.error('Fetch overturn rates error:', { error: error.message })
     res.status(500).json({ error: 'Could not fetch overturn rates' })
+  }
+})
+
+// ─── Admin ───────────────────────────────────────────────────────────────────
+// These two moved here from server.js, where they sat inline below the
+// `app.use('/api/disputes', ...)` mount. The user-facing handlers that sat
+// beside them were dead (shadowed by this router); these were still reachable
+// because the router defines no matching GET /all or PATCH /:id, so Express
+// fell through to them. Registered ahead of the `/:id/*` routes below so the
+// literal `/all` path can never be captured as an `:id`.
+//
+// The joins cast both sides to text: `disputes.user_id`/`account_id` are TEXT
+// (see ensureDisputesInfrastructure above) while `users.id`/`accounts.id` may
+// not be, and the same casting convention is already used by /my-disputes.
+
+// GET /api/disputes/all
+router.get('/all', authenticateAdmin, async (req, res) => {
+  try {
+    await ensureDisputesInfrastructure()
+    const result = await pool.query(
+      `SELECT d.*, u.email, u.full_name, u.trader_uid,
+              a.account_uid, a.account_type, a.account_size, a.status AS account_status
+         FROM disputes d
+         JOIN users u ON d.user_id::text = u.id::text
+         LEFT JOIN accounts a ON d.account_id::text = a.id::text
+        ORDER BY d.created_at DESC`
+    )
+    res.json(result.rows)
+  } catch (error) {
+    logger.error('Fetch all disputes error:', { error: error.message })
+    res.status(500).json({ error: 'Could not load disputes.' })
+  }
+})
+
+// PATCH /api/disputes/:id
+router.patch('/:id', authenticateAdmin, async (req, res) => {
+  try {
+    await ensureDisputesInfrastructure()
+    const { id } = req.params
+    const { status, admin_response } = req.body
+    const valid = ['open', 'under_review', 'resolved', 'rejected']
+    if (!valid.includes(status)) {
+      return res.status(400).json({ error: `status must be one of: ${valid.join(', ')}` })
+    }
+    const result = await pool.query(
+      `UPDATE disputes SET status = $1, admin_response = $2, updated_at = NOW()
+        WHERE id = $3 RETURNING *`,
+      [status, admin_response || null, id]
+    )
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Dispute not found' })
+    res.json({ message: 'Dispute updated', dispute: result.rows[0] })
+  } catch (error) {
+    logger.error('Update dispute error:', { error: error.message })
+    res.status(500).json({ error: 'Could not update dispute' })
   }
 })
 

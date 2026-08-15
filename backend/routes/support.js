@@ -12,6 +12,7 @@ const {
   normalizeSupportReplyPayload,
   normalizeSupportTicketPayload
 } = require('../utils/supportValidation')
+const { sanitizeString } = require('../utils/validation')
 
 const router = express.Router()
 const adminRouter = express.Router()
@@ -44,9 +45,11 @@ router.post('/ticket', supportLimiter, optionalUserAuth, async function(req, res
     }
     const { category, subject, message, email, name } = normalized.value
 
+    // sla_due_at is carried over from the handler this replaced (previously
+    // inline in server.js) — the admin support inbox sorts and flags on it.
     await pool.query(
-      `INSERT INTO support_tickets (user_id, email, name, category, subject, message)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+      `INSERT INTO support_tickets (user_id, email, name, category, subject, message, sla_due_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW() + INTERVAL '24 hours')`,
       [userId || null, email, name, category, subject, message]
     )
     res.status(201).json({ message: 'Support ticket submitted successfully' })
@@ -153,6 +156,13 @@ router.post('/ticket/:id/reply', authenticateToken, async function(req, res) {
   }
 })
 
+// ─── Admin ───────────────────────────────────────────────────────────────────
+// Ported from the inline handlers that previously lived in server.js. That set
+// was the live one and is what SupportAppealsCenter.jsx calls, so it is kept
+// whole here: the partial versions this file used to carry supported only
+// `status` and had no detail or reply route, which would have broken the
+// admin inbox on mount.
+
 adminRouter.get('/support-tickets', authenticateAdmin, async function(req, res) {
   try {
     const result = await pool.query(
@@ -168,22 +178,95 @@ adminRouter.get('/support-tickets', authenticateAdmin, async function(req, res) 
 
 adminRouter.patch('/support-tickets/:id', authenticateAdmin, async function(req, res) {
   try {
-    const { status } = req.body
-    if (!['open', 'resolved', 'closed'].includes(status)) {
-      return res.status(400).json({ error: 'Invalid status' })
+    const { status, assigned_agent, internal_notes } = req.body
+    const sets = []
+    const values = []
+    if (status !== undefined) {
+      if (!['open', 'resolved', 'closed'].includes(status)) {
+        return res.status(400).json({ error: 'Invalid status' })
+      }
+      values.push(status)
+      sets.push(`status = $${values.length}`)
     }
+    if (assigned_agent !== undefined) {
+      values.push(sanitizeString(String(assigned_agent || ''), 100) || null)
+      sets.push(`assigned_agent = $${values.length}`)
+    }
+    if (internal_notes !== undefined) {
+      values.push(sanitizeString(String(internal_notes || ''), 5000) || null)
+      sets.push(`internal_notes = $${values.length}`)
+    }
+    if (sets.length === 0) return res.status(400).json({ error: 'Nothing to update' })
+    values.push(req.params.id)
+
     const result = await pool.query(
-      `UPDATE support_tickets
-          SET status = $1
-        WHERE id = $2
-        RETURNING *`,
-      [status, req.params.id]
+      `UPDATE support_tickets SET ${sets.join(', ')} WHERE id = $${values.length} RETURNING *`,
+      values
     )
     if (result.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' })
     res.json({ message: 'Ticket updated', ticket: result.rows[0] })
   } catch (error) {
     logger.error('Admin support ticket update error:', { error: error.message })
     res.status(500).json({ error: 'Could not update ticket' })
+  }
+})
+
+adminRouter.get('/support-tickets/:id', authenticateAdmin, async function(req, res) {
+  try {
+    const ticketId = parseInt(req.params.id, 10)
+    if (!Number.isFinite(ticketId)) {
+      return res.status(400).json({ error: 'Invalid ticket id' })
+    }
+
+    const ticketResult = await pool.query(
+      `SELECT * FROM support_tickets WHERE id = $1`,
+      [ticketId]
+    )
+    if (ticketResult.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' })
+
+    const messagesResult = await pool.query(
+      `SELECT id, sender_type, sender_name, message, created_at
+       FROM support_ticket_messages
+       WHERE ticket_id = $1
+       ORDER BY created_at ASC, id ASC`,
+      [ticketId]
+    )
+
+    res.json({ ticket: ticketResult.rows[0], messages: messagesResult.rows })
+  } catch (error) {
+    logger.error('Admin support ticket detail error:', { error: error.message })
+    res.status(500).json({ error: 'Could not load ticket thread' })
+  }
+})
+
+adminRouter.post('/support-tickets/:id/reply', authenticateAdmin, async function(req, res) {
+  try {
+    const ticketId = parseInt(req.params.id, 10)
+    if (!Number.isFinite(ticketId)) {
+      return res.status(400).json({ error: 'Invalid ticket id' })
+    }
+
+    const normalized = normalizeSupportReplyPayload(req.body)
+    if (normalized.errors.length > 0) {
+      return res.status(400).json({ error: normalized.errors.join('; ') })
+    }
+    const { message } = normalized.value
+
+    const ticketResult = await pool.query(`SELECT id FROM support_tickets WHERE id = $1`, [ticketId])
+    if (ticketResult.rows.length === 0) return res.status(404).json({ error: 'Ticket not found' })
+
+    const senderName = req.admin?.full_name || req.admin?.email || 'Support'
+    const replyResult = await pool.query(
+      `INSERT INTO support_ticket_messages (ticket_id, sender_type, sender_name, message)
+       VALUES ($1, 'admin', $2, $3)
+       RETURNING id, sender_type, sender_name, message, created_at`,
+      [ticketId, senderName, message]
+    )
+
+    res.status(201).json({ message: 'Reply sent successfully', reply: replyResult.rows[0] })
+  } catch (error) {
+    logger.error('Admin support ticket reply error:', { error: error.message })
+    res.status(500).json({ error: 'Could not send reply' })
   }
 })
 
