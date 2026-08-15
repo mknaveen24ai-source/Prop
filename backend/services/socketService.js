@@ -12,6 +12,12 @@
 const jwt = require('jsonwebtoken')
 const logger = require('../utils/logger')
 
+// How often a live socket re-checks that its session is still good. The
+// handshake alone is not enough: a Socket.IO connection can outlive a ban or a
+// token_version bump by hours, and until this existed such a socket kept
+// receiving price and account events for the whole session.
+const SESSION_REVALIDATE_MS = 5 * 60 * 1000
+
 // ─── Utility ──────────────────────────────────────────────────────────────────
 function getCookieValue(cookieHeader, key) {
   if (!cookieHeader || !key) return null
@@ -21,6 +27,44 @@ function getCookieValue(cookieHeader, key) {
     if (k === key) return decodeURIComponent(rest.join('=') || '')
   }
   return null
+}
+
+// ─── Session validation ───────────────────────────────────────────────────────
+// Used by both the handshake and the periodic re-check below, so the two can
+// never drift apart on what counts as a valid session.
+//
+// A rejection carries sessionInvalid = true. Anything else escaping these
+// (a dropped pool connection, say) is an infrastructure fault, and the periodic
+// check deliberately keeps the socket open for those rather than mass-
+// disconnecting every trader because the database blipped.
+function sessionError(message) {
+  const err = new Error(message)
+  err.sessionInvalid = true
+  return err
+}
+
+async function assertUserSessionValid(pool, userId, tokenVersion) {
+  const result = await pool.query(
+    'SELECT token_version, is_banned FROM users WHERE id = $1',
+    [userId]
+  )
+  if (result.rows.length === 0) throw sessionError('User not found')
+  const { token_version, is_banned } = result.rows[0]
+  if (is_banned) throw sessionError('Account suspended')
+  if (tokenVersion !== undefined && tokenVersion < token_version) {
+    throw sessionError('Session expired')
+  }
+}
+
+async function assertAdminSessionValid(pool, adminTokenVersion) {
+  const result = await pool.query(
+    `SELECT value FROM platform_settings WHERE key = 'admin_token_version'`
+  )
+  if (result.rows.length === 0) return
+  const serverVersion = parseInt(result.rows[0].value, 10)
+  if (!Number.isNaN(serverVersion) && (adminTokenVersion || 0) < serverVersion) {
+    throw sessionError('Admin session expired')
+  }
 }
 
 // ─── Auth middleware (io.use) ─────────────────────────────────────────────────
@@ -51,33 +95,19 @@ function buildSocketAuthMiddleware(pool) {
       // FIX (CRITICAL #4): Validate token version against DB to support
       // instant session invalidation (password change, logout all, ban).
       if (userDecoded?.userId) {
-        const result = await pool.query(
-          'SELECT token_version, is_banned FROM users WHERE id = $1',
-          [userDecoded.userId]
-        )
-        if (result.rows.length === 0) throw new Error('User not found')
-        const { token_version, is_banned } = result.rows[0]
-        if (is_banned) throw new Error('Account suspended')
-        if (userDecoded.tv !== undefined && userDecoded.tv < token_version) {
-          throw new Error('Session expired')
-        }
+        await assertUserSessionValid(pool, userDecoded.userId, userDecoded.tv)
         socket.data.userId = String(userDecoded.userId)
+        // Kept so the periodic re-check can compare against the same version
+        // this handshake was granted on.
+        socket.data.tokenVersion = userDecoded.tv
         socket.join(socket.data.userId)
         socket.join('prices')
       }
 
       if (adminDecoded) {
-        const result = await pool.query(
-          `SELECT value FROM platform_settings WHERE key = 'admin_token_version'`
-        )
-        if (result.rows.length > 0) {
-          const serverVersion = parseInt(result.rows[0].value, 10)
-          const tokenVersion = adminDecoded.atv || 0
-          if (!Number.isNaN(serverVersion) && tokenVersion < serverVersion) {
-            throw new Error('Admin session expired')
-          }
-        }
+        await assertAdminSessionValid(pool, adminDecoded.atv)
         socket.data.isAdmin = true
+        socket.data.adminTokenVersion = adminDecoded.atv
         socket.join('admin')
       }
       next()
@@ -87,6 +117,65 @@ function buildSocketAuthMiddleware(pool) {
   }
 }
 
+// ─── Periodic session re-validation ───────────────────────────────────────────
+/**
+ * Re-runs the handshake's session checks every SESSION_REVALIDATE_MS for as
+ * long as the socket is open, so a ban or a token_version bump takes effect
+ * within five minutes instead of surviving until the client reconnects.
+ *
+ * The first tick is jittered across the window: without it every socket
+ * connected during a restart would re-query in the same instant, which at a few
+ * thousand traders is a self-inflicted thundering herd on the pool.
+ */
+function startSessionRevalidation(pool, socket) {
+  const firstDelay = Math.floor(Math.random() * SESSION_REVALIDATE_MS)
+
+  async function revalidate() {
+    try {
+      if (socket.data?.userId) {
+        await assertUserSessionValid(pool, socket.data.userId, socket.data.tokenVersion)
+      }
+      if (socket.data?.isAdmin) {
+        await assertAdminSessionValid(pool, socket.data.adminTokenVersion)
+      }
+    } catch (err) {
+      if (!err.sessionInvalid) {
+        // Database trouble, not a revoked session — leave the socket alone.
+        logger.warn('Socket session re-validation could not run:', {
+          socketId: socket.id, error: err.message
+        })
+        return
+      }
+      logger.info('Socket session revoked, disconnecting:', {
+        socketId: socket.id,
+        userId: socket.data?.userId || null,
+        isAdmin: Boolean(socket.data?.isAdmin),
+        reason: err.message
+      })
+      stopSessionRevalidation(socket)
+      socket.disconnect(true)
+    }
+  }
+
+  const timer = setTimeout(function firstRun() {
+    revalidate()
+    socket.data._revalidateTimer = setInterval(revalidate, SESSION_REVALIDATE_MS)
+    if (typeof socket.data._revalidateTimer.unref === 'function') {
+      socket.data._revalidateTimer.unref()
+    }
+  }, firstDelay)
+
+  if (typeof timer.unref === 'function') timer.unref()
+  socket.data._revalidateTimer = timer
+}
+
+function stopSessionRevalidation(socket) {
+  if (!socket.data?._revalidateTimer) return
+  clearTimeout(socket.data._revalidateTimer)
+  clearInterval(socket.data._revalidateTimer)
+  socket.data._revalidateTimer = null
+}
+
 // ─── Connection handler (io.on) ───────────────────────────────────────────────
 function buildConnectionHandler(pool) {
   return function onConnection(socket) {
@@ -94,6 +183,8 @@ function buildConnectionHandler(pool) {
       socketId: socket.id,
       isAdmin: socket.data?.isAdmin ? '[admin]' : `[user:${socket.data?.userId}]`
     })
+
+    startSessionRevalidation(pool, socket)
 
     // ── join_account ──────────────────────────────────────────────────────────
     socket.on('join_account', async function (userId) {
@@ -194,6 +285,7 @@ function buildConnectionHandler(pool) {
 
     // ── disconnect ────────────────────────────────────────────────────────────
     socket.on('disconnect', function () {
+      stopSessionRevalidation(socket)
       logger.http('Socket disconnected:', { socketId: socket.id })
     })
   }
@@ -211,4 +303,14 @@ function configureSocket(io, pool) {
   logger.info('[socketService] Socket.IO configured')
 }
 
-module.exports = { configureSocket, getCookieValue }
+module.exports = {
+  configureSocket,
+  getCookieValue,
+  SESSION_REVALIDATE_MS,
+  // Exported for test/socketRevalidation.test.js — the handshake and the
+  // periodic re-check share these, so testing them covers both paths.
+  assertUserSessionValid,
+  assertAdminSessionValid,
+  startSessionRevalidation,
+  stopSessionRevalidation
+}
