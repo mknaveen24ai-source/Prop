@@ -362,6 +362,50 @@ export function isTradableInstrument(symbol) {
   return getTradableInstruments().includes(String(symbol || '').toUpperCase())
 }
 
+// ─── FX rates (mirrors backend/utils/fxRates.js) ─────────────────────────────
+// The risk/reward preview multiplies distance * lots * contractSize and labels
+// the result USD, which is only true for USD-quoted instruments. These helpers
+// supply the same multiplier the server uses, derived from the price map the
+// socket already delivers — so no extra request, and the preview agrees with
+// what the trade will actually book.
+//
+// Bid only, matching the backend: the tenant spread markup is applied to the
+// ask, and a conversion rate must not carry a tenant's markup.
+const FX_RATE_SOURCES = {
+  USD: { identity: true },
+  JPY: { pair: 'USDJPY', invert: true },
+  CHF: { pair: 'USDCHF', invert: true },
+  CAD: { pair: 'USDCAD', invert: true },
+  GBP: { pair: 'GBPUSD', invert: false },
+  AUD: { pair: 'AUDUSD', invert: false },
+  NZD: { pair: 'NZDUSD', invert: false },
+  EUR: { pair: 'EURUSD', invert: false },
+  // HKD is pegged to USD in the 7.75–7.85 band and has no pair in the feed.
+  HKD: { pegged: 7.8, invert: true },
+}
+
+/**
+ * USD value of one unit of `currency`, or null when it cannot be determined.
+ * Null means "do not show a USD figure" — never fall back to 1, which is the
+ * bug this mirrors a fix for.
+ */
+export function getUsdRateFromPrices(prices, currency) {
+  const source = FX_RATE_SOURCES[String(currency || '').toUpperCase()]
+  if (!source) return null
+  if (source.identity) return 1
+  if (source.pegged) return 1 / source.pegged
+
+  const bid = Number(prices?.[source.pair]?.bid)
+  if (!Number.isFinite(bid) || bid <= 0) return null
+  return source.invert ? 1 / bid : bid
+}
+
+/** USD multiplier for the currency `instrument` settles in, or null. */
+export function getUsdRateForInstrument(prices, instrument) {
+  if (!isFxConversionEnabled()) return 1
+  return getUsdRateFromPrices(prices, getQuoteCurrency(instrument))
+}
+
 export const TRADABLE_INSTRUMENTS_SUMMARY = '28 forex pairs + 4 metals + 3 energies + 10 global indices'
 
 // Maps this platform's instrument codes to TradingView's public widget

@@ -6,6 +6,8 @@ import {
   getQuoteCurrency,
   getTradableInstruments,
   isTradableInstrument,
+  getUsdRateFromPrices,
+  getUsdRateForInstrument,
 } from './instruments.js'
 
 // C-01 containment, mirroring backend/test/instruments.test.js.
@@ -99,5 +101,50 @@ describe('getAvailableInstrumentList', () => {
       US500: { bid: 'nope', ask: 'nope' },
     }
     expect(getAvailableInstrumentList(prices)).toEqual(['EURUSD'])
+  })
+})
+
+describe('FX rates (mirrors backend/utils/fxRates.js)', () => {
+  const PRICES = {
+    USDJPY: { bid: 150.0, ask: 150.02 },
+    GBPUSD: { bid: 1.27, ask: 1.2701 },
+    EURUSD: { bid: 1.1, ask: 1.1001 },
+  }
+
+  it('inverts USD/QUOTE pairs and passes QUOTE/USD through', () => {
+    expect(getUsdRateFromPrices(PRICES, 'JPY')).toBeCloseTo(1 / 150, 10)
+    expect(getUsdRateFromPrices(PRICES, 'GBP')).toBe(1.27)
+    expect(getUsdRateFromPrices(PRICES, 'USD')).toBe(1)
+  })
+
+  it('uses the HKD peg rather than the feed', () => {
+    expect(getUsdRateFromPrices(PRICES, 'HKD')).toBeCloseTo(1 / 7.8, 10)
+  })
+
+  it('reads the bid, so a tenant ask markup cannot skew the rate', () => {
+    expect(getUsdRateFromPrices({ GBPUSD: { bid: 1.27, ask: 9.99 } }, 'GBP')).toBe(1.27)
+  })
+
+  it('returns null rather than falling back to 1 when the rate is unknown', () => {
+    expect(getUsdRateFromPrices({}, 'JPY')).toBeNull()
+    expect(getUsdRateFromPrices({ USDJPY: { bid: 0, ask: 0 } }, 'JPY')).toBeNull()
+    expect(getUsdRateFromPrices(PRICES, 'ZWL')).toBeNull()
+  })
+
+  it('reports rate 1 for everything while conversion is off (grandfathering)', () => {
+    vi.stubEnv('VITE_FX_CONVERSION_ENABLED', '')
+    expect(getUsdRateForInstrument(PRICES, 'USDJPY')).toBe(1)
+    expect(getUsdRateForInstrument(PRICES, 'EURUSD')).toBe(1)
+  })
+
+  it('converts once enabled, and agrees with the backend on USDJPY', () => {
+    vi.stubEnv('VITE_FX_CONVERSION_ENABLED', 'true')
+    expect(getUsdRateForInstrument(PRICES, 'USDJPY')).toBeCloseTo(1 / 150, 10)
+    expect(getUsdRateForInstrument(PRICES, 'EURUSD')).toBe(1)
+    expect(getUsdRateForInstrument(PRICES, 'JP225')).toBeCloseTo(1 / 150, 10)
+
+    // The audit's headline case: 1 lot USDJPY over 10 pips.
+    const rate = getUsdRateForInstrument(PRICES, 'USDJPY')
+    expect(0.1 * 1 * 100000 * rate).toBeCloseTo(66.67, 1)
   })
 })

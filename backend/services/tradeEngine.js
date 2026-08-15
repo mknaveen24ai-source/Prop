@@ -42,6 +42,7 @@ const tradeIndex = require('../utils/tradeIndex')
 const drawdownService = require('./drawdownService')
 const tradingDaysService = require('./tradingDaysService')
 const { calculatePnL } = require('../utils/pnlCalculator')
+const { getUsdRateForInstrument } = require('../utils/fxRates')
 const { fetchStepModelBySlug } = require('../utils/stepModels')
 const { fetchProgressionSettings, promotePassedAccount } = require('./progressionService')
 const { getCurrentPricesForTenant } = require('../priceFeed')
@@ -831,6 +832,23 @@ async function checkFloatingDrawdown(io) {
 
     const todayRealizedMap = await tradingDaysService.getTodayRealizedPnl(pool, Object.keys(accountTrades))
 
+    // FIX (C-01) + perf: resolve each instrument's USD rate ONCE for the whole
+    // pass. This loop runs every 1000ms over every open trade on the platform,
+    // so letting calculatePnL look the rate up per call would turn a ~0.8µs
+    // lookup into the dominant cost of the pass (~470ms at 100K open trades).
+    // An unavailable rate leaves the instrument out of the floating total for
+    // this pass rather than valuing it at the wrong rate; the next pass retries.
+    const usdRates = new Map()
+    for (const instrument of new Set(tradesResult.rows.map((row) => row.instrument))) {
+      try {
+        usdRates.set(instrument, getUsdRateForInstrument(instrument))
+      } catch (error) {
+        logger.warn('[checkFloatingDrawdown] no USD rate for instrument:', {
+          instrument, error: error.message
+        })
+      }
+    }
+
     for (const [aid, trades] of Object.entries(accountTrades)) {
       const acc = accountMeta[aid]
 
@@ -838,6 +856,9 @@ async function checkFloatingDrawdown(io) {
       for (const trade of trades) {
         const priceData = priceMap[trade.instrument]
         if (!priceData) continue
+
+        const usdRate = usdRates.get(trade.instrument)
+        if (usdRate === undefined) continue
 
         const currentPrice = trade.direction === 'buy'
           ? parseFloat(priceData.bid)
@@ -849,7 +870,8 @@ async function checkFloatingDrawdown(io) {
           currentPrice,
           parseFloat(trade.lot_size),
           trade.instrument,
-          parseFloat(trade.commission || 0)
+          parseFloat(trade.commission || 0),
+          usdRate
         ))
       }
 
@@ -1012,6 +1034,25 @@ async function runTick(io, changedInstruments) {
     const price = priceCache.getPrice(instrument)
     if (!price) continue
 
+    // FIX (C-01): PnL comes out in the instrument's quote currency, so it needs
+    // a USD multiplier. Resolved once here, per instrument, rather than inside
+    // the per-trade loop below — the scan stays O(instruments) on rate lookups.
+    //
+    // Skipping the instrument on an unavailable rate mirrors the `!price`
+    // guard above: the interval fallbacks still cover it, and it is the only
+    // safe option since the alternative is valuing the position at the wrong
+    // rate. Rate sources are themselves subscribed instruments, so this can
+    // only really fire while the feed is still warming.
+    let usdRate
+    try {
+      usdRate = getUsdRateForInstrument(instrument)
+    } catch (error) {
+      logger.warn('[tradeEngine] skipping instrument — no USD rate:', {
+        instrument, error: error.message
+      })
+      continue
+    }
+
     const trades = tradeIndex.getTradesByInstrument(instrument)
     for (const trade of trades.values()) {
       scanned++
@@ -1029,7 +1070,8 @@ async function runTick(io, changedInstruments) {
         closePrice,
         trade.lots,
         trade.contractSize,
-        trade.commission
+        trade.commission,
+        usdRate
       )
       tradeIndex.applyTradePnl(trade, pnl)
       _touchedAccounts.add(trade.accountId)
@@ -1497,14 +1539,27 @@ function addOpenTradeToIndex(tradeRow, accountRow = null) {
   if (!entry) return null
   const price = priceCache.getPrice(entry.instrument)
   if (price) {
-    tradeIndex.applyTradePnl(entry, fastPnL(
-      entry.sign,
-      entry.openPrice,
-      closePriceFor(entry.sign, price),
-      entry.lots,
-      entry.contractSize,
-      entry.commission
-    ))
+    // A missing rate here means the seed is skipped, not that the trade is
+    // valued at rate 1 — the next tick on this instrument recomputes it.
+    let usdRate = null
+    try {
+      usdRate = getUsdRateForInstrument(entry.instrument)
+    } catch (error) {
+      logger.warn('[tradeEngine] could not seed floating PnL — no USD rate:', {
+        instrument: entry.instrument, error: error.message
+      })
+    }
+    if (usdRate != null) {
+      tradeIndex.applyTradePnl(entry, fastPnL(
+        entry.sign,
+        entry.openPrice,
+        closePriceFor(entry.sign, price),
+        entry.lots,
+        entry.contractSize,
+        entry.commission,
+        usdRate
+      ))
+    }
   }
   return entry
 }
@@ -1568,6 +1623,16 @@ function reseedFloatingPnl() {
 
   for (const instrument in prices) {
     const price = prices[instrument]
+    // Resolved per instrument, same as the tick scan — see runTick.
+    let usdRate
+    try {
+      usdRate = getUsdRateForInstrument(instrument)
+    } catch (error) {
+      logger.warn('[tradeEngine] skipping instrument during reseed — no USD rate:', {
+        instrument, error: error.message
+      })
+      continue
+    }
     const trades = tradeIndex.getTradesByInstrument(instrument)
     for (const trade of trades.values()) {
       tradeIndex.applyTradePnl(trade, fastPnL(
@@ -1576,7 +1641,8 @@ function reseedFloatingPnl() {
         closePriceFor(trade.sign, price),
         trade.lots,
         trade.contractSize,
-        trade.commission
+        trade.commission,
+        usdRate
       ))
       seeded++
     }

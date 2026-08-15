@@ -48,19 +48,27 @@ function contractSizeFor(instrument) {
 /**
  * Native-float mirror of calculatePnL().
  *
+ * FIX (C-01): takes usdRate for the same reason calculatePnL does — the raw
+ * product is in the instrument's quote currency. The rate is resolved ONCE PER
+ * INSTRUMENT PER TICK by the caller (see runTick in services/tradeEngine.js)
+ * rather than looked up here, so the scan stays O(instruments) on rate lookups
+ * and O(trades) on arithmetic. Commission is already USD and is subtracted
+ * after conversion, matching calculatePnL exactly.
+ *
  * @param {1|-1}   sign          Pre-resolved direction (see directionSign)
  * @param {number} openPrice
  * @param {number} closePrice
  * @param {number} lots
  * @param {number} contractSize  Pre-resolved (see contractSizeFor)
- * @param {number} commission
+ * @param {number} commission    already in USD
+ * @param {number} [usdRate=1]   USD per unit of quote currency
  * @returns {number} PnL, unrounded — callers must not persist this
  */
-function fastPnL(sign, openPrice, closePrice, lots, contractSize, commission) {
+function fastPnL(sign, openPrice, closePrice, lots, contractSize, commission, usdRate = 1) {
   const diff = sign === DIRECTION_BUY
     ? closePrice - openPrice
     : openPrice - closePrice
-  return diff * lots * contractSize - commission
+  return diff * lots * contractSize * usdRate - commission
 }
 
 /**

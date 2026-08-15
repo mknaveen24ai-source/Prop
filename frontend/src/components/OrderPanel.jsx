@@ -8,6 +8,7 @@ import {
   getPriceDecimals,
   getSpreadPoints,
   getTradableInstruments,
+  getUsdRateForInstrument,
   isTradableInstrument,
 } from '../utils/instruments'
 import { calculateRiskRewardRatio, formatCurrency, toDecimal, toMoneyNumber } from '../utils/finance'
@@ -143,28 +144,28 @@ export default function OrderPanel({
     if (!lots || lots < 0.01 || !Number.isFinite(previewEntry) || (!stopLossNum && !takeProfitNum)) return null
 
     // C-01: distance * lots * contractSize lands in the instrument's QUOTE
-    // currency, so labelling it USD is only honest for USD-quoted instruments.
-    // Those are the only ones that can be opened right now, so this guard is
-    // belt-and-braces — but it also means the preview stays correct rather than
-    // quietly reappearing with wrong numbers when the catalogue is re-enabled.
-    // Phase 2 replaces this guard with the same QUOTE/USD rate the server uses.
+    // currency, so calling it USD needs the same QUOTE/USD rate the server
+    // applies. A null rate means we cannot state a dollar figure — show nothing
+    // rather than a number that is wrong by the rate (~150x on the JPY pairs).
     if (!isTradableInstrument(instrument)) return null
+    const usdRate = getUsdRateForInstrument(prices, instrument)
+    if (usdRate == null) return null
 
     const riskDistance = stopLossNum ? Math.abs(previewEntry - stopLossNum) : null
     const rewardDistance = takeProfitNum ? Math.abs(takeProfitNum - previewEntry) : null
 
-    const riskUSD = riskDistance != null
-      ? toMoneyNumber(toDecimal(riskDistance).mul(toDecimal(lots)).mul(toDecimal(contractSize)))
-      : null
-    const rewardUSD = rewardDistance != null
-      ? toMoneyNumber(toDecimal(rewardDistance).mul(toDecimal(lots)).mul(toDecimal(contractSize)))
-      : null
+    const toUSD = (distance) => toMoneyNumber(
+      toDecimal(distance).mul(toDecimal(lots)).mul(toDecimal(contractSize)).mul(toDecimal(usdRate))
+    )
+
+    const riskUSD = riskDistance != null ? toUSD(riskDistance) : null
+    const rewardUSD = rewardDistance != null ? toUSD(rewardDistance) : null
     const rr = riskUSD != null && rewardUSD != null
       ? calculateRiskRewardRatio(riskUSD, rewardUSD)
       : null
 
     return { riskUSD, rewardUSD, rr }
-  }, [contractSize, instrument, orderForm.lots, previewEntry, stopLossNum, takeProfitNum])
+  }, [contractSize, instrument, orderForm.lots, previewEntry, prices, stopLossNum, takeProfitNum])
 
   async function submitOrder(payload) {
     if (isSubmitting) return
