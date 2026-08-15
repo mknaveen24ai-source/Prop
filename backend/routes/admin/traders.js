@@ -322,6 +322,13 @@ router.post('/ban', authenticateAdmin, adminModerationLimiter, requireAdminCapab
     )
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' })
 
+    // FIX (H-02): authenticateToken reads is_banned from the Redis token cache
+    // (utils/tokenCache.js, CACHE_TTL = 5 min). Without this the ban had no
+    // effect for up to five minutes — the trader kept trade placement and
+    // payout access the whole time. Sockets are unaffected; socketService
+    // re-validates against the database directly.
+    await invalidateAllUserTokens(user_id)
+
     try {
       await appendImmutableAudit(pool, {
         eventType: 'user_banned',
@@ -354,6 +361,11 @@ router.post('/unban', authenticateAdmin, adminModerationLimiter, requireAdminCap
       [user_id]
     )
     if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' })
+
+    // FIX (H-02): drop the cached is_banned = true immediately, or the trader
+    // stays locked out for the remainder of the 5-minute cache TTL after an
+    // admin has already unbanned them.
+    await invalidateAllUserTokens(user_id)
 
     try {
       await appendImmutableAudit(pool, {

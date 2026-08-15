@@ -778,8 +778,15 @@ async function checkFloatingDrawdown(io) {
   try {
     // FIX: single query for all open trades across all active accounts
     const tradesResult = await pool.query(
+      // FIX (H-01): t.commission was missing from this SELECT while the
+      // floating-PnL loop below reads `trade.commission || 0` — so commission
+      // silently evaluated to 0 on every open position. Floating equity was
+      // overstated by the total open commission, which made accounts fail late
+      // and pass early, and made this interval path disagree with the
+      // event path (tradeIndex carries commission) on the same account.
       `SELECT t.id, t.account_id, t.instrument, t.direction, t.lot_size, t.open_price,
               t.stop_loss, t.take_profit, t.status, t.open_time, t.demo_trade_id,
+              t.commission,
               a.user_id, a.current_balance, a.starting_balance, a.peak_balance,
               a.max_drawdown_pct, a.account_type, a.profit_target, a.account_size,
               a.starting_balance as acc_starting,

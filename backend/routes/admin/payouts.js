@@ -151,28 +151,51 @@ router.post('/payouts/approve', authenticateAdmin, requireAdminCapability('payou
   }
 })
 
+// FIX (H-05): this handler had no status check, no transaction and no row
+// lock, while /payouts/paid above has all three. Rejecting an already-`paid`
+// payout therefore flipped its status after the money had been sent and the
+// balance debited — every `WHERE status = 'paid'` aggregate (public landing
+// stats, transparency page, b-book reconciliation) silently lost the record,
+// and no compensating credit exists to undo the debit.
+//
+// Now mirrors /payouts/paid exactly: BEGIN, SELECT ... FOR UPDATE, reject
+// anything not still pending, COMMIT.
 router.post('/payouts/reject', authenticateAdmin, requireAdminCapability('payout:review:scoped'), async function(req, res) {
+  let client
   try {
     const { payout_id, reason } = req.body
 
     if (!payout_id) return res.status(400).json({ error: 'payout_id is required' })
 
-    // Fetch payout details and user email/name
-    const payoutData = await pool.query(
-      `SELECT p.amount_requested, u.id::text AS user_id, u.email, u.full_name
+    client = await pool.connect()
+    await client.query('BEGIN')
+
+    const payoutData = await client.query(
+      `SELECT p.amount_requested, p.status, u.id::text AS user_id, u.email, u.full_name
        FROM payouts p
        JOIN users u ON p.user_id = u.id
-       WHERE p.id = $1`,
+       WHERE p.id = $1
+       FOR UPDATE`,
       [payout_id]
     )
 
     if (payoutData.rows.length === 0) {
+      await client.query('ROLLBACK')
       return res.status(404).json({ error: 'Payout not found' })
     }
 
-    const { amount_requested, user_id, email, full_name } = payoutData.rows[0]
+    const { amount_requested, status, user_id, email, full_name } = payoutData.rows[0]
 
-    await pool.query(
+    if (status !== 'pending') {
+      await client.query('ROLLBACK')
+      return res.status(400).json({
+        error: status === 'paid'
+          ? 'This payout has already been paid and cannot be rejected.'
+          : `Payout is not pending (current status: ${status}).`
+      })
+    }
+
+    await client.query(
       `UPDATE payouts SET
        status = 'rejected',
        updated_at = NOW(),
@@ -181,24 +204,37 @@ router.post('/payouts/reject', authenticateAdmin, requireAdminCapability('payout
       [reason || 'Rejected by admin', payout_id]
     )
 
-    // Send automated email to the user
-    await enqueuePayoutRejectedEmail(email, full_name, amount_requested, reason, {
-      userId: user_id || null
-    })
+    await client.query('COMMIT')
 
-    const io = req.app.get('io')
-    if (io && user_id) {
-      await createUserNotification(io, user_id, {
-        type: 'error',
-        title: 'Payout Rejected',
-        message: reason ? `Your payout request was rejected: ${reason}` : 'Your payout request was rejected.'
+    // Notification is best-effort and deliberately outside the transaction: a
+    // mail or socket failure must not report an error for a rejection that has
+    // already committed (the mistake M-09 flags in /payouts/paid).
+    try {
+      await enqueuePayoutRejectedEmail(email, full_name, amount_requested, reason, {
+        userId: user_id || null
+      })
+
+      const io = req.app.get('io')
+      if (io && user_id) {
+        await createUserNotification(io, user_id, {
+          type: 'error',
+          title: 'Payout Rejected',
+          message: reason ? `Your payout request was rejected: ${reason}` : 'Your payout request was rejected.'
+        })
+      }
+    } catch (notifyErr) {
+      logger.error('Payout rejected but trader could not be notified:', {
+        error: notifyErr.message, payoutId: payout_id
       })
     }
 
     res.json({ message: 'Payout rejected and user notified' })
   } catch (error) {
+    if (client) await client.query('ROLLBACK').catch(() => {})
     logger.error('Could not reject payout:', { error: error.message })
     res.status(500).json({ error: 'Could not update payout' })
+  } finally {
+    if (client) client.release()
   }
 })
 

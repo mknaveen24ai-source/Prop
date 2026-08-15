@@ -265,6 +265,12 @@ router.post('/command-center/bulk-action', authenticateAdmin, adminBulkLimiter, 
               [user.id]
             )
             updatedUser = result.rows[0]
+            // FIX (H-02): authenticateToken reads is_banned from the Redis
+            // token cache, so without this the ban did not take effect for up
+            // to CACHE_TTL (5 min) — the trader kept full API access, trade
+            // placement and payout requests included. revoke_sessions below
+            // already used this mechanism; ban/unban never did.
+            postCommitInvalidateUserId = user.id
             message = 'Trader banned'
           } else if (action === 'unban') {
             const result = await client.query(
@@ -273,6 +279,9 @@ router.post('/command-center/bulk-action', authenticateAdmin, adminBulkLimiter, 
               [user.id]
             )
             updatedUser = result.rows[0]
+            // Same reason in reverse: without this the trader stays locked out
+            // for the rest of the TTL after being unbanned.
+            postCommitInvalidateUserId = user.id
             message = 'Trader unbanned'
           } else if (action === 'revoke_sessions') {
             const result = await client.query(

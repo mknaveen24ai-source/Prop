@@ -67,6 +67,16 @@ const TRADING_RULE_KEYS = [
   'weekend_holding_enabled',
   'max_daily_trades'
 ]
+/**
+ * Numeric setting resolver that treats NaN as "absent" — see the FIX (H-06)
+ * note in getTradingRules(). `??` alone is not enough here because
+ * parseFloat() of a malformed value yields NaN, which `??` happily passes
+ * straight through into a risk-limit comparison.
+ */
+function finiteOr(value, fallback) {
+  return Number.isFinite(value) ? value : fallback
+}
+
 const DEFAULT_TRADING_RULES = {
   minHoldSeconds: 60,
   forexLotsPer1k: FOREX_LOTS_PER_1K,
@@ -141,20 +151,30 @@ async function getTradingRules() {
           : parseFloat(value)
       }
     }
+    // FIX (H-06): every numeric rule used `parsed.x ?? DEFAULT`, and `??` only
+    // falls back on null/undefined — never on NaN. A single non-numeric row in
+    // platform_settings therefore produced NaN, and every downstream
+    // comparison against NaN is false:
+    //
+    //   secondsOpen < NaN                  → minimum hold time not enforced
+    //   (currentLots + lots) > NaN         → lot exposure cap removed
+    //   currentOpenCount >= NaN            → unlimited open positions
+    //
+    // i.e. a typo in one admin setting silently disabled the risk caps rather
+    // than falling back to them. slippageMaxPipsAdverse below already guarded
+    // correctly with Number.isFinite; this extends the same guard to the rest.
     const resolved = {
-      minHoldSeconds: parsed.min_hold_seconds ?? DEFAULT_TRADING_RULES.minHoldSeconds,
-      forexLotsPer1k: parsed.forex_lots_per_1k ?? DEFAULT_TRADING_RULES.forexLotsPer1k,
-      commodityLotsPer1k: parsed.commodity_lots_per_1k ?? DEFAULT_TRADING_RULES.commodityLotsPer1k,
-      minLotSize: parsed.min_lot_size ?? DEFAULT_TRADING_RULES.minLotSize,
-      maxTradesPer1k: parsed.max_trades_per_1k ?? DEFAULT_TRADING_RULES.maxTradesPer1k,
-      maxOpenPositions: parsed.max_open_positions ?? DEFAULT_TRADING_RULES.maxOpenPositions,
-      maxDailyTrades: parsed.max_daily_trades ?? DEFAULT_TRADING_RULES.maxDailyTrades,
-      dynamicCommissionPerLot: parsed.dynamic_commission_per_lot ?? DEFAULT_TRADING_RULES.dynamicCommissionPerLot,
+      minHoldSeconds: finiteOr(parsed.min_hold_seconds, DEFAULT_TRADING_RULES.minHoldSeconds),
+      forexLotsPer1k: finiteOr(parsed.forex_lots_per_1k, DEFAULT_TRADING_RULES.forexLotsPer1k),
+      commodityLotsPer1k: finiteOr(parsed.commodity_lots_per_1k, DEFAULT_TRADING_RULES.commodityLotsPer1k),
+      minLotSize: finiteOr(parsed.min_lot_size, DEFAULT_TRADING_RULES.minLotSize),
+      maxTradesPer1k: finiteOr(parsed.max_trades_per_1k, DEFAULT_TRADING_RULES.maxTradesPer1k),
+      maxOpenPositions: finiteOr(parsed.max_open_positions, DEFAULT_TRADING_RULES.maxOpenPositions),
+      maxDailyTrades: finiteOr(parsed.max_daily_trades, DEFAULT_TRADING_RULES.maxDailyTrades),
+      dynamicCommissionPerLot: finiteOr(parsed.dynamic_commission_per_lot, DEFAULT_TRADING_RULES.dynamicCommissionPerLot),
       commissionPerLotJson: parsed.commission_per_lot_json ?? '{}',
       slippageSimulatorEnabled: parsed.slippage_simulator_enabled ?? DEFAULT_TRADING_RULES.slippageSimulatorEnabled,
-      slippageMaxPipsAdverse: Number.isFinite(parsed.slippage_max_pips_adverse)
-        ? parsed.slippage_max_pips_adverse
-        : DEFAULT_TRADING_RULES.slippageMaxPipsAdverse,
+      slippageMaxPipsAdverse: finiteOr(parsed.slippage_max_pips_adverse, DEFAULT_TRADING_RULES.slippageMaxPipsAdverse),
       slippageMaxPipsAdverseJson: parsed.slippage_max_pips_adverse_json ?? '{}',
       weekendHoldingEnabled: parsed.weekend_holding_enabled ?? DEFAULT_TRADING_RULES.weekendHoldingEnabled,
     }
