@@ -65,7 +65,6 @@ router.post('/batch-action', authenticateToken, tradingLimiter, async function(r
       error: 0
     }
 
-    const tradeIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown'
     const client = await pool.connect()
     try {
       for (const trade of openTradesResult.rows) {
