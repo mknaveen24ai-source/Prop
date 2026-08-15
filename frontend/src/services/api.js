@@ -96,10 +96,22 @@ const api = axios.create({
   withCredentials: true
 })
 
-// NOTE: There is no request interceptor. The backend sets the JWT as an
-// httpOnly cookie which axios sends automatically via withCredentials: true.
-// Storing the token in browser storage creates an XSS theft vector — any injected
-// script can read it. The httpOnly cookie is inaccessible to JavaScript.
+// NOTE: The request interceptor deliberately does NOT attach auth. The backend
+// sets the JWT as an httpOnly cookie which axios sends automatically via
+// withCredentials: true. Storing the token in browser storage creates an XSS
+// theft vector — any injected script can read it. The httpOnly cookie is
+// inaccessible to JavaScript.
+//
+// It attaches a request id instead. The backend echoes it on X-Request-ID and
+// stamps it on every log line written while handling the request, so a error
+// reported from the UI can be traced to the exact server-side log entry.
+api.interceptors.request.use((config) => {
+  config.headers = config.headers || {}
+  if (!config.headers['X-Request-ID']) {
+    config.headers['X-Request-ID'] = randomToken()
+  }
+  return config
+})
 
 // Response interceptor - handle global errors
 api.interceptors.response.use(

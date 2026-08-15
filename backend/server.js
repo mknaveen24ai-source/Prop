@@ -27,6 +27,9 @@ const {
   ensureTenantSettingsInfrastructure
 } = require('./utils/tenantSettings')
 const { sanitizeString } = require('./utils/validation')
+const { requestContextMiddleware } = require('./utils/requestContext')
+const prometheusMetrics = require('./utils/prometheusMetrics')
+const { getSystemHealth } = require('./utils/systemHealth')
 const { isAllowedOrigin } = require('./utils/allowedOrigins')
 
 // ── Services (extracted from the old monolithic server.js) ────────────────────
@@ -234,6 +237,9 @@ httpServer.on('connection', (socket) => {
 })
 
 // ─── Express middleware ───────────────────────────────────────────────────────
+// First in the chain: everything downstream, including the error handlers, then
+// logs under a request id that the client also sees on X-Request-ID.
+app.use(requestContextMiddleware)
 app.use(sentryRequestHandler())
 app.use(sentryTracingHandler())
 
@@ -256,6 +262,7 @@ app.use(express.json({ limit: '1mb' }))
 app.use(cookieParser())
 app.disable('x-powered-by')
 app.use(logger.httpMiddleware)
+app.use(prometheusMetrics.metricsMiddleware)
 
 // ─── Secure uploads ───────────────────────────────────────────────────────────
 const uploadsRoot = path.resolve(__dirname, 'uploads')
@@ -311,6 +318,30 @@ app.get('/api/health', async function (req, res) {
 })
 app.get('/api/metrics', authAdm, requireSuperAdmin, function (req, res) { res.json(getMetrics()) })
 app.post('/api/metrics/reset', authAdm, requireSuperAdmin, function (req, res) { resetMetrics(); res.json({ message: 'Metrics reset successfully' }) })
+
+// Prometheus text format. Deliberately a separate path from /api/metrics above,
+// which returns a bespoke JSON shape the admin UI already consumes.
+app.get('/api/metrics/prometheus', authAdm, requireSuperAdmin, async function (req, res) {
+  try {
+    res.set('Content-Type', prometheusMetrics.contentType)
+    res.send(await prometheusMetrics.getMetricsText())
+  } catch (error) {
+    logger.error('Prometheus metrics error:', { error: error.message })
+    res.status(500).json({ error: 'Could not render metrics' })
+  }
+})
+
+// Aggregated subsystem health for the admin dashboard. Read-only and safe to
+// poll; every probe inside is individually guarded so one dead subsystem does
+// not take the whole response down.
+app.get('/api/admin/system-health', authAdm, async function (req, res) {
+  try {
+    res.json(await getSystemHealth())
+  } catch (error) {
+    logger.error('System health error:', { error: error.message })
+    res.status(500).json({ error: 'Could not collect system health' })
+  }
+})
 
 app.get('/api/announcement', async function (req, res) {
   try {

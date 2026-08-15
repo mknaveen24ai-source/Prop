@@ -33,6 +33,36 @@ const metrics = {
 // Configuration
 const SLOW_REQUEST_THRESHOLD = 500 // ms
 const SLOW_QUERY_THRESHOLD = 200 // ms
+
+// Runtime-adjustable so the threshold can be tightened during an investigation
+// or loosened during a known-slow backfill without a redeploy. Seeded from the
+// environment; admin settings can push a new value in via
+// setSlowQueryThreshold. Not read from platform_settings per query for the
+// obvious reason -- that lookup is itself a query.
+let _slowQueryThresholdMs = Number(process.env.SLOW_QUERY_THRESHOLD_MS) || SLOW_QUERY_THRESHOLD
+
+function getSlowQueryThreshold() {
+  return _slowQueryThresholdMs
+}
+
+function setSlowQueryThreshold(ms) {
+  const parsed = Number(ms)
+  if (!Number.isFinite(parsed) || parsed <= 0) return _slowQueryThresholdMs
+  _slowQueryThresholdMs = parsed
+  return _slowQueryThresholdMs
+}
+
+// First stack frame outside this file — the code that actually issued the
+// query. Cheap enough at the slow-query rate; never called on the fast path.
+function callerFrame() {
+  const stack = new Error().stack || ''
+  const frames = stack.split('\n').slice(2)
+  for (const frame of frames) {
+    if (frame.includes('performance.js')) continue
+    return frame.trim().slice(0, 200)
+  }
+  return null
+}
 const MEMORY_SAMPLE_INTERVAL = 60000 // 1 minute
 
 // Memory monitoring
@@ -141,12 +171,14 @@ function wrapDatabaseQuery(pool) {
       metrics.database.totalQueryTime += duration
 
       // Track slow queries
-      if (duration > SLOW_QUERY_THRESHOLD) {
+      if (duration > getSlowQueryThreshold()) {
         const slowQuery = {
           sql: sql.slice(0, 200), // Truncate long SQL
           duration,
           timestamp: new Date().toISOString(),
-          paramCount: params ? params.length : 0
+          paramCount: params ? params.length : 0,
+          rowCount: result?.rowCount ?? result?.rows?.length ?? null,
+          caller: callerFrame()
         }
 
         metrics.database.slowQueries.push(slowQuery)
@@ -156,9 +188,15 @@ function wrapDatabaseQuery(pool) {
           metrics.database.slowQueries = metrics.database.slowQueries.slice(-50)
         }
 
+        // rowCount and caller are what make these actionable: "slow" alone does
+        // not distinguish a missing index from a query legitimately returning
+        // 200k rows, and the SQL on its own rarely identifies which of several
+        // call sites issued it.
         logger.warn(`[PERFORMANCE] Slow database query: ${duration}ms`, {
           duration,
-          sql: sql.slice(0, 100)
+          sql: sql.slice(0, 200),
+          rowCount: slowQuery.rowCount,
+          caller: slowQuery.caller
         })
       }
 
@@ -271,5 +309,7 @@ module.exports = {
   getMetrics,
   resetMetrics,
   getHealthStatus,
+  getSlowQueryThreshold,
+  setSlowQueryThreshold,
   metrics
 }

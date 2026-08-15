@@ -40,6 +40,7 @@ const AdminAccess = lazy(() => import('./pages/admin/AdminAccess'))
 const AdminLeaderboard = lazy(() => import('./pages/admin/AdminLeaderboard'))
 const AdminAccountDetail = lazy(() => import('./pages/admin/AdminAccountDetail'))
 const AdminViolations = lazy(() => import('./pages/admin/AdminViolations'))
+const AdminSystemHealth = lazy(() => import('./pages/admin/AdminSystemHealth'))
 const AdminChat = lazy(() => import('./pages/admin/AdminChat'))
 const AdminDisputes = lazy(() => import('./pages/admin/AdminDisputes'))
 const AdminCommandCenter = lazy(() => import('./pages/admin/AdminCommandCenter'))
@@ -157,6 +158,7 @@ function AnimatedRoutes({ user, login, logout }) {
             <Route path="promotion-reviews" element={<AdminPromotionReviews />} />
             <Route path="leaderboard" element={<AdminLeaderboard />} />
             <Route path="violations" element={<AdminViolations />} />
+            <Route path="system-health" element={<AdminSystemHealth />} />
             <Route path="chat" element={<AdminChat />} />
             <Route path="disputes" element={<AdminDisputes />} />
             <Route path="competitions" element={<AdminCompetitions />} />

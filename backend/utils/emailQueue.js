@@ -542,8 +542,38 @@ async function runEmailAutomationPass(options = {}) {
   }
 }
 
+/**
+ * Counts of jobs that exhausted every retry delay and were parked at 'dead'.
+ *
+ * markEmailJobRetry moves a job to 'dead' once computeRetryDelayMs returns
+ * null, so nothing retries forever — but nothing surfaces it either. A rising
+ * dead count is the signal that outbound mail is broken (bad SMTP credentials,
+ * a blocked sender domain), which otherwise shows up only as traders reporting
+ * they never received a password reset.
+ */
+async function getDeadLetterStats() {
+  const result = await pool.query(
+    `SELECT COUNT(*)::int                         AS dead_count,
+            MIN(created_at)                       AS oldest_dead,
+            MAX(updated_at)                       AS latest_dead,
+            COUNT(*) FILTER (
+              WHERE updated_at > NOW() - INTERVAL '24 hours'
+            )::int                                AS dead_last_24h
+       FROM email_jobs
+      WHERE status = 'dead'`
+  )
+  const row = result.rows[0] || {}
+  return {
+    dead_count: row.dead_count || 0,
+    dead_last_24h: row.dead_last_24h || 0,
+    oldest_dead: row.oldest_dead || null,
+    latest_dead: row.latest_dead || null
+  }
+}
+
 module.exports = {
   ensureEmailQueueInfrastructure,
+  getDeadLetterStats,
   enqueueEmailJob,
   enqueueTemplateEmail,
   enqueuePasswordResetEmail,

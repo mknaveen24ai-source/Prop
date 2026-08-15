@@ -124,11 +124,30 @@ function sanitizeForLogging(obj) {
   return obj;
 }
 
-// Add sanitizing wrapper
+// Add sanitizing wrapper.
+//
+// The requestId is attached here rather than at each call site: every log in
+// the app already funnels through this one function, so a single lookup gives
+// end-to-end tracing without touching hundreds of logger.* calls. Required
+// lazily because requestContext is loaded by server.js, which loads this.
+let getRequestId = null;
+function currentRequestId() {
+  if (!getRequestId) {
+    ({ getRequestId } = require('./requestContext'));
+  }
+  return getRequestId();
+}
+
 const originalLog = logger.log.bind(logger);
 logger.log = function(level, message, meta) {
   if (meta) {
     meta = sanitizeForLogging(meta);
+  }
+  // undefined outside a request — the engines, workers and startup all log
+  // from outside one, and those lines simply carry no id.
+  const requestId = currentRequestId();
+  if (requestId) {
+    meta = { ...(meta || {}), requestId };
   }
   return originalLog(level, message, meta);
 };

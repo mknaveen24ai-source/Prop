@@ -45,6 +45,7 @@ const { calculatePnL } = require('../utils/pnlCalculator')
 const { fetchStepModelBySlug } = require('../utils/stepModels')
 const { fetchProgressionSettings, promotePassedAccount } = require('./progressionService')
 const { getCurrentPricesForTenant } = require('../priceFeed')
+const { recordEngineTick } = require('../utils/prometheusMetrics')
 const {
   COMMODITY_INSTRUMENTS,
   FOREX_INSTRUMENTS
@@ -970,10 +971,12 @@ async function onPriceTick(io, changedInstruments) {
   _tickRunning = true
   try {
     let result = await runTick(io, changedInstruments)
+    recordEngineTick('price_tick', result?.durationMs)
     while (_tickCoalesced && _tickCoalesced.size > 0) {
       const next = Array.from(_tickCoalesced)
       _tickCoalesced = null
       result = await runTick(io, next)
+      recordEngineTick('price_tick', result?.durationMs)
     }
     return result
   } catch (error) {
