@@ -1,8 +1,12 @@
 name: CI
 
 on:
+  # Every branch, not just main. CI checks out a fresh tree, which is the only
+  # thing that catches a commit depending on a file that was never committed —
+  # local runs always pass because the file is sitting in the working tree.
+  # Restricting this to main meant that class of break stayed invisible until
+  # a PR was opened, which is exactly how it reached this branch once.
   push:
-    branches: [main]
   pull_request:
     branches: [main]
 

@@ -9,7 +9,6 @@ const {
   checkPendingOrders,
   checkFloatingDrawdown
 } = require('../services/tradeEngine')
-const { getMarketStatus } = require('../services/tradeShared')
 
 // ─── Shared mock helpers ────────────────────────────────────────────────────
 // Every DB call in the engines ultimately goes through the shared `pool`
@@ -166,7 +165,12 @@ test('checkPendingOrders cancels a pending order when its account is no longer a
   assert.match(cancelCalls[0][0], /Account inactive/)
 })
 
-test('checkPendingOrders fills a buy_limit order once the ask price reaches the limit price', { skip: !getMarketStatus('EURUSD', { purpose: 'open' }).open && 'market closed at test-run time' }, async () => {
+// Pinned to a Wednesday midday rather than skipped when the real calendar says
+// the market is shut: a conditional skip means this fill path goes uncovered
+// every weekend, silently. Only Date is mocked, so timers still run.
+test('checkPendingOrders fills a buy_limit order once the ask price reaches the limit price', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-04-15T12:00:00.000Z') })
+
   const order = {
     id: 'order-2', account_id: 'acc-4', instrument: 'EURUSD', direction: 'buy',
     lot_size: '1', order_type: 'buy_limit', pending_price: '1.10020', status: 'pending',

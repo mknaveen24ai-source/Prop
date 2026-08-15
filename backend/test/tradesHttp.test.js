@@ -24,6 +24,17 @@ const authHeader = `Bearer ${authToken}`
 
 const PRICE_ROW = { instrument: 'EURUSD', bid: '1.10000', ask: '1.10020', updated_at: new Date() }
 
+// /open and /close both refuse to trade when the market is shut, so without a
+// fixed clock this file passes Mon–Fri and fails every weekend on the real
+// calendar. Pin it to a Wednesday midday for any test that drives those routes.
+// Only Date is mocked — timers still run, so supertest is unaffected — and
+// marketHours.test.js is untouched because it always passes an explicit `now`.
+const MARKET_OPEN_UTC = new Date('2026-04-15T12:00:00.000Z') // Wednesday
+
+function pinMarketOpen(t) {
+  t.mock.timers.enable({ apis: ['Date'], now: MARKET_OPEN_UTC })
+}
+
 function baseAccount(overrides = {}) {
   const now = new Date()
   return {
@@ -79,7 +90,9 @@ test('POST /api/trades/open rejects with 401 when no auth token is supplied', as
   assert.equal(res.status, 401)
 })
 
-test('POST /api/trades/open opens a market trade and returns the created trade', async () => {
+test('POST /api/trades/open opens a market trade and returns the created trade', async (t) => {
+  pinMarketOpen(t)
+
   const account = baseAccount()
   const client = makeMockClient([
     [/FROM accounts WHERE id = \$1 AND user_id = \$2 AND status = 'active' FOR UPDATE/, () => ({ rows: [account] })],
@@ -111,7 +124,9 @@ test('POST /api/trades/open opens a market trade and returns the created trade',
   assert.ok(client.calls.some(c => c.sql === 'COMMIT'))
 })
 
-test('POST /api/trades/open rejects an unknown account with 400', async () => {
+test('POST /api/trades/open rejects an unknown account with 400', async (t) => {
+  pinMarketOpen(t)
+
   const client = makeMockClient([
     [/FROM accounts WHERE id = \$1 AND user_id = \$2 AND status = 'active' FOR UPDATE/, () => ({ rows: [] })]
   ])
@@ -127,7 +142,9 @@ test('POST /api/trades/open rejects an unknown account with 400', async () => {
   assert.ok(client.calls.some(c => c.sql === 'ROLLBACK'))
 })
 
-test('POST /api/trades/open rejects insufficient equity for the requested margin', async () => {
+test('POST /api/trades/open rejects insufficient equity for the requested margin', async (t) => {
+  pinMarketOpen(t)
+
   // account_size stays at 10000 so the exposure cap (which scales off account_size)
   // easily allows 5 lots — only current_balance (equity) is starved, so this
   // isolates the margin/equity check from the separate exposure-cap check.
@@ -150,7 +167,9 @@ test('POST /api/trades/open rejects insufficient equity for the requested margin
   assert.equal(client.calls.find(c => /INSERT INTO trades/.test(c.sql)), undefined)
 })
 
-test('POST /api/trades/close closes an open trade and applies the PnL to the account balance', async () => {
+test('POST /api/trades/close closes an open trade and applies the PnL to the account balance', async (t) => {
+  pinMarketOpen(t)
+
   const openTime = new Date(Date.now() - 10 * 60 * 1000)
   const openTrade = {
     id: 'trade-http-2', account_id: ACCOUNT_ID, instrument: 'EURUSD', direction: 'buy',
@@ -184,7 +203,9 @@ test('POST /api/trades/close closes an open trade and applies the PnL to the acc
   assert.equal(balanceCall.values[0], 500)
 })
 
-test('POST /api/trades/close returns 403 when the trade belongs to another user', async () => {
+test('POST /api/trades/close returns 403 when the trade belongs to another user', async (t) => {
+  pinMarketOpen(t)
+
   const openTrade = {
     id: 'trade-http-3', account_id: ACCOUNT_ID, instrument: 'EURUSD', direction: 'buy',
     lot_size: '1', open_price: '1.09500', open_time: new Date(), status: 'open',

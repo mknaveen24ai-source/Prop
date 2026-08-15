@@ -6,10 +6,10 @@
  */
 
 const knex = require('knex')
-const logger = require('./utils/logger')
+const logger = require('./logger')
 require('../loadEnv')
 
-const knexConfig = require('./knexfile')
+const knexConfig = require('../knexfile')
 const env = process.env.NODE_ENV || 'development'
 
 /**
