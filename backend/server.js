@@ -555,36 +555,17 @@ app.get('/api/price-status', async function (req, res) {
 app.set('io', io)
 registerIO(io)
 
-// ─── Start price feed pipeline ────────────────────────────────────────────────
-startPriceFeedPipeline(io, { registerTrackedInterval, registerTrackedTimeout })
-  .catch((error) => {
-    logger.error('Failed to start price feed pipeline:', { error: error.message })
-  })
-
-// ─── Start news service and schedulers ────────────────────────────────────────
-startNewsService()
-startAllSchedulers(io, {
-  checkSLTP,
-  checkPendingOrders,
-  checkFloatingDrawdown,
-  runChallengeEngine,
-  runCompetitionEngine,
-  runReferralSeasonEngine,
-  tickCompetitionBots,
-  checkNewsForceClose,
-  weekendForceCloseByTenant,
-  flatByCloseForAccounts,
-  pruneOldPriceHistory:          require('./priceFeed').pruneOldPriceHistory,
-  syncHourlyPriceHistory:        require('./priceFeed').syncHourlyPriceHistory,
-  syncDedicatedPriceFeedWatchers: require('./priceFeed').syncDedicatedPriceFeedWatchers,
-  processQueuedNotifications:    require('./services/notificationDeliveryService').processQueuedNotifications
-})
+// ─── Background work starts inside startServer(), not here ───────────────────
+// FIX (L-05): startPriceFeedPipeline() and startAllSchedulers() used to run at
+// module load, which is BEFORE startServer() awaits ensureStartupInfrastructure()
+// and initializeRedis(). Early ticks therefore ran against tables the startup
+// DDL had not created yet and a cold token cache. See startBackgroundWork().
 
 // ─── Sentry error handler (before global handler) ─────────────────────────────
 app.use(sentryErrorHandler())
 
 // ─── Global error handler (must be last, 4 args) ─────────────────────────────
-app.use(function (err, req, res, next) { // eslint-disable-line no-unused-vars
+app.use(function (err, req, res, next) {
   logger.error('Unhandled error:', {
     method: req.method, path: req.path, error: err.message, stack: err.stack,
     ip: req.ip, userAgent: req.get('User-Agent')
@@ -595,6 +576,34 @@ app.use(function (err, req, res, next) { // eslint-disable-line no-unused-vars
     : { error: err.message || 'Internal server error', stack: err.stack }
   res.status(err.status || 500).json(errorResponse)
 })
+
+
+async function startBackgroundWork() {
+  // ─── Start price feed pipeline ────────────────────────────────────────────────
+  startPriceFeedPipeline(io, { registerTrackedInterval, registerTrackedTimeout })
+    .catch((error) => {
+      logger.error('Failed to start price feed pipeline:', { error: error.message })
+    })
+
+  // ─── Start news service and schedulers ────────────────────────────────────────
+  startNewsService()
+  startAllSchedulers(io, {
+    checkSLTP,
+    checkPendingOrders,
+    checkFloatingDrawdown,
+    runChallengeEngine,
+    runCompetitionEngine,
+    runReferralSeasonEngine,
+    tickCompetitionBots,
+    checkNewsForceClose,
+    weekendForceCloseByTenant,
+    flatByCloseForAccounts,
+    pruneOldPriceHistory:          require('./priceFeed').pruneOldPriceHistory,
+    syncHourlyPriceHistory:        require('./priceFeed').syncHourlyPriceHistory,
+    syncDedicatedPriceFeedWatchers: require('./priceFeed').syncDedicatedPriceFeedWatchers,
+    processQueuedNotifications:    require('./services/notificationDeliveryService').processQueuedNotifications
+  })
+}
 
 // ─── Server startup & graceful shutdown ───────────────────────────────────────
 const PORT = process.env.PORT || 5000
@@ -608,6 +617,9 @@ async function startServer() {
     // instance silently drops roughly half of all realtime events.
     await attachRedisAdapter(io)
     await initializeKafka()
+
+    // Only now is it safe: the startup DDL has run and Redis is connected.
+    startBackgroundWork()
 
     httpServer.listen(PORT, function () {
       logger.info('Server started:', { port: PORT, env: process.env.NODE_ENV || 'development' })

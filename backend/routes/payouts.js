@@ -224,18 +224,17 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
         return res.status(400).json({ error: 'You already have a pending payout request' })
       }
 
-      const settingsResult = await client.query(
-        `SELECT value FROM platform_settings WHERE key = 'profit_share_pct'`
-      )
-      if (settingsResult.rows.length === 0) {
-        logger.warn('[PAYOUTS] profit_share_pct not found in platform_settings â€" defaulting to 80%.')
-      }
-      const profitSharePct = settingsResult.rows.length > 0
-        ? parseFloat(settingsResult.rows[0].value) / 100
-        : 0.80
-
+      // FIX (L-04): this used to issue its own `SELECT value FROM
+      // platform_settings WHERE key = 'profit_share_pct'` and then immediately
+      // discard the result -- getTenantSettings() below already resolves the
+      // same key, and its value won. One wasted round-trip per payout request,
+      // and two apparent sources of truth for the same number.
       const payoutSettings = await getTenantSettings(['profit_share_pct'])
-      const effectiveProfitSharePct = parseFloat(payoutSettings.profit_share_pct || (profitSharePct * 100) || 80) / 100
+      const rawProfitShare = parseFloat(payoutSettings.profit_share_pct)
+      if (!Number.isFinite(rawProfitShare) || rawProfitShare <= 0) {
+        logger.warn('[PAYOUTS] profit_share_pct missing or invalid - defaulting to 80%.')
+      }
+      const effectiveProfitSharePct = (Number.isFinite(rawProfitShare) && rawProfitShare > 0 ? rawProfitShare : 80) / 100
       const amount_payable = parseFloat((amountNum * effectiveProfitSharePct).toFixed(2))
 
       // Ã¢â€â‚¬Ã¢â€â‚¬ Flag checks Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬

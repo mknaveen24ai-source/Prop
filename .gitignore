@@ -28,6 +28,11 @@ backups/
 e2e/playwright-report/
 e2e/test-results/
 
+# NOTE (audit L-07): ALL_*.md no longer matches anything tracked --
+# ALL_BUGS_AND_ISSUES.md predates this rule and is committed. Left in place so
+# new scratch reports stay ignored; the superseded April snapshots
+# (ALL_BUGS_AND_ISSUES.md, CODE_QUALITY_ASSESSMENT.md) are the user's call to
+# remove, not a safe automatic deletion.
 ALL_*.md
 BUG_ANALYSIS_REPORT.md
 CHAT_FEATURE_DOCUMENTATION.md

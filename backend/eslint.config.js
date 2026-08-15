@@ -17,7 +17,7 @@ module.exports = [
       'scripts/v2_migrate.js',
       'scripts/v2_upgrade_db.js',
       'generate_audit_pdf.js',
-      'MIGRATION_INSTALL_SUMMARY.js'
+      'MIGRATION_INSTALL_SUMMARY.md'
     ]
   },
 

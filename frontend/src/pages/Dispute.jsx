@@ -61,7 +61,7 @@ export default function Dispute({ user, accounts }) {
       const saved = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null')
       if (saved && saved.description) setForm((f) => ({ ...f, ...saved }))
     } catch { /* ignore malformed draft */ }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (!form.account_id) { setViolationContext(null); return }

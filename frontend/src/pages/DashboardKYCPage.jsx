@@ -144,7 +144,6 @@ export default function DashboardKYCPage({
 
   useEffect(() => {
     fetchDetail()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kycStatus])
 
   const [showFullForm, setShowFullForm] = useState(false)
