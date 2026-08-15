@@ -5,7 +5,7 @@ const { authenticateToken } = require('./middleware')
 const rateLimit = require('express-rate-limit')
 const { ipKeyGenerator } = require('express-rate-limit')
 const logger = require('../utils/logger')
-const { CONTRACT_SIZES } = require('../constants')
+const { calculatePnL } = require('../utils/pnlCalculator')
 const {
   abandonIdempotentRequest,
   beginIdempotentRequest,
@@ -57,18 +57,20 @@ async function ensureChallengeOrderInfrastructure() {
   await ensureTenantSettingsInfrastructure()
 }
 
+// Resolves the price an open trade would close at and defers the arithmetic to
+// the canonical Decimal implementation in utils/pnlCalculator.js. Closing a buy
+// hits the bid, closing a sell hits the ask -- that side selection is the only
+// thing specific to this call site; the maths is not duplicated here.
 function calculateOpenTradePnl(trade) {
-  const contractSize = CONTRACT_SIZES[trade.instrument] || 100000
-  const openPrice = parseFloat(trade.open_price || 0)
-  const lots = parseFloat(trade.lot_size || 0)
-  const commission = parseFloat(trade.commission || 0)
-  const currentPrice = trade.direction === 'buy'
-    ? parseFloat(trade.bid || 0)
-    : parseFloat(trade.ask || 0)
-  const priceDiff = trade.direction === 'buy'
-    ? currentPrice - openPrice
-    : openPrice - currentPrice
-  return parseFloat(((priceDiff * lots * contractSize) - commission).toFixed(2))
+  const closePrice = trade.direction === 'buy' ? trade.bid : trade.ask
+  return calculatePnL(
+    trade.direction,
+    trade.open_price || 0,
+    closePrice || 0,
+    trade.lot_size || 0,
+    trade.instrument,
+    trade.commission || 0
+  )
 }
 
 function getUtcDayBounds() {
