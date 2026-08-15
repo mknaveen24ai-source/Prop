@@ -12,6 +12,7 @@
 const jwt = require('jsonwebtoken')
 const logger = require('../utils/logger')
 const { BUILT_IN_ROLES } = require('../routes/middleware')
+const { getRedisClient } = require('../utils/tokenCache')
 
 // How often a live socket re-checks that its session is still good. The
 // handshake alone is not enough: a Socket.IO connection can outlive a ban or a
@@ -304,6 +305,47 @@ function buildConnectionHandler(pool) {
  * @param {import('socket.io').Server} io
  * @param {import('pg').Pool} pool
  */
+/**
+ * Attach the Redis adapter so rooms and emits cross process boundaries.
+ *
+ * FIX (H-08): without this, every io.to(userId).emit(...) — SL/TP fills,
+ * account_failed, payout_approved — only reaches clients connected to the
+ * process that emitted it. With two instances behind a load balancer roughly
+ * half of all realtime events are silently lost, and the loss is invisible:
+ * nothing errors, traders just stop seeing their own fills.
+ *
+ * Best-effort by design. A single instance works fine without Redis, so a
+ * missing or dead Redis degrades to the previous in-process behaviour with a
+ * loud warning rather than refusing to start.
+ */
+async function attachRedisAdapter(io) {
+  const client = getRedisClient()
+  if (!client) {
+    logger.warn('[socketService] No Redis client — Socket.IO is in-process only. ' +
+      'Safe on a single instance; realtime events will be lost if you scale out.')
+    return false
+  }
+
+  try {
+    const { createAdapter } = require('@socket.io/redis-adapter')
+    // Duplicate rather than reuse: a client in subscriber mode cannot serve
+    // the ordinary GET/SETEX calls the token cache makes on the same connection.
+    const subClient = client.duplicate()
+    const pubClient = client.duplicate()
+    subClient.on('error', (err) => logger.error('Socket.IO Redis sub error:', { error: err.message }))
+    pubClient.on('error', (err) => logger.error('Socket.IO Redis pub error:', { error: err.message }))
+    await Promise.all([subClient.connect(), pubClient.connect()])
+    io.adapter(createAdapter(pubClient, subClient))
+    logger.info('[socketService] Socket.IO Redis adapter attached — rooms span instances')
+    return true
+  } catch (error) {
+    logger.error('[socketService] Could not attach Redis adapter — staying in-process:', {
+      error: error.message
+    })
+    return false
+  }
+}
+
 function configureSocket(io, pool) {
   io.use(buildSocketAuthMiddleware(pool))
   io.on('connection', buildConnectionHandler(pool))
@@ -311,6 +353,7 @@ function configureSocket(io, pool) {
 }
 
 module.exports = {
+  attachRedisAdapter,
   configureSocket,
   getCookieValue,
   SESSION_REVALIDATE_MS,

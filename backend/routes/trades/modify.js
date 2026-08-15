@@ -6,7 +6,7 @@
 
 const express = require('express')
 const pool = require('../../db')
-const rateLimit = require('express-rate-limit')
+const { createLimiter } = require('../../utils/security')
 const logger = require('../../utils/logger')
 const { authenticateToken } = require('../middleware')
 const { getMinDistance, roundPrice } = require('../../constants')
@@ -25,7 +25,7 @@ const router = express.Router()
 // FIX: Added rate limiter â€” 60 modifications per minute per user is generous
 // for legitimate use but prevents bot-level abuse that would hammer the DB.
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const tradeModifyLimiter = rateLimit({
+const tradeModifyLimiter = createLimiter('trade-modify', {
   windowMs: 60 * 1000,
   max: 60,
   message: { error: 'Too many modify requests. Please slow down.' },

@@ -391,6 +391,11 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
           idempotencyKey: getIdempotencyKey(req)
         })
 
+        // FIX (H-03): a missing header used to mean "no replay protection",
+        // so a retried request opened a second position.
+        if (idempotencyResult.required) {
+          return { status: 400, body: { error: idempotencyResult.error } }
+        }
         if (idempotencyResult.replay) {
           return {
             status: idempotencyResult.responseStatus,

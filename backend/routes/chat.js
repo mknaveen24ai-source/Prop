@@ -3,14 +3,14 @@ const express = require('express')
 const router = express.Router()
 const pool = require('../db')
 const { authenticateToken, authenticateAdmin, requireAdminCapability } = require('./middleware')
-const rateLimit = require('express-rate-limit')
+const { createLimiter } = require('../utils/security')
 const logger = require('../utils/logger')
 const { publishDomainEvent } = require('../utils/kafka')
 
 let ensureChatTablesPromise = null
 
 // Rate limiter for chat messages
-const chatMessageLimiter = rateLimit({
+const chatMessageLimiter = createLimiter('chat-message', {
   windowMs: 60 * 1000, // 1 minute
   max: 30, // 30 messages per minute
   message: { error: 'Too many messages. Please slow down.' },

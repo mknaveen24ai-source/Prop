@@ -7,9 +7,8 @@ const crypto   = require('crypto')
 const qrcode   = require('qrcode')
 const pool     = require('../db')
 const { authenticateToken, authenticatePre2FA } = require('./middleware')
-const rateLimit = require('express-rate-limit')
 const { enqueuePasswordResetEmail, enqueueWelcomeOnboardingEmail } = require('../utils/emailQueue')
-const { passwordResetLimiter } = require('../utils/security')
+const { passwordResetLimiter, createLimiter } = require('../utils/security')
 const { isValidEmail, isValidPassword, sanitizeString } = require('../utils/validation')
 const logger   = require('../utils/logger')
 const totp     = require('../utils/totp')
@@ -70,7 +69,7 @@ const BLOCKED_EMAIL_DOMAINS = [
   'yopmail.com', 'trashmail.com', 'sharklasers.com'
 ]
 
-const loginLimiter = rateLimit({
+const loginLimiter = createLimiter('login', {
   windowMs: 1 * 60 * 1000,
   max: 10,
   message: { error: 'Too many login attempts. Please try again in 1 minute.' },
@@ -78,7 +77,7 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
 })
 
-const registerLimiter = rateLimit({
+const registerLimiter = createLimiter('register', {
   windowMs: 60 * 60 * 1000,
   max: 5,
   message: { error: 'Too many registration attempts. Please try again later.' },
@@ -86,7 +85,7 @@ const registerLimiter = rateLimit({
   legacyHeaders: false,
 })
 
-const forgotLimiter = rateLimit({
+const forgotLimiter = createLimiter('forgot', {
   windowMs: 15 * 60 * 1000,
   max: 5,
   message: { error: 'Too many requests. Please wait 15 minutes.' },
@@ -761,7 +760,7 @@ module.exports = router
 // ─────────────────────────────────────────────────────────────────────────────
 // Rate limiter for 2FA validate — 10 attempts per 15 min per IP
 // ─────────────────────────────────────────────────────────────────────────────
-const twoFaValidateLimiter = rateLimit({
+const twoFaValidateLimiter = createLimiter('two-fa-validate', {
   windowMs: 15 * 60 * 1000,
   max: 10,
   message: { error: 'Too many 2FA attempts. Please wait 15 minutes.' },

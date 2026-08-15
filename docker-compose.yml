@@ -131,7 +131,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: propfirm_backend
+    # container_name is deliberately absent: Docker refuses duplicate
+    # names, so setting it makes `docker compose up --scale` fail outright.
+    # (audit finding H-08 — this service is horizontally scalable.)
     restart: unless-stopped
     env_file: .env
     environment:
@@ -190,7 +192,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: propfirm_email_worker
+    # container_name is deliberately absent: Docker refuses duplicate
+    # names, so setting it makes `docker compose up --scale` fail outright.
+    # (audit finding H-08 — this service is horizontally scalable.)
     restart: unless-stopped
     env_file: .env
     environment:
@@ -222,7 +226,9 @@ services:
         VITE_API_URL:     "${VITE_API_URL-}"
         VITE_APP_VERSION: ${APP_VERSION:-1.0.0}
         VITE_SENTRY_DSN:  ${FRONTEND_SENTRY_DSN:-}
-    container_name: propfirm_frontend
+    # container_name is deliberately absent: Docker refuses duplicate
+    # names, so setting it makes `docker compose up --scale` fail outright.
+    # (audit finding H-08 — this service is horizontally scalable.)
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null 2>&1 || exit 1"]

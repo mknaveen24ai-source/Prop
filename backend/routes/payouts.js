@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 const pool = require('../db')
 const { authenticateToken } = require('./middleware')
-const rateLimit = require('express-rate-limit')
+const { createLimiter } = require('../utils/security')
 const { ipKeyGenerator } = require('express-rate-limit')
 const logger = require('../utils/logger')
 const Decimal = require('decimal.js')
@@ -28,7 +28,7 @@ function escapeHtml(value) {
 }
 
 // FIX (H3): Withdrawal rate limiting - prevent spam of payout requests
-const payoutRequestLimiter = rateLimit({
+const payoutRequestLimiter = createLimiter('payout-request', {
   windowMs: 24 * 60 * 60 * 1000,  // 24 hours
   max: 1,                          // 1 request per 24 hours per user
   message: { error: 'You can submit one payout request per 24 hours. Please try again later.' },
@@ -316,6 +316,12 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
         actorId: req.user.userId,
         idempotencyKey: getIdempotencyKey(req)
       })
+      // FIX (H-03): a missing Idempotency-Key used to disable replay protection
+      // entirely on this endpoint. A replayed POST is a duplicate withdrawal.
+      if (idempotencyResult.required) {
+        await client.query('ROLLBACK')
+        return res.status(400).json({ error: idempotencyResult.error })
+      }
       if (idempotencyResult.replay) {
         await client.query('ROLLBACK')
         return res.status(idempotencyResult.responseStatus).json(idempotencyResult.responseBody)

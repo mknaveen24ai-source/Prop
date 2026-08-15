@@ -6,7 +6,7 @@
 
 const express = require('express')
 const pool = require('../../db')
-const rateLimit = require('express-rate-limit')
+const { createLimiter } = require('../../utils/security')
 const logger = require('../../utils/logger')
 const Decimal = require('decimal.js')
 const tradeIndex = require('../../utils/tradeIndex')
@@ -35,7 +35,7 @@ const router = express.Router()
 // (b) double-close race with the background checkSLTP checker
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // FIX (LOOPHOLE 1): Rate limit trade close to prevent DoS flooding
-const tradeCloseLimiter = rateLimit({
+const tradeCloseLimiter = createLimiter('trade-close', {
   windowMs: 60 * 1000,
   max: 60,
   message: { error: 'Too many close requests. Please wait a moment.' },

@@ -103,6 +103,18 @@ function installPoolMock({
     if (/SELECT token_version, is_banned FROM users/.test(sql)) {
       return { rows: [{ token_version: 0, is_banned: false }] }
     }
+    // FIX (H-03): payouts:request now always takes an idempotency claim. It did
+    // not before, because a request without the header skipped the guard
+    // entirely — so this mock never had to answer these.
+    if (/idempotency_requests/i.test(sql)) {
+      // No prior claim, then hand back an id for the INSERT ... RETURNING id.
+      return /INSERT INTO idempotency_requests/i.test(sql)
+        ? { rows: [{ id: 1 }] }
+        : { rows: [] }
+    }
+    if (/CREATE TABLE|CREATE INDEX|ALTER TABLE/i.test(sql)) {
+      return { rows: [] }
+    }
     // getTenantSettingsMap passes the key list as a parameter rather than
     // inlining it, so match on the table and return a key/value row. Returning
     // nothing here is not neutral: the route would fall back to
@@ -130,7 +142,14 @@ function validBody(overrides = {}) {
 }
 
 function post(body, user) {
-  return request(app).post('/api/payouts/request').set('Authorization', user.header).send(body)
+  // FIX (H-03): payouts:request is a strict idempotency scope now — a request
+  // without this header is rejected rather than silently running with no replay
+  // protection, which is how a retried POST became a duplicate withdrawal.
+  return request(app)
+    .post('/api/payouts/request')
+    .set('Authorization', user.header)
+    .set('Idempotency-Key', `test-${Math.random().toString(36).slice(2)}`)
+    .send(body)
 }
 
 function findInsert(calls) {

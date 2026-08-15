@@ -33,7 +33,10 @@ function withEnvVar(key, value, fn) {
 test('authenticateToken accepts cookie token', async () => {
   await withEnvVar('JWT_SECRET', 'test-secret', async () => {
     pool.query = async () => ({ rows: [{ token_version: 1, is_banned: false }] })
-    const token = jwt.sign({ userId: 'u1' }, process.env.JWT_SECRET)
+    // FIX (H-07): a token with no `tv` claim is now rejected rather than
+    // silently skipping the version check. Every jwt.sign site in routes/auth.js
+    // includes tv, so this matches what the app actually issues.
+    const token = jwt.sign({ userId: 'u1', tv: 1 }, process.env.JWT_SECRET)
 
     const req = { headers: {}, cookies: { token } }
     const res = makeRes()
@@ -47,15 +50,23 @@ test('authenticateToken accepts cookie token', async () => {
 
 test('authenticateAdmin accepts admin_token cookie', async () => {
   await withEnvVar('ADMIN_JWT_SECRET', 'admin-secret', async () => {
-    const token = jwt.sign({ role: 'admin' }, process.env.ADMIN_JWT_SECRET)
+    const token = jwt.sign({ role: 'admin', atv: 1 }, process.env.ADMIN_JWT_SECRET)
+    // FIX (H-07): the env-fallback branch now fails closed when
+    // admin_token_version is missing, so the row has to resolve.
+    const previousQuery = pool.query
+    pool.query = async () => ({ rows: [{ value: '1' }] })
 
     const req = { headers: {}, cookies: { admin_token: token } }
     const res = makeRes()
     let called = false
 
-    await authenticateAdmin(req, res, () => { called = true })
-    assert.equal(called, true)
-    assert.equal(req.admin.role, 'super_admin')
+    try {
+      await authenticateAdmin(req, res, () => { called = true })
+      assert.equal(called, true)
+      assert.equal(req.admin.role, 'super_admin')
+    } finally {
+      pool.query = previousQuery
+    }
   })
 })
 

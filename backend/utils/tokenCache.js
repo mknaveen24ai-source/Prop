@@ -198,8 +198,21 @@ async function closeRedis() {
   }
 }
 
+/**
+ * The connected Redis client, or null when Redis is unavailable.
+ *
+ * Exposed for consumers that need the connection itself rather than the token
+ * cache built on it — the Socket.IO Redis adapter (H-08) and the rate-limit
+ * store (H-04). Both duplicate() this client rather than using it directly,
+ * since pub/sub puts a connection into subscriber mode.
+ */
+function getRedisClient() {
+  return redisClient
+}
+
 module.exports = {
   initializeRedis,
+  getRedisClient,
   getCachedTokenData,
   cacheTokenData,
   invalidateTokenCache,

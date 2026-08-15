@@ -20,6 +20,109 @@ const logger = require('./logger');
 // req.ip; test/rateLimitKeys.test.js guards this.
 const { ipKeyGenerator } = require('express-rate-limit');
 
+// ─────────────────────────────────────────────────────────────────────────────
+// FIX (H-04): shared Redis-backed rate-limit store
+// ─────────────────────────────────────────────────────────────────────────────
+// Every limiter in this app used express-rate-limit's default MemoryStore, so
+// every counter lived in one process's heap. Three consequences, all bad:
+//
+//   1. Limits reset on every deploy, restart or crash. The payout limiter is
+//      "1 request per 24 hours" — a restart handed every trader a fresh one.
+//   2. With N instances behind a load balancer the effective limit is N x the
+//      configured value, silently.
+//   3. Nothing survived a process swap mid-attack.
+//
+// Nginx's limit_req zones give a real per-IP floor, but nothing enforced the
+// per-USER limits that matter for payout and trading abuse.
+//
+// createLimiter() injects a Redis store when Redis is up and falls back to
+// MemoryStore with a loud warning when it is not — a single instance with no
+// Redis still works exactly as before, rather than failing to boot.
+//
+// Limiters are constructed while modules are still being required — long before
+// startServer() calls initializeRedis(). So the store cannot capture a client at
+// construction time; it resolves one per command instead, and degrades to an
+// in-process MemoryStore for as long as Redis is down.
+let _warnedNoRedis = false;
+
+function makeSharedStore(prefix) {
+  const { getRedisClient } = require('./tokenCache');
+  const { RedisStore } = require('rate-limit-redis');
+
+  const memoryFallback = new rateLimit.MemoryStore();
+  const redisStore = new RedisStore({
+    prefix: `rl:${prefix}:`,
+    // async, not a bare throw: RedisStore.init() calls sendCommand to load its
+    // increment script and awaits the result, so a synchronous throw escapes as
+    // an unhandled rejection and takes the process down at require time.
+    sendCommand: async (...args) => {
+      const client = getRedisClient();
+      if (!client) throw new Error('Redis client not connected yet');
+      return client.sendCommand(args);
+    }
+  });
+
+  let initOptions = null;
+  function warnOnce(error) {
+    if (_warnedNoRedis) return;
+    _warnedNoRedis = true;
+    logger.warn(
+      '[security] Rate limiting fell back to in-process counters: ' + error.message + '. ' +
+      'Safe on a single instance; limits reset on restart and multiply by instance count if you scale out.'
+    );
+  }
+
+  // Delegating wrapper rather than a hard choice at boot: Redis coming back
+  // after a blip silently restores shared counting.
+  return {
+    init(options) {
+      initOptions = options;
+      memoryFallback.init(options);
+      // Redis is not connected at module-load time, so this init will normally
+      // fail. That is expected and harmless — increment() re-attempts per
+      // request and the store initialises itself once Redis is up. Swallowing
+      // the rejection is required: express-rate-limit calls init() synchronously
+      // and an unhandled rejection here kills the process at require time.
+      Promise.resolve()
+        .then(() => redisStore.init(options))
+        .catch(() => {});
+    },
+    async increment(key) {
+      try {
+        return await redisStore.increment(key);
+      } catch (error) {
+        warnOnce(error);
+        if (initOptions) memoryFallback.init(initOptions);
+        return memoryFallback.increment(key);
+      }
+    },
+    async decrement(key) {
+      try { return await redisStore.decrement(key); } catch { return memoryFallback.decrement(key); }
+    },
+    async resetKey(key) {
+      try { return await redisStore.resetKey(key); } catch { return memoryFallback.resetKey(key); }
+    }
+  };
+}
+
+/**
+ * rateLimit() with the shared Redis-backed store attached.
+ *
+ * @param {string} name     stable identifier used as the Redis key prefix.
+ *                          Changing it resets that limiter's counters.
+ * @param {object} options  anything express-rate-limit accepts
+ */
+function createLimiter(name, options = {}) {
+  return rateLimit({
+    standardHeaders: true,
+    legacyHeaders: false,
+    ...options,
+    // Tests run without Redis and assert on counting behaviour directly;
+    // MemoryStore is both correct and faster there.
+    ...(process.env.NODE_ENV === 'test' ? {} : { store: makeSharedStore(name) })
+  });
+}
+
 // Enhanced security headers configuration
 const securityHeaders = helmet({
   contentSecurityPolicy: {
@@ -44,7 +147,7 @@ const securityHeaders = helmet({
 });
 
 // Trading operations rate limiter (stricter than general API)
-const tradingLimiter = rateLimit({
+const tradingLimiter = createLimiter('trading', {
   windowMs: 60 * 1000, // 1 minute
   max: 30, // 30 trades per minute per user
   message: { error: 'Too many trading requests. Please wait before trying again.' },
@@ -56,7 +159,7 @@ const tradingLimiter = rateLimit({
 });
 
 // API endpoint rate limiter
-const apiLimiter = rateLimit({
+const apiLimiter = createLimiter('api', {
   windowMs: 60 * 1000, // 1 minute
   max: 100, // 100 requests per minute per IP
   message: { error: 'Too many API requests. Please wait before trying again.' },
@@ -70,7 +173,7 @@ const apiLimiter = rateLimit({
 });
 
 // Password reset rate limiter
-const passwordResetLimiter = rateLimit({
+const passwordResetLimiter = createLimiter('password-reset', {
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 3, // 3 password reset attempts per 15 minutes
   message: { error: 'Too many password reset attempts. Please try again later.' },
@@ -83,7 +186,7 @@ const passwordResetLimiter = rateLimit({
 });
 
 // KYC submission rate limiter
-const kycLimiter = rateLimit({
+const kycLimiter = createLimiter('kyc', {
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 5, // 5 KYC submissions per hour
   message: { error: 'Too many KYC submissions. Please wait before trying again.' },
@@ -93,7 +196,7 @@ const kycLimiter = rateLimit({
 });
 
 // Payout request rate limiter
-const payoutLimiter = rateLimit({
+const payoutLimiter = createLimiter('payout', {
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 3, // 3 payout requests per hour
   message: { error: 'Too many payout requests. Please wait before trying again.' },
@@ -241,6 +344,7 @@ const requestSizeLimiter = (req, res, next) => {
 };
 
 module.exports = {
+  createLimiter,
   securityHeaders,
   tradingLimiter,
   apiLimiter,

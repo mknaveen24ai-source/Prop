@@ -15,8 +15,7 @@ const pool = require('./db')
 const { readPool } = require('./db')
 const { Server } = require('socket.io')
 const helmet = require('helmet')
-const rateLimit = require('express-rate-limit')
-const { securityHeaders, apiLimiter, abuseDetector } = require('./utils/security')
+const { securityHeaders, apiLimiter, abuseDetector, createLimiter } = require('./utils/security')
 const { securityMonitor } = require('./config/security-config')
 const logger = require('./utils/logger')
 const { initializeRedis, closeRedis } = require('./utils/tokenCache')
@@ -34,7 +33,7 @@ const { getSystemHealth } = require('./utils/systemHealth')
 const { isAllowedOrigin } = require('./utils/allowedOrigins')
 
 // ── Services (extracted from the old monolithic server.js) ────────────────────
-const { configureSocket } = require('./services/socketService')
+const { configureSocket, attachRedisAdapter } = require('./services/socketService')
 const { startPriceFeedPipeline } = require('./services/priceBroadcast')
 const {
   registerTrackedInterval,
@@ -213,8 +212,8 @@ app.use(apiLimiter)
 app.use(securityMonitor.checkAttackPatterns)
 
 // Rate limiters
-const authLimiter    = rateLimit({ windowMs: 1 * 60 * 1000,  max: 10, message: { error: 'Too many attempts. Wait 1 minute.' },                    standardHeaders: true, legacyHeaders: false })
-const trackLimiter   = rateLimit({ windowMs: 60 * 1000,      max: 20, message: { error: 'Too many tracking events.' },                          standardHeaders: true, legacyHeaders: false })
+const authLimiter = createLimiter('auth', { windowMs: 1 * 60 * 1000,  max: 10, message: { error: 'Too many attempts. Wait 1 minute.' },                    standardHeaders: true, legacyHeaders: false })
+const trackLimiter = createLimiter('track', { windowMs: 60 * 1000,      max: 20, message: { error: 'Too many tracking events.' },                          standardHeaders: true, legacyHeaders: false })
 
 const io = new Server(httpServer, {
   cors: {
@@ -567,6 +566,10 @@ async function startServer() {
   try {
     await ensureStartupInfrastructure()
     await initializeRedis()
+    // FIX (H-08): must follow initializeRedis — the adapter duplicates that
+    // client. Without it, Socket.IO rooms are per-process and any second
+    // instance silently drops roughly half of all realtime events.
+    await attachRedisAdapter(io)
     await initializeKafka()
 
     httpServer.listen(PORT, function () {

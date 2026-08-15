@@ -42,7 +42,13 @@ function installPoolMock(queryHandlers = []) {
     if (/SELECT token_version, is_banned FROM users/.test(sql)) {
       return { rows: [{ token_version: 0, is_banned: false }] }
     }
-    // ensureDisputesInfrastructure / admin_token_version lookups
+    // FIX (H-07): admin_token_version must resolve. authenticateAdmin used to
+    // skip revocation entirely when this row was absent, so returning [] here
+    // was asserting the hole. Migration 029 seeds it in every real database.
+    if (/admin_token_version/.test(sql)) {
+      return { rows: [{ value: '1' }] }
+    }
+    // ensureDisputesInfrastructure and other DDL
     return { rows: [] }
   }
   return calls

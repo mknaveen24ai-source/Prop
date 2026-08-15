@@ -17,11 +17,11 @@ const router   = express.Router()
 const pool     = require('../db')
 const bcrypt   = require('bcryptjs')
 const logger   = require('../utils/logger')
-const rateLimit = require('express-rate-limit')
+const { createLimiter } = require('../utils/security')
 const { resolveMailTransportConfig } = require('../mailer')
 
 // Only allow 5 setup attempts per hour (prevents brute-force seeding)
-const setupLimiter = rateLimit({
+const setupLimiter = createLimiter('setup', {
   windowMs: 60 * 60 * 1000,
   max: 5,
   message: { error: 'Too many setup attempts. Try again in 1 hour.' },

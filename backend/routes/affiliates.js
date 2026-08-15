@@ -1,7 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const pool = require('../db')
-const rateLimit = require('express-rate-limit')
+const { createLimiter } = require('../utils/security')
 const { ipKeyGenerator } = require('express-rate-limit')
 const logger = require('../utils/logger')
 const { authenticateToken } = require('./middleware')
@@ -29,7 +29,7 @@ function parsePagination(req) {
 }
 
 // One request per 24h per user — mirrors payouts.js's payoutRequestLimiter.
-const affiliatePayoutRequestLimiter = rateLimit({
+const affiliatePayoutRequestLimiter = createLimiter('affiliate-payout-request', {
   windowMs: 24 * 60 * 60 * 1000,
   max: 1,
   message: { error: 'You can submit one affiliate payout request per 24 hours. Please try again later.' },

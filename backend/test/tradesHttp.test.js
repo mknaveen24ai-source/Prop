@@ -73,6 +73,14 @@ function installPoolMock({ queryHandlers = [], connectClient = null } = {}) {
       return { rows: [{ token_version: 0, is_banned: false }] }
     }
     if (/FROM price_feed\b/i.test(sql)) return { rows: [PRICE_ROW] }
+    // FIX (H-03): trades:open always takes an idempotency claim now. It did not
+    // before — a request without the header skipped the guard entirely, which
+    // is how a retried POST opened a second position.
+    if (/idempotency_requests/i.test(sql)) {
+      return /INSERT INTO idempotency_requests/i.test(sql)
+        ? { rows: [{ id: 1 }] }
+        : { rows: [] }
+    }
     return { rows: [] }
   }
   pool.connect = async () => connectClient || makeMockClient()
@@ -112,6 +120,10 @@ test('POST /api/trades/open opens a market trade and returns the created trade',
   const res = await request(app)
     .post('/api/trades/open')
     .set('Authorization', authHeader)
+    // FIX (H-03): trades:open is a strict idempotency scope now. Without this
+    // header the request is rejected rather than running with no replay
+    // protection, which is how a retried POST opened a second position.
+    .set('Idempotency-Key', 'test-open-market-1')
     .send({ account_id: ACCOUNT_ID, instrument: 'EURUSD', direction: 'buy', lots: 1 })
 
   assert.equal(res.status, 201)

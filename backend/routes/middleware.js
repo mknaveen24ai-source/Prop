@@ -142,7 +142,11 @@ async function authenticateToken(req, res, next) {
     return res.status(403).json({ error: 'Account has been suspended' })
   }
 
-  if (decoded.tv !== undefined && decoded.tv < token_version) {
+  // FIX (H-07): `decoded.tv !== undefined &&` meant a token with no `tv` claim
+  // skipped the version check entirely and could never be revoked. Every token
+  // this app issues carries `tv`, so treating its absence as invalid costs
+  // nothing and closes the hole.
+  if (decoded.tv === undefined || decoded.tv < token_version) {
     return res.status(401).json({ error: 'Session expired - please log in again' })
   }
 
@@ -231,16 +235,28 @@ async function authenticateAdmin(req, res, next) {
       return next()
     }
 
-    // Legacy env-backed super-admin fallback token version check
+    // Legacy env-backed super-admin fallback token version check.
+    //
+    // FIX (H-07): this used to be `if (result.rows.length > 0) { ...check... }`,
+    // so a missing admin_token_version row skipped revocation entirely — and no
+    // migration created that row; its INSERT existed only as a comment above.
+    // A leaked super-admin token was therefore valid to its 24h expiry with no
+    // kill switch. Migration 029 seeds the row; this now fails closed if it is
+    // ever absent again.
     const result = await pool.query(
       `SELECT value FROM platform_settings WHERE key = 'admin_token_version'`
     )
-    if (result.rows.length > 0) {
-      const serverVersion = parseInt(result.rows[0].value, 10)
-      const tokenVersion  = decoded.atv || 0
-      if (tokenVersion < serverVersion) {
-        return res.status(401).json({ error: 'Admin session expired - please log in again' })
-      }
+    if (result.rows.length === 0) {
+      logger.error('[admin-auth] admin_token_version is missing — refusing env-fallback admin token')
+      return res.status(503).json({ error: 'Admin session cannot be verified' })
+    }
+    const serverVersion = parseInt(result.rows[0].value, 10)
+    if (!Number.isFinite(serverVersion)) {
+      logger.error('[admin-auth] admin_token_version is not a number — refusing env-fallback admin token')
+      return res.status(503).json({ error: 'Admin session cannot be verified' })
+    }
+    if ((decoded.atv || 0) < serverVersion) {
+      return res.status(401).json({ error: 'Admin session expired - please log in again' })
     }
   } catch (dbErr) {
     logger.error('[admin-auth] Token version check failed:', { error: dbErr.message })
@@ -325,7 +341,9 @@ async function authenticatePre2FA(req, res, next) {
     if (is_banned) {
       return res.status(403).json({ error: 'Account has been suspended' })
     }
-    if (decoded.tv !== undefined && decoded.tv < token_version) {
+    // FIX (H-07): same as authenticateToken — a missing `tv` claim used to skip
+    // the check. All four jwt.sign sites in routes/auth.js include it.
+    if (decoded.tv === undefined || decoded.tv < token_version) {
       return res.status(401).json({ error: 'Session expired - please log in again' })
     }
   } catch (dbErr) {
@@ -361,6 +379,28 @@ async function authenticateAdminPre2FA(req, res, next) {
 
   if (decoded.type !== 'pre_2fa_admin') {
     return res.status(403).json({ error: 'Invalid admin token type' })
+  }
+
+  // FIX (H-07): this performed no status or version check at all, unlike its
+  // user-side counterpart authenticatePre2FA. A deactivated admin holding a
+  // pre-2FA token could still complete the second factor and get a full
+  // session, so deactivation did not take effect until the token expired.
+  if (decoded.adminId) {
+    try {
+      const platformAdmin = await getPlatformAdminById(decoded.adminId)
+      if (!platformAdmin) {
+        return res.status(403).json({ error: 'Platform admin not found' })
+      }
+      if (platformAdmin.status !== 'active') {
+        return res.status(403).json({ error: 'Platform admin account is inactive' })
+      }
+      if ((decoded.atv || 0) < parseInt(platformAdmin.token_version || 1, 10)) {
+        return res.status(401).json({ error: 'Admin session expired - please log in again' })
+      }
+    } catch (dbErr) {
+      logger.error('[admin-auth] Pre-2FA admin check failed:', { error: dbErr.message })
+      return res.status(503).json({ error: 'Authentication service unavailable' })
+    }
   }
 
   req.adminPre2fa = decoded

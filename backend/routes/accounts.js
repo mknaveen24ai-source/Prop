@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 const pool = require('../db')
 const { authenticateToken } = require('./middleware')
-const rateLimit = require('express-rate-limit')
+const { createLimiter } = require('../utils/security')
 const { ipKeyGenerator } = require('express-rate-limit')
 const logger = require('../utils/logger')
 const { calculatePnL } = require('../utils/pnlCalculator')
@@ -32,7 +32,7 @@ const { generateAccountUid } = require('../utils/accountIds')
 const { issueGiftVoucherForOrder, redeemGiftVoucher } = require('../utils/giftVouchers')
 const { isValidEmail } = require('../utils/validation')
 
-const createAccountLimiter = rateLimit({
+const createAccountLimiter = createLimiter('create-account', {
   windowMs: 60 * 60 * 1000,     // 1 hour
   max: 1,                        // FIX (H3): Reduced from 20 to 1 per hour (was abuse vector)
   message: { error: 'You can create only 1 account per hour. Please try again later.' },
@@ -342,6 +342,11 @@ router.post('/create', authenticateToken, createAccountLimiter, async function(r
       idempotencyKey: getIdempotencyKey(req)
     })
 
+    // FIX (H-03): without the header this endpoint previously ran with no
+    // replay protection, so a retried POST created a second paid account.
+    if (idempotencyResult.required) {
+      return res.status(400).json({ error: idempotencyResult.error })
+    }
     if (idempotencyResult.replay) {
       return res.status(idempotencyResult.responseStatus).json(idempotencyResult.responseBody)
     }

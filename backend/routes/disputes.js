@@ -5,7 +5,7 @@ const path = require('path')
 const pool = require('../db')
 const { authenticateToken, authenticateAdmin } = require('./middleware')
 const logger = require('../utils/logger')
-const rateLimit = require('express-rate-limit')
+const { createLimiter } = require('../utils/security')
 const { ipKeyGenerator } = require('express-rate-limit')
 const { sanitizeString } = require('../utils/validation')
 const { ensureViolationTables } = require('../services/violationEngine')
@@ -80,7 +80,7 @@ async function ensureDisputesInfrastructure() {
 
 // FIX: Rate limit dispute submissions — max 3 per 24 hours per user.
 // Without this a banned/failed user could spam thousands of dispute records.
-const disputeLimiter = rateLimit({
+const disputeLimiter = createLimiter('dispute', {
   windowMs: 24 * 60 * 60 * 1000,
   max: 3,
   message: { error: 'You can only submit 3 disputes per day. Please contact support directly if you need further assistance.' },

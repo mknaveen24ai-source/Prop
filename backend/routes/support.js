@@ -1,6 +1,6 @@
 const express = require('express')
 const jwt = require('jsonwebtoken')
-const rateLimit = require('express-rate-limit')
+const { createLimiter } = require('../utils/security')
 
 const pool = require('../db')
 const logger = require('../utils/logger')
@@ -17,7 +17,7 @@ const { sanitizeString } = require('../utils/validation')
 const router = express.Router()
 const adminRouter = express.Router()
 
-const supportLimiter = rateLimit({
+const supportLimiter = createLimiter('support', {
   windowMs: 60 * 60 * 1000,
   max: 10,
   message: { error: 'Too many support requests. Wait before retrying.' },

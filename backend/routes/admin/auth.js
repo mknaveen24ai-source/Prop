@@ -11,7 +11,7 @@ const {
   buildAdminSessionPayload
 } = require('../middleware')
 const bcrypt = require('bcryptjs')
-const rateLimit = require('express-rate-limit')
+const { createLimiter } = require('../../utils/security')
 const qrcode = require('qrcode')
 const logger = require('../../utils/logger')
 const totp   = require('../../utils/totp')
@@ -27,7 +27,7 @@ const {
   buildAdminAuditActor, buildAdminSecurityStatus
 } = require('./shared/helpers')
 
-const adminLoginLimiter = rateLimit({
+const adminLoginLimiter = createLimiter('admin-login', {
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5,                    // 5 attempts total per IP
   message: { error: 'Too many admin login attempts. Please wait 15 minutes before trying again.' },
@@ -346,7 +346,7 @@ async function getLegacyAdminTokenVersion() {
 }
 
 
-const adminTwoFaValidateLimiter = rateLimit({
+const adminTwoFaValidateLimiter = createLimiter('admin-two-fa-validate', {
   windowMs: 15 * 60 * 1000,
   max: 10,
   message: { error: 'Too many admin 2FA attempts. Please wait.' },
