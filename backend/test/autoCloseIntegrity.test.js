@@ -3,13 +3,20 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 
-const tradesSource = fs.readFileSync(path.join(__dirname, '..', 'routes', 'trades.js'), 'utf8')
 const challengeSource = fs.readFileSync(path.join(__dirname, '..', 'challengeEngine.js'), 'utf8')
-// The engine functions these assertions guard now live in services/tradeEngine.js.
-// The route-level assertions below still read routes/trades.js.
+// The engine functions these assertions guard live in services/tradeEngine.js.
 const engineSource = fs.readFileSync(path.join(__dirname, '..', 'services', 'tradeEngine.js'), 'utf8')
 
-function functionBody(name, nextName, sourceText = tradesSource) {
+// The route-level assertions read routes/trades/, which replaced the former
+// single routes/trades.js. Each route now names the module it lives in; before
+// the split every lookup scanned one file and bounded itself with the NEXT
+// route's declaration, which is why several of these needed a `nextMarker` at
+// all. Where a route is last in its module, the module end is the boundary.
+function tradesModule(name) {
+  return fs.readFileSync(path.join(__dirname, '..', 'routes', 'trades', `${name}.js`), 'utf8')
+}
+
+function functionBody(name, nextName, sourceText) {
   const start = sourceText.indexOf(`async function ${name}`)
   assert.notEqual(start, -1, `${name} should exist`)
   const end = nextName ? sourceText.indexOf(`async function ${nextName}`, start + 1) : sourceText.length
@@ -17,12 +24,13 @@ function functionBody(name, nextName, sourceText = tradesSource) {
   return sourceText.slice(start, end)
 }
 
-function routeBody(method, pathLiteral, nextMarker) {
-  const start = tradesSource.indexOf(`router.${method}('${pathLiteral}'`)
-  assert.notEqual(start, -1, `${method.toUpperCase()} ${pathLiteral} should exist`)
-  const end = nextMarker ? tradesSource.indexOf(nextMarker, start + 1) : tradesSource.length
+function routeBody(moduleName, method, pathLiteral, nextMarker) {
+  const source = tradesModule(moduleName)
+  const start = source.indexOf(`router.${method}('${pathLiteral}'`)
+  assert.notEqual(start, -1, `${method.toUpperCase()} ${pathLiteral} should be in routes/trades/${moduleName}.js`)
+  const end = nextMarker ? source.indexOf(nextMarker, start + 1) : source.length
   assert.notEqual(end, -1, `${nextMarker} should exist after ${method.toUpperCase()} ${pathLiteral}`)
-  return tradesSource.slice(start, end)
+  return source.slice(start, end)
 }
 
 test('autoCloseAndPass is fail-fast on trade close errors', () => {
@@ -58,19 +66,21 @@ test('pending, modify, cancel, and batch action routes protect race side effects
   assert.match(pendingSource, /FOR UPDATE SKIP LOCKED/)
   assert.match(pendingSource, /Account inactive/)
 
-  const cancelSource = routeBody('post', '/cancel', '// PATCH /api/trades/modify')
+  // /cancel is last in close.js, so the module end bounds it.
+  const cancelSource = routeBody('close', 'post', '/cancel')
   assert.match(cancelSource, /WHERE id = \$1 AND status = 'pending'/)
   assert.match(cancelSource, /Pending order was already processed/)
 
-  const pendingModifySource = routeBody('patch', '/modify-pending', "router.patch('/modify'")
+  const pendingModifySource = routeBody('modify', 'patch', '/modify-pending', "router.patch('/modify'")
   assert.match(pendingModifySource, /validatePendingOrderPrice\(trade\.order_type, nextPendingPrice, bid, ask\)/)
   assert.match(pendingModifySource, /WHERE id = \$\$\{idx\} AND status = 'pending' RETURNING \*/)
 
-  const modifySource = routeBody('patch', '/modify', "router.get('/open'")
+  // /modify is last in modify.js; /batch-action is the only route in batch.js.
+  const modifySource = routeBody('modify', 'patch', '/modify')
   assert.match(modifySource, /WHERE id = \$\$\{idx\} AND status = 'open'/)
   assert.match(modifySource, /Trade was already processed/)
 
-  const batchSource = routeBody('post', '/batch-action', "router.get('/:tradeId/screenshot/:kind'")
+  const batchSource = routeBody('batch', 'post', '/batch-action')
   assert.match(batchSource, /FOR UPDATE SKIP LOCKED/)
   assert.match(batchSource, /Batch Close/)
 })
