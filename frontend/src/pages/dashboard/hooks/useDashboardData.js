@@ -68,7 +68,12 @@ export default function useDashboardData({ setError }) {
         setActiveAccount(latestVisibleAccounts[0])
       }
       return res.data
-    } catch { setError('Could not fetch accounts') }
+    } catch (err) {
+      // Logged as well as banner-ed: the banner clears itself after 5s, so a
+      // failure caught mid-session used to leave nothing behind to diagnose.
+      console.error('[Dashboard] fetchAccounts failed:', err.response?.status, err.response?.data?.error || err.message)
+      setError('Could not fetch accounts')
+    }
   }, [setAllAccounts, setActiveAccount, setError])
 
   const fetchPrices = useCallback(async () => {

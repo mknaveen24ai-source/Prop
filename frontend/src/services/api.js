@@ -6,6 +6,11 @@
 import axios from 'axios'
 import { setMemoryItem } from '../utils/memoryStore'
 import { API_BASE_URL as API_URL } from '../config/apiBase'
+import { getDeviceSignature, initDeviceSignature, getDeviceSignatureAsync } from '../utils/deviceSignature'
+
+// Start fingerprint collection as soon as the API layer loads, so the signature
+// is ready well before the user reaches login or the trading terminal.
+initDeviceSignature()
 
 
 function randomToken() {
@@ -105,10 +110,18 @@ const api = axios.create({
 // It attaches a request id instead. The backend echoes it on X-Request-ID and
 // stamps it on every log line written while handling the request, so a error
 // reported from the UI can be traced to the exact server-side log entry.
+//
+// It also attaches the device signature used by the account-sharing detector.
+// Collection is memoized and cached in sessionStorage, so this is a map lookup
+// per request, not a re-fingerprint — see utils/deviceSignature.js.
 api.interceptors.request.use((config) => {
   config.headers = config.headers || {}
   if (!config.headers['X-Request-ID']) {
     config.headers['X-Request-ID'] = randomToken()
+  }
+  const deviceSignature = getDeviceSignature()
+  if (deviceSignature) {
+    config.headers['X-Device-Signature'] = deviceSignature
   }
   return config
 })
@@ -152,8 +165,15 @@ export const authAPI = {
       { headers: { Authorization: `Bearer ${pre2faToken}` } }
     ),
   
-  register: (data) => 
-    api.post('/api/auth/register', data),
+  // Registration is the one call worth waiting on the fingerprint for: it is the
+  // first time we ever see this device, and it is user-initiated so a few ms of
+  // collection is imperceptible. Every other call takes whatever is ready.
+  register: async (data) => {
+    const deviceSignature = await getDeviceSignatureAsync()
+    return api.post('/api/auth/register', data, {
+      headers: deviceSignature ? { 'X-Device-Signature': deviceSignature } : {}
+    })
+  },
   
   logout: () => 
     api.post('/api/auth/logout'),

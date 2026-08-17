@@ -5,6 +5,7 @@ import useStore from '../../../store/useStore'
 import { renderIcon } from '../../../utils/iconMap'
 import { formatCurrency } from '../../../utils/finance'
 import { SOCKET_URL } from '../../../config/apiBase'
+import closeSocket from '../../../utils/closeSocket'
 import { enrichTradesWithPrices } from '../enrichTradesWithPrices'
 
 // The dashboard's live feed: 15 socket listeners covering prices, positions,
@@ -75,16 +76,30 @@ export default function useDashboardSocket({
       if (user?.id) socket.emit('join_account', String(user.id))
     })
     socket.on('disconnect', () => setConnected(false))
+    // Three payload shapes, all merged into one price map:
+    //
+    //   { t, p: { EURUSD: {...} } }  the current delta format. Carries ONLY the
+    //                                instruments that moved, so it must be
+    //                                merged over the existing map — treating it
+    //                                as a replacement would blank every symbol
+    //                                that happened not to tick.
+    //   { instrument, bid, ask }     a single-instrument update.
+    //   { EURUSD: {...}, ... }       a complete map (legacy full broadcast).
+    //
+    // The delta format is why 10K traders can be online at once: the old full
+    // map was ~6KB to every socket on every tick.
     socket.on('price_update', (payload) => {
-      const mergedPrices = payload?.instrument
-        ? { ...pricesRef.current, [payload.instrument]: payload }
-        : payload
+      if (!payload || typeof payload !== 'object') return
 
-      if (!mergedPrices || typeof mergedPrices !== 'object') return
-
-      if (payload?.instrument) {
+      let mergedPrices
+      if (payload.p && typeof payload.p === 'object') {
+        mergedPrices = { ...pricesRef.current, ...payload.p }
+        updatePrices(mergedPrices)
+      } else if (payload.instrument) {
+        mergedPrices = { ...pricesRef.current, [payload.instrument]: payload }
         updatePrice(payload.instrument, payload)
       } else {
+        mergedPrices = payload
         updatePrices(mergedPrices)
       }
 
@@ -253,7 +268,7 @@ export default function useDashboardSocket({
       if (equityFrameRef.current) cancelAnimationFrame(equityFrameRef.current)
       equityFrameRef.current = null
       pendingEquity.clear()
-      socket.disconnect()
+      closeSocket(socket)
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
