@@ -1,0 +1,607 @@
+/* ── Mobile trading terminal ──────────────────────────────────────────────────
+   Only ever mounted below the `md` breakpoint (see hooks/useBreakpoint.js), so
+   these rules need no media query of their own — the component gate is the
+   breakpoint. Heights are built from 100dvh, not 100vh, so the layout does not
+   jump when mobile Safari collapses its URL bar.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.mterm {
+  --mterm-action-h: 58px;
+  --mterm-nav-h: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  /* Reserve the commit bar, plus room for the disabled-reason line that sits
+     above it when trading is unavailable. */
+  padding-bottom: calc(var(--mterm-action-h) + var(--space-8));
+}
+
+/* On the Trade view *on mobile only*, the app topbar gives up its sticky
+   position so this terminal's price header is the single pinned element.
+   Without this, two `sticky; top: 0` bars stack: the app chrome has the higher
+   z-index (App.css:894, z 90) and paints straight over the symbol and quote —
+   exactly the two things a trader needs pinned. Desktop keeps its sticky
+   topbar, and never renders this header at all.
+   bp: md (768px) — see src/styles/breakpoints.js */
+@media (max-width: 767px) {
+  .dashboard-main[data-view='trade'] .dashboard-topbar {
+    position: static;
+  }
+}
+
+/* Price header + pane switcher pin as one block, so the tabs need no
+   hard-coded offset and stay reachable while a long positions list scrolls. */
+.mterm__chrome {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: var(--paper);
+}
+
+/* ── Header ── */
+.mterm__header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* This is permanently pinned, so every pixel here is a pixel the chart does
+     not get. Kept to roughly three compact rows. */
+  padding: var(--space-2) var(--space-1);
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+}
+.mterm__symbol-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.mterm__symbol-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--touch-min);
+  margin-left: -6px;
+  padding: 0 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.mterm__symbol {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0.01em;
+}
+
+/* Instrument picker rows (inside BottomSheet, padded={false}) */
+.mterm__picker-search {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--space-3) var(--space-4);
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.mterm__picker-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--touch-min);
+  padding: var(--space-3) var(--space-4);
+  border: none;
+  border-bottom: 1px solid var(--rule-soft);
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.mterm__picker-row[aria-current='true'] { color: var(--accent); }
+.mterm__picker-price {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.mterm__pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  margin: -10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.mterm__change {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.mterm__prices {
+  display: flex;
+  gap: var(--space-5);
+}
+.mterm__price {
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.mterm__price > span,
+.mterm__risk > span > span {
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-right: 4px;
+}
+.mterm__risk {
+  display: flex;
+  gap: var(--space-5);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Pane switcher ── */
+.mterm__tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--rule);
+  background: var(--paper-2);
+}
+.mterm__tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: var(--touch-min);
+  padding: var(--space-2) 4px;
+  border: none;
+  border-right: 1px solid var(--rule-soft);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.mterm__tab:last-child { border-right: none; }
+.mterm__tab[aria-selected='true'] {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.mterm__tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--on-primary);
+  font-size: 9.5px;
+}
+
+/* ── Panes ── */
+.mterm__pane { min-width: 0; }
+
+.mterm__chart {
+  /* Fill what is left of the viewport rather than a fixed pixel height: the
+     desktop panel hardcoded 500px, which on a phone is most of the screen and
+     still the wrong shape. Floor at 260px so the chart stays readable on a
+     small phone in landscape. */
+  height: max(260px, calc(100dvh - 340px));
+  border: 1px solid var(--rule);
+  background: var(--paper-2);
+}
+
+.mterm__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-1);
+}
+.mterm__empty {
+  margin: 0;
+  padding: var(--space-7) var(--space-4);
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  border: 1px dashed var(--rule);
+}
+
+/* ── Watchlist rows ── */
+.mterm__watch-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto 56px;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--touch-min);
+  padding: var(--space-3);
+  border: 1px solid var(--rule-soft);
+  background: var(--paper-2);
+  cursor: pointer;
+  text-align: left;
+}
+.mterm__watch-row[aria-current='true'] { border-color: var(--accent); }
+.mterm__watch-symbol {
+  font-size: 13px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mterm__watch-price,
+.mterm__watch-change {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.mterm__watch-spark { display: block; height: 18px; }
+
+/* ── Commit bar ── */
+/* Why the bar is dead, pinned with it rather than only in the header. */
+.mterm__actions-reason {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--mterm-nav-h) + var(--mterm-action-h) + var(--safe-bottom));
+  z-index: 60;
+  margin: 0;
+  padding: 6px var(--space-4);
+  background: var(--danger-bg);
+  border-top: 1px solid var(--loss);
+  color: var(--loss);
+  font-size: 11.5px;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.mterm__actions {
+  position: fixed;
+  left: 0;
+  right: 0;
+  /* Sits directly on top of the trader bottom tab bar. */
+  bottom: calc(var(--mterm-nav-h) + var(--safe-bottom));
+  z-index: 60;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  padding: 0 var(--safe-right) 0 var(--safe-left);
+  background: var(--rule);
+  border-top: 1px solid var(--rule);
+}
+.mterm__action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-height: var(--mterm-action-h);
+  border: none;
+  cursor: pointer;
+  color: var(--paper);
+}
+.mterm__action:disabled { opacity: 0.45; cursor: not-allowed; }
+.mterm__action--sell { background: var(--loss); }
+.mterm__action--buy { background: var(--gain); }
+.mterm__action-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.mterm__action-price {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Position / order card ── */
+.mtrade-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--rule);
+  background: var(--paper-2);
+}
+.mtrade-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.mtrade-card__ident {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.mtrade-card__symbol { font-size: 15px; font-weight: 600; color: var(--ink); }
+.mtrade-card__direction {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.mtrade-card__lots {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+.mtrade-card__pnl {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.mtrade-card__figures {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-4);
+}
+.mtrade-card__figure {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.mtrade-card__figure-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.mtrade-card__figure-value {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.mtrade-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--rule-soft);
+}
+.mtrade-card__actions > .lx-btn { flex: 1 1 auto; }
+.mtrade-card__confirm-label {
+  flex: 1 1 100%;
+  font-size: 12px;
+  color: var(--loss);
+}
+
+/* ── Order ticket (inside BottomSheet) ── */
+.mticket { display: flex; flex-direction: column; gap: var(--space-4); }
+.mticket__closed {
+  margin: 0;
+  padding: var(--space-3);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--loss);
+  border: 1px solid var(--loss);
+  background: var(--danger-bg);
+}
+.mticket__label {
+  display: block;
+  margin-bottom: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+/* Market / Pending switch */
+.mticket__modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--rule);
+}
+.mticket__mode {
+  min-height: var(--touch-min);
+  border: none;
+  border-right: 1px solid var(--rule);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.mticket__mode:last-child { border-right: none; }
+.mticket__mode[aria-selected='true'] {
+  background: var(--paper-2);
+  color: var(--ink);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* Pending type choice — only the two matching the tapped direction. */
+.mticket__types {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+.mticket__type {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: var(--touch-min);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--rule);
+  background: var(--paper-2);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.mticket__type[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+.mticket__type-label { font-size: 13px; font-weight: 600; }
+.mticket__type-hint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.mticket__check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch-min);
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.mticket__check input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+}
+
+.mticket__stepper {
+  display: grid;
+  grid-template-columns: var(--touch-min) minmax(0, 1fr) var(--touch-min);
+  gap: var(--space-2);
+}
+.mticket__step {
+  min-height: var(--touch-min);
+  border: 1px solid var(--rule);
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+.mticket__step:active { background: var(--bg-hover); }
+.mticket__lots {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.mticket__row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.mticket__field { min-width: 0; }
+.mticket__rr {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--rule-soft);
+  background: var(--paper-2);
+}
+.mticket__rr dt {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.mticket__rr dd {
+  margin: 2px 0 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.mticket__confirm { min-height: 52px; font-size: 14px; }
+.mticket__hint {
+  margin: calc(var(--space-2) * -1) 0 0;
+  font-size: 11.5px;
+  color: var(--loss);
+}
+.mticket__ok {
+  margin: calc(var(--space-2) * -1) 0 0;
+  font-size: 11.5px;
+  color: var(--gain);
+}
+.mticket__label-note {
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--text-dim);
+}
+.mticket__buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.mticket__buttons > .lx-btn { min-height: 48px; }
+
+/* Quick partial-close fractions — no keypad needed for the common case. */
+.mticket__fractions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.mticket__fraction {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 56px;
+  border: 1px solid var(--rule);
+  background: var(--paper-2);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.mticket__fraction:disabled { opacity: 0.4; cursor: not-allowed; }
+.mticket__fraction-lots {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* ── Small phones ── */
+/* bp: sm (480px) — see src/styles/breakpoints.js */
+@media (max-width: 479px) {
+  .mterm__prices { gap: var(--space-4); }
+  .mterm__price { font-size: 16px; }
+  .mtrade-card__figures { grid-template-columns: 1fr; }
+  .mticket__rr { grid-template-columns: 1fr; }
+  .mticket__rr > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+  .mticket__rr dd { margin: 0; }
+}

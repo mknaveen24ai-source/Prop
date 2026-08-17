@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Card from './ui/Card'
 import Sparkline from './ui/Sparkline'
 import OrderPanel from './OrderPanel'
@@ -12,7 +12,32 @@ import { renderIcon } from '../utils/iconMap'
 import {
   getAvailableInstrumentList,
   formatPrice,
+  INSTRUMENT_GROUPS,
 } from '../utils/instruments'
+
+// Shared by the ticker's flex gap and the marquee's wrap arithmetic — they have
+// to agree or the loop drifts by a few pixels per revolution.
+const SYMBOL_TICKER_GAP_PX = 8
+
+/**
+ * How many back-to-back copies of the symbol list the ticker must render for
+ * the marquee to have somewhere to scroll.
+ *
+ * The marquee advances scrollLeft and wraps by one copy's width, which only
+ * looks like motion while the rendered content is wider than the visible row.
+ * Two copies were hardcoded, which held when the ticker carried all 45
+ * instruments but not once it was narrowed to the tradable subset — one copy
+ * then fits on screen and the row stops scrolling. Sizing to the container
+ * guarantees overflow for any non-empty symbol list.
+ *
+ * Exported for test/documentation; the component uses it via useLayoutEffect.
+ */
+export function symbolTickerCopyCount(containerWidth, copyWidth) {
+  if (!(copyWidth > 0)) return 2
+  // +1 so the trailing copy still fills the viewport at the moment the loop
+  // wraps, rather than exposing a gap at the right edge.
+  return Math.max(2, Math.ceil(containerWidth / copyWidth) + 1)
+}
 import {
   calculateEquity,
   calculatePercent,
@@ -23,10 +48,13 @@ import {
 import { filterVisibleTraderAccounts, isTraderAccountVisible } from '../utils/accountVisibility'
 import Pagination from './Pagination'
 import PositionsPanel from './trading/PositionsPanel'
+import MobileTradingTerminal from './trading/MobileTradingTerminal'
 import useSplitPane from './trading/hooks/useSplitPane'
 import useWatchlist from './trading/hooks/useWatchlist'
 import usePriceFeedStatus from './trading/hooks/usePriceFeedStatus'
 import { buildBatchFeedback, formatBatchActionLabel } from './trading/batchFeedback'
+import { useIsMobile } from '../hooks/useBreakpoint'
+import './trading/mobile-terminal.css'
 
 
 export default function TradingPanel({
@@ -58,6 +86,11 @@ export default function TradingPanel({
 
   const { tradingLayoutRef, splitPct, handleSplitDragStart, resetSplit } = useSplitPane()
 
+  // Below `md` the desk layout is replaced wholesale by MobileTradingTerminal —
+  // stacking the three desktop columns still leaves the order ticket a scroll
+  // away from the price, which is the thing that makes trading on a phone hard.
+  const isMobile = useIsMobile()
+
   const prices = Object.keys(storePrices || {}).length > 0 ? storePrices : (propPrices || {})
 
   const liveAvailableInstruments = useMemo(() => getAvailableInstrumentList(prices), [prices])
@@ -74,10 +107,44 @@ export default function TradingPanel({
     tickerInstruments
   } = useWatchlist(prices, availableInstruments)
 
+  // Only offer a category that has something in it. `availableInstruments` is
+  // already narrowed to what the server will actually let you open, and two of
+  // these groups survive that filter with nothing left — every FX minor is a
+  // cross, and DE40/FRA40/EUSTX50 are all EUR-quoted — so those chips used to
+  // select an empty ticker row.
+  const symbolCategoryTabs = useMemo(() => {
+    const ALL_TABS = [
+      { key: 'all', label: 'All', color: 'var(--accent)' },
+      { key: 'FOREX_MAJORS', label: 'FX Majors', color: 'var(--accent)' },
+      { key: 'FOREX_MINORS', label: 'FX Minors', color: 'var(--accent)' },
+      { key: 'COMMODITY_METALS', label: 'Metals', color: 'var(--accent-gold)' },
+      { key: 'ENERGIES', label: 'Energies', color: 'var(--accent-gold)' },
+      { key: 'INDICES_SPOT', label: 'Indices Spot', color: 'var(--accent-green)' },
+      { key: 'INDICES_MAJOR', label: 'Indices Major', color: 'var(--accent-green)' },
+    ]
+    const available = new Set(availableInstruments)
+    return ALL_TABS.filter((tab) => (
+      tab.key === 'all' || (INSTRUMENT_GROUPS[tab.key] || []).some((symbol) => available.has(symbol))
+    ))
+  }, [availableInstruments])
+
+  // If the selected category disappears (price feed narrowed, FX conversion
+  // toggled), fall back to All rather than leaving the ticker empty.
+  useEffect(() => {
+    if (tickerCategory === 'all') return
+    if (symbolCategoryTabs.some((tab) => tab.key === tickerCategory)) return
+    setTickerCategory('all')
+  }, [symbolCategoryTabs, tickerCategory, setTickerCategory])
+
   // ── Auto-scrolling symbol ticker ────────────────────────────────────────────
   const symbolRowRef = useRef(null)
+  const symbolCopyRef = useRef(null)
   const symbolMarqueePausedRef = useRef(false)
   const symbolMarqueeResumeTimeoutRef = useRef(null)
+  // Width of ONE copy of the symbol list, including its trailing gap. The loop
+  // wraps on this rather than scrollWidth/2 (see below).
+  const symbolCopyWidthRef = useRef(0)
+  const [symbolCopyCount, setSymbolCopyCount] = useState(2)
 
   const pauseSymbolMarquee = useCallback(() => {
     symbolMarqueePausedRef.current = true
@@ -94,33 +161,75 @@ export default function TradingPanel({
     }, 1500)
   }, [])
 
+  // How many back-to-back copies of the symbol list to render.
+  //
+  // This used to be a hardcoded two, and the loop only advanced while one copy
+  // was wider than the container. That held when the ticker carried all 45
+  // instruments, but it is now fed getTradableInstruments() — 14 USD-quoted
+  // symbols unless VITE_FX_CONVERSION_ENABLED is on — and a category chip
+  // narrows that to three or four. One copy then fits on screen, the overflow
+  // test goes false, and the marquee silently stops. Sizing the copy count to
+  // the container instead means it always overflows and always scrolls, however
+  // few symbols survive filtering.
+  useLayoutEffect(() => {
+    const row = symbolRowRef.current
+    const copy = symbolCopyRef.current
+    if (!row || !copy) return undefined
+
+    function measure() {
+      const copyWidth = copy.getBoundingClientRect().width
+      if (copyWidth <= 0) return
+      // + the flex gap that follows this copy, so wrapping by exactly this
+      // amount lands on the pixel-identical spot in the next copy.
+      symbolCopyWidthRef.current = copyWidth + SYMBOL_TICKER_GAP_PX
+      setSymbolCopyCount(symbolTickerCopyCount(row.clientWidth, symbolCopyWidthRef.current))
+    }
+
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(row)
+    observer.observe(copy)
+    return () => observer.disconnect()
+  }, [tickerInstruments, symbolCopyCount])
+
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return undefined
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined
 
-    let frameId
+    const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+    let frameId = null
     const SCROLL_SPEED_PX_PER_FRAME = 0.6
 
     function step() {
       const el = symbolRowRef.current
-      if (el && !symbolMarqueePausedRef.current) {
-        // The symbol list is rendered twice back-to-back (see the symbol row
-        // below), so scrollWidth covers both copies — halfWidth is exactly
-        // one copy's width. Subtracting it (instead of resetting to 0) once
-        // scrollLeft crosses that point lands on the pixel-identical spot in
-        // the second copy, so the loop has no visible jump.
-        const halfWidth = el.scrollWidth / 2
-        if (halfWidth > el.clientWidth) {
-          const next = el.scrollLeft + SCROLL_SPEED_PX_PER_FRAME
-          el.scrollLeft = next >= halfWidth ? next - halfWidth : next
-        }
+      const copyWidth = symbolCopyWidthRef.current
+      if (el && copyWidth > 0 && !symbolMarqueePausedRef.current) {
+        // Wrap on one measured copy rather than scrollWidth / copies: the
+        // latter divides in the gaps *between* copies too, which is what put a
+        // few pixels of visible jump into every loop.
+        const next = el.scrollLeft + SCROLL_SPEED_PX_PER_FRAME
+        el.scrollLeft = next >= copyWidth ? next - copyWidth : next
       }
       frameId = requestAnimationFrame(step)
     }
-    frameId = requestAnimationFrame(step)
+
+    // Re-read the preference instead of sampling it once at mount: previously a
+    // machine with OS animations turned off got no marquee for the lifetime of
+    // the page, even after the user turned them back on.
+    function sync() {
+      if (motionQuery.matches) {
+        if (frameId !== null) cancelAnimationFrame(frameId)
+        frameId = null
+        return
+      }
+      if (frameId === null) frameId = requestAnimationFrame(step)
+    }
+
+    sync()
+    motionQuery.addEventListener('change', sync)
 
     return () => {
-      cancelAnimationFrame(frameId)
+      motionQuery.removeEventListener('change', sync)
+      if (frameId !== null) cancelAnimationFrame(frameId)
       clearTimeout(symbolMarqueeResumeTimeoutRef.current)
     }
   }, [])
@@ -389,17 +498,14 @@ export default function TradingPanel({
         </div>
       )}
 
-      {/* Symbol Selector category filter chips */}
+      {/* Symbol Selector category filter chips.
+          Desktop only: on a phone the ticker's 18px chips and its continuous
+          requestAnimationFrame marquee are both wrong — the mobile terminal
+          selects instruments through its own picker and watchlist pane, and
+          skipping this subtree stops the rAF loop from running at all there. */}
+      {!isMobile && (
       <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '8px' }}>
-        {[
-          { key: 'all', label: 'All', color: 'var(--accent)' },
-          { key: 'FOREX_MAJORS', label: 'FX Majors', color: 'var(--accent)' },
-          { key: 'FOREX_MINORS', label: 'FX Minors', color: 'var(--accent)' },
-          { key: 'COMMODITY_METALS', label: 'Metals', color: 'var(--accent-gold)' },
-          { key: 'ENERGIES', label: 'Energies', color: 'var(--accent-gold)' },
-          { key: 'INDICES_SPOT', label: 'Indices Spot', color: 'var(--accent-green)' },
-          { key: 'INDICES_MAJOR', label: 'Indices Major', color: 'var(--accent-green)' },
-        ].map((tab) => (
+        {symbolCategoryTabs.map((tab) => (
           <button
             key={tab.key}
             type="button"
@@ -421,8 +527,10 @@ export default function TradingPanel({
           >{tab.label}</button>
         ))}
       </div>
+      )}
 
       {/* Symbol Selector — auto-scrolling live ticker (pauses on hover/touch) */}
+      {!isMobile && (
       <div
         ref={symbolRowRef}
         onMouseEnter={pauseSymbolMarquee}
@@ -435,13 +543,22 @@ export default function TradingPanel({
         overflowX: 'auto',
         width: '100%',
         maxWidth: '100%',
-        gap: '8px',
+        gap: `${SYMBOL_TICKER_GAP_PX}px`,
         marginBottom: '20px',
         paddingBottom: '4px'
       }}>
-        {/* Rendered twice back-to-back so the auto-scroll loop can reset at the
-            halfway point with no visible jump — see the rAF loop above. */}
-        {[0, 1].flatMap(copy => tickerInstruments.map(instrument => {
+        {/* Rendered as N identical copies back-to-back so the auto-scroll loop
+            can wrap on one copy's width with no visible jump. N is measured
+            against the container (see the layout effect above) rather than
+            fixed at two, so the row overflows — and therefore scrolls — even
+            when a category filter leaves only three symbols. */}
+        {Array.from({ length: symbolCopyCount }, (_, copy) => (
+        <div
+          key={`copy-${copy}`}
+          ref={copy === 0 ? symbolCopyRef : undefined}
+          style={{ display: 'flex', flexWrap: 'nowrap', gap: `${SYMBOL_TICKER_GAP_PX}px`, flexShrink: 0 }}
+        >
+        {tickerInstruments.map(instrument => {
           const data = prices[instrument]
           const isSelected = orderForm.instrument === instrument
           const isPinned = pinnedInstruments.includes(instrument)
@@ -489,8 +606,11 @@ export default function TradingPanel({
               </div>
             </div>
           )
-        }))}
+        })}
+        </div>
+        ))}
       </div>
+      )}
 
       {/* No account yet */}
       {accounts.length === 0 && (
@@ -522,8 +642,44 @@ export default function TradingPanel({
         </div>
       )}
 
-      {/* Main Trading Layout — active accounts only */}
-      {!accountLoading && selectedAccount && selectedAccount.status === 'active' && (
+      {/* Main Trading Layout — active accounts only.
+          Mobile gets its own terminal; the desk below is the desktop layout. */}
+      {!accountLoading && selectedAccount && selectedAccount.status === 'active' && isMobile && (
+        <MobileTradingTerminal
+          prices={prices}
+          theme={theme}
+          selectedAccount={selectedAccount}
+          floatingBalance={floatingBalance}
+          floatingProfit={floatingProfit}
+          availableInstruments={availableInstruments}
+          orderForm={orderForm}
+          setOrderForm={setOrderForm}
+          handleOpenTrade={handleOpenTrade}
+          openPositions={openPositions}
+          pendingOrders={pendingOrders}
+          closingTradeSet={closingTradeSet}
+          handleCloseTrade={handleCloseTrade}
+          handlePartialClose={handlePartialClose}
+          partialForm={partialForm}
+          setPartialForm={setPartialForm}
+          modifyingTradeId={modifyingTradeId}
+          modifyForm={modifyForm}
+          setModifyForm={setModifyForm}
+          modifyError={modifyError}
+          modifySuccess={modifySuccess}
+          openModifyForm={openModifyForm}
+          cancelModify={cancelModify}
+          submitModify={submitModify}
+          moveTradeToBreakeven={moveTradeToBreakeven}
+          onCancelOrder={onCancelOrder}
+          pinnedInstruments={pinnedInstruments}
+          priceHistory={priceHistoryRef.current}
+          isPinned={(symbol) => pinnedInstruments.includes(symbol)}
+          togglePin={togglePin}
+        />
+      )}
+
+      {!accountLoading && selectedAccount && selectedAccount.status === 'active' && !isMobile && (
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
           {/* Watchlist rail (Modern Gazette handoff spec, isTrade block): pinned
               instruments with live price + sparkline. Added alongside the
@@ -590,7 +746,10 @@ export default function TradingPanel({
                 This same information lives on the Dashboard's Risk Budget
                 block and Rules' Live Status card instead of being
                 duplicated here. */}
-              <div style={{ width: '100%', height: '500px', marginBottom: '16px' }}>
+              {/* .trading-chart-shell (App.css) sizes this fluidly —
+                  clamp(340px, 52vw, 480px) with a tablet step-down. It replaces
+                  a hardcoded inline 500px, which no media query could reach. */}
+              <div className="trading-chart-shell">
                 <TradingViewWidget symbol={orderForm.instrument} theme={theme} />
               </div>
             <div className="trade-desk-stack">

@@ -11,14 +11,23 @@ export default function TradingViewWidget({ symbol, theme = 'dark', interval = '
   const containerRef = useRef(null)
 
   useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
+    const host = containerRef.current
+    if (!host) return
 
-    container.innerHTML = ''
+    // Each embed gets its own subtree. TradingView's loader finds its mount
+    // point as `document.currentScript.parentNode.querySelector('.tradingview-
+    // widget-container__widget')`, so the script and that div must be siblings
+    // and both must still be in the document when the script executes.
+    const mount = document.createElement('div')
+    mount.className = 'tradingview-widget-container'
+    mount.style.width = '100%'
+    mount.style.height = '100%'
 
     const widgetDiv = document.createElement('div')
     widgetDiv.className = 'tradingview-widget-container__widget'
-    container.appendChild(widgetDiv)
+    widgetDiv.style.width = '100%'
+    widgetDiv.style.height = '100%'
+    mount.appendChild(widgetDiv)
 
     const script = document.createElement('script')
     script.type = 'text/javascript'
@@ -37,14 +46,36 @@ export default function TradingViewWidget({ symbol, theme = 'dark', interval = '
       save_image: false,
       support_host: 'https://www.tradingview.com'
     })
-    container.appendChild(script)
+    mount.appendChild(script)
+    host.appendChild(mount)
+
+    // Detaching the subtree while the loader is still in flight leaves it with
+    // a null `parentNode` when it finally runs, and it throws "Cannot read
+    // properties of null (reading 'querySelector')". React StrictMode's
+    // mount/unmount/mount trips this on every dev page load, and a quick
+    // symbol switch trips it in production. So teardown hides the old embed
+    // immediately (no layout jump, no double chart) but defers the actual
+    // removal until the script has executed — `load` fires after execution.
+    let settled = false
+    const markSettled = () => {
+      settled = true
+      script.removeEventListener('load', markSettled)
+      script.removeEventListener('error', markSettled)
+    }
+    script.addEventListener('load', markSettled)
+    script.addEventListener('error', markSettled)
 
     return () => {
-      container.innerHTML = ''
+      if (settled) {
+        mount.remove()
+        return
+      }
+      mount.style.display = 'none'
+      const remove = () => mount.remove()
+      script.addEventListener('load', remove)
+      script.addEventListener('error', remove)
     }
   }, [symbol, theme, interval])
 
-  return (
-    <div className="tradingview-widget-container" ref={containerRef} style={{ width: '100%', height: '100%' }} />
-  )
+  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
 }
