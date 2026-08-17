@@ -76,7 +76,8 @@ async function main() {
 
   // ── 2. Every quote currency has a usable rate source ───────────────────────
   console.log('\n2. Rate sources')
-  await priceCache.updatePrices(await getCurrentPrices().catch(() => null))
+  const basePrices = await getCurrentPrices().catch(() => null)
+  await priceCache.updatePrices(basePrices)
 
   const needed = new Set(INSTRUMENT_DEFINITIONS.map((definition) => definition.quoteCurrency))
   const snapshot = getRateSnapshot()
@@ -89,6 +90,33 @@ async function main() {
       failures++
       line(false, `${currency.padEnd(4)} ${entry?.reason || 'no rate source configured'}`)
     }
+  }
+
+  // ── 3. Those rates are LIVE, not the last values before the feed died ──────
+  //
+  // getRateSnapshot() reports a rate as available whenever one is in the price
+  // cache, and says nothing about its age. A dead feed therefore produced a full
+  // set of green ticks and a READY verdict — which is a false green in exactly
+  // the case that matters, because the cutover revalues every non-USD position
+  // at whatever these rates happen to be.
+  console.log('\n3. Rate freshness')
+  const prices = Object.entries(basePrices || {})
+  const stale = prices.filter(([, price]) => price?.stale)
+
+  if (prices.length === 0) {
+    failures++
+    line(false, 'no prices at all — the feed is not running, so no rate can be trusted')
+  } else if (stale.length === prices.length) {
+    failures++
+    line(false, `every one of the ${prices.length} feed prices is stale — the rates above are last-known, not live`)
+    console.log('\n      Start the price feed and re-run. Flipping now would revalue')
+    console.log('      every non-USD position at whatever the feed last managed to')
+    console.log('      publish, which may be hours or days old.')
+  } else if (stale.length > 0) {
+    line(true, `${prices.length - stale.length}/${prices.length} prices fresh`)
+    console.log(`      (stale: ${stale.map(([symbol]) => symbol).slice(0, 8).join(', ')}${stale.length > 8 ? ', …' : ''})`)
+  } else {
+    line(true, `all ${prices.length} feed prices are fresh`)
   }
 
   // ── Verdict ───────────────────────────────────────────────────────────────
