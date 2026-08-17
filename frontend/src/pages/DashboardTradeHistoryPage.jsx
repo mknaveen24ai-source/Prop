@@ -6,6 +6,7 @@ import EquityCurveChart from '../components/EquityCurveChart'
 import ListToolbar from '../components/ui/ListToolbar'
 import FilterChips from '../components/ui/FilterChips'
 import Drawer from '../components/ui/Drawer'
+import Table from '../components/ui/Table'
 import Pagination from '../components/Pagination'
 import { renderIcon } from '../utils/iconMap'
 import { formatCurrency } from '../utils/finance'
@@ -19,6 +20,50 @@ const PAGE_SIZE = 15
 function formatSigned(value) {
   return formatCurrency(value, { signed: true })
 }
+
+const priceDecimals = (instrument) => (instrument?.includes('JPY') ? 3 : 5)
+
+// `primary` names the card's title on mobile; `hideOnMobile` drops the columns
+// that are reference detail rather than the reason you scan the list. The full
+// record is still one tap away in the drawer.
+const TRADE_COLUMNS = [
+  { key: 'instrument', header: 'Instrument', primary: true },
+  {
+    key: 'direction',
+    header: 'Side',
+    render: (t) => (
+      <span className="lx-badge" style={{ color: t.direction === 'buy' ? 'var(--gain)' : 'var(--loss)' }}>
+        {t.direction === 'buy' ? 'BUY' : 'SELL'}
+      </span>
+    ),
+  },
+  { key: 'lot_size', header: 'Lots', num: true, render: (t) => parseFloat(t.lot_size).toFixed(2) },
+  {
+    key: 'open_price', header: 'Entry', num: true, hideOnMobile: true,
+    render: (t) => parseFloat(t.open_price).toFixed(priceDecimals(t.instrument)),
+  },
+  {
+    key: 'close_price', header: 'Exit', num: true, hideOnMobile: true,
+    render: (t) => (t.close_price != null ? parseFloat(t.close_price).toFixed(priceDecimals(t.instrument)) : '—'),
+  },
+  {
+    key: 'r_multiple', header: 'R', num: true,
+    render: (t) => (
+      <span style={{ color: 'var(--muted)' }}>{t.r_multiple != null ? `${t.r_multiple.toFixed(2)}R` : '—'}</span>
+    ),
+  },
+  {
+    key: 'close_time', header: 'Closed', num: true,
+    render: (t) => (t.close_time ? new Date(t.close_time).toLocaleDateString() : '—'),
+  },
+  {
+    key: 'demo_pnl', header: 'P&L', num: true,
+    render: (t) => {
+      const pnl = parseFloat(t.demo_pnl || 0)
+      return <span style={{ color: pnl >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{formatSigned(pnl)}</span>
+    },
+  },
+]
 
 // Relocated from TradingPanel.jsx — this screen is where "export the closed
 // trade log" actually belongs now (Trade screen no longer hosts one).
@@ -211,34 +256,16 @@ export default function DashboardTradeHistoryPage({ selectedAccount, accountHist
           <FilterChips options={OUTCOME_CHIPS} activeId={outcomeFilter} onChange={setOutcomeFilter} />
 
           <Card ruled flush title="Closed Trades">
-            <div className="lx-table-wrap">
-              <table className="lx-table">
-                <thead>
-                  <tr>
-                    <th>Instrument</th><th>Side</th><th>Lots</th><th>Entry</th><th>Exit</th><th>R</th><th>Closed</th><th>P&amp;L</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paged.length === 0 ? (
-                    <tr><td colSpan={8} className="lx-table__empty">No closed trades match your filters</td></tr>
-                  ) : paged.map((t) => {
-                    const pnl = parseFloat(t.demo_pnl || 0)
-                    return (
-                      <tr key={t.id} onClick={() => setDrawerTrade(t)} style={{ cursor: 'pointer' }}>
-                        <td>{t.instrument}</td>
-                        <td><span className="lx-badge" style={{ color: t.direction === 'buy' ? 'var(--gain)' : 'var(--loss)' }}>{t.direction === 'buy' ? 'BUY' : 'SELL'}</span></td>
-                        <td className="lx-num">{parseFloat(t.lot_size).toFixed(2)}</td>
-                        <td className="lx-num">{parseFloat(t.open_price).toFixed(t.instrument?.includes('JPY') ? 3 : 5)}</td>
-                        <td className="lx-num">{t.close_price != null ? parseFloat(t.close_price).toFixed(t.instrument?.includes('JPY') ? 3 : 5) : '—'}</td>
-                        <td className="lx-num" style={{ color: 'var(--muted)' }}>{t.r_multiple != null ? `${t.r_multiple.toFixed(2)}R` : '—'}</td>
-                        <td className="lx-num">{t.close_time ? new Date(t.close_time).toLocaleDateString() : '—'}</td>
-                        <td className="lx-num" style={{ color: pnl >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{formatSigned(pnl)}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+            {/* Eight columns do not fit a phone, and this is a list of records
+                rather than a matrix — so below `md` each trade becomes a card
+                (Table mobileCard) instead of a sideways scroll. */}
+            <Table
+              columns={TRADE_COLUMNS}
+              rows={paged}
+              mobileCard
+              onRowClick={setDrawerTrade}
+              emptyMessage="No closed trades match your filters"
+            />
           </Card>
 
           <Pagination page={page} totalPages={totalPages} onPageChange={setPage} pageSize={PAGE_SIZE} total={filtered.length} />

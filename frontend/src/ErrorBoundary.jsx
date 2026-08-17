@@ -61,7 +61,7 @@ class ErrorBoundary extends React.Component {
     if (this.state.hasError) {
       return (
         <div style={{
-          height: '100vh', width: '100%', 
+          height: '100dvh', width: '100%', 
           display: 'flex', flexDirection: 'column', 
           justifyContent: 'center', alignItems: 'center', 
           background: 'var(--paper, #161616)',

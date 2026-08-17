@@ -280,9 +280,15 @@ function Dashboard({ user, onLogout }) {
           explicit offset instead of relying on flex to push it over.
           Class-based (not inline) so the mobile media query can still
           override it — see .dashboard-main rules in App.css. */}
+      {/* data-view lets CSS treat one screen differently without a second
+          layout: on mobile the Trade view un-sticks this topbar so the trading
+          terminal's own price header can pin instead — two sticky bars both at
+          top: 0 would otherwise stack to 253px of a 692px phone, with the
+          symbol and bid/ask hidden underneath. */}
       <div
+        data-view={activePage}
         className={`dashboard-main animate-fade-up ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
-        style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column' }}>
         {/* Top Nav — flush, full-width header matching the prototype exactly
             (breadcrumb + Playfair title, search, MARKETS OPEN — no floating
             card/margin, that's what was creating the visible gap around it). */}
@@ -336,12 +342,15 @@ function Dashboard({ user, onLogout }) {
               </span>
             )}
           </button>
+          {/* Popover geometry (width, max-height, anchoring) comes from
+              .dashboard-notification-popover in App.css, which already caps it
+              at min(320px, 100vw - 32px). An inline width: 320px used to sit
+              here and beat that cap, so the popover overhung the viewport on a
+              small phone. Only the surface treatment stays inline. */}
           {showNotifications && (
-            <div role="dialog" aria-label="Notifications" style={{
-              position: 'absolute', right: 0, top: '42px', width: '320px', maxHeight: '400px',
+            <div role="dialog" aria-label="Notifications" className="dashboard-notification-popover" style={{
               background: 'var(--glass-2)', backdropFilter: 'blur(24px) saturate(160%)', WebkitBackdropFilter: 'blur(24px) saturate(160%)',
-              border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', boxShadow: 'var(--elev-lg)', zIndex: 999,
-              overflow: 'hidden', display: 'flex', flexDirection: 'column'
+              border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', boxShadow: 'var(--elev-lg)'
             }}>
               <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--rule)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontFamily: 'var(--font-display)', fontSize: '14px', color: 'var(--accent)' }}>Notifications</span>

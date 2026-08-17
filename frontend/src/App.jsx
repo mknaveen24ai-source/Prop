@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react'
+import React, { Suspense, lazy, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Toaster } from 'react-hot-toast'
@@ -45,6 +45,7 @@ const AdminAccess = lazy(() => import('./pages/admin/AdminAccess'))
 const AdminLeaderboard = lazy(() => import('./pages/admin/AdminLeaderboard'))
 const AdminAccountDetail = lazy(() => import('./pages/admin/AdminAccountDetail'))
 const AdminViolations = lazy(() => import('./pages/admin/AdminViolations'))
+const AdminAccountLinking = lazy(() => import('./pages/admin/AdminAccountLinking'))
 const AdminSystemHealth = lazy(() => import('./pages/admin/AdminSystemHealth'))
 const AdminChat = lazy(() => import('./pages/admin/AdminChat'))
 const AdminDisputes = lazy(() => import('./pages/admin/AdminDisputes'))
@@ -88,7 +89,7 @@ export const PageWrapper = ({ children }) => (
 function RouteFallback() {
   return (
     <div style={{
-      minHeight: '100vh',
+      minHeight: '100dvh',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -102,6 +103,20 @@ function RouteFallback() {
 
 function AnimatedRoutes({ user, login, logout }) {
   const location = useLocation()
+
+  // Dev-only: a page that scrolls sideways is always a bug here, and the cause
+  // is usually one element inside a tree of inline styles. Reports it in the
+  // console instead of leaving it to be spotted by eye. Tree-shaken from
+  // production by the import.meta.env.DEV guard.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return undefined
+    const timer = setTimeout(() => {
+      import('./utils/overflowGuard').then(({ findHorizontalOverflow }) => {
+        findHorizontalOverflow({ label: location.pathname })
+      })
+    }, 600) // let route transitions and lazy chunks settle first
+    return () => clearTimeout(timer)
+  }, [location.pathname])
 
   return (
     <Suspense fallback={<RouteFallback />}>
@@ -164,6 +179,7 @@ function AnimatedRoutes({ user, login, logout }) {
             <Route path="promotion-reviews" element={<AdminPromotionReviews />} />
             <Route path="leaderboard" element={<AdminLeaderboard />} />
             <Route path="violations" element={<AdminViolations />} />
+            <Route path="account-linking" element={<AdminAccountLinking />} />
             <Route path="system-health" element={<AdminSystemHealth />} />
             <Route path="chat" element={<AdminChat />} />
             <Route path="disputes" element={<AdminDisputes />} />

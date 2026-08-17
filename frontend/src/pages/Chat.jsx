@@ -3,6 +3,7 @@ import axios from 'axios'
 import io from 'socket.io-client'
 import { getStatusToneColor } from '../utils/statusTone'
 import { API_BASE_URL as API_URL, SOCKET_URL } from '../config/apiBase'
+import closeSocket from '../utils/closeSocket'
 
 
 // FIX (HIGH #8): Use module-level ref tracking to prevent socket connection leaks
@@ -34,6 +35,9 @@ function Chat() {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
+  // Which of the three panes the phone is showing. Ignored above `md`, where
+  // CSS restores all three columns — see .chat-layout in App.css.
+  const [mobileView, setMobileView] = useState('list')
   // FIX (MEDIUM #23): Use useRef for typing timeout instead of useState.
   // useState can lead to stale closures where clearTimeout uses an outdated timeout ID.
   const typingTimeoutRef = useRef(null)
@@ -98,7 +102,7 @@ function Chat() {
         socketRef.current.off('user_typing')
       }
       if (socketRefCount === 0 && socketInstance) {
-        socketInstance.disconnect()
+        closeSocket(socketInstance)
         socketInstance = null
       }
       socketRef.current = null
@@ -182,6 +186,7 @@ function Chat() {
       const res = await axios.get(`${API_URL}/api/chat/conversations/${id}`)
       setMessages(res.data.messages || [])
       setSelectedConversation(res.data.conversation)
+      setMobileView('thread')
     } catch (error) {
       console.error('Failed to load conversation:', error)
       alert('Failed to load conversation')
@@ -300,12 +305,12 @@ function Chat() {
   ] : []
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '240px minmax(0,1fr) 300px', gap: '16px', alignItems: 'start', height: 'calc(100vh - 150px)' }}>
+    <div className="chat-layout" data-mobile-view={mobileView}>
       {/* Conversations rail — real functionality (multiple threads over
           time) beyond the prototype's single-ticket isChat block; kept
           alongside it per the "keep real, add spec pieces" pattern used
           on Trade/Competitions. */}
-      <div style={{ background: 'var(--glass)', backdropFilter: 'blur(16px)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      <div className="chat-pane chat-pane--list" style={{ background: 'var(--glass)', backdropFilter: 'blur(16px)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--rule)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontFamily: 'var(--font-display)', fontSize: '15px' }}>Conversations</span>
           <button
@@ -370,10 +375,20 @@ function Chat() {
       </div>
 
       {/* Chat panel — matches the prototype's isChat block */}
-      <div style={{ background: 'var(--glass)', backdropFilter: 'blur(16px) saturate(140%)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div className="chat-pane chat-pane--thread" style={{ background: 'var(--glass)', backdropFilter: 'blur(16px) saturate(140%)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', display: 'flex', flexDirection: 'column', height: '100%' }}>
         {selectedConversation ? (
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '15px 18px', borderBottom: '3px double var(--rule)' }}>
+              {/* Mobile-only: the conversation list is a separate view there,
+                  so the thread needs a way back to it. */}
+              <button
+                type="button"
+                className="chat-back"
+                onClick={() => setMobileView('list')}
+                aria-label="Back to conversations"
+              >
+                ←
+              </button>
               <div style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--accent)', flex: '0 0 auto' }}>
                 {initialsOf(selectedConversation.assigned_to)}
               </div>
@@ -464,8 +479,9 @@ function Chat() {
         )}
       </div>
 
-      {/* Right rail — ticket meta + FAQs, matches the prototype */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {/* Right rail — ticket meta + FAQs, matches the prototype. On mobile it
+          rides along under the thread rather than claiming a third column. */}
+      <div className="chat-pane chat-pane--meta" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {selectedConversation && (
           <div style={{ background: 'var(--glass)', backdropFilter: 'blur(16px) saturate(140%)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', padding: '16px 18px' }}>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px', borderBottom: '1px solid var(--rule)', paddingBottom: '10px', marginBottom: '4px' }}>This Ticket</div>

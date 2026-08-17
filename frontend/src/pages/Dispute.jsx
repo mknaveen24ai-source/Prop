@@ -153,7 +153,7 @@ export default function Dispute({ user, accounts }) {
     <div style={{ maxWidth: '1020px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '18px' }}>
       <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', margin: 0 }}>File an Appeal</h2>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.35fr) minmax(0,1fr)', gap: '16px', alignItems: 'start' }}>
+      <div className="ui-split" style={{ alignItems: 'start', '--split': 'minmax(0,1.35fr) minmax(0,1fr)' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {successId && (
             <Card style={{ border: '1px solid var(--gain)' }}>

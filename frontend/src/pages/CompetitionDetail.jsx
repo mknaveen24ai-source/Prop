@@ -186,7 +186,7 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
       </button>
 
       {/* Hero + Prize Pool — Modern Gazette handoff spec, isComps block */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: '16px', alignItems: 'stretch' }}>
+      <div className="ui-split" style={{ alignItems: 'stretch', '--split': 'minmax(0,1.4fr) minmax(0,1fr)' }}>
         <div style={{ position: 'relative', overflow: 'hidden', background: 'var(--glass-2)', backdropFilter: 'blur(18px) saturate(150%)', border: '1px solid var(--accent)', borderRadius: '4px', boxShadow: 'var(--elev-lg)', padding: '22px 24px' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(420px 220px at 88% 0%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%)', pointerEvents: 'none' }} />
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--accent)' }}>
@@ -319,7 +319,7 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
 
       {/* Podium */}
       {podium.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,minmax(0,1fr))', gap: '14px' }}>
+        <div className="ui-cols" style={{ '--cols': 'repeat(3,minmax(0,1fr))', '--cols-gap': '14px' }}>
           {podium.map((p, idx) => (
             <Card key={p.entry_id} interactive onClick={() => (onSelectTrader ? onSelectTrader(p.user_id) : navigate(`/trader/${p.user_id}`))}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -418,7 +418,7 @@ export default function CompetitionDetail() {
 
   return (
     <PageWrapper>
-      <div style={{ minHeight: '100vh', background: 'var(--paper)' }}>
+      <div style={{ minHeight: '100dvh', background: 'var(--paper)' }}>
         <div className="nav">
           <span className="nav-logo" onClick={() => navigate('/competitions')} style={{ cursor: 'pointer' }}>PROP FIRM</span>
           <ThemeToggle />

@@ -343,7 +343,7 @@ function EvaluationsSection() {
   return (
     <div>
       {/* Overall pass rate */}
-      <div className="tr-kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 24 }}>
+      <div className="tr-kpi-grid tr-kpi-grid--3" style={{ marginBottom: 24 }}>
         <KpiCard label="Overall Pass Rate" value={`${overallPassRate}%`} sub="funded / total" valueClass="accent" />
         <KpiCard label="Total Funded"      value={formatNum(funnel.funded)} sub="all time" valueClass="positive" />
         <KpiCard label="Evaluations Started" value={formatNum(funnel.total)} sub="unique traders" />
@@ -653,7 +653,7 @@ function PayoutsSection() {
 
   return (
     <div>
-      <div className="tr-kpi-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', marginBottom: 24 }}>
+      <div className="tr-kpi-grid tr-kpi-grid--2" style={{ marginBottom: 24 }}>
         <KpiCard label="Total Payouts" value={formatNum(total)} sub="paid lifetime" />
         <KpiCard label="Showing" value={`Page ${page} / ${totalPages}`} sub="20 per page" />
       </div>
@@ -738,7 +738,7 @@ function ActivitySection() {
   if (loading) return <div className="tr-loading">Loading activity feed...</div>
 
   return (
-    <div className="tr-chart-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+    <div className="tr-chart-grid">
       {/* Live activity feed */}
       <div className="tr-chart-card">
         <div className="tr-chart-title">Live Activity</div>
@@ -872,7 +872,10 @@ export default function Transparency() {
             {firmName}
           </Link>
 
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 28 }}>
+          {/* Layout in Transparency.css so it can wrap to its own line on a
+              phone — as an inline flex row it squeezed the logo to zero width
+              and pushed the CTAs off the right edge. */}
+          <div className="tr-nav-links">
             <Link to="/" style={{ color: 'var(--text-secondary)', textDecoration: 'none', fontSize: 13, fontFamily: 'var(--font-ui)' }}
               onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'}
               onMouseOut={e => e.currentTarget.style.color = 'var(--text-secondary)'}

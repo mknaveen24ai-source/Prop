@@ -27,7 +27,7 @@ export default function LegalPage({ eyebrow = 'LEGAL DOCUMENT', title, intro, se
   return (
     <div style={{
       background: 'var(--navy)',
-      minHeight: '100vh',
+      minHeight: '100dvh',
       color: 'var(--text)',
       fontFamily: 'var(--font-ui)'
     }}>

@@ -119,7 +119,7 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
   return (
     <div style={{
       background: 'var(--navy)',
-      minHeight: '100vh',
+      minHeight: '100dvh',
       color: 'var(--text)',
       fontFamily: 'var(--font-ui)'
     }}>

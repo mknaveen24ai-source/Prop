@@ -1,6 +1,7 @@
 import React from 'react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { formatCurrency } from '../utils/finance'
+import { useIsMobile } from '../hooks/useBreakpoint'
 
 function formatCompact(value) {
   const n = Number(value || 0)
@@ -42,6 +43,7 @@ function EquityTooltip({ active, payload, label, tone }) {
 }
 
 export default function EquityCurveChart({ data, height = 240, tone }) {
+  const isMobile = useIsMobile()
   if (!data || !data.length) return null
 
   const first = data[0].value
@@ -50,7 +52,10 @@ export default function EquityCurveChart({ data, height = 240, tone }) {
   const gradId = 'equity-curve-fill'
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
+    // initialDimension overrides ResponsiveContainer's -1x-1 default, which
+    // otherwise logs "The width(-1) and height(-1) of chart should be greater
+    // than 0" on the frame before ResizeObserver reports the real width.
+    <ResponsiveContainer width="100%" height={height} initialDimension={{ width: 600, height }}>
       <AreaChart data={data} margin={{ top: 10, right: 12, bottom: 4, left: 4 }}>
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
@@ -72,7 +77,10 @@ export default function EquityCurveChart({ data, height = 240, tone }) {
           axisLine={false}
           tickLine={false}
           tickFormatter={formatCompact}
-          width={64}
+          // 64px of axis gutter is ~19% of the plot area at a 335px content
+          // width, which squeezes the curve itself into a strip. The labels are
+          // already compact ("12.4k"), so a narrower gutter still fits them.
+          width={isMobile ? 40 : 64}
         />
         <Tooltip
           defaultIndex={data.length - 1}

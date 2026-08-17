@@ -198,7 +198,7 @@ export default function Checkout() {
 
   return (
     <div className="auth-shell mode-public" style={{
-      minHeight: '100vh',
+      minHeight: '100dvh',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -411,7 +411,7 @@ export default function Checkout() {
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '12px' }}>
+              <div className="ui-cols" style={{ fontSize: '12px', '--cols-gap': '10px' }}>
                 {targets.map((t, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-muted)' }}>Phase {i + 1} Target</span>

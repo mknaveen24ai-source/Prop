@@ -525,13 +525,13 @@ export default function Analytics({ selectedAccount }) {
         </div>
 
         {(breakdowns.weekday?.length > 0 || breakdowns.symbol?.length > 0) && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr)', gap: '16px', marginBottom: '20px', alignItems: 'start' }}>
+          <div className="ui-split" style={{ marginBottom: '20px', alignItems: 'start', '--split': 'minmax(0,2fr) minmax(0,1fr)' }}>
             <Card ruled eyebrow="Realised P&L" title="By Day of Week">
               {(() => {
                 const rows = [...(breakdowns.weekday || [])].sort((a, b) => a.order - b.order)
                 const maxAbs = rows.reduce((best, r) => Math.max(best, Math.abs(r.total_pnl || 0)), 1)
                 return (
-                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', height: '200px', paddingTop: '10px' }}>
+                  <div className="bar-strip" style={{ height: '200px' }}>
                     {rows.map((r) => {
                       const pnl = r.total_pnl || 0
                       const heightPct = Math.max(4, (Math.abs(pnl) / maxAbs) * 100)
@@ -589,7 +589,7 @@ export default function Analytics({ selectedAccount }) {
               ].map((b) => ({ ...b, count: analytics.r_distribution.filter(b.test).length }))
               const maxCount = buckets.reduce((best, b) => Math.max(best, b.count), 1)
               return (
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px', height: '180px', paddingTop: '10px' }}>
+                <div className="bar-strip" style={{ height: '180px' }}>
                   {buckets.map((b) => {
                     const heightPct = Math.max(4, (b.count / maxCount) * 100)
                     const tone = b.label.includes('-') ? 'var(--loss)' : 'var(--gain)'
@@ -630,6 +630,9 @@ export default function Analytics({ selectedAccount }) {
               flush
               style={{ marginBottom: '20px' }}
             >
+              {/* Scroll wrapper: this table was bare, so on a narrow viewport
+                  it pushed the whole page sideways instead of scrolling. */}
+              <div className="lx-table-wrap">
               <table className="lx-table">
                 <thead>
                   <tr>
@@ -670,6 +673,7 @@ export default function Analytics({ selectedAccount }) {
                   ))}
                 </tbody>
               </table>
+              </div>
             </Card>
           )
         })()}

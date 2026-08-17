@@ -31,8 +31,14 @@ export default function DashboardComparePage({ accounts = [] }) {
         const failed = []
         results.forEach((res, idx) => {
           const accountId = accounts[idx].id
-          if (res.status === 'fulfilled') next[accountId] = res.value.data
-          else failed.push(accountId)
+          if (res.status === 'fulfilled') {
+            next[accountId] = res.value.data
+          } else {
+            failed.push(accountId)
+            // Without this the banner only ever said "couldn't load", which is
+            // indistinguishable between a 404, a 429 and the server being down.
+            console.error('[Compare] stats failed for', accountId, res.reason?.response?.status, res.reason?.response?.data?.error || res.reason?.message)
+          }
         })
         setStatsById(next)
         setFailedIds(failed)

@@ -86,7 +86,7 @@ function AffiliateAnalysisTab({ summary }) {
 
   return (
     <>
-      <div className="grid-2" style={{ marginBottom: '20px', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+      <div style={{ display: 'grid', gap: '16px', marginBottom: '20px', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
         <StatCell label="Total Referrals" value={totalReferrals} />
         <StatCell label="Paying Referrals" value={payingReferrals} tone="gain" />
         <StatCell label="Conversion Rate" value={`${conversionPct}%`} />
@@ -460,7 +460,7 @@ export default function DashboardAffiliatePage() {
             </p>
           </Card>
 
-          <div className="grid-2" style={{ marginBottom: '20px', maxWidth: '700px', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+          <div style={{ display: 'grid', gap: '16px', marginBottom: '20px', maxWidth: '700px', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
             <StatCell label="Lifetime Commission" value={formatCurrency(summary?.lifetime_commission || 0)} tone="gain" />
             <StatCell label="Available Balance" value={formatCurrency(summary?.available_balance || 0)} />
             <StatCell label="Total Referrals" value={summary?.total_referrals || 0} />

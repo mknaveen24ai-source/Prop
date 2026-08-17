@@ -213,18 +213,20 @@ function Login({ onLogin, initialMode = 'login' }) {
 
   return (
     <div className="auth-shell mode-public" style={{
-      minHeight: '100vh',
+      minHeight: '100dvh',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: 'center',
-      position: 'relative',
-      overflow: 'hidden'
+      // Not `center`: a flex child taller than the container overflows in both
+      // directions and the top becomes unreachable. Auto margins on the card
+      // centre it when it fits and let it scroll when it does not.
+      justifyContent: 'flex-start',
+      position: 'relative'
     }}>
       <Link
         to="/"
-        className="auth-secondary-button"
-        style={{ position: 'absolute', top: '24px', left: '24px', width: 'auto', display: 'inline-block', textDecoration: 'none', zIndex: 20 }}
+        className="auth-secondary-button auth-back-link"
+        style={{ width: 'auto', textDecoration: 'none' }}
       >
         ← Back to Home
       </Link>
@@ -446,7 +448,7 @@ function Login({ onLogin, initialMode = 'login' }) {
                     {resetStrength.label}
                   </span>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px' }}>
+                <div className="ui-cols ui-cols--keep-2" style={{ '--cols-gap': '3px' }}>
                   {resetStrength.checks.map(c => (
                     <div key={c.label} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                       <span style={{ fontSize: '10px', color: c.pass ? 'var(--muted)' : 'var(--text-dim)' }}>

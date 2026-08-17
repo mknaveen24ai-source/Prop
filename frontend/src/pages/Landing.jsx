@@ -1,6 +1,8 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Menu } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
+import BottomSheet from '../components/ui/BottomSheet';
 import { useTheme } from '../ThemeContext';
 import { trackEvent } from '../utils/analytics';
 import { useBranding } from '../BrandingContext';
@@ -18,6 +20,17 @@ const LandingAffiliate = lazy(() => import('./landing-sections/LandingAffiliate'
 const LandingComparison = lazy(() => import('./landing-sections/LandingComparison'));
 const LandingFAQ = lazy(() => import('./landing-sections/LandingFAQ'));
 const LandingFooter = lazy(() => import('./landing-sections/LandingFooter'));
+
+// One source for the header destinations, so the desktop row and the mobile
+// menu can never drift apart. Previously the row was simply hidden below
+// 1024px with nothing replacing it, which made all six unreachable on a phone.
+const NAV_LINKS = [
+  { label: 'Funding', href: '#mp-calculator' },
+  { label: 'Features', href: '#mp-features' },
+  { label: 'How It Works', href: '#mp-scaling' },
+  { label: 'Refer & Earn', href: '#mp-affiliate' },
+  { label: 'FAQ', href: '#faq' },
+];
 
 function scrollToId(id) {
   const el = document.getElementById(id);
@@ -52,6 +65,7 @@ export default function Landing() {
   const defaultTitle = `${tenant?.name || 'PropFirm'} | Prop Trading Challenges`;
   const defaultDescription = 'Start a prop trading challenge with transparent rules, clear progression, and white-label infrastructure.';
   const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     // Inject Masterpiece CSS
@@ -253,15 +267,11 @@ export default function Landing() {
           </span>
         </div>
 
-        {/* Center Links (desktop) */}
-        <div className="mp-nav-links" style={{ display: 'flex', gap: '28px', alignItems: 'center' }}>
-              {[
-                { label: 'Funding', href: '#mp-calculator' },
-                { label: 'Features', href: '#mp-features' },
-                { label: 'How It Works', href: '#mp-scaling' },
-                { label: 'Refer & Earn', href: '#mp-affiliate' },
-                { label: 'FAQ', href: '#faq' },
-              ].map(link => (
+        {/* Center Links (desktop). Layout lives in public.css: an inline
+            `display: flex` here is exactly what forced responsive.css to hide
+            this row with !important. */}
+        <div className="mp-nav-links">
+              {NAV_LINKS.map(link => (
                 <a key={link.label} href={link.href} style={{
                   color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '14px',
                   fontFamily: 'var(--font-ui)', fontWeight: '500',
@@ -306,8 +316,69 @@ export default function Landing() {
                 onClick={() => trackEvent('landing_cta_click', { placement: 'nav', action: 'register' })}>
                 Get Funded
               </Link>
+              {/* Mobile only — the counterpart to hiding .mp-nav-links. */}
+              <button
+                type="button"
+                className="mp-nav-burger"
+                aria-label="Open menu"
+                aria-haspopup="dialog"
+                aria-expanded={menuOpen}
+                onClick={() => setMenuOpen(true)}
+              >
+                <Menu size={20} />
+              </button>
             </div>
       </nav>
+
+      <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} title="Menu" padded={false}>
+        <nav className="mp-menu">
+          {NAV_LINKS.map((link) => (
+            <a
+              key={link.label}
+              href={link.href}
+              className="mp-menu__link"
+              onClick={(e) => {
+                trackEvent('landing_nav_click', { label: link.label, href: link.href });
+                setMenuOpen(false);
+                if (link.href.startsWith('#')) {
+                  e.preventDefault();
+                  const targetId = link.href.slice(1);
+                  window.history.replaceState(null, '', `#${targetId}`);
+                  // Let the sheet finish closing before measuring scroll offsets.
+                  window.setTimeout(() => scrollToId(targetId), 240);
+                }
+              }}
+            >
+              {link.label}
+            </a>
+          ))}
+          <Link
+            to="/transparency"
+            className="mp-menu__link"
+            onClick={() => {
+              trackEvent('landing_nav_click', { label: 'Transparency', href: '/transparency' });
+              setMenuOpen(false);
+            }}
+          >
+            Transparency
+          </Link>
+          <div className="mp-menu__actions">
+            <Link to="/login" className="btn btn-ghost" onClick={() => setMenuOpen(false)}>
+              Log In
+            </Link>
+            <Link
+              to="/register"
+              className="btn btn-primary"
+              onClick={() => {
+                trackEvent('landing_cta_click', { placement: 'mobile_menu', action: 'register' });
+                setMenuOpen(false);
+              }}
+            >
+              Get Funded
+            </Link>
+          </div>
+        </nav>
+      </BottomSheet>
 
       <main>
       {/* Sections */}

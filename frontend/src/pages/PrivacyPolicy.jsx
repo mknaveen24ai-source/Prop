@@ -130,7 +130,7 @@ We encourage you to review this policy periodically. Your continued use of the p
   return (
     <div style={{
       background: 'var(--navy)',
-      minHeight: '100vh',
+      minHeight: '100dvh',
       color: 'var(--text)',
       fontFamily: 'var(--font-ui)'
     }}>

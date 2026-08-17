@@ -117,7 +117,7 @@ export default function Competitions() {
 
   return (
     <PageWrapper>
-      <div style={{ minHeight: '100vh', background: 'var(--paper)' }}>
+      <div style={{ minHeight: '100dvh', background: 'var(--paper)' }}>
         <div className="nav">
           <span className="nav-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>PROP FIRM</span>
           <ThemeToggle />

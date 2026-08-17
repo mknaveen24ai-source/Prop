@@ -321,8 +321,8 @@ function SessionHeat({ matrix, hours }) {
   }
 
   return (
-    <div>
-      <div style={{ display: 'grid', gridTemplateColumns: '32px repeat(24, 1fr)', gap: '2px', marginBottom: '4px' }}>
+    <div className="ui-scroll-x">
+      <div className="heatmap-grid" style={{ marginBottom: '4px' }}>
         <div />
         {hours.map((h) => (
           <div key={h} style={{ fontSize: '8px', textAlign: 'center', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
@@ -331,7 +331,7 @@ function SessionHeat({ matrix, hours }) {
         ))}
       </div>
       {matrix.map((row) => (
-        <div key={row.day_label} style={{ display: 'grid', gridTemplateColumns: '32px repeat(24, 1fr)', gap: '2px', marginBottom: '2px', alignItems: 'center' }}>
+        <div key={row.day_label} className="heatmap-grid" style={{ marginBottom: '2px', alignItems: 'center' }}>
           <div style={{ fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>{row.day_label.slice(0, 3).toUpperCase()}</div>
           {(row.slots || []).map((slot) => (
             <div
@@ -355,7 +355,7 @@ function SessionHeat({ matrix, hours }) {
         <span>
           {hovered
             ? `${hovered.day.slice(0, 3)} ${String(hovered.hour).padStart(2, '0')}:00 · ${hovered.trades} trade${hovered.trades === 1 ? '' : 's'} · ${formatSigned(hovered.pnl || 0)}`
-            : 'Hover a cell'}
+            : 'Select a cell for detail'}
         </span>
       </div>
     </div>
@@ -804,15 +804,18 @@ export default function DashboardHome({
         />
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px,1fr))', gap: '14px' }}>
-          {kpis.map((k) => <KpiCard key={k.key} {...k} sparkData={kpiSparkData} />)}
+          {/* `key` is destructured out rather than left in the spread: React 19
+              errors on a key arriving via {...props}, and it was also being
+              forwarded to KpiCard as a normal prop. */}
+          {kpis.map(({ key, ...k }) => <KpiCard key={key} {...k} sparkData={kpiSparkData} />)}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,2.1fr) minmax(0,1fr)', gap: '16px', alignItems: 'start' }}>
+        <div className="ui-split" style={{ alignItems: 'start', '--split': 'minmax(0,2.1fr) minmax(0,1fr)' }}>
           {equityBlock}
           {riskBlock}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,2.1fr) minmax(0,1fr)', gap: '16px', alignItems: 'start' }}>
+        <div className="ui-split" style={{ alignItems: 'start', '--split': 'minmax(0,2.1fr) minmax(0,1fr)' }}>
           {positionsBlock}
           {heatBlock}
         </div>

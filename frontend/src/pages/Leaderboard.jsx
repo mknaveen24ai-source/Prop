@@ -22,7 +22,7 @@ export default function Leaderboard() {
 
   return (
     <PageWrapper>
-      <div style={{ minHeight: '100vh', background: 'var(--navy)' }}>
+      <div style={{ minHeight: '100dvh', background: 'var(--navy)' }}>
         <div className="nav">
           <span className="nav-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>PROP FIRM</span>
           <ThemeToggle />

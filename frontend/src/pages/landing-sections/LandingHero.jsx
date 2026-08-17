@@ -185,7 +185,7 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
   }
 
   return (
-    <section className="mp-section mp-hero" ref={heroRef} style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', paddingTop: '120px', position: 'relative' }}>
+    <section className="mp-section mp-hero" ref={heroRef} style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', paddingTop: '120px', position: 'relative' }}>
 
       <div className="mp-container" style={{ position: 'relative', zIndex: 2 }}>
         <div
@@ -301,8 +301,11 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
         </div>
       </div>
 
-      {/* Scroll indicator */}
-      <div style={{ position: 'absolute', bottom: '40px', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', opacity: 0.4, animation: 'mp-scroll-bounce 2s ease-in-out infinite' }}>
+      {/* Scroll indicator. Absolutely positioned at the foot of the hero, so on
+          a phone — where the hero is shorter and the stat rows stack — it lands
+          on top of "Payout Cycles". Hidden below `md` via .mp-scroll-cue: it is
+          decorative, and scrolling needs no prompting on a touch screen. */}
+      <div className="mp-scroll-cue" style={{ position: 'absolute', bottom: '40px', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', opacity: 0.4, animation: 'mp-scroll-bounce 2s ease-in-out infinite' }}>
               <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.2em', fontFamily: 'var(--font-mono)' }}>Scroll to explore</span>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="6 9 12 15 18 9" />

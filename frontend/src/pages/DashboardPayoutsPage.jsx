@@ -125,7 +125,7 @@ export default function DashboardPayoutsPage({
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.5fr)', gap: '16px', alignItems: 'start' }}>
+      <div className="ui-split" style={{ alignItems: 'start', '--split': 'minmax(0,1fr) minmax(0,1.5fr)' }}>
         {/* Request a payout */}
         <form onSubmit={requestPayout} style={{ background: 'var(--glass-2)', backdropFilter: 'blur(18px)', border: '1px solid var(--accent)', borderRadius: '4px', boxShadow: 'var(--elev)', padding: '18px 20px' }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: '20px', borderBottom: '3px double var(--rule)', paddingBottom: '12px', marginBottom: '16px' }}>Request a payout</div>
@@ -294,6 +294,7 @@ export default function DashboardPayoutsPage({
               <div style={{ textAlign: 'center', padding: '48px', color: 'var(--muted)' }}>No payouts requested yet.</div>
             ) : (
               <>
+                <div className="lx-table-wrap">
                 <table className="lx-table">
                   <thead>
                     <tr>
@@ -320,6 +321,7 @@ export default function DashboardPayoutsPage({
                     ))}
                   </tbody>
                 </table>
+                </div>
                 <div style={{ padding: '10px 18px' }}>
                   <Pagination page={payoutsPage} totalPages={totalPayoutPages} onPageChange={setPayoutsPage} pageSize={PAYOUTS_PAGE_SIZE} total={payouts.length} />
                 </div>

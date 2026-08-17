@@ -327,7 +327,7 @@ function TwoFactorSetup({ apiBase = '' }) {
           background: 'var(--navy-hover)', border: '1px solid var(--navy-border)',
           borderRadius: '0', padding: '16px', marginBottom: '16px'
         }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+          <div className="ui-cols" style={{ '--cols-gap': '8px' }}>
             {backupCodes.map((code, i) => (
               <div key={i} style={{
                 fontFamily: 'monospace', fontSize: '14px',

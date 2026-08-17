@@ -267,19 +267,22 @@ function Register({ onLogin }) {
 
   return (
     <div className="auth-shell mode-public" style={{
-      minHeight: '100vh',
+      minHeight: '100dvh',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: 'center',
+      // Not `center`: this card (email, password, confirm, country, consent,
+      // 5-row strength meter) is taller than a 667px iPhone SE viewport, and a
+      // flex child that overflows a centred container has its top clipped with
+      // no way to scroll back to it.
+      justifyContent: 'flex-start',
       padding: '24px',
-      position: 'relative',
-      overflow: 'hidden'
+      position: 'relative'
     }}>
       <Link
         to="/"
-        className="auth-secondary-button"
-        style={{ position: 'absolute', top: '24px', left: '24px', width: 'auto', display: 'inline-block', textDecoration: 'none', zIndex: 20 }}
+        className="auth-secondary-button auth-back-link"
+        style={{ width: 'auto', textDecoration: 'none' }}
       >
         ← Back to Home
       </Link>
@@ -372,7 +375,7 @@ function Register({ onLogin }) {
                   <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Password strength</span>
                   <span style={{ fontSize: '11px', fontWeight: '600', color: strength.color }}>{strength.label}</span>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px' }}>
+                <div className="ui-cols ui-cols--keep-2" style={{ '--cols-gap': '3px' }}>
                   {strength.checks.map(c => (
                     <div key={c.label} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                       <span style={{ fontSize: '10px', color: c.pass ? strength.color : 'var(--text-dim)' }}>{c.pass ? '✓' : '○'}</span>

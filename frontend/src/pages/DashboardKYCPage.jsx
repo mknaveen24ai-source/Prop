@@ -225,7 +225,7 @@ export default function DashboardKYCPage({
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.25fr) minmax(0,1fr)', gap: '16px', alignItems: 'start' }}>
+      <div className="ui-split" style={{ alignItems: 'start', '--split': 'minmax(0,1.25fr) minmax(0,1fr)' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {detailLoading && !detail && !detailError && (
             <div style={{ fontSize: '12px', color: 'var(--muted)' }}>Checking your document status…</div>
