@@ -5,6 +5,30 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background: var(--paper, #161616);
   color: var(--ink, #e8e4d8);
+  /* Nothing in this app is a horizontally-scrolling page. Wide content
+     (tables, heatmaps) scrolls inside its own overflow container instead, so a
+     page-level sideways scroll is always a bug — clip it rather than let a
+     stray element drag the whole layout. `clip` (not `hidden`) keeps
+     position: sticky working on descendants. */
+  overflow-x: clip;
+}
+
+/* Touch ergonomics. Neither of these has a CSS-only equivalent elsewhere in
+   the tree, and both are invisible on desktop. */
+html {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+button,
+[role='button'],
+a,
+label,
+select,
+summary {
+  /* Removes the ~300ms click delay and stops a double-tap from zooming a
+     control the user was only trying to press twice (e.g. a lots stepper). */
+  touch-action: manipulation;
 }
 
 h1, h2, h3, h4, h5, h6 {

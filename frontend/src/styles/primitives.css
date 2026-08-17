@@ -6,6 +6,7 @@
 
 .ui-shell {
   min-height: 100vh;
+  min-height: 100dvh;
   width: 100%;
 }
 
@@ -87,6 +88,102 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: var(--space-4);
+}
+
+/* ── Responsive layout primitives ─────────────────────────────────────────────
+   The codebase sets layout through inline style objects, which a media query
+   physically cannot override — the reason responsive.css grew into a wall of
+   !important. These classes invert that: the *class* owns
+   `grid-template-columns`, and callers pass only a custom property inline. A
+   media query can then redefine the property outright and win on source order,
+   with no specificity fight and no !important.
+
+     <div className="ui-split" style={{ '--split': 'minmax(0,2fr) minmax(0,1fr)' }}>
+
+   Collapse points use the shared scale in src/styles/breakpoints.js.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.ui-split {
+  display: grid;
+  grid-template-columns: var(--split, minmax(0, 1fr) minmax(0, 1fr));
+  gap: var(--split-gap, var(--space-5));
+  align-items: start;
+}
+
+/* Fixed-count grids that must not stay fixed on a phone. */
+.ui-cols {
+  display: grid;
+  grid-template-columns: var(--cols, repeat(2, minmax(0, 1fr)));
+  gap: var(--cols-gap, var(--space-4));
+}
+
+/* Wide content that is legitimately wide (heatmaps, dense matrices). Scrolls
+   inside itself rather than dragging the page sideways. */
+.ui-scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+/* ── Scroll affordance ────────────────────────────────────────────────────────
+   A horizontally scrolling table with content running off the right edge looks
+   identical to a broken layout — which is exactly how it was being read on a
+   phone. This is the classic four-layer background trick: two `local` cover
+   patches sit on the content and two `scroll` shadows sit on the container, so
+   a shadow only shows on a side that actually has more content. Pure CSS, no
+   scroll listener. */
+.ui-scroll-x,
+.lx-table-wrap,
+.table-wrapper,
+.bar-strip {
+  background-image:
+    linear-gradient(to right, var(--paper) 30%, transparent),
+    linear-gradient(to left, var(--paper) 30%, transparent),
+    /* Neutral grey rather than black: a black shadow is invisible against the
+       dark theme's near-black paper. This reads on both editions. */
+    linear-gradient(to right, rgba(128, 128, 128, 0.38), transparent 22px),
+    linear-gradient(to left, rgba(128, 128, 128, 0.38), transparent 22px);
+  background-position: left center, right center, left center, right center;
+  background-repeat: no-repeat;
+  background-size: 34px 100%, 34px 100%, 16px 100%, 16px 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+
+/* The card-mode table stops scrolling entirely on mobile, so it must not keep
+   painting a shadow that implies otherwise. */
+@media (max-width: 767px) {
+  .lx-table-wrap--cards { background-image: none; }
+}
+
+/* Day × hour heatmap: a label gutter plus 24 hour columns. At 375px those 25
+   tracks resolve to ~11px each, which is neither readable nor tappable — so
+   the grid keeps a usable minimum and scrolls inside .ui-scroll-x instead. */
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: 32px repeat(24, minmax(12px, 1fr));
+  gap: 2px;
+  min-width: 420px;
+}
+
+/* bp: lg (1024px) — a two-pane split stops being readable once each pane is
+   under ~380px, which is where a tablet lands. */
+@media (max-width: 1023px) {
+  .ui-split { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* bp: md (768px) — phones and small tablets get one column, always...
+   ...except .ui-cols--keep-2, for grids that genuinely read better as two
+   narrow columns on a phone (short text labels, no numbers) such as a
+   password-strength checklist. Declared in this order so the more specific
+   opt-out lands after the rule it is overriding. */
+@media (max-width: 767px) {
+  .ui-cols { grid-template-columns: minmax(0, 1fr); }
+  .ui-cols--keep-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* bp: sm (480px) — even the opt-out gives up on a small phone. */
+@media (max-width: 479px) {
+  .ui-cols--keep-2 { grid-template-columns: minmax(0, 1fr); }
 }
 
 .ui-empty-state {

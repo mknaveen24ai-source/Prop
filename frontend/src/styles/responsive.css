@@ -25,9 +25,9 @@
     gap: 12px;
   }
 
-  .mode-public .mp-nav-links {
-    display: none !important;
-  }
+  /* .mp-nav-links / .mp-nav-burger now swap together in modes/public.css,
+     which App.css imports after this file — a reveal here would lose to the
+     base rule there. */
 
   .mode-public .mp-hero {
     min-height: auto !important;
@@ -35,17 +35,14 @@
     padding-bottom: 72px !important;
   }
 
+  /* Decorative, and it collides with the stacked hero stats once the hero
+     stops being full-height. */
+  .mode-public .mp-scroll-cue {
+    display: none;
+  }
+
   .mode-trader .dashboard-topbar {
     margin: 12px 12px 18px !important;
-  }
-
-  .mode-trader .chart-workspace-toolbar {
-    align-items: flex-start;
-  }
-
-  .mode-trader .chart-workspace-meta,
-  .mode-trader .chart-workspace-controls {
-    width: 100%;
   }
 
   .mode-trader .trader-service-layout {
@@ -158,19 +155,6 @@
     font-size: 22px;
   }
 
-  .mode-trader .chart-layout-grid {
-    grid-template-columns: 1fr !important;
-    grid-template-rows: repeat(var(--chart-grid-rows, 1), minmax(260px, 1fr)) !important;
-  }
-
-  .mode-trader .chart-workspace-shell {
-    min-height: auto;
-  }
-
-  .mode-trader .chart-pane-shell {
-    min-height: 280px;
-  }
-
   .mode-operator .admin-topbar-center {
     order: 3;
     width: 100%;
@@ -210,6 +194,9 @@
     gap: 8px !important;
   }
 
+  /* .mp-nav-login used to be hidden here, which left a phone with no way to
+     log in from the header at all. It now lives in the mobile menu, so the
+     header keeps just the primary CTA plus the burger. */
   .mode-public .mp-nav-login {
     display: none;
   }
@@ -301,28 +288,8 @@
     border-radius: var(--radius-lg);
   }
 
-  .mode-trader .chart-workspace-shell {
-    border-radius: var(--radius-lg);
-  }
-
-  .mode-trader .chart-workspace-toolbar {
-    padding: 12px;
-  }
-
-  .mode-trader .chart-workspace-body {
-    padding: 10px;
-  }
-
-  .mode-trader .chart-pane-shell {
-    min-height: 240px;
-  }
-
   .mode-trader .trading-layout {
     gap: 14px;
-  }
-
-  .mode-trader .trading-chart-shell {
-    height: min(320px, 70vh);
   }
 
   .mode-trader .trader-service-layout {

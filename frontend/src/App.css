@@ -35,6 +35,7 @@ body {
   font-size: 14px;
   line-height: 1.6;
   min-height: 100vh;
+  min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.3s ease, color 0.3s ease;
@@ -43,6 +44,7 @@ body {
 
 #root {
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -179,7 +181,48 @@ h1, h2, h3, h4, h5, h6 {
   background-image:
     radial-gradient(ellipse 600px 400px at 20% 40%, var(--glow-primary), transparent),
     radial-gradient(ellipse 400px 300px at 80% 60%, var(--glow-success), transparent);
-  overflow: hidden;
+  /* `hidden` here (with the page's centred flex column) clipped tall auth
+     cards on short viewports with no way to scroll to them. `clip` keeps the
+     decorative orbs contained on the x-axis while leaving the page scrollable
+     on the y-axis. */
+  overflow-x: clip;
+}
+
+/* Auto margins centre the card while it fits and yield to scrolling when it
+   does not — the safe replacement for justify-content: center. */
+.auth-shell > .auth-glass-card,
+.auth-shell > .lx-card {
+  margin-block: auto;
+}
+
+/* "← Back to Home". Pinned to the corner on desktop; on a narrow screen it
+   overlapped AuthMasthead, so below `md` it returns to normal flow above the
+   card. bp: md (768px) — see src/styles/breakpoints.js */
+.auth-back-link {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  display: inline-block;
+  z-index: 20;
+}
+@media (max-width: 767px) {
+  .auth-back-link {
+    position: static;
+    align-self: flex-start;
+    margin-bottom: var(--space-3);
+    min-height: var(--touch-min);
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+/* The two 500px blur(80px) orbs are pure decoration and a real compositing
+   cost on a mobile GPU. Keep the tint, drop the animated blur. */
+@media (max-width: 767px) {
+  .auth-ambient-primary,
+  .auth-ambient-secondary {
+    display: none;
+  }
 }
 
 .auth-ambient {
@@ -395,6 +438,16 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 15px;
   transition: border-color 0.2s ease;
   outline: none;
+}
+
+/* iOS Safari auto-zooms the viewport when a focused control is under 16px and
+   does not zoom back out. 15px above is one pixel into that trap.
+   bp: md (768px) — see src/styles/breakpoints.js */
+@media (max-width: 767px) {
+  .input-field, .select-field, .textarea-field {
+    font-size: var(--input-font-mobile);
+    min-height: var(--touch-min);
+  }
 }
 
 .select-field option,
@@ -620,7 +673,7 @@ h1, h2, h3, h4, h5, h6 {
 .data-table td.mono { font-family: var(--font-mono); }
 
 /* Layout Structure */
-.dashboard-layout { display: flex; min-height: 100vh; background: var(--bg-base); }
+.dashboard-layout { display: flex; min-height: 100vh; min-height: 100dvh; background: var(--bg-base); }
 .dashboard-main {
   flex: 1;
   padding: 0;
@@ -655,11 +708,53 @@ h1, h2, h3, h4, h5, h6 {
   padding-top: 10px;
 }
 
+/* Grid and flex items default to `min-width: auto`, meaning they refuse to
+   shrink below their content's minimum width. On a phone that is how a single
+   wide row (a bar strip, a nowrap table) silently widens its whole page. These
+   are the trader dashboard's top-level content containers, so capping their
+   direct children here contains the damage to the one element that is actually
+   too wide — which can then scroll inside its own wrapper. */
+.dashboard-page-stack > *,
+.analytics-page > *,
+.dashboard-page-content > * {
+  min-width: 0;
+}
+
 .analytics-page {
   display: grid;
+  /* minmax(0,1fr), not the implicit `auto`: an auto grid column sizes to its
+     widest child's min-content, so a single wide row (the weekday P&L bars,
+     a table) stretched the whole page past the viewport and dragged every
+     descendant out with it. This caps the column at the container and makes
+     wide children scroll inside their own wrapper instead. */
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: 22px;
 }
+
+/* Bar strips (P&L by weekday, R-multiple distribution). Each column is
+   `flex: 1` but carries a mono value label, and a flex item will not shrink
+   below its content — seven of those need ~480px, which is what widened the
+   whole Analytics page on a phone. Give the strip a legible minimum and let it
+   scroll inside itself rather than stretching the page. */
+.bar-strip {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding-top: 10px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.bar-strip::-webkit-scrollbar { display: none; }
+/* Wide enough for a full currency label ("-$1,234.56" at 10px mono ≈ 62px), so
+   adjacent bars' values never run into each other. */
+.bar-strip > * {
+  flex: 1 0 auto;
+  min-width: 68px;
+}
+.bar-strip > * > div { white-space: nowrap; }
 
 .analytics-history-wrapper {
   background: transparent;
@@ -880,6 +975,7 @@ h1, h2, h3, h4, h5, h6 {
   top: 42px;
   width: min(320px, calc(100vw - 32px));
   max-height: min(400px, 60vh);
+  max-height: min(400px, 60dvh);
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -936,18 +1032,50 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--nav-bg); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   border-top: 1px solid var(--border);
   z-index: 1000;
-  justify-content: flex-start;
-  overflow-x: auto;
-  padding-bottom: env(safe-area-inset-bottom);
-  scrollbar-width: none;
+  /* Was flex-start + overflow-x: auto with a 78px min per tab, so six tabs
+     needed 468px and the bar scrolled sideways on every phone with no
+     affordance that it did. The tabs now share the width instead. */
+  justify-content: space-between;
+  padding-bottom: var(--safe-bottom);
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
 }
-.sidebar-mobile-bottom::-webkit-scrollbar { display: none; }
 .mobile-tab-btn {
-  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  min-width: 78px;
-  padding: 8px 8px 6px;
+  flex: 1 1 0; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: var(--touch-min);
+  padding: 8px 4px 6px;
   border: none; outline: none; cursor: pointer; transition: var(--transition);
 }
+/* Labels shrink before the row does; the icon carries the meaning. */
+.mobile-tab-btn > span:last-child {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Trader "More" sheet list — markup lives in Sidebar.jsx, behaviour in
+   ui/BottomSheet.jsx. */
+.sidebar-more-group { padding: 10px 16px 4px; }
+.sidebar-more-group__label {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+}
+.sidebar-more-item {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  min-height: var(--touch-min);
+  padding: 11px 4px; border: none; background: transparent;
+  border-bottom: 1px solid var(--rule-soft); cursor: pointer; text-align: left;
+  color: var(--ink);
+}
+.sidebar-more-item[aria-current='page'] { color: var(--accent); }
+.sidebar-more-item__icon { position: relative; display: inline-flex; flex-shrink: 0; }
+.sidebar-more-item__dot {
+  position: absolute; top: -2px; right: -4px;
+  width: 7px; height: 7px; border-radius: 50%;
+}
+.sidebar-more-item__label { flex: 1; font-size: 14px; }
 
 .trading-panel {
   width: 100%;
@@ -1042,6 +1170,86 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--glass-2);
   border: 1px solid var(--rule-soft);
   box-shadow: inset 0 1px 0 var(--glass-hi);
+}
+
+/* ── Support chat: three panes on desktop, two views on a phone ──────────────
+   The 240px + 300px rails plus a centre pane guaranteed a sideways page scroll
+   on every phone. Below `md` the layout becomes the standard chat pattern —
+   one pane at a time, list → thread — driven by data-mobile-view on the shell.
+   The meta rail rides under the thread rather than claiming a third column. */
+.chat-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 300px;
+  gap: 16px;
+  align-items: start;
+  height: calc(100vh - 150px);
+  height: calc(100dvh - 150px);
+}
+.chat-back { display: none; }
+
+/* bp: lg (1024px) — drop the meta rail first; it is the least load-bearing. */
+@media (max-width: 1023px) {
+  .chat-layout { grid-template-columns: 220px minmax(0, 1fr); }
+  .chat-pane--meta { display: none; }
+}
+
+/* bp: md (768px) — one pane at a time. */
+@media (max-width: 767px) {
+  .chat-layout {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+    min-height: calc(100dvh - 210px);
+  }
+  .chat-layout[data-mobile-view='list'] .chat-pane--thread { display: none; }
+  .chat-layout[data-mobile-view='thread'] .chat-pane--list { display: none; }
+  .chat-layout[data-mobile-view='thread'] .chat-pane--meta { display: flex; }
+  .chat-layout .chat-pane { height: auto; min-height: 60dvh; }
+
+  .chat-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--touch-min);
+    min-height: var(--touch-min);
+    margin-left: -10px;
+    background: transparent;
+    border: none;
+    color: var(--ink);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+  }
+}
+
+/* Pending order types (Buy/Sell Limit, Buy/Sell Stop). Collapses to one column
+   at 640px — see the mobile block near the end of this file. */
+.order-panel-type-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+/* Risk / Reward / Ratio. Three currency figures at ~85px per column clip a
+   value like -$1,234.56, so below the phone breakpoint they stack into rows
+   instead. Declared here rather than inline in OrderPanel.jsx precisely so a
+   media query can reach it. */
+.order-panel-rr-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+/* bp: sm (480px) — see src/styles/breakpoints.js */
+@media (max-width: 479px) {
+  .order-panel-rr-grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .order-panel-rr-grid > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
 }
 
 .order-panel-mode-toggle {
@@ -1373,8 +1581,11 @@ h1, h2, h3, h4, h5, h6 {
 @media (max-width: 1024px) {
   .dashboard-main, .dashboard-main.sidebar-collapsed { margin-left: 0; padding: 80px 16px 88px; }
   .dashboard-page-content { padding: 0 4px 24px; }
+  /* Below 1024px the trader sidebar is replaced by the bottom tab bar plus the
+     "More" sheet (Sidebar.jsx), so it stays off-screen. There used to be a
+     `.sidebar.mobile-open` rule here implying a drawer, but nothing ever
+     applied that class — removed rather than left to mislead. */
   .sidebar { transform: translateX(-100%); }
-  .sidebar.mobile-open { transform: translateX(0); box-shadow: var(--shadow-lg); }
   .grid-4 { grid-template-columns: repeat(2, 1fr); }
   .grid-6 { grid-template-columns: repeat(3, 1fr); }
   .dashboard-topbar {
@@ -1491,12 +1702,11 @@ h1, h2, h3, h4, h5, h6 {
     grid-template-columns: 1fr 1fr;
     padding: 14px;
   }
-  .order-panel-rr-grid {
-    grid-template-columns: repeat(3, 1fr) !important;
-    gap: 4px !important;
-  }
+  /* The rr-grid override that used to sit here forced three columns with
+     !important *inside* the mobile query — the opposite of what a phone needs.
+     Its stacking rule now lives with the base class above. */
   .order-panel-type-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: 1fr;
   }
   .analytics-history-table {
     min-width: 620px;
@@ -1509,12 +1719,6 @@ h1, h2, h3, h4, h5, h6 {
   }
   .terminal-section-card {
     padding: 16px;
-  }
-  .trading-chart-shell {
-    height: 300px;
-  }
-  .mobile-tab-btn {
-    min-width: 72px;
   }
 }
 

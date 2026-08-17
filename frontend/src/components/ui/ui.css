@@ -93,10 +93,16 @@
   border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
   box-shadow: var(--elev);
-  padding: 20px 18px;
+  /* Fluid so a card keeps usable interior width on a 375px viewport: 40px of
+     fixed padding out of ~335px of content was a sixth of the card. */
+  padding: clamp(14px, 3.4vw, 20px) clamp(12px, 3vw, 18px);
   transition: border-color 0.16s ease;
 }
-.lx-card:hover { border-color: var(--accent); }
+/* Hover-only affordance — on touch there is no hover, and an un-guarded :hover
+   sticks after a tap until the user taps elsewhere. */
+@media (hover: hover) {
+  .lx-card:hover { border-color: var(--accent); }
+}
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .lx-card { background: var(--paper-2); }
 }
@@ -282,8 +288,19 @@ textarea.lx-field__control { resize: vertical; min-height: 84px; }
 .lx-field__reveal:hover { color: var(--ink); }
 
 /* ── Table ────────────────────────────────────────────────────────────────── */
-.lx-table-wrap { width: 100%; overflow-x: auto; }
+.lx-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
 .lx-table { width: 100%; border-collapse: collapse; text-align: left; }
+/* Without a floor the table just squashes inside its scroller — six columns of
+   two-character cells rather than a scrollable, readable table.
+   bp: md (768px) — see src/styles/breakpoints.js */
+@media (max-width: 767px) {
+  .lx-table { min-width: 560px; }
+}
 .lx-table thead th {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -303,7 +320,6 @@ textarea.lx-field__control { resize: vertical; min-height: 84px; }
   vertical-align: middle;
 }
 .lx-table tbody tr:last-child td { border-bottom: none; }
-.lx-table tbody tr:hover td { background: var(--paper-2); }
 .lx-table .lx-num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -316,7 +332,197 @@ textarea.lx-field__control { resize: vertical; min-height: 84px; }
   font-size: 13px;
 }
 
+/* ── Card mode (Table mobileCard) ──
+   Below `md`, a record-per-row table becomes a stack of cards. Exactly one of
+   the two representations is displayed, never both. */
+.lx-cards { display: none; }
+/* bp: md (768px) — see src/styles/breakpoints.js */
+@media (max-width: 767px) {
+  .lx-table-wrap--cards {
+    overflow-x: visible;
+  }
+  .lx-table-wrap--cards > .lx-table { display: none; }
+  .lx-table-wrap--cards > .lx-cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+}
+.lx-card-row {
+  display: block;
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--rule);
+  background: var(--paper-2);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+button.lx-card-row { cursor: pointer; }
+button.lx-card-row:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.lx-card-row__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--rule-soft);
+}
+.lx-card-row__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+.lx-card-row__fields > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.lx-card-row__fields dt {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.lx-card-row__fields dd {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* bp: sm (480px) */
+@media (max-width: 479px) {
+  .lx-card-row__fields { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* ── Badge ────────────────────────────────────────────────────────────────── */
+/* ── Bottom sheet ─────────────────────────────────────────────────────────────
+   Touch counterpart to the right-hand Drawer. z-index sits above the trader
+   bottom nav (200) so a sheet opened from it is not clipped. */
+.lx-sheet-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1900;
+}
+.lx-sheet-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+}
+.lx-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border-top: 1px solid var(--rule);
+  box-shadow: var(--elev-lg);
+  /* Clears the home indicator on notched devices — real only because
+     index.html sets viewport-fit=cover. */
+  padding-bottom: var(--safe-bottom);
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+.lx-sheet__grip {
+  width: 36px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--rule);
+  margin: var(--space-2) auto var(--space-1);
+  flex: none;
+}
+.lx-sheet__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--rule-soft);
+  flex: none;
+}
+.lx-sheet__title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.lx-sheet__subtitle {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: var(--space-1);
+}
+.lx-sheet__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  margin: calc(var(--space-2) * -1);
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.lx-sheet__close:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+.lx-sheet__body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Contain the scroll chain so flicking past the end of the sheet does not
+     start scrolling the page underneath it. */
+  overscroll-behavior: contain;
+}
+.lx-sheet__body--padded { padding: var(--space-4); }
+
+/* ── Filter chip ──────────────────────────────────────────────────────────────
+   Single-select pill row. Moved out of FilterChips.jsx's inline styles so the
+   touch-target rule below can reach it — an inline style cannot be widened by
+   a media query. */
+.lx-chip-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-5);
+}
+.lx-chip {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+.lx-chip[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--paper);
+}
+.lx-chip:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
 /* Status pill — driven entirely by the shared ACCOUNT_STATUSES lookup
    (utils/constants.js) via the StatusBadge component. One markup, every
    trader-facing status: mono, uppercase, bordered, never filled. */
@@ -336,4 +542,43 @@ textarea.lx-field__control { resize: vertical; min-height: 84px; }
 
 @media (prefers-reduced-motion: reduce) {
   .lx-btn, .lx-field__control { transition: none; }
+}
+
+/* ── Touch ──────────────────────────────────────────────────────────────────
+   Scoped to `pointer: coarse` so desktop density is untouched. The primitives
+   below were all sized for a mouse: .lx-btn--sm resolved to roughly 22px tall
+   (4px padding + 12px text + line-height 1), which is half the platform
+   minimum and is the size of every table row action and the order panel's
+   Market/Pending toggle. */
+@media (pointer: coarse) {
+  .lx-btn {
+    min-height: var(--touch-min);
+  }
+  .lx-btn--sm {
+    /* Keep the compact typography — grow the hit area, not the label. */
+    padding: var(--space-2) var(--space-4);
+  }
+  .lx-field__control {
+    min-height: var(--touch-min);
+  }
+
+  .lx-chip {
+    min-height: var(--touch-min);
+  }
+}
+
+/* iOS Safari zooms the viewport whenever a focused form control renders below
+   16px, and never zooms back out — the single most disruptive mobile defect in
+   a trading form. Applied by width rather than `pointer: coarse` because the
+   zoom behaviour is viewport-driven.
+   bp: md (768px) — see src/styles/breakpoints.js */
+@media (max-width: 767px) {
+  .lx-field__control,
+  .lx-field__control::placeholder {
+    font-size: var(--input-font-mobile);
+  }
+}
+
+@media (hover: hover) {
+  .lx-table tbody tr:hover td { background: var(--paper-2); }
 }

@@ -129,6 +129,21 @@
   --shell-gutter-x: clamp(16px, 2vw, 32px);
   --shell-gutter-y: clamp(16px, 2.4vw, 28px);
 
+  /* ── Touch ergonomics ──
+     --touch-min is the WCAG 2.5.5 / platform-HIG minimum hit area; applied to
+     controls under `pointer: coarse` only, so desktop density is unchanged.
+     --input-font-mobile must stay >= 16px: iOS Safari auto-zooms the viewport
+     when a focused field is smaller, and does not zoom back out. */
+  --touch-min: 44px;
+  --input-font-mobile: 16px;
+
+  /* Safe-area passthroughs. These resolve to real values only because
+     index.html sets viewport-fit=cover. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
   --bg-base: var(--color-bg-base);
   --bg-surface: var(--color-surface-glass);
   --bg-elevated: var(--color-surface-elevated);

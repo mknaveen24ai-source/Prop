@@ -28,3 +28,64 @@
 .mode-public .nav-transparent.scrolled {
   background: var(--nav-bg);
 }
+
+/* ── Header navigation swap ───────────────────────────────────────────────────
+   The desktop link row and the mobile menu trigger are mutually exclusive, so
+   both rules live here rather than being split across responsive.css. App.css
+   imports public.css *after* responsive.css, so a reveal placed there would be
+   overridden by the base rule here — and that ordering trap is what the old
+   `display: none !important` on .mp-nav-links was papering over.
+   bp: lg (1024px) — see src/styles/breakpoints.js */
+.mode-public .mp-nav-links {
+  display: flex;
+  gap: 28px;
+  align-items: center;
+}
+
+.mode-public .mp-nav-burger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch-min);
+  min-height: var(--touch-min);
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+@media (max-width: 1023px) {
+  .mode-public .mp-nav-links { display: none; }
+  .mode-public .mp-nav-burger { display: inline-flex; }
+}
+.mode-public .mp-nav-burger:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+.mp-menu {
+  display: flex;
+  flex-direction: column;
+}
+.mp-menu__link {
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-min);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--rule-soft);
+  color: var(--text-primary);
+  text-decoration: none;
+  font-family: var(--font-ui);
+  font-size: 15px;
+}
+.mp-menu__actions {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+}
+.mp-menu__actions > .btn {
+  width: 100%;
+  min-height: 48px;
+  justify-content: center;
+  text-decoration: none;
+}
