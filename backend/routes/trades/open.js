@@ -15,6 +15,8 @@ const newsService = require('../../services/newsService')
 const { authenticateToken } = require('../middleware')
 const { v4: uuidv4 } = require('uuid')
 const { tradingLimiter } = require('../../utils/security')
+const { getRequestIp } = require('../../utils/requestIp')
+const { recordRequestSignals } = require('../../services/identitySignals')
 const { isValidLotSize, sanitizeString } = require('../../utils/validation')
 const {
   FOREX_INSTRUMENTS,
@@ -92,7 +94,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
 
     // FIX (BUG-C002): tradeIp was never declared in this handler — caused
     // ReferenceError when inserting into trade_logs on every trade open.
-    const tradeIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown'
+    const tradeIp = getRequestIp(req)
 
     // Sanitize inputs
     const sanitizedInstrument = sanitizeString(String(instrument).toUpperCase(), 10)
@@ -217,6 +219,74 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
         return res.status(400).json({ error: 'Challenge phase has expired. No new trades allowed.' })
       }
 
+      // ─────────────────────────────────────────────────────────────────────────
+      // Pre-trade snapshot — every read-only check in ONE round trip.
+      //
+      // These were seven sequential queries, each a full client→Postgres→client
+      // round trip taken WHILE HOLDING the account row lock above. That serialises
+      // per account, so the lock hold time is the ceiling on how fast one trader
+      // can place orders, and every trip is pool time nobody else can use. At the
+      // open rates this platform is being scaled for, it is the write path's
+      // dominant cost.
+      //
+      // They stay INSIDE the transaction, after the FOR UPDATE. That is not
+      // incidental — it is the whole reason these limits hold. Moving them before
+      // BEGIN would let two concurrent opens both read "4 of 5 positions used" and
+      // both insert, putting the account over its cap. Fewer round trips is worth
+      // having; a race on an exposure limit is not.
+      //
+      // Every sub-select runs unconditionally, even when the corresponding rule is
+      // switched off. They are all single-account, index-backed lookups, so paying
+      // for one that will be ignored is far cheaper than the round trip that
+      // conditionality would cost.
+      // ─────────────────────────────────────────────────────────────────────────
+      const oppositeDirection = directionFinal === 'buy' ? 'sell' : 'buy'
+      const exposureGroup = COMMODITY_INSTRUMENTS.includes(instrumentFinal)
+        ? COMMODITY_INSTRUMENTS
+        : FOREX_INSTRUMENTS.includes(instrumentFinal)
+          ? FOREX_INSTRUMENTS
+          : []
+
+      const snapshot = (await client.query(
+        `SELECT
+           (SELECT 1 FROM trades
+             WHERE account_id = $1 AND instrument = $2 AND direction = $3
+               AND status IN ('open', 'pending') LIMIT 1)                       AS opposite_open,
+
+           (SELECT 1 FROM trades
+             WHERE account_id = $1 AND instrument = $2 AND direction = $4
+               AND status IN ('open', 'pending') LIMIT 1)                       AS same_direction_open,
+
+           (SELECT json_build_object('lot_size', lot_size, 'demo_pnl', demo_pnl)
+              FROM trades
+             WHERE account_id = $1 AND instrument = $2 AND direction = $4
+               AND status = 'closed'
+             ORDER BY close_time DESC LIMIT 1)                                  AS last_closed_setup,
+
+           (SELECT COUNT(*)::int FROM trade_logs
+             WHERE account_id = $1
+               AND logged_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')
+               AND logged_at <  date_trunc('day', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 day')
+                                                                                AS trades_today,
+
+           (SELECT COALESCE(SUM(lot_size), 0) FROM trades
+             WHERE account_id = $1 AND instrument = ANY($5::text[])
+               AND status IN ('open', 'pending'))                               AS exposure_lots,
+
+           (SELECT COUNT(*)::int FROM trades
+             WHERE account_id = $1 AND status IN ('open', 'pending'))           AS open_or_pending_count,
+
+           (SELECT COALESCE(json_agg(json_build_object(
+                     'direction',  direction,
+                     'open_price', open_price,
+                     'lot_size',   lot_size,
+                     'instrument', instrument,
+                     'commission', commission)), '[]'::json)
+              FROM trades
+             WHERE account_id = $1 AND status = 'open')                         AS open_trades`,
+        [accountIdStr, instrumentFinal, oppositeDirection, directionFinal, exposureGroup]
+      )).rows[0]
+
       // ── Trading-restriction flags from the account's challenge model ──────────
       // no_ea_bots is intentionally not enforced here — there is no reliable
       // server-side signal (e.g. client fingerprinting) to distinguish bot-driven
@@ -224,48 +294,25 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       if (account.challenge_model_slug) {
         const model = await fetchStepModelBySlug(account.challenge_model_slug)
         if (model) {
-          if (model.no_hedging) {
-            const oppositeDirection = directionFinal === 'buy' ? 'sell' : 'buy'
-            const hedgeCheck = await client.query(
-              `SELECT 1 FROM trades
-               WHERE account_id = $1 AND instrument = $2 AND direction = $3
-                 AND status IN ('open', 'pending') LIMIT 1`,
-              [accountIdStr, instrumentFinal, oppositeDirection]
-            )
-            if (hedgeCheck.rows.length > 0) {
-              await client.query('ROLLBACK')
-              return res.status(400).json({
-                error: `Hedging is not allowed on this account. Close your existing ${instrumentFinal} position before opening the opposite direction.`
-              })
-            }
+          if (model.no_hedging && snapshot.opposite_open) {
+            await client.query('ROLLBACK')
+            return res.status(400).json({
+              error: `Hedging is not allowed on this account. Close your existing ${instrumentFinal} position before opening the opposite direction.`
+            })
           }
 
           // Simplified enforcement: one open/pending position per instrument+direction.
-          if (model.no_grid_trading) {
-            const gridCheck = await client.query(
-              `SELECT 1 FROM trades
-               WHERE account_id = $1 AND instrument = $2 AND direction = $3
-                 AND status IN ('open', 'pending') LIMIT 1`,
-              [accountIdStr, instrumentFinal, directionFinal]
-            )
-            if (gridCheck.rows.length > 0) {
-              await client.query('ROLLBACK')
-              return res.status(400).json({
-                error: `Grid trading is not allowed on this account. You already have an open or pending ${directionFinal} order on ${instrumentFinal}.`
-              })
-            }
+          if (model.no_grid_trading && snapshot.same_direction_open) {
+            await client.query('ROLLBACK')
+            return res.status(400).json({
+              error: `Grid trading is not allowed on this account. You already have an open or pending ${directionFinal} order on ${instrumentFinal}.`
+            })
           }
 
           // Simplified enforcement: can't size up on the same instrument+direction
           // right after that setup closed at a loss (classic doubling-down pattern).
           if (model.no_martingale) {
-            const lastClosed = await client.query(
-              `SELECT lot_size, demo_pnl FROM trades
-               WHERE account_id = $1 AND instrument = $2 AND direction = $3 AND status = 'closed'
-               ORDER BY close_time DESC LIMIT 1`,
-              [accountIdStr, instrumentFinal, directionFinal]
-            )
-            const lastRow = lastClosed.rows[0]
+            const lastRow = snapshot.last_closed_setup
             if (lastRow && parseFloat(lastRow.demo_pnl) < 0 && lotsNum > parseFloat(lastRow.lot_size)) {
               await client.query('ROLLBACK')
               return res.status(400).json({
@@ -277,15 +324,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       }
 
       if (rules.maxDailyTrades > 0) {
-        const dailyTradesResult = await client.query(
-          `SELECT COUNT(*)::int AS count
-           FROM trade_logs
-           WHERE account_id = $1
-             AND logged_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')
-             AND logged_at < date_trunc('day', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 day'`,
-          [accountIdStr]
-        )
-        const tradesToday = parseInt(dailyTradesResult.rows[0].count || 0, 10)
+        const tradesToday = parseInt(snapshot.trades_today || 0, 10)
         if (tradesToday >= rules.maxDailyTrades) {
           await client.query('ROLLBACK')
           return res.status(400).json({
@@ -304,15 +343,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
 
       if (COMMODITY_INSTRUMENTS.includes(instrumentFinal)) {
         const maxCommodityLots = parseFloat((accountSizeK * rules.commodityLotsPer1k).toFixed(4))
-        const existingResult   = await client.query(
-          `SELECT COALESCE(SUM(lot_size), 0) as total_lots
-           FROM trades
-           WHERE account_id = $1
-             AND instrument = ANY($2::text[])
-             AND status IN ('open', 'pending')`,
-          [accountIdStr, COMMODITY_INSTRUMENTS]
-        )
-        const currentLots = parseFloat(existingResult.rows[0].total_lots)
+        const currentLots = parseFloat(snapshot.exposure_lots)
         if (parseFloat((currentLots + lotsNum).toFixed(4)) > maxCommodityLots) {
           await client.query('ROLLBACK')
           return res.status(400).json({
@@ -321,15 +352,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
         }
       } else if (FOREX_INSTRUMENTS.includes(instrumentFinal)) {
         const maxForexLots   = parseFloat((accountSizeK * rules.forexLotsPer1k).toFixed(4))
-        const existingResult = await client.query(
-          `SELECT COALESCE(SUM(lot_size), 0) as total_lots
-           FROM trades
-           WHERE account_id = $1
-             AND instrument = ANY($2::text[])
-             AND status IN ('open', 'pending')`,
-          [accountIdStr, FOREX_INSTRUMENTS]
-        )
-        const currentLots = parseFloat(existingResult.rows[0].total_lots)
+        const currentLots = parseFloat(snapshot.exposure_lots)
         if (parseFloat((currentLots + lotsNum).toFixed(4)) > maxForexLots) {
           await client.query('ROLLBACK')
           return res.status(400).json({
@@ -350,11 +373,7 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       // scaling multiplier so a funded account's raised capacity applies here
       // too. Zero or negative disables it, matching maxDailyTrades.
       const maxOpenTrades = rules.maxOpenPositions
-      const openTradeCountResult = await client.query(
-        `SELECT COUNT(*) FROM trades WHERE account_id = $1 AND status IN ('open', 'pending')`,
-        [accountIdStr]
-      )
-      const currentOpenCount = parseInt(openTradeCountResult.rows[0].count)
+      const currentOpenCount = parseInt(snapshot.open_or_pending_count, 10)
 
       // FIX (M-01): max_trades_per_1k was stored in platform_settings, shown in
       // the admin settings UI, returned to traders via /api/accounts, and loaded
@@ -388,12 +407,10 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
       
       let floatingPnl = new Decimal(0)
       const livePrices = await getCurrentPricesForTenant()
-      const openTradesResult = await client.query(
-        `SELECT t.direction, t.open_price, t.lot_size, t.instrument, t.commission
-         FROM trades t
-         WHERE t.account_id = $1 AND t.status = 'open'`,
-        [accountIdStr]
-      )
+      // Read in the same snapshot query above, under the same lock. json_agg
+      // renders numerics as JSON numbers rather than the strings a normal row
+      // gives, which the parseFloat calls below already tolerate.
+      const openTradesResult = { rows: snapshot.open_trades || [] }
       for (const t of openTradesResult.rows) {
         const livePrice = livePrices[t.instrument]
         if (!livePrice) continue
@@ -537,6 +554,14 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
         }
         await client.query('COMMIT')
 
+        // Fire-and-forget, and only after COMMIT — a fraud signal must never
+        // hold a trade transaction open or fail an order.
+        recordRequestSignals(req.user.userId, {
+          ip: tradeIp,
+          deviceSignature: req.deviceSignature,
+          context: 'trade'
+        })
+
         const tradeRow = newTrade.rows[0]
 
         // Keep the engine's in-memory index in step with what was just written,
@@ -651,6 +676,13 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
     } finally {
       client.release()
     }
+
+    // Fire-and-forget, post-COMMIT — see the pending-order path above.
+    recordRequestSignals(req.user.userId, {
+      ip: tradeIp,
+      deviceSignature: req.deviceSignature,
+      context: 'trade'
+    })
 
     const tradeRow = newTrade.rows[0]
 

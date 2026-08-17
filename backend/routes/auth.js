@@ -9,13 +9,15 @@ const pool     = require('../db')
 const { authenticateToken, authenticatePre2FA } = require('./middleware')
 const { enqueuePasswordResetEmail, enqueueWelcomeOnboardingEmail } = require('../utils/emailQueue')
 const { passwordResetLimiter, createLimiter } = require('../utils/security')
-const { isValidEmail, isValidPassword, sanitizeString } = require('../utils/validation')
+const { isValidEmail, isValidPassword, sanitizeString, isValidUUID } = require('../utils/validation')
 const logger   = require('../utils/logger')
 const totp     = require('../utils/totp')
 const { invalidateTokenCache } = require('../utils/tokenCache')
 const { CURRENT_TOS_VERSION } = require('../utils/tosVersion')
 const { resolveAffiliateCode } = require('../utils/affiliates')
 const { generateTraderUid } = require('../utils/traderIds')
+const { getRequestIp } = require('../utils/requestIp')
+const { recordRequestSignals } = require('../services/identitySignals')
 require('../loadEnv')
 
 
@@ -153,12 +155,27 @@ router.post('/register', registerLimiter, async function(req, res) {
       return res.status(400).json({ error: 'Email already registered' })
     }
 
-    if (device_fingerprint) {
-      const existingDevice = await pool.query(
-        'SELECT id FROM users WHERE device_fingerprint = $1',
-        [device_fingerprint]
+    // Device fingerprint. Prefer the signature recomputed server-side by
+    // utils/deviceSignature.js over anything the body claims — a client-supplied
+    // hash can be set to a fresh value per signup, which would defeat the point.
+    const deviceHash = req.deviceSignature?.hash
+      || (device_fingerprint ? sanitizeString(String(device_fingerprint), 128) : null)
+
+    // This used to 403 outright on ANY device match. That was dead code (the
+    // frontend never sent a fingerprint), and switching it on as-is would have
+    // blocked every household, shared office and library machine — a false
+    // positive here costs a paying customer at the very first step.
+    //
+    // Sharing is now detected, scored and queued for review by
+    // services/accountLinkingService.js instead. The one case still worth a hard
+    // block is ban evasion: a user who was banned coming back on the same device.
+    if (deviceHash) {
+      const bannedOnDevice = await pool.query(
+        `SELECT id FROM users WHERE device_fingerprint = $1 AND is_banned = true LIMIT 1`,
+        [deviceHash]
       )
-      if (existingDevice.rows.length > 0) {
+      if (bannedOnDevice.rows.length > 0) {
+        logger.warn('[register] Blocked signup from a device with a banned account', { deviceHash })
         return res.status(403).json({ error: 'An account already exists from this device' })
       }
     }
@@ -186,7 +203,7 @@ router.post('/register', registerLimiter, async function(req, res) {
         countryTrimmed,
         phone,
         referrer ? referrer.affiliate_code : null,
-        device_fingerprint || null,
+        deviceHash,
         affiliate_code,
         trader_uid,
         sanitizeString(String(signup_source || 'direct'), 100)
@@ -212,12 +229,19 @@ router.post('/register', registerLimiter, async function(req, res) {
       try {
         await pool.query(
           `INSERT INTO user_agreement_acceptances (user_id, tos_version, ip_address) VALUES ($1, $2, $3)`,
-          [user.id, CURRENT_TOS_VERSION, req.ip || null]
+          [user.id, CURRENT_TOS_VERSION, getRequestIp(req, null)]
         )
       } catch (tosErr) {
         logger.warn('Failed to record ToS acceptance:', { error: tosErr.message })
       }
     }
+
+    // Fire-and-forget: never let fraud-signal capture delay or fail a signup.
+    recordRequestSignals(user.id, {
+      ip: getRequestIp(req),
+      deviceSignature: req.deviceSignature,
+      context: 'register'
+    })
 
     const tokenVersion = user.token_version || 1
     const token = jwt.sign(
@@ -329,8 +353,8 @@ router.post('/login', loginLimiter, async function(req, res) {
     setAuthCookie(res, token)
 
     // IP logging — non-fatal
+    const loginIp = getRequestIp(req)
     try {
-      const loginIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown'
       await pool.query(
         `INSERT INTO login_logs (user_id, ip_address, logged_in_at) VALUES ($1, $2, NOW())`,
         [user.id, loginIp]
@@ -338,6 +362,12 @@ router.post('/login', loginLimiter, async function(req, res) {
     } catch (logErr) {
       logger.error('[login_log] Failed to log login IP:', { error: logErr.message })
     }
+
+    recordRequestSignals(user.id, {
+      ip: loginIp,
+      deviceSignature: req.deviceSignature,
+      context: 'login'
+    })
 
     res.json({
       message: 'Login successful',
@@ -655,8 +685,10 @@ router.post('/logout-all', authenticateToken, async function(req, res) {
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 router.get('/profile/:userId', async function(req, res) {
   try {
+    // User ids are UUIDs — the numeric guard rejected any id starting with a
+    // letter, so those traders' public profiles 400'd instead of rendering.
     const { userId } = req.params
-    if (!userId || isNaN(parseInt(userId))) {
+    if (!isValidUUID(String(userId || '').trim())) {
       return res.status(400).json({ error: 'Invalid user ID' })
     }
 
@@ -886,7 +918,7 @@ router.post('/2fa/verify-setup', authenticateToken, async function(req, res) {
 // Also accepts backup codes (same endpoint — tries TOTP first, then backup).
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/2fa/validate', twoFaValidateLimiter, authenticatePre2FA, async function(req, res) {
-  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'unknown'
+  const ip = getRequestIp(req)
 
   // Per-IP rate limit check (5 failures → 15 min lock)
   const rl = totp.checkRateLimit(ip)
@@ -944,6 +976,25 @@ router.post('/2fa/validate', twoFaValidateLimiter, authenticatePre2FA, async fun
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     )
     setAuthCookie(res, fullToken)
+
+    // A 2FA-enabled login produced NO login_logs row at all before this: /login
+    // returns early at the requires2FA branch, well before its IP logging, and
+    // this handler only ever used the IP for the TOTP rate limiter. The platform
+    // was blind to exactly the accounts with the strongest security posture.
+    try {
+      await pool.query(
+        `INSERT INTO login_logs (user_id, ip_address, logged_in_at) VALUES ($1, $2, NOW())`,
+        [user.id, ip]
+      )
+    } catch (logErr) {
+      logger.error('[login_log] Failed to log 2FA login IP:', { error: logErr.message })
+    }
+
+    recordRequestSignals(user.id, {
+      ip,
+      deviceSignature: req.deviceSignature,
+      context: 'login_2fa'
+    })
 
     res.json({
       message: 'Login successful',
