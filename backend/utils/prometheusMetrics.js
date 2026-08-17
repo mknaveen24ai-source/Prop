@@ -50,6 +50,26 @@ const engineTickDuration = new client.Histogram({
   registers: [register]
 })
 
+// ─── Price feed ──────────────────────────────────────────────────────────────
+// Time spent turning a DWX file change into a usable price map: the stat, the
+// read, the parse, and the throttled Postgres persistence when it is due.
+//
+// This sits IN FRONT of the engine tick — the same await chain that ends in
+// onPriceTick — so it is added directly to every stop-loss reaction time, and
+// until now it was the one part of that path with no measurement at all.
+//
+// Read it against propfirm_engine_tick_duration_seconds. If ingest p99 is a
+// small fraction of the tick, the feed is not the problem and moving it to its
+// own process would buy isolation but not latency. If it is comparable or
+// larger, the file parse is the thing to fix first.
+const priceFeedIngestDuration = new client.Histogram({
+  name: 'propfirm_price_feed_ingest_duration_seconds',
+  help: 'Time to read, parse and persist one DWX price file change',
+  labelNames: ['outcome'],
+  buckets: [0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1],
+  registers: [register]
+})
+
 // ─── WebSocket ───────────────────────────────────────────────────────────────
 
 const websocketConnections = new client.Gauge({
@@ -128,6 +148,21 @@ function recordEngineTick(tickType, durationMs) {
   } catch { /* metrics must never break the engine */ }
 }
 
+/**
+ * Record one price-feed ingest.
+ *
+ * @param {string} outcome 'updated' when a new map was produced, otherwise the
+ *   reason it was not ('unchanged', 'no_price_rows', 'market_data_error', ...).
+ *   Labelled because an ingest that bails early is cheap and would otherwise
+ *   drag the useful percentile down.
+ * @param {number} durationMs
+ */
+function recordPriceFeedIngest(outcome, durationMs) {
+  try {
+    priceFeedIngestDuration.observe({ outcome: String(outcome) }, durationMs / 1000)
+  } catch { /* metrics must never break the feed */ }
+}
+
 function setWebsocketConnections(count) {
   try {
     if (typeof count === 'number') websocketConnections.set(count)
@@ -193,6 +228,7 @@ module.exports = {
   register,
   metricsMiddleware,
   recordEngineTick,
+  recordPriceFeedIngest,
   setWebsocketConnections,
   refreshGauges,
   getMetricsText,

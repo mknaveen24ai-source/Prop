@@ -47,10 +47,19 @@ const consoleFormat = winston.format.combine(
   })
 );
 
+// Test runs share these log files with the real app, so fixture accounts
+// (acc-ce-1, trade-race, ...) and deliberately-injected failures were landing in
+// logs/error.log and logs/combined.log alongside production entries — which is
+// how a batch of test-only "[violation-engine] Failed to record violation"
+// lines got triaged as a live incident. Silence every transport under test; the
+// suite asserts on behaviour, never on log output.
+const isTestRun = process.env.NODE_ENV === 'test' || process.argv.includes('--test');
+
 // Create logger instance
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
   levels: logLevels.levels,
+  silent: isTestRun,
   transports: [
     // Console transport for development
     new winston.transports.Console({

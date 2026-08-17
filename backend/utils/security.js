@@ -135,6 +135,24 @@ function createLimiter(name, options = {}) {
   return rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
+    // Every 429 is logged. apiLimiter runs at server.js:211, well before
+    // logger.httpMiddleware at :267, so a throttled request short-circuits
+    // before anything writes it down: http.log showed no trace of it and the
+    // browser just saw requests fail. That invisibility is what made the
+    // dashboard's rate-limit exhaustion look like a backend outage.
+    handler: (req, res, _next, opts) => {
+      logger.warn('Rate limit exceeded', {
+        limiter: name,
+        method: req.method,
+        path: req.originalUrl || req.path,
+        ip: req.ip,
+        limit: opts.limit ?? opts.max,
+        windowMs: opts.windowMs,
+        requestId: req.requestId
+      });
+      const body = typeof opts.message === 'string' ? { error: opts.message } : opts.message;
+      res.status(opts.statusCode).json(body);
+    },
     ...options,
     // Tests run without Redis and assert on counting behaviour directly;
     // MemoryStore is both correct and faster there.
@@ -177,10 +195,30 @@ const tradingLimiter = createLimiter('trading', {
   }
 });
 
-// API endpoint rate limiter
+// API endpoint rate limiter.
+//
+// This is the blunt global ceiling in front of every route (server.js:211), and
+// it is keyed by IP because it runs before cookieParser and before any route's
+// auth middleware — there is no req.user to key on yet, and keying on an
+// unverified token would just hand attackers a fresh bucket per forged string.
+//
+// The old ceiling of 100/min was below what ONE legitimate trader generates.
+// A single dashboard refresh cycle is ~11 requests (my-accounts, stats, rules,
+// open, pending, history, payouts x2, account history, step-models,
+// announcement), and the socket's account_update handler re-runs that cycle on
+// every fill; the Compare Accounts page adds one stats call per account on top.
+// Measured from logs/http.log, an active session peaked at ~160 requests in a
+// minute — and that only counts requests that got PAST the limiter. So traders
+// were throttling themselves out of their own dashboard, and any NAT'd office
+// or campus sharing one IP made it dramatically worse.
+//
+// 1000/min still stops scraping and credential-stuffing volume by a wide
+// margin, while leaving room for several real sessions behind one address.
+// Per-user and per-route limits (tradingLimiter, authLimiter, payout and admin
+// limiters) are the ones doing the precise work; this one only catches floods.
 const apiLimiter = createLimiter('api', {
   windowMs: 60 * 1000, // 1 minute
-  max: 100, // 100 requests per minute per IP
+  max: Number(process.env.API_RATE_LIMIT_MAX) || 1000, // per IP per minute
   message: { error: 'Too many API requests. Please wait before trying again.' },
   standardHeaders: true,
   legacyHeaders: false,

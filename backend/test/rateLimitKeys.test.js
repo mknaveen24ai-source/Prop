@@ -62,15 +62,47 @@ test('ipKeyGenerator normalises IPv6 to a subnet so a /128 rotation cannot evade
 test('the real limiters in utils/security.js enforce their limits', async () => {
   // Exercises the exported middleware rather than a local copy, so a future
   // edit to security.js that reintroduces the bug fails here.
+  //
+  // The ceiling is driven through API_RATE_LIMIT_MAX rather than asserted at
+  // its production value: the point of this test is that the limiter counts at
+  // all (it was silently inert before), not what the tuning number happens to
+  // be. Pinning the number here is what made retuning it look like a
+  // regression. Re-required with a cleared cache because createLimiter reads
+  // the env var once, at module load.
+  const previous = process.env.API_RATE_LIMIT_MAX
+  process.env.API_RATE_LIMIT_MAX = '20'
+  delete require.cache[require.resolve('../utils/security')]
+
+  try {
+    const { apiLimiter } = require('../utils/security')
+    const app = express()
+    app.use(apiLimiter)
+    app.get('/probe', (_req, res) => res.json({ ok: true }))
+
+    // Must not be '/' — apiLimiter's own skip() exempts the root path.
+    const codes = await statuses(app, 25, '/probe')
+    assert.equal(codes.filter((c) => c === 200).length, 20, 'apiLimiter allows exactly its configured max')
+    assert.equal(codes.filter((c) => c === 429).length, 5, 'and rejects the rest')
+  } finally {
+    if (previous === undefined) delete process.env.API_RATE_LIMIT_MAX
+    else process.env.API_RATE_LIMIT_MAX = previous
+    delete require.cache[require.resolve('../utils/security')]
+  }
+})
+
+test('the global API ceiling leaves room for a real dashboard session', async () => {
+  // Regression guard for the actual outage: a single trader's dashboard issues
+  // ~11 requests per refresh cycle and re-runs that cycle on every socket
+  // account_update, so the old 100/min ceiling throttled traders out of their
+  // own account. Anything back down at that order of magnitude is a bug.
+  delete require.cache[require.resolve('../utils/security')]
   const { apiLimiter } = require('../utils/security')
   const app = express()
   app.use(apiLimiter)
   app.get('/probe', (_req, res) => res.json({ ok: true }))
 
-  // Must not be '/' — apiLimiter's own skip() exempts the root path.
-  const codes = await statuses(app, 105, '/probe')
-  assert.equal(codes.filter((c) => c === 200).length, 100, 'apiLimiter allows 100/min')
-  assert.equal(codes.filter((c) => c === 429).length, 5, 'and rejects the rest')
+  const codes = await statuses(app, 200, '/probe')
+  assert.equal(codes.filter((c) => c === 429).length, 0, 'a burst of 200 requests must not be throttled')
 })
 
 test('no source file passes the request object to ipKeyGenerator', () => {

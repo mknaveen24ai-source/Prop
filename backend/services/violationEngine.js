@@ -144,7 +144,19 @@ async function recordEnforcementEvent(clientOrPayload, maybePayload) {
       String(payload.message || '')
     ]
   )
+  // `RETURNING *` on a plain INSERT cannot come back empty against a real
+  // Postgres, so an empty result means the query layer is not what we think it
+  // is (a mocked pool, a row-suppressing trigger). Degrade instead of throwing:
+  // the callers below are audit-trail writers wrapped in safeRecord* helpers,
+  // and a raised TypeError here only buries the actual cause.
   const event = result.rows[0]
+  if (!event) {
+    logger.warn('[violation-engine] Enforcement event insert returned no row; skipping admin broadcast', {
+      action: String(payload.action || 'unknown_action'),
+      accountId: payload.accountId ? String(payload.accountId) : null
+    })
+    return null
+  }
   emitAdminEvent('admin_enforcement_event', event)
   emitAdminEvent('admin_alert', {
     type: 'violation',
@@ -203,7 +215,16 @@ async function recordViolation(input) {
     ]
   )
 
+  // See recordEnforcementEvent — the ON CONFLICT DO UPDATE has no WHERE, so
+  // this always returns a row in production. Guarded for the same reason.
   const violation = result.rows[0]
+  if (!violation) {
+    logger.warn('[violation-engine] Violation insert returned no row; skipping admin broadcast', {
+      violationType: String(payload.violationType || 'unknown_violation'),
+      accountId: payload.accountId ? String(payload.accountId) : null
+    })
+    return null
+  }
   emitAdminEvent('admin_violation_updated', violation)
   emitAdminEvent('admin_alert', {
     type: 'violation',

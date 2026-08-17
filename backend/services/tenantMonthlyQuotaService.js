@@ -1,4 +1,5 @@
 const pool = require('../db')
+const { resolvePromotionTarget } = require('./promotionTarget')
 
 let infrastructureReady = false
 let infrastructurePromise = null
@@ -65,16 +66,15 @@ async function ensureTenantMonthlyQuotaInfrastructure(db = pool) {
   await infrastructurePromise
 }
 
-function getTargetAccountType(fromAccountType) {
-  if (fromAccountType === 'phase1') return 'phase2'
-  if (fromAccountType === 'phase2') return 'funded'
-  return null
-}
-
 async function createPromotionReview(db, acc, { triggeredBy = 'auto_pass', reason = null, requestedByAdminId = null, payload = {} } = {}) {
   await ensureTenantMonthlyQuotaInfrastructure(db)
-  const targetAccountType = getTargetAccountType(String(acc?.account_type || '').toLowerCase())
-  if (!targetAccountType) return null
+  // The local getTargetAccountType that used to live here hardcoded
+  // phase1 -> phase2 and phase2 -> funded, so on a 3-step model the review row
+  // advertised a promotion the approval would not actually perform. Both sides
+  // now read the same resolver.
+  const target = await resolvePromotionTarget(acc)
+  if (!target) return null
+  const targetAccountType = target.targetAccountType
 
   const result = await db.query(
     `INSERT INTO account_promotion_reviews (
@@ -198,7 +198,6 @@ module.exports = {
   ensureTenantMonthlyQuotaInfrastructure,
   getPromotionReviewForUpdate,
   getQuotaMonth,
-  getTargetAccountType,
   listPromotionReviews,
   markPromotionReviewApproved,
   markPromotionReviewRejected

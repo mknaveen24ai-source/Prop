@@ -88,6 +88,19 @@ function resolveMailTransportConfig() {
   }
 }
 
+// Nodemailer's defaults are 2 min to connect, 30 s for the greeting and — the
+// one that matters — 10 min on the socket. The email worker
+// (workers/emailWorker.js) drains its batch serially, so a single wedged SMTP
+// host could stall the whole queue for ten minutes per message while the job
+// row sat in 'sending'. These bound that to well under the 15-minute stale
+// reclaim window in utils/emailQueue.js, so a hung send is retried rather than
+// blocking everything behind it.
+const SMTP_TIMEOUTS = {
+  connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS) || 10000,
+  greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS) || 10000,
+  socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS) || 30000
+}
+
 async function getMailTransporter() {
   if (transporter) return transporter
 
@@ -98,7 +111,8 @@ async function getMailTransporter() {
       host: config.host,
       port: config.port,
       secure: config.secure,
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      ...SMTP_TIMEOUTS
     })
     console.log(`[mail] SMTP: ${config.host}:${config.port}${config.usesBrevo ? ' (Brevo)' : ''}`)
   } else if (config.mode === 'sendgrid') {
@@ -106,7 +120,8 @@ async function getMailTransporter() {
       host: 'smtp.sendgrid.net',
       port: 587,
       secure: false,
-      auth: { user: 'apikey', pass: process.env.SENDGRID_API_KEY }
+      auth: { user: 'apikey', pass: process.env.SENDGRID_API_KEY },
+      ...SMTP_TIMEOUTS
     })
     console.log('[mail] SendGrid SMTP bridge enabled')
   } else {
