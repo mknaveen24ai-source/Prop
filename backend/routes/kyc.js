@@ -10,6 +10,11 @@ const { authenticateToken } = require('./middleware')
 const logger = require('../utils/logger')
 const { encryptFileAtRest, readKycFileBuffer, getKycContentType } = require('../utils/secureKycStorage')
 const { sanitizeString } = require('../utils/validation')
+const {
+  recordSignals,
+  normalizeKycDocument,
+  SIGNAL_TYPES
+} = require('../services/identitySignals')
 
 // Ensure upload directory exists
 const uploadDir = path.join(__dirname, '../uploads/kyc')
@@ -256,6 +261,19 @@ router.post('/upload',
          WHERE id = $7`,
         [idDocRelPath, idDocBackRelPath, selfieRelPath, country, documentType, documentNumber, req.user.userId]
       )
+
+      // A passport re-used across "unrelated" accounts is either the same person
+      // or a rented identity — either way it links them. kyc_document_number has
+      // never had any uniqueness or duplicate check; this records it as a signal
+      // (hashed, scoped by country) so the linking scan can find the reuse.
+      const kycSignal = normalizeKycDocument(documentNumber, country)
+      if (kycSignal) {
+        recordSignals(
+          req.user.userId,
+          [{ type: SIGNAL_TYPES.KYC_DOC, value: kycSignal }],
+          'kyc'
+        )
+      }
 
       // Delete old files AFTER successful DB update — only the ones actually replaced.
       if (existing.id_document_path && existing.id_document_path !== idDocRelPath) {

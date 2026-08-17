@@ -4,6 +4,7 @@
 // they are directly unit-testable. Moved verbatim out of routes/trades.js, where
 // they were ~660 lines serving the single GET /api/trades/analytics endpoint.
 const { CONTRACT_SIZES } = require('../constants')
+const { evaluatePayoutEligibility } = require('../domain/payoutEligibility')
 
 const ANALYTICS_WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const ANALYTICS_WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0]
@@ -535,8 +536,6 @@ function buildBreachAnalysis(account, trades, violations) {
 }
 
 function buildPayoutForecast(account, userProfile, payoutRows, openTradeSummary, tenantSettings, recentTrades) {
-  const accountType = String(account.account_type || '').toLowerCase()
-  const status = String(account.status || '').toLowerCase()
   const sharePct = toFiniteNumber(tenantSettings.profit_share_pct, 80)
   const shareRatio = sharePct / 100
   const minRequestAmount = toFiniteNumber(tenantSettings.min_payout_amount, 50)
@@ -546,7 +545,6 @@ function buildPayoutForecast(account, userProfile, payoutRows, openTradeSummary,
   const realizedProfit = parseFloat((currentBalance - startingBalance).toFixed(2))
   const estimatedPayable = parseFloat((Math.max(0, realizedProfit) * shareRatio).toFixed(2))
   const pendingPayoutCount = (payoutRows || []).filter((row) => String(row.status).toLowerCase() === 'pending').length
-  const hasOpenExposure = (openTradeSummary?.open_count || 0) > 0 || (openTradeSummary?.pending_count || 0) > 0
   const nextMilestoneProfit = shareRatio > 0 ? parseFloat((minRequestAmount / shareRatio).toFixed(2)) : minRequestAmount
   const profitGap = parseFloat(Math.max(0, nextMilestoneProfit - realizedProfit).toFixed(2))
   const recentTrendPnl = parseFloat(
@@ -557,13 +555,22 @@ function buildPayoutForecast(account, userProfile, payoutRows, openTradeSummary,
   )
   const trendLabel = recentTrendPnl > 0 ? 'improving' : recentTrendPnl < 0 ? 'cooling' : 'flat'
 
-  const blockers = []
-  if (accountType !== 'funded') blockers.push('Only funded accounts can request payouts.')
-  if (status !== 'active') blockers.push(`Account status is ${account.status}.`)
-  if ((userProfile?.kyc_status || '').toLowerCase() !== 'approved') blockers.push('KYC approval is still required.')
-  if (hasOpenExposure) blockers.push('All open and pending trades must be closed before requesting a payout.')
-  if (pendingPayoutCount > 0) blockers.push('There is already a pending payout request on this account.')
-  if (estimatedPayable < minRequestAmount) blockers.push(`You need ${parseFloat((minRequestAmount - estimatedPayable).toFixed(2))} more payable profit to clear the minimum payout.`)
+  // Shared with routes/payouts.js (request) and domain/payout.js (approval), so
+  // what the trader is told here is exactly what the two write paths enforce.
+  // These rules used to be written out three times and had drifted: approval
+  // checked almost none of them.
+  //
+  // Flattened to strings because this list is a published API shape the
+  // dashboard renders directly; the predicate returns {code, message} objects.
+  const blockers = evaluatePayoutEligibility({
+    account,
+    kycStatus: userProfile?.kyc_status,
+    openTradeCount: openTradeSummary?.open_count || 0,
+    pendingOrderCount: openTradeSummary?.pending_count || 0,
+    pendingPayoutCount,
+    minRequestAmount,
+    profitSharePct: sharePct
+  }).blockers.map((blocker) => blocker.message)
 
   return {
     eligible_now: blockers.length === 0,
