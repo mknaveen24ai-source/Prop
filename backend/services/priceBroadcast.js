@@ -17,6 +17,7 @@
 
 const logger = require('../utils/logger')
 const priceCache = require('../utils/priceCache')
+const realtimeFanout = require('./realtimeFanout')
 const tradeEngine = require('./tradeEngine')
 const {
   fetchAndStorePrices,
@@ -39,12 +40,6 @@ let lastWatcherEmitAt = 0
 let _io = null // set by startPriceFeedPipeline
 let _engineEnabled = false
 
-// Equity pushes are throttled per user. A busy feed can tick several times a
-// second; the dashboard only needs to feel live, and re-rendering KPI cards more
-// often than this is wasted work on both ends.
-const EQUITY_PUSH_INTERVAL_MS = 500
-const _lastEquityPushAt = new Map()
-
 function engineMode() {
   return String(process.env.ENGINE_MODE || 'interval').trim().toLowerCase()
 }
@@ -53,7 +48,7 @@ async function emitDedicatedFeedPriceUpdate() {
   if (!_io) return
   try {
     const prices = await getCurrentPricesForTenant()
-    _io.emit('price_update', prices)
+    realtimeFanout.broadcastSnapshot(prices)
   } catch (error) {
     logger.error('Dedicated feed price broadcast error:', { error: error.message })
   }
@@ -69,67 +64,34 @@ async function runInitialPriceFeedMaintenance() {
 }
 
 /**
- * Push live equity to the traders whose numbers moved.
- *
- * The dashboard previously had to re-fetch to see balance, drawdown or profit
- * progress change. These snapshots come straight out of the engine tick, so
- * there is no extra query behind them.
- */
-function pushEquityUpdates(io, snapshots) {
-  if (!io || !snapshots || snapshots.length === 0) return
-  const now = Date.now()
-
-  for (const snapshot of snapshots) {
-    const lastPush = _lastEquityPushAt.get(snapshot.accountId) || 0
-    if ((now - lastPush) < EQUITY_PUSH_INTERVAL_MS) continue
-    _lastEquityPushAt.set(snapshot.accountId, now)
-
-    const drawdownUsedPct = snapshot.startingBalance > 0
-      ? ((snapshot.startingBalance - snapshot.equity) / snapshot.startingBalance) * 100
-      : 0
-    const profitTarget = snapshot.profitTarget > 0
-      ? snapshot.profitTarget
-      : snapshot.startingBalance * 0.10
-
-    io.to(String(snapshot.userId)).emit('equity_update', {
-      account_id: snapshot.accountId,
-      equity: snapshot.equity,
-      floating_pnl: snapshot.floatingPnl,
-      current_balance: snapshot.currentBalance,
-      drawdown_floor: snapshot.floor,
-      drawdown_used_pct: Math.max(0, drawdownUsedPct),
-      daily_drawdown_used_pct: snapshot.dailyLossPct,
-      daily_drawdown_limit_pct: snapshot.dailyDrawdownPct,
-      profit_remaining: Math.max(0, profitTarget - (snapshot.equity - snapshot.startingBalance))
-    })
-  }
-
-  // Bound the throttle map — accounts churn as challenges pass and fail.
-  if (_lastEquityPushAt.size > 50000) {
-    for (const [accountId, at] of _lastEquityPushAt) {
-      if ((now - at) > 60000) _lastEquityPushAt.delete(accountId)
-    }
-  }
-}
-
-/**
- * Ingest a tick: update the cache, broadcast, then run the engine.
+ * Ingest a tick: update the cache, queue the broadcast, then run the engine.
  *
  * Only instruments whose bid or ask actually moved are reported as changed. That
  * replaces the old JSON.stringify hash comparison (same "don't re-broadcast
  * identical data" guarantee, without serialising the whole map every tick) and
  * is also what lets the engine scan a few thousand trades instead of all of them.
+ *
+ * ── Two consumers, two cadences ──
+ *
+ * The engine is called on EVERY tick, synchronously with the price that caused
+ * it. That is what keeps SL/TP, drawdown and profit-target reaction at 50-80ms,
+ * and nothing here defers it.
+ *
+ * Browsers are a different matter: realtimeFanout coalesces the delta and sends
+ * it at most a few times a second. This used to be one `io.emit` of the entire
+ * price map to every socket on every tick, which is linear in connections and is
+ * the reason the platform could not carry more than about 1,500 of them.
  */
 async function handlePriceTick(io, basePrices) {
   const changed = await priceCache.updatePrices(basePrices)
   if (changed.length === 0) return
 
-  io.emit('price_update', priceCache.getAllPrices())
+  realtimeFanout.queuePriceDelta(changed)
 
   if (!_engineEnabled) return
   try {
     const result = await tradeEngine.onPriceTick(io, changed)
-    if (result) pushEquityUpdates(io, result.equity)
+    if (result) realtimeFanout.queueEquityUpdates(result.equity)
   } catch (error) {
     logger.error('[priceBroadcast] engine tick error:', { error: error.message })
   }
@@ -224,6 +186,5 @@ function isEngineEnabled() {
 
 module.exports = {
   startPriceFeedPipeline,
-  isEngineEnabled,
-  pushEquityUpdates
+  isEngineEnabled
 }

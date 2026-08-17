@@ -238,6 +238,148 @@ services:
     networks:
       - external
 
+  # ═══════════════════════════════════════════════════════════════════════════
+  # SPLIT ROLES (opt-in) — the topology for 10K+ concurrent traders
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Start with:
+  #     docker compose --profile scaleout up -d --scale gateway=3 --scale api=2
+  #     # and swap the nginx vhost for deploy/nginx/propfirm.scaleout.conf
+  #
+  # OPT-IN, like pgbouncer above. Without the profile none of this starts and
+  # `backend` (ROLE unset → 'all') runs exactly as it always has.
+  #
+  # ── Why the split ──
+  #
+  # The trade index (backend/utils/tradeIndex.js) is in process memory and is
+  # read synchronously inside the tick's scan loop. That is why a 100K-trade tick
+  # costs ~11.5ms, and it is also why there can only ever be ONE engine.
+  #
+  # One process cannot also serve 10,000 websockets: the fan-out is bytes-out
+  # linear in connections. So the engine and the sockets go in different
+  # processes, and only the socket tier is scaled.
+  #
+  # DO NOT scale `engine`. A second one would build its own index, hold a stale
+  # view of trades the first opened and closed, and disagree about floating PnL.
+  # Closes stay correct either way (FOR UPDATE SKIP LOCKED) and the sweeps are
+  # advisory-locked — but nothing would tell you the index had drifted.
+
+  engine:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    profiles: ["scaleout"]
+    container_name: propfirm_engine   # exactly one — naming it makes that literal
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV:     production
+      ROLE:         engine
+      TRUST_PROXY:  ${TRUST_PROXY:-1}
+      # 100K trade entries plus ~30K account entries is 70-100MB of live objects
+      # before V8's own overhead. The default heap is enough today and would not
+      # be at target, and the failure mode is an OOM kill of the one process that
+      # closes stop-losses.
+      NODE_OPTIONS: ${ENGINE_NODE_OPTIONS:---max-old-space-size=4096}
+      DATABASE_URL: postgresql://${DB_USER:-propfirm}:${DB_PASSWORD}@${DB_POOLER_HOST:-postgres}:${DB_POOLER_PORT:-5432}/${DB_NAME:-propfirm}
+      DIRECT_DATABASE_URL: postgresql://${DB_USER:-propfirm}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-propfirm}
+      READ_DATABASE_URL: ${READ_DATABASE_URL:-}
+      REDIS_URL:    redis://:${REDIS_PASSWORD:-redispass}@redis:6379
+      ENGINE_MODE:  ${ENGINE_MODE:-interval}
+      DWX_PATH:     /app/mt5-bridge
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - uploads:/app/uploads
+      - logs:/app/logs
+      - ${MT5_BRIDGE_PATH:-./deploy/mt5-bridge}:/app/mt5-bridge
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5000/api/health >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+      - external
+
+  # Socket tier. This is the service you add replicas of when more traders log
+  # in. No index, no schedulers, no price feed — it receives price deltas and
+  # batched equity over Redis and writes them to its own connections.
+  gateway:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    profiles: ["scaleout"]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV:     production
+      ROLE:         gateway
+      TRUST_PROXY:  ${TRUST_PROXY:-1}
+      DATABASE_URL: postgresql://${DB_USER:-propfirm}:${DB_PASSWORD}@${DB_POOLER_HOST:-postgres}:${DB_POOLER_PORT:-5432}/${DB_NAME:-propfirm}
+      DIRECT_DATABASE_URL: postgresql://${DB_USER:-propfirm}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-propfirm}
+      # Redis is not optional here: it is the only path from the engine to these
+      # traders. Without it a gateway accepts connections and sends nothing.
+      REDIS_URL:    redis://:${REDIS_PASSWORD:-redispass}@redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    # Each socket is a file descriptor, and the container limit is reached long
+    # before the process is busy.
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5000/api/health >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+      - external
+
+  # HTTP tier. Stateless — scale it on CPU like any other web tier.
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    profiles: ["scaleout"]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV:     production
+      ROLE:         api
+      TRUST_PROXY:  ${TRUST_PROXY:-1}
+      DATABASE_URL: postgresql://${DB_USER:-propfirm}:${DB_PASSWORD}@${DB_POOLER_HOST:-postgres}:${DB_POOLER_PORT:-5432}/${DB_NAME:-propfirm}
+      DIRECT_DATABASE_URL: postgresql://${DB_USER:-propfirm}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-propfirm}
+      READ_DATABASE_URL: ${READ_DATABASE_URL:-}
+      REDIS_URL:    redis://:${REDIS_PASSWORD:-redispass}@redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - uploads:/app/uploads
+      - logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5000/api/health >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+      - external
+
   # ── Nginx Reverse Proxy ───────────────────────────────────────────────────────
   nginx:
     image: nginx:1.25-alpine
@@ -247,9 +389,24 @@ services:
       - "80:80"
       - "443:443"
     volumes:
+      # Main config. Exists for worker_connections, which cannot be set from
+      # conf.d and whose stock value (1024, x2 per proxied WebSocket) caps the
+      # proxy at roughly 2,000 concurrent traders regardless of hardware.
+      #
+      # Running split roles? Swap the vhost below for propfirm.scaleout.conf,
+      # which routes sockets and API traffic to separate upstreams and makes
+      # socket sessions sticky.
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./deploy/nginx/propfirm.conf:/etc/nginx/conf.d/default.conf:ro
       - ./deploy/certs:/etc/nginx/certs:ro
       - nginx_logs:/var/log/nginx
+    # worker_rlimit_nofile is a request nginx cannot grant itself: without a
+    # matching container limit, raising worker_connections just moves the failure
+    # from "worker_connections are not enough" to "Too many open files".
+    ulimits:
+      nofile:
+        soft: 131072
+        hard: 131072
     depends_on:
       backend:
         condition: service_healthy
