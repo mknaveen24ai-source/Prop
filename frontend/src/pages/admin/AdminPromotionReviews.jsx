@@ -19,6 +19,16 @@ function formatDate(value) {
   return value ? new Date(value).toLocaleString() : 'N/A'
 }
 
+// Include the HTTP status when the server did not send a usable message. A bare
+// "Failed to load" reads the same whether the endpoint is missing, forbidden or
+// erroring — which is exactly how a 404 went undiagnosed here.
+function describeError(error, fallback) {
+  const serverMessage = error?.response?.data?.error
+  if (typeof serverMessage === 'string' && serverMessage) return serverMessage
+  const status = error?.response?.status
+  return status ? `${fallback} (HTTP ${status})` : `${fallback} — ${error?.message || 'network error'}`
+}
+
 export default function AdminPromotionReviews() {
   const { adminAxios } = useOutletContext()
   const toast = useToast()
@@ -34,19 +44,29 @@ export default function AdminPromotionReviews() {
 
   async function fetchData({ silent = false } = {}) {
     if (!silent) setLoading(true)
-    try {
-      const [quotaRes, reviewsRes] = await Promise.all([
-        adminAxios.get('/api/admin/account-batches', { params: { ...params, all_sizes: true } }),
-        adminAxios.get('/api/admin/promotion-reviews', { params: { ...params, status } })
-      ])
-      const nextQuota = quotaRes.data || null
-      setQuota(nextQuota)
-      setReviews(Array.isArray(reviewsRes.data?.rows) ? reviewsRes.data.rows : [])
-    } catch (error) {
-      toast.error(error?.response?.data?.error || 'Failed to load promotion reviews')
-    } finally {
-      if (!silent) setLoading(false)
+    // Settled rather than all: these are two independent reads, and a failing
+    // quota lookup should not blank the review queue. Both used to share one
+    // catch, so either failing produced the same opaque "Failed to load
+    // promotion reviews" — which is what a 404 from the deleted endpoints
+    // looked like for months.
+    const [quotaRes, reviewsRes] = await Promise.allSettled([
+      adminAxios.get('/api/admin/account-batches', { params: { ...params, all_sizes: true } }),
+      adminAxios.get('/api/admin/promotion-reviews', { params: { ...params, status } })
+    ])
+
+    if (quotaRes.status === 'fulfilled') {
+      setQuota(quotaRes.value.data || null)
+    } else {
+      toast.error(describeError(quotaRes.reason, 'Failed to load account size availability'))
     }
+
+    if (reviewsRes.status === 'fulfilled') {
+      setReviews(Array.isArray(reviewsRes.value.data?.rows) ? reviewsRes.value.data.rows : [])
+    } else {
+      toast.error(describeError(reviewsRes.reason, 'Failed to load promotion reviews'))
+    }
+
+    if (!silent) setLoading(false)
   }
 
   useEffect(() => {
@@ -115,7 +135,8 @@ export default function AdminPromotionReviews() {
         <div>
           <h1 className="admin-h1">Promotion Review</h1>
           <p style={{ color: 'var(--admin-text-muted)', fontSize: 13 }}>
-            Passed Phase 1 and Phase 2 accounts wait here until quota is available and an admin approves the next account.
+            Every passed challenge account waits here until an admin approves it. Approving creates the next account —
+            Phase 2, Phase 3 or Funded, whichever the account&rsquo;s challenge model says comes next.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -132,15 +153,19 @@ export default function AdminPromotionReviews() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20, marginBottom: 24 }}>
         <AdminStatCard icon="wallet" label="Full Sizes" value={String((quota?.sizes || []).filter((row) => row.state === 'full').length)} />
-        <AdminStatCard icon="activity" label="Used This Month" value={String((quota?.sizes || []).reduce((sum, row) => sum + (Number(row.used) || 0), 0))} />
+        {/* Relabelled from "Used This Month": the slot pool is lifetime, so
+            every account ever created for a (model, size) counts. */}
+        <AdminStatCard icon="activity" label="Slots Used" value={String((quota?.sizes || []).reduce((sum, row) => sum + (Number(row.used) || 0), 0))} />
         <AdminStatCard icon="approve" label="Available Sizes" value={String((quota?.sizes || []).filter((row) => row.is_unlimited || Number(row.remaining) > 0).length)} />
         <AdminStatCard icon="warning" label="Pending Reviews" value={String(reviews.filter((row) => row.status === 'pending').length)} />
       </div>
 
       <Card style={{ marginBottom: 24 }}>
-        <h2 className="admin-h2">Per-Size Quota Gate</h2>
+        <h2 className="admin-h2">Account Size Availability</h2>
         <p style={{ color: 'var(--admin-text-muted)', fontSize: 13, marginTop: 6 }}>
-          Promotion approval checks the target account size against its monthly quota. Edit limits from Settings to Per-Size Monthly Allocation.
+          Slots are a lifetime pool per challenge model and size, not a monthly quota. These figures are
+          advisory — a full pool does <strong>not</strong> block approval, because a trader who has already passed
+          should never be stranded by it. Edit limits under Step Models.
         </p>
       </Card>
 

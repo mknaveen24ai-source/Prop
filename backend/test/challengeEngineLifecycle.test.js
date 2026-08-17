@@ -30,6 +30,18 @@ function makeMockClient(handlers = []) {
   }
 }
 
+// db.js exports the Pool instance itself, so `pool` is one mutable object shared
+// by every module. Overwriting its methods without putting them back leaks the
+// catch-all `{ rows: [] }` mock into whatever runs next under
+// --test-isolation=none, which is how unrelated suites ended up logging
+// "[violation-engine] Failed to record violation".
+const REAL_POOL_QUERY = pool.query
+const REAL_POOL_CONNECT = pool.connect
+test.after(() => {
+  pool.query = REAL_POOL_QUERY
+  pool.connect = REAL_POOL_CONNECT
+})
+
 function installPoolMock({ account, queryHandlers = [], connectHandlers = [] }) {
   const calls = []
   pool.query = async (sql, values) => {
@@ -105,21 +117,21 @@ test('runChallengeEngine leaves an account active when balance stays above the d
   assert.equal(client.calls.find(c => /UPDATE accounts SET status = 'expired'/.test(c.sql)), undefined)
 })
 
-test('runChallengeEngine passes an account that hit its profit target and creates the next-phase account', async () => {
+test('runChallengeEngine passes an account that hit its profit target and raises a promotion review', async () => {
+  // Passing no longer creates the next account. It marks the source passed and
+  // queues a review for an admin to approve in /admin/promotion-reviews, which
+  // is what actually creates the phase2/phase3/funded account. The assertion
+  // that NO account row is inserted here is the point of the test.
+  //
   // starting_balance 10000, profit_target 1000 -> current_balance 11000 clears it, no open trades.
   const account = baseAccount({ current_balance: '11000' })
-  const sequences = new Map()
   const openTradesCountHandler = [/SELECT COUNT\(\*\) FROM trades WHERE account_id = \$1 AND status = 'open'/, () => ({ rows: [{ count: '0' }] })]
   const client = makeMockClient([
     [FULL_ACCOUNT_LOCK_QUERY, () => ({ rows: [{ ...account, current_balance: '11000' }] })],
     openTradesCountHandler,
-    [/INSERT INTO account_id_sequences/i, (sql, values) => {
-      const category = values[0]
-      const next = (sequences.get(category) || 0) + 1
-      sequences.set(category, next)
-      return { rows: [{ last_value: next }] }
-    }],
-    [/INSERT INTO accounts[\s\S]*RETURNING id/i, () => ({ rows: [{ id: 'new-phase2-account' }] })]
+    [/INSERT INTO account_promotion_reviews/i, (sql, values) => ({
+      rows: [{ id: 77, source_account_id: values[0], from_account_type: values[2], target_account_type: values[3], status: 'pending' }]
+    })]
   ])
   // processAccount checks the open-trade count via the plain pool (not the tx
   // client) before ever calling passAccount, so it needs the same handler.
@@ -132,6 +144,15 @@ test('runChallengeEngine passes an account that hit its profit target and create
   assert.ok(passCall, 'expected the source account to be marked passed')
   assert.equal(passCall.values[0], 'acc-ce-1')
 
-  const promotionInsert = client.calls.find(c => /INSERT INTO accounts[\s\S]*RETURNING id/i.test(c.sql))
-  assert.ok(promotionInsert, 'expected the next-phase account to be created')
+  const reviewInsert = client.calls.find(c => /INSERT INTO account_promotion_reviews/i.test(c.sql))
+  assert.ok(reviewInsert, 'expected a pending promotion review to be raised')
+  assert.equal(reviewInsert.values[0], 'acc-ce-1', 'review points at the source account')
+  assert.equal(reviewInsert.values[2], 'phase1', 'from_account_type')
+  // baseAccount carries no challenge_model_slug, so the legacy ladder applies.
+  assert.equal(reviewInsert.values[3], 'phase2', 'target_account_type resolved up front')
+
+  const accountInsert = client.calls.find(c => /INSERT INTO accounts[\s\S]*RETURNING id/i.test(c.sql))
+  assert.equal(accountInsert, undefined, 'the next account must wait for admin approval')
+
+  assert.ok(client.calls.some(c => /COMMIT/.test(c.sql)), 'expected the pass to commit')
 })

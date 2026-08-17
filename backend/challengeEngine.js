@@ -6,7 +6,7 @@ const logger = require('./utils/logger')
 const { calculatePnL } = require('./utils/pnlCalculator')
 require('./loadEnv')
 const { getCurrentPricesForTenant } = require('./priceFeed')
-const { fetchProgressionSettings, promotePassedAccount } = require('./services/progressionService')
+const { fetchProgressionSettings, createPendingPromotionReview } = require('./services/progressionService')
 const {
   enqueuePhasePassedEmail,
   enqueueAccountFailedEmail,
@@ -97,6 +97,11 @@ async function incrementBbookMetric(client, column) {
 // data inconsistency if the server crashes mid-operation.
 // ─────────────────────────────────────────────────────────────────────────────
 async function expireAccount(acc, io) {
+  // Read before BEGIN — see failAccount for why: this is a query on a separate
+  // pool connection, and issuing it mid-transaction held the account row lock
+  // across an unrelated round-trip.
+  const priceMap = await getCurrentPricesForTenant()
+
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
@@ -116,8 +121,6 @@ async function expireAccount(acc, io) {
       `SELECT * FROM trades WHERE account_id = $1 AND status = 'open'`,
       [acc.id]
     )
-
-    const priceMap = await getCurrentPricesForTenant()
 
     // FIX (AUDIT): Use Decimal accumulator — native float += on many trades
     // causes sub-penny rounding drift in the final balance update.
@@ -210,6 +213,12 @@ async function expireAccount(acc, io) {
 // drawdown checker in trades.js.
 // ─────────────────────────────────────────────────────────────────────────────
 async function failAccount(acc, reason, io, platformSettings = null, options = {}) {
+  // Read before BEGIN. getCurrentPricesForTenant() queries price_feed on a
+  // separate pool connection, and running it inside the transaction held this
+  // account's row lock across an unrelated round-trip. It is a read-only
+  // snapshot, so hoisting does not affect the close arithmetic below.
+  const priceMap = await getCurrentPricesForTenant()
+
   const client = await pool.connect()
   try {
     const closeReason = options.closeReason || 'Account Failed'
@@ -264,8 +273,6 @@ async function failAccount(acc, reason, io, platformSettings = null, options = {
       `SELECT * FROM trades WHERE account_id = $1 AND status = 'open'`,
       [acc.id]
     )
-
-    const priceMap = await getCurrentPricesForTenant()
 
     // FIX (AUDIT): Use Decimal accumulator — native float += on many trades
     // causes sub-penny rounding drift in the final balance update.
@@ -449,23 +456,36 @@ async function passAccount(acc, platformSettings, io) {
       [acc.id]
     )
 
-    const promoted = await promotePassedAccount(client, acc, platformSettings)
-    if (!promoted) {
-      throw new Error('Failed to create promoted account')
+    // The next account is NOT created here any more. Passing a challenge now
+    // raises a pending promotion review, and an admin approving it in
+    // /admin/promotion-reviews is what creates the phase2/phase3/funded
+    // account. The review row records the resolved target up front, so the
+    // admin approves exactly what will be created.
+    const review = await createPendingPromotionReview(client, acc, {
+      triggeredBy: 'auto_pass',
+      reason: 'Profit target reached',
+      payload: { source: 'challengeEngine', account_type: acc.account_type, account_size: acc.account_size }
+    })
+    if (!review) {
+      throw new Error('Failed to raise promotion review for passed account')
     }
 
     await client.query('COMMIT')
 
-    if (io && promoted) {
+    if (io) {
       io.to(String(acc.user_id)).emit('account_update', {
-        event:          promoted.event,
+        event:          'promotion_pending_review',
         account_id:     acc.id,
-        new_account_id: promoted.new_account_id,
-        message:        promoted.message || `Your ${acc.account_type} challenge passed!`
+        review_id:      review.id,
+        target_account_type: review.target_account_type,
+        message:        `Your ${acc.account_type} challenge passed! Your next account is awaiting admin approval.`
       })
     }
 
-    logger.info(`Challenge engine: account ${acc.id} PASSED (${acc.account_type})`)
+    logger.info(
+      `Challenge engine: account ${acc.id} PASSED (${acc.account_type}) — ` +
+      `promotion review #${review.id} raised for ${review.target_account_type}`
+    )
 
     try {
       const userResult = await pool.query('SELECT email, full_name FROM users WHERE id = $1', [acc.user_id])
@@ -539,9 +559,24 @@ async function evaluateScalingPlan(acc, io) {
     const startingBalance = parseFloat(locked.starting_balance)
     if (!(startingBalance > 0)) { await client.query('ROLLBACK'); return }
 
+    // Subtract EVERY balance adjustment, not just this function's own past
+    // injections. Rearranging the invariant documented on the
+    // balance_adjustments migration:
+    //
+    //   current_balance = starting_balance + trading P&L + SUM(adjustments)
+    //   ⇒ trading P&L  = current_balance - starting_balance - SUM(adjustments)
+    //
+    // so summing the whole ledger is what actually isolates trading profit.
+    //
+    // Filtering on source = 'scaling_capital_increase' was a live bug: admin
+    // balance adjustments landed in the separate admin_balance_adjustments
+    // table and so were invisible here, which meant a goodwill credit read as
+    // trading profit and could mint a real scaling milestone. Admin
+    // adjustments now write the canonical ledger too (routes/admin/accounts.js),
+    // and this sum picks them up.
     const injectedResult = await client.query(
       `SELECT COALESCE(SUM(amount), 0) AS total FROM balance_adjustments
-        WHERE account_id = $1 AND source = 'scaling_capital_increase'`,
+        WHERE account_id = $1`,
       [acc.id]
     )
     const cumulativeInjected = parseFloat(injectedResult.rows[0].total || 0)
@@ -856,11 +891,13 @@ async function runChallengeEngine(io) {
     }
 
     // ── IP-based multi-account detection ───────────────────────────────────────
-    try {
-      await detectIPMultiAccounts()
-    } catch (ipErr) {
-      logger.error('[ip_detection] Detection error:', { error: ipErr.message })
-    }
+    // Removed. detectIPMultiAccounts() auto-flagged every account belonging to
+    // any two users who shared an exact IP within 24h — no subnet awareness, no
+    // scoring, and a guaranteed false positive for households, shared offices
+    // and mobile CGNAT. Superseded by services/accountLinkingService.js, which
+    // reads the same data plus device/payout/KYC/simultaneity signals, weights
+    // each by how rare the shared value is, and produces a scored review queue
+    // instead of an automatic flag. Scheduled separately as jobs:account_linking.
 
   } catch (error) {
     logger.error('runChallengeEngine error:', { error: error.message })
@@ -1075,70 +1112,6 @@ async function detectOpposingTrades(io) {
         message: `⚠️ Your accounts have been locked for review due to opposing trades detected on ${instrument}. Please contact support.`
       })
     }
-  }
-}
-
-// ── IP-based multi-account detection (LOOPHOLE 4 FIX) ─────────────────────────
-// Detects different users trading from the same IP address and flags them.
-async function detectIPMultiAccounts() {
-  try {
-    // Find IPs that have been used by multiple users for trading within last 24h
-    const result = await pool.query(`
-      SELECT ip_address,
-             array_agg(DISTINCT user_id) AS user_ids,
-             COUNT(DISTINCT user_id) AS user_count
-      FROM trade_logs
-      WHERE logged_at > NOW() - INTERVAL '24 hours'
-        AND ip_address IS NOT NULL
-        AND ip_address <> 'unknown'
-      GROUP BY ip_address
-      HAVING COUNT(DISTINCT user_id) > 1
-    `)
-
-    if (result.rows.length === 0) return
-
-    for (const row of result.rows) {
-      const { ip_address, user_ids } = row
-
-      // Flag all accounts belonging to these users
-      const accountsResult = await pool.query(
-        `SELECT id, user_id FROM accounts
-         WHERE user_id = ANY($1::uuid[])
-           AND status = 'active'
-           AND review_flagged = false`,
-        [user_ids]
-      )
-
-      if (accountsResult.rows.length === 0) continue
-
-      const accountIds = accountsResult.rows.map(r => r.id)
-      const reason = `IP-based multi-account detected: users ${user_ids.join(', ')} trading from same IP ${ip_address} within 24h`
-      for (const account of accountsResult.rows) {
-        await safeRecordViolation({
-          violationType: 'ip_multi_account_detection',
-          severity: 'high',
-          accountId: account.id,
-          userId: account.user_id,
-          instrument: '',
-          source: 'challenge_engine',
-          message: reason,
-          payload: { ip_address, user_ids }
-        })
-
-        try {
-          await applyAccountEnforcement({
-            accountId: account.id,
-            action: 'flag_for_review',
-            reason,
-            payload: { ip_address, user_ids }
-          })
-        } catch (silentErr) { logger.warn("[challenge_engine] Non-critical operation failed silently:", { error: silentErr.message }) }
-      }
-
-      logger.warn(`[ip_detection] Multiple users (${user_ids.join(', ')}) detected trading from IP ${ip_address}`)
-    }
-  } catch (err) {
-    logger.error('[ip_detection] Error:', { error: err.message })
   }
 }
 

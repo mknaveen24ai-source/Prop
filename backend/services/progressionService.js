@@ -1,8 +1,8 @@
 const pool = require('../db')
 const logger = require('../utils/logger')
 const { getTenantSettings } = require('./tenantPolicyService')
-const { fetchStepModelBySlug } = require('../utils/stepModels')
 const { generateAccountUid } = require('../utils/accountIds')
+const { resolvePromotionTarget } = require('./promotionTarget')
 const {
   createPromotionReview,
   markPromotionReviewApproved
@@ -163,11 +163,11 @@ async function buildFundedInsertArgs(acc, settings, db) {
 // system shipped carries `challenge_model_slug`/`step_number`, so the next
 // phase (or funded promotion) is resolved from `challenge_models` instead of
 // hardcoded phase1/phase2 settings.
-async function buildNextPhaseStepModelPlan(acc, stepModel, db) {
+async function buildNextPhaseStepModelPlan(acc, stepModel, db, target) {
   const currentStep = parseInt(acc.step_number || 1, 10)
   const nextStep = currentStep + 1
   const accountUid = await generateAccountUid(db, {
-    accountType: nextStep <= stepModel.steps ? `phase${nextStep}` : 'funded',
+    accountType: target.targetAccountType,
     challengeModelSlug: stepModel.slug
   })
   const currentPhaseName = Array.isArray(stepModel.profit_targets_pct) && stepModel.profit_targets_pct.length > 1
@@ -176,10 +176,10 @@ async function buildNextPhaseStepModelPlan(acc, stepModel, db) {
 
   logger.info(
     `[progression] Promoting ${stepModel.slug} account for user ${acc.user_id}: ` +
-    `step ${currentStep} -> ${nextStep <= stepModel.steps ? `phase${nextStep}` : 'funded'} (size=$${acc.account_size})`
+    `step ${currentStep} -> ${target.targetAccountType} (size=$${acc.account_size})`
   )
 
-  if (nextStep <= stepModel.steps) {
+  if (!target.isFinalPromotion) {
     const phaseIdx0 = nextStep - 1
     const profitTargetPct = parseFloat(stepModel.profit_targets_pct[phaseIdx0])
     const dayLimit = parseInt(stepModel.time_limits_days[phaseIdx0], 10)
@@ -205,7 +205,7 @@ async function buildNextPhaseStepModelPlan(acc, stepModel, db) {
                     $16)
             RETURNING id`,
       values: [
-        acc.user_id, `phase${nextStep}`, acc.account_size,
+        acc.user_id, target.targetAccountType, acc.account_size,
         profitTarget, stepModel.max_drawdown_pct, phaseEndDate, accountUid,
         stepModel.id, stepModel.slug, nextStep, stepModel.daily_drawdown_pct, stepModel.drawdown_type,
         consistencyPct, stepModel.min_trading_days, stepModel.min_daily_profit_pct,
@@ -251,13 +251,18 @@ async function buildNextPhaseStepModelPlan(acc, stepModel, db) {
 }
 
 async function buildPromotionPlan(acc, settings, db = pool) {
-  if (acc.challenge_model_slug) {
-    const stepModel = await fetchStepModelBySlug(acc.challenge_model_slug)
-    if (stepModel) return buildNextPhaseStepModelPlan(acc, stepModel, db)
-    logger.error(`[progression] Account ${acc.id} references unknown step model "${acc.challenge_model_slug}" — falling back to legacy settings.`)
-  }
-  if (acc.account_type === 'phase1') return buildPhase2InsertArgs(acc, settings, db)
-  if (acc.account_type === 'phase2') return buildFundedInsertArgs(acc, settings, db)
+  // resolvePromotionTarget is the shared authority on the target account type —
+  // the promotion review row shown to the admin is derived from the same call,
+  // so what is approved is always what gets created. See services/promotionTarget.js.
+  const target = await resolvePromotionTarget(acc)
+  if (!target) return null
+
+  if (target.stepModel) return buildNextPhaseStepModelPlan(acc, target.stepModel, db, target)
+
+  // Legacy, pre-step-model accounts (no challenge_model_slug) keep the original
+  // fixed ladder driven by platform_settings rather than a challenge model.
+  if (target.targetAccountType === 'phase2') return buildPhase2InsertArgs(acc, settings, db)
+  if (target.targetAccountType === 'funded') return buildFundedInsertArgs(acc, settings, db)
   return null
 }
 
@@ -270,7 +275,16 @@ async function promotePassedAccount(db, acc, settings) {
   // BUG-02 FIX: Wrap both writes in a transaction so that a crash between
   // the account insert and the bbook_pnl upsert cannot leave the P&L
   // dashboard counts permanently wrong.
-  const client = db.connect ? await db.connect() : null
+  //
+  // Only checking out our own client when `db` IS a pool. The test for that was
+  // `db.connect ? ... : null`, but a pg PoolClient also carries a .connect
+  // method (inherited from Client), so every caller that correctly passed its
+  // own transaction client — challengeEngine, tradeEngine, admin manual
+  // promote, and promotion-review approval — landed in the pool branch and hit
+  // `Client has already been connected. You cannot reuse a client.` A pool has
+  // no .release; a checked-out client does. That is the reliable discriminator.
+  const isPool = typeof db.connect === 'function' && typeof db.release !== 'function'
+  const client = isPool ? await db.connect() : null
   const executor = client || db
 
   try {
@@ -295,7 +309,10 @@ async function promotePassedAccount(db, acc, settings) {
 }
 
 async function createPendingPromotionReview(db, acc, options = {}) {
-  if (!['phase1', 'phase2'].includes(String(acc?.account_type || '').toLowerCase())) return null
+  // Gated on "does a promotion path exist" rather than a hardcoded
+  // ['phase1','phase2'] list, which silently excluded phase3 accounts on
+  // 3-step models — they passed their final challenge and no review was ever
+  // raised, so they could never reach funded.
   return createPromotionReview(db, acc, options)
 }
 

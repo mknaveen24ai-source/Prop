@@ -9,7 +9,6 @@ const {
   authenticateAdmin,
   requireAdminCapability
 } = require('../middleware')
-const Decimal = require('decimal.js')
 const logger = require('../../utils/logger')
 const {
   enqueuePayoutApprovedEmail,
@@ -32,6 +31,7 @@ const {
 const {
   buildPayoutListResult
 } = require('./shared/listBuilders')
+const { approvePayout } = require('../../domain/payout')
 
 router.get('/payouts', authenticateAdmin, requireAdminCapability('payout:read:scoped'), async function(req, res) {
   try {
@@ -73,56 +73,17 @@ router.post('/payouts/approve', authenticateAdmin, requireAdminCapability('payou
     client = await pool.connect()
     await client.query('BEGIN')
 
-    // Fetch payout details and user email/name first
-    const payoutData = await client.query(
-      `SELECT p.amount_requested, p.amount_payable, p.payment_method, p.account_id, p.status,
-              u.id::text AS user_id, u.email, u.full_name
-       FROM payouts p
-       JOIN users u ON p.user_id = u.id
-       WHERE p.id = $1
-       FOR UPDATE`,
-      [payout_id]
-    )
-
-    if (payoutData.rows.length === 0) {
-      await client.query('ROLLBACK')
-      return res.status(404).json({ error: 'Payout not found' })
-    }
-
-    const { amount_requested, amount_payable, payment_method, account_id, status, user_id, email, full_name } = payoutData.rows[0]
-    if (status !== 'pending') {
-      await client.query('ROLLBACK')
-      return res.status(400).json({ error: 'Payout is not pending' })
-    }
-
-    const accountData = await client.query(
-      `SELECT current_balance, starting_balance FROM accounts WHERE id = $1 FOR UPDATE`,
-      [account_id]
-    )
-    if (accountData.rows.length === 0) {
-      await client.query('ROLLBACK')
-      return res.status(404).json({ error: 'Account not found' })
-    }
-
-    const availableProfit = new Decimal(accountData.rows[0].current_balance).minus(accountData.rows[0].starting_balance)
-    if (availableProfit.lt(amount_requested)) {
-      await client.query('ROLLBACK')
-      return res.status(400).json({ error: 'Insufficient realized profit for payout' })
-    }
-
-    await client.query(
-      `UPDATE accounts SET current_balance = current_balance - $1 WHERE id = $2`,
-      [amount_requested, account_id]
-    )
-
-    await client.query(
-      `UPDATE payouts SET
-       status = 'paid',
-       paid_at = NOW(),
-       transaction_id = $1
-       WHERE id = $2`,
-      [transaction_id, payout_id]
-    )
+    // Approval, eligibility re-check and the ledger-backed debit all live in
+    // domain/payout.js, shared with the command-centre bulk action. Both call
+    // sites previously carried their own copy of this logic, and both checked
+    // only that the payout was pending and that profit covered it — never that
+    // the account was still funded, active and KYC-approved at approval time.
+    const approval = await approvePayout(client, payout_id, {
+      transactionId: transaction_id,
+      actor: getAdminActorLabel(req.admin)
+    })
+    const { recipient } = approval
+    const { email, full_name, amountPayable: amount_payable, paymentMethod: payment_method, userId: user_id } = recipient
 
     await client.query('COMMIT')
 
@@ -155,6 +116,13 @@ router.post('/payouts/approve', authenticateAdmin, requireAdminCapability('payou
   } catch (error) {
     if (client) await client.query('ROLLBACK').catch(() => {})
     logger.error('Could not mark payout as paid:', { error: error.message })
+    // Domain refusals (payout not pending, account no longer eligible, unknown
+    // payout) carry their own status code and a message safe to show the admin.
+    // Collapsing them all into a 500 told the admin the platform had broken
+    // when in fact it had correctly refused the approval.
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message })
+    }
     res.status(500).json({ error: 'Could not update payout' })
   } finally {
     if (client) client.release()

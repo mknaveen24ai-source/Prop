@@ -13,6 +13,7 @@ const {
 const logger = require('../../utils/logger')
 const { emitAdminEvent } = require('../../utils/realtime')
 const { fetchProgressionSettings, promotePassedAccount } = require('../../services/progressionService')
+const { hasPromotionPath } = require('../../services/promotionTarget')
 const { getTenantSettings } = require('../../services/tenantPolicyService')
 require('../../loadEnv')
 
@@ -34,6 +35,7 @@ const {
 const {
   forceCloseOpenTradesForAccount, cancelPendingTradesForAccount
 } = require('./shared/tradeOps')
+const { fromLockedRow } = require('../../domain/account')
 
 router.get('/accounts', authenticateAdmin, requireAdminCapability('account:read:scoped'), async function(req, res) {
   try {
@@ -87,30 +89,57 @@ router.post('/accounts/:accountId/adjust-balance', authenticateAdmin, requireAdm
     }
 
     const beforeSnapshot = normalizeAccountSnapshot(account)
-    const updated = await client.query(
-      `UPDATE accounts
-          SET current_balance = current_balance + $1,
-              peak_balance = GREATEST(peak_balance, current_balance + $1),
-              updated_at = NOW()
-        WHERE id = $2
-        RETURNING id, user_id, account_type, current_balance, starting_balance,
-                  peak_balance, status, profit_target, max_drawdown_pct, phase_start_date,
-                  phase_end_date, account_uid, review_flagged, review_flag_reason`,
-      [amount, account.id]
-    )
 
+    // Goes through the Account aggregate rather than a raw UPDATE, which buys
+    // two things this endpoint previously lacked:
+    //
+    //   1. A canonical balance_adjustments row. This endpoint used to write
+    //      only admin_balance_adjustments, a table nothing else reads — so an
+    //      admin credit was invisible to the ledger invariant, and
+    //      evaluateScalingPlan counted it as *trading profit* and could mint a
+    //      real scaling milestone from a goodwill credit.
+    //   2. A drawdown-anchor shift, so a credit or debit moves the trailing
+    //      frame with the capital instead of leaving it anchored to a balance
+    //      that no longer exists.
+    const aggregate = fromLockedRow(client, account)
+    const adjustment = await aggregate.adjustBalance({
+      amount,
+      source: 'admin_adjustment',
+      reason,
+      createdBy: getAdminActorLabel(req.admin),
+      metadata: { actor: buildAdminActorPayload(req.admin) }
+    })
+
+    // admin_balance_adjustments stays as the admin-facing audit trail: it
+    // carries created_by attribution and an adjustment_type the canonical
+    // ledger does not, and the admin UI reads it. Same transaction, so the two
+    // cannot diverge.
+    //
+    // created_by stores the acting admin, not their role: the previous
+    // `req.admin?.role` wrote "super_admin" for every adjustment, which makes
+    // the ledger useless for attribution — the one thing an audit log is for.
     await client.query(
       `INSERT INTO admin_balance_adjustments
-        (account_id, user_id, amount, reason, adjustment_type, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+        (account_id, user_id, amount, balance_before, balance_after, reason, adjustment_type, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         String(account.id),
         String(account.user_id),
         amount,
+        adjustment.balanceBefore,
+        adjustment.balanceAfter,
         reason,
         amount > 0 ? 'credit' : 'debit',
-        String(req.admin?.role || 'admin')
+        getAdminActorLabel(req.admin)
       ]
+    )
+
+    const updated = await client.query(
+      `SELECT id, user_id, account_type, current_balance, starting_balance,
+              peak_balance, status, profit_target, max_drawdown_pct, phase_start_date,
+              phase_end_date, account_uid, review_flagged, review_flag_reason
+         FROM accounts WHERE id = $1`,
+      [account.id]
     )
 
     try {
@@ -200,7 +229,10 @@ router.post('/accounts/:accountId/override', authenticateAdmin, adminAccountActi
     let cancelledCount = 0
 
     if (action === 'pass' || action === 'promote') {
-      if (!['phase1', 'phase2'].includes(account.account_type)) {
+      // Was ['phase1','phase2'], which blocked the final step of a 3-step model
+      // from ever being promoted. Ask the resolver instead, so the accepted set
+      // follows challenge_models.steps rather than a stale literal.
+      if (!(await hasPromotionPath(account))) {
         await client.query('ROLLBACK')
         return res.status(400).json({ error: 'Only challenge accounts can be promoted' })
       }
@@ -240,7 +272,7 @@ router.post('/accounts/:accountId/override', authenticateAdmin, adminAccountActi
       )
       message = `Account breached manually. Closed ${closeResult.closedCount} open trades and cancelled ${cancelledCount} pending orders.`
     } else if (action === 'extend_14_days' || action === 'extend_days') {
-      if (!['phase1', 'phase2'].includes(account.account_type)) {
+      if (!['phase1', 'phase2', 'phase3'].includes(account.account_type)) {
         await client.query('ROLLBACK')
         return res.status(400).json({ error: 'Only challenge accounts can be extended' })
       }
@@ -310,11 +342,21 @@ router.post('/accounts/:accountId/override', authenticateAdmin, adminAccountActi
       cancelledCount = await cancelPendingTradesForAccount(client, account.id, 'Admin Restore With Reset')
       const phaseEndDate = computePhaseEndDateForAccountType(account.account_type, platformSettings)
 
+      // resetToStarting rebases eod_peak_equity / eod_trailing_floor as well as
+      // the balance. The raw UPDATE this replaces did not: those two columns are
+      // what the drawdown engine actually reads, and every other writer guards
+      // them with GREATEST, so a reset account came back with its floor still
+      // computed off the pre-reset peak and could be failed on the first price
+      // tick — with no way to recover, since the guards are monotonic.
+      await fromLockedRow(client, account).resetToStarting({
+        reason,
+        createdBy: getAdminActorLabel(req.admin),
+        metadata: { action: 'restore_with_reset' }
+      })
+
       await client.query(
         `UPDATE accounts
             SET status = 'active',
-                current_balance = starting_balance,
-                peak_balance = starting_balance,
                 phase_start_date = NOW(),
                 phase_end_date = $2,
                 review_flagged = FALSE,
