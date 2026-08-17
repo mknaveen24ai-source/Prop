@@ -19,7 +19,9 @@ const app = express()
 app.use(express.json())
 app.use('/api/payouts', payoutRoutes)
 
-const ACCOUNT_ID = '4001'
+// A real UUID, not the old integer fixture: accounts.id is uuid in the schema
+// and the route validates the shape before it queries.
+const ACCOUNT_ID = 'a3f1c2d4-5e6b-4a7c-8d9e-0f1a2b3c4d5e'
 
 // payoutRequestLimiter allows one request per user per 24 hours, so every test
 // needs its own identity or the second one onwards would just see a 429.
@@ -70,6 +72,15 @@ function installPoolMock({
       }
       if (/FROM payouts WHERE account_id = \$1 AND status = 'pending'/i.test(sql)) {
         return { rows: pendingPayouts }
+      }
+      // The idempotency claim is taken on the TRANSACTION client now, not the
+      // pool: it must commit and roll back with the payout, and asking the pool
+      // for a second connection while this one holds FOR UPDATE on the account
+      // is the deadlock shape the route comments describe.
+      if (/idempotency_requests/i.test(sql)) {
+        return /INSERT INTO idempotency_requests/i.test(sql)
+          ? { rows: [{ id: 1 }] }   // claim won
+          : { rows: [] }            // no prior claim to replay
       }
       if (/profit_share_pct/i.test(sql)) {
         return { rows: [{ value: profitSharePct }] }

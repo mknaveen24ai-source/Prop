@@ -1,54 +1,101 @@
 const pool = require('../db')
+const logger = require('./logger')
 
-let idempotencyInfrastructurePromise = null
+/**
+ * How long a claim may sit in 'started' before the reaper treats it as abandoned.
+ *
+ * A claim goes 'started' → 'completed' inside one request. It can only be left
+ * behind if the process died mid-request, and without a reaper that row is
+ * permanent: every retry of that Idempotency-Key gets 409 "already being
+ * processed", forever. For a withdrawal that means a trader who can never
+ * resubmit.
+ *
+ * Fifteen minutes is far longer than any of these endpoints can legitimately
+ * take, so a row this old is dead by definition rather than slow.
+ */
+const STALE_CLAIM_MS = Math.max(
+  60 * 1000,
+  parseInt(process.env.IDEMPOTENCY_STALE_CLAIM_MS || '', 10) || 15 * 60 * 1000
+)
 
+/**
+ * How long a COMPLETED claim is kept for replay detection.
+ *
+ * Nothing ever deleted these, so the table grew with every payout, trade open
+ * and account creation for the life of the deployment. Seven days is well past
+ * any client's retry horizon.
+ */
+const COMPLETED_RETENTION_MS = Math.max(
+  60 * 60 * 1000,
+  parseInt(process.env.IDEMPOTENCY_RETENTION_MS || '', 10) || 7 * 24 * 60 * 60 * 1000
+)
+
+let infrastructureVerified = false
+
+/**
+ * Confirm the table exists. It does NOT create it.
+ *
+ * This used to issue CREATE TABLE / ALTER TABLE / CREATE INDEX from the request
+ * path. That is how `idempotency_requests_scope_key_actor_uq` ended up with two
+ * competing definitions under one name (see migration 035): whichever of the
+ * migration and this DDL ran first won, and the other was silently skipped by
+ * IF NOT EXISTS.
+ *
+ * Migrations are the schema of record (finding C-02), so this now fails loudly
+ * and points at them rather than papering over a database that never migrated.
+ */
 async function ensureIdempotencyInfrastructure() {
-  if (idempotencyInfrastructurePromise) return idempotencyInfrastructurePromise
+  if (infrastructureVerified) return
 
-  idempotencyInfrastructurePromise = (async () => {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS idempotency_requests (
-        id BIGSERIAL PRIMARY KEY,
-        actor_id TEXT,
-        scope TEXT NOT NULL,
-        idempotency_key TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'started',
-        response_status INTEGER,
-        response_body_json JSONB NOT NULL DEFAULT '{}'::jsonb,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `)
-    await pool.query(`ALTER TABLE idempotency_requests ADD COLUMN IF NOT EXISTS actor_id TEXT`)
-    await pool.query(`ALTER TABLE idempotency_requests ADD COLUMN IF NOT EXISTS scope TEXT`)
-    await pool.query(`ALTER TABLE idempotency_requests ADD COLUMN IF NOT EXISTS idempotency_key TEXT`)
-    await pool.query(`ALTER TABLE idempotency_requests ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'started'`)
-    await pool.query(`ALTER TABLE idempotency_requests ADD COLUMN IF NOT EXISTS response_status INTEGER`)
-    await pool.query(`ALTER TABLE idempotency_requests ADD COLUMN IF NOT EXISTS response_body_json JSONB NOT NULL DEFAULT '{}'::jsonb`)
-    await pool.query(`ALTER TABLE idempotency_requests ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`)
-    await pool.query(`ALTER TABLE idempotency_requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`)
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS idempotency_requests_created_idx
-        ON idempotency_requests(created_at DESC)
-    `)
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS idempotency_requests_scope_idx
-        ON idempotency_requests(scope, created_at DESC)
-    `)
-    await pool.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS idempotency_requests_scope_key_actor_uq
-        ON idempotency_requests(
-          scope,
-          idempotency_key,
-          COALESCE(actor_id, '')
-        )
-    `)
-  })().catch((error) => {
-    idempotencyInfrastructurePromise = null
-    throw error
-  })
+  const result = await pool.query(`
+    SELECT EXISTS (
+      SELECT FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'idempotency_requests'
+    ) AS present
+  `)
 
-  return idempotencyInfrastructurePromise
+  if (!result.rows[0]?.present) {
+    throw new Error(
+      'idempotency_requests is missing. Replay protection on payouts, trade opens ' +
+      'and account creation cannot work without it. Run `npx knex migrate:latest`.'
+    )
+  }
+
+  infrastructureVerified = true
+}
+
+/**
+ * Delete abandoned claims and expired completed ones.
+ *
+ * Run from the scheduler. Returns what it removed so a spike in `stale` is
+ * visible — in a healthy system that number is zero, and a non-zero one means
+ * requests are dying mid-flight.
+ */
+async function reapIdempotencyClaims() {
+  const stale = await pool.query(
+    `DELETE FROM idempotency_requests
+      WHERE status = 'started'
+        AND created_at < NOW() - ($1::bigint * INTERVAL '1 millisecond')
+      RETURNING id`,
+    [STALE_CLAIM_MS]
+  )
+
+  const expired = await pool.query(
+    `DELETE FROM idempotency_requests
+      WHERE status = 'completed'
+        AND created_at < NOW() - ($1::bigint * INTERVAL '1 millisecond')
+      RETURNING id`,
+    [COMPLETED_RETENTION_MS]
+  )
+
+  if (stale.rowCount > 0) {
+    logger.warn('[idempotency] reaped abandoned claims — requests are dying mid-flight', {
+      count: stale.rowCount,
+      olderThanMs: STALE_CLAIM_MS
+    })
+  }
+
+  return { stale: stale.rowCount, expired: expired.rowCount }
 }
 
 function getIdempotencyKey(req) {
@@ -86,7 +133,6 @@ async function beginIdempotentRequest(clientOrPool, {
   actorId = null,
   idempotencyKey
 }) {
-  await ensureIdempotencyInfrastructure()
   const db = clientOrPool && typeof clientOrPool.query === 'function' ? clientOrPool : pool
   const key = String(idempotencyKey || '').trim()
   if (!key) {
@@ -102,6 +148,36 @@ async function beginIdempotentRequest(clientOrPool, {
   }
 
   const normalizedActorId = actorId == null ? null : String(actorId)
+
+  // Claim first, ask questions second.
+  //
+  // This was SELECT-then-INSERT, which is not atomic: two concurrent requests
+  // carrying the same key both missed the SELECT, both INSERTed, and the second
+  // hit the unique index. That surfaced as a 500 rather than the 409 the caller
+  // is written to handle — on a withdrawal endpoint, where a 500 is exactly what
+  // makes a client retry.
+  //
+  // ON CONFLICT DO NOTHING makes winning the claim a single atomic step. The
+  // conflict target must match migration 035's expression index exactly.
+  const inserted = await db.query(
+    `INSERT INTO idempotency_requests (
+       actor_id, scope, idempotency_key, status
+     ) VALUES (
+       $1, $2, $3, 'started'
+     )
+     ON CONFLICT (scope, idempotency_key, COALESCE(actor_id, '')) DO NOTHING
+     RETURNING id`,
+    [normalizedActorId, String(scope), key]
+  )
+
+  if (inserted.rows.length > 0) {
+    return {
+      enabled: true,
+      claimId: inserted.rows[0].id
+    }
+  }
+
+  // Someone else holds the claim — either finished (replay it) or in flight.
   const existing = await db.query(
     `SELECT id, status, response_status, response_body_json
        FROM idempotency_requests
@@ -112,41 +188,27 @@ async function beginIdempotentRequest(clientOrPool, {
     [String(scope), key, normalizedActorId]
   )
 
-  if (existing.rows.length > 0) {
-    const row = existing.rows[0]
-    if (row.status === 'completed') {
-      return {
-        enabled: true,
-        replay: true,
-        responseStatus: parseInt(row.response_status || 200, 10),
-        responseBody: row.response_body_json || {}
-      }
-    }
+  const row = existing.rows[0]
+  if (row && row.status === 'completed') {
     return {
       enabled: true,
-      inProgress: true
+      replay: true,
+      responseStatus: parseInt(row.response_status || 200, 10),
+      responseBody: row.response_body_json || {}
     }
   }
 
-  const inserted = await db.query(
-    `INSERT INTO idempotency_requests (
-       actor_id, scope, idempotency_key, status
-     ) VALUES (
-       $1, $2, $3, 'started'
-     )
-     RETURNING id`,
-    [normalizedActorId, String(scope), key]
-  )
-
+  // Includes the case where the row vanished between the two statements (the
+  // reaper, or a concurrent rollback). Reporting in-progress is the safe answer:
+  // it asks the caller to retry rather than letting a second withdrawal through.
   return {
     enabled: true,
-    claimId: inserted.rows[0].id
+    inProgress: true
   }
 }
 
 async function completeIdempotentRequest(clientOrPool, claimId, responseStatus, responseBody) {
   if (!claimId) return
-  await ensureIdempotencyInfrastructure()
   const db = clientOrPool && typeof clientOrPool.query === 'function' ? clientOrPool : pool
   await db.query(
     `UPDATE idempotency_requests
@@ -161,7 +223,6 @@ async function completeIdempotentRequest(clientOrPool, claimId, responseStatus, 
 
 async function abandonIdempotentRequest(clientOrPool, claimId) {
   if (!claimId) return
-  await ensureIdempotencyInfrastructure()
   const db = clientOrPool && typeof clientOrPool.query === 'function' ? clientOrPool : pool
   await db.query(`DELETE FROM idempotency_requests WHERE id = $1`, [claimId])
 }
@@ -173,5 +234,8 @@ module.exports = {
   ensureIdempotencyInfrastructure,
   getIdempotencyKey,
   isStrictScope,
+  reapIdempotencyClaims,
+  COMPLETED_RETENTION_MS,
+  STALE_CLAIM_MS,
   STRICT_SCOPES
 }

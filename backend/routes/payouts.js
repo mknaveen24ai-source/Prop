@@ -5,14 +5,17 @@ const { authenticateToken } = require('./middleware')
 const { createLimiter } = require('../utils/security')
 const { ipKeyGenerator } = require('express-rate-limit')
 const logger = require('../utils/logger')
-const Decimal = require('decimal.js')
-const { CONTRACT_SIZES } = require('../constants')
 const { getTenantSettings } = require('../services/tenantPolicyService')
 const { enqueuePayoutRequestedEmail } = require('../utils/emailQueue')
 const tradingDaysService = require('../services/tradingDaysService')
 const { fetchStepModelBySlug } = require('../utils/stepModels')
+const { isValidUUID } = require('../utils/validation')
 const {
-  abandonIdempotentRequest,
+  recordSignals,
+  normalizePayoutDestination,
+  SIGNAL_TYPES
+} = require('../services/identitySignals')
+const {
   beginIdempotentRequest,
   completeIdempotentRequest,
   getIdempotencyKey
@@ -51,7 +54,6 @@ const payoutRequestLimiter = createLimiter('payout-request', {
 // instead of four sequential round-trips.
 // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 router.post('/request', authenticateToken, payoutRequestLimiter, async function(req, res) {
-  let idempotencyClaim = null
   try {
     const { account_id, amount_requested, payment_method, payment_details } = req.body
 
@@ -65,9 +67,10 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
       return res.status(400).json({ error: `Invalid payment method. Must be one of: ${ALLOWED_PAYMENT_METHODS.join(', ')}` })
     }
 
+    // Account ids are UUIDs — the earlier numeric guard here rejected any id
+    // starting with a letter, so payout requests on those accounts 400'd.
     const accountIdStr = String(account_id || '').trim()
-    // FIX (LOW #29): Replace dead code `|| false` with proper numeric validation
-    if (!accountIdStr || isNaN(parseInt(accountIdStr))) {
+    if (!isValidUUID(accountIdStr)) {
       return res.status(400).json({ error: 'Invalid account ID' })
     }
 
@@ -87,6 +90,26 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
     if (amountNum < 50) {
       return res.status(400).json({ error: 'Minimum payout request is $50' })
     }
+
+    // Resolved BEFORE the transaction opens. getTenantSettings() is usually a
+    // cache hit, but on a miss it queries on a SEPARATE pool connection — and
+    // doing that while holding a transaction that has FOR UPDATE on the account
+    // row is the pool-deadlock shape described at beginIdempotentRequest below.
+    // These are platform settings with no dependency on the locked row, so
+    // reading them early changes nothing but the connection accounting.
+    //
+    // FIX (L-04): this used to issue its own `SELECT value FROM
+    // platform_settings WHERE key = 'profit_share_pct'` and then immediately
+    // discard the result -- getTenantSettings() already resolves the same key,
+    // and its value won. One wasted round-trip per payout request, and two
+    // apparent sources of truth for the same number.
+    const payoutSettings = await getTenantSettings(['profit_share_pct'])
+    const rawProfitShare = parseFloat(payoutSettings.profit_share_pct)
+    if (!Number.isFinite(rawProfitShare) || rawProfitShare <= 0) {
+      logger.warn('[PAYOUTS] profit_share_pct missing or invalid - defaulting to 80%.')
+    }
+    const effectiveProfitSharePct = (Number.isFinite(rawProfitShare) && rawProfitShare > 0 ? rawProfitShare : 80) / 100
+    const amount_payable = parseFloat((amountNum * effectiveProfitSharePct).toFixed(2))
 
     // FIX (Bug 3): Wrap the entire payout request in a transaction with
     // FOR UPDATE on the account row to prevent double-payout race condition.
@@ -224,18 +247,8 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
         return res.status(400).json({ error: 'You already have a pending payout request' })
       }
 
-      // FIX (L-04): this used to issue its own `SELECT value FROM
-      // platform_settings WHERE key = 'profit_share_pct'` and then immediately
-      // discard the result -- getTenantSettings() below already resolves the
-      // same key, and its value won. One wasted round-trip per payout request,
-      // and two apparent sources of truth for the same number.
-      const payoutSettings = await getTenantSettings(['profit_share_pct'])
-      const rawProfitShare = parseFloat(payoutSettings.profit_share_pct)
-      if (!Number.isFinite(rawProfitShare) || rawProfitShare <= 0) {
-        logger.warn('[PAYOUTS] profit_share_pct missing or invalid - defaulting to 80%.')
-      }
-      const effectiveProfitSharePct = (Number.isFinite(rawProfitShare) && rawProfitShare > 0 ? rawProfitShare : 80) / 100
-      const amount_payable = parseFloat((amountNum * effectiveProfitSharePct).toFixed(2))
+      // profit_share_pct and amount_payable are resolved before BEGIN — see the
+      // note above pool.connect().
 
       // Ã¢â€â‚¬Ã¢â€â‚¬ Flag checks Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
       let is_flagged = false
@@ -310,7 +323,22 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
         logger.error('[payouts] Flag check error:', { error: flagErr.message })
       }
 
-      const idempotencyResult = await beginIdempotentRequest(pool, {
+      // `client`, not `pool` — two separate reasons, both load-bearing.
+      //
+      // DEADLOCK: this runs while `client` holds an open transaction with
+      // FOR UPDATE on the account row. Asking the same pool for a SECOND
+      // connection here means each in-flight payout holds one connection and
+      // waits for another. At DB_POOL_MAX concurrent requests every connection
+      // is held by a request waiting for one that will never be freed;
+      // connectionTimeoutMillis turns the deadlock into a 5s stall and a 500
+      // rather than a hang, but the endpoint still collapses under load.
+      //
+      // ATOMICITY: inside the transaction, the claim commits with the payout and
+      // rolls back with it. That removes the window where a crash between COMMIT
+      // and completeIdempotentRequest left a claim stuck in 'started' forever —
+      // permanently 409-ing every retry of that key, i.e. a trader who can never
+      // resubmit their withdrawal.
+      const idempotencyResult = await beginIdempotentRequest(client, {
         scope: 'payouts:request',
         actorId: req.user.userId,
         idempotencyKey: getIdempotencyKey(req)
@@ -329,7 +357,9 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
         await client.query('ROLLBACK')
         return res.status(409).json({ error: 'This payout request is already being processed.' })
       }
-      idempotencyClaim = idempotencyResult.claimId || null
+      // Scoped to the transaction that owns it, now that the claim lives and
+      // dies with that transaction rather than outliving the handler.
+      const idempotencyClaim = idempotencyResult.claimId || null
 
       const payout = await client.query(
         `INSERT INTO payouts
@@ -339,15 +369,27 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
         [req.user.userId, accountIdStr, amountNum, amount_payable, payment_method, paymentDetailsStr, is_flagged, flagReasons.join(' | ') || null]
       )
 
-      await client.query('COMMIT')
-
       const responseBody = {
         message: 'Payout request submitted successfully',
         payout: payout.rows[0]
       }
+      // Completed BEFORE the commit, so the claim and the payout land together.
       if (idempotencyClaim) {
-        await completeIdempotentRequest(pool, idempotencyClaim, 201, responseBody)
-        idempotencyClaim = null
+        await completeIdempotentRequest(client, idempotencyClaim, 201, responseBody)
+      }
+
+      await client.query('COMMIT')
+
+      // Payout destination is the hardest signal for a passing service to evade:
+      // however many accounts they run, they have to be paid somewhere. Hashed,
+      // never stored in plaintext here — see services/identitySignals.js.
+      const destinationSignal = normalizePayoutDestination(paymentDetailsStr)
+      if (destinationSignal) {
+        recordSignals(
+          req.user.userId,
+          [{ type: SIGNAL_TYPES.PAYOUT_DEST, value: destinationSignal }],
+          'payout'
+        )
       }
 
       if (payoutEmail) {
@@ -380,9 +422,11 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
     }
 
   } catch (error) {
-    if (idempotencyClaim) {
-      await abandonIdempotentRequest(pool, idempotencyClaim).catch(() => {})
-    }
+    // No abandonIdempotentRequest here any more: the claim is created on
+    // `client` inside the transaction, so any path that reaches this handler has
+    // already rolled it back. An explicit DELETE would target a row that no
+    // longer exists — harmless, but it would imply the claim outlives the
+    // transaction, which is exactly the confusion this restructuring removes.
     logger.error('Payout request error:', { error: error.message })
     res.status(500).json({ error: 'Could not submit payout request' })
   }
