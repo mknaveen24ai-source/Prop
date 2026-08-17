@@ -36,8 +36,36 @@ test('the read pool allows longer statements than the write pool', () => {
   )
 })
 
-test('the direct pool is small — only the scheduler locks use it', () => {
-  assert.ok(directPool.options.max <= 10)
+test('the direct pool can cover every advisory-locked scheduler job at once', () => {
+  // withAdvisoryLock holds a connection for the WHOLE job, not just the lock
+  // acquisition, so the pool needs one per job that can be in flight together —
+  // and their cadences coincide, so that is all of them.
+  //
+  // The bound is derived from the source rather than hardcoded: this previously
+  // asserted `max <= 10` against a pool of 5 while thirteen jobs used it, so the
+  // test passed while the overflow timed out and runLockedSchedulerJob's .catch
+  // swallowed it. The challenge engine silently skipped runs under load.
+  const src = read('services/schedulerService.js')
+  const lockNames = new Set(
+    [...src.matchAll(/runLockedSchedulerJob\(\s*'([^']+)'/g)].map((m) => m[1])
+  )
+
+  assert.ok(lockNames.size > 0, 'expected to find advisory-locked jobs to size against')
+  assert.ok(
+    directPool.options.max >= lockNames.size,
+    `direct pool max is ${directPool.options.max} but ${lockNames.size} advisory-locked jobs share it; ` +
+    'the overflow blocks for connectionTimeoutMillis and is then swallowed as a skipped run'
+  )
+})
+
+test('the direct pool stays far smaller than the write pool', () => {
+  // The other half of the sizing. It bypasses PgBouncer, so every connection
+  // here is a real backend against max_connections — it must not drift into
+  // being a second general-purpose pool.
+  assert.ok(
+    directPool.options.max < pool.options.max / 2,
+    'direct pool should stay a fraction of the write pool'
+  )
 })
 
 test('the direct pool sets no statement_timeout', () => {

@@ -16,6 +16,7 @@ const { readPool } = require('./db')
 const { Server } = require('socket.io')
 const helmet = require('helmet')
 const { securityHeaders, apiLimiter, abuseDetector, createLimiter } = require('./utils/security')
+const { deviceSignatureMiddleware } = require('./utils/deviceSignature')
 const { securityMonitor } = require('./config/security-config')
 const logger = require('./utils/logger')
 const { initializeRedis, closeRedis } = require('./utils/tokenCache')
@@ -31,6 +32,9 @@ const { requestContextMiddleware } = require('./utils/requestContext')
 const prometheusMetrics = require('./utils/prometheusMetrics')
 const { getSystemHealth } = require('./utils/systemHealth')
 const { isAllowedOrigin } = require('./utils/allowedOrigins')
+
+// ── Process role (which workloads this instance takes on) ─────────────────────
+const role = require('./config/role')
 
 // ── Services (extracted from the old monolithic server.js) ────────────────────
 const { configureSocket, attachRedisAdapter } = require('./services/socketService')
@@ -207,6 +211,10 @@ logger.info('[startup] Express trust proxy configured', { trustProxy: trustProxy
 
 app.use(securityHeaders)
 app.use(abuseDetector)
+// Parses the X-Device-Signature header into req.deviceSignature for the
+// account-sharing detector. Size-capped and never throws; a malformed or absent
+// header simply leaves req.deviceSignature undefined.
+app.use(deviceSignatureMiddleware)
 app.use(performanceMonitor)
 app.use(apiLimiter)
 app.use(securityMonitor.checkAttackPatterns)
@@ -215,6 +223,24 @@ app.use(securityMonitor.checkAttackPatterns)
 const authLimiter = createLimiter('auth', { windowMs: 1 * 60 * 1000,  max: 10, message: { error: 'Too many attempts. Wait 1 minute.' },                    standardHeaders: true, legacyHeaders: false })
 const trackLimiter = createLimiter('track', { windowMs: 60 * 1000,      max: 20, message: { error: 'Too many tracking events.' },                          standardHeaders: true, legacyHeaders: false })
 
+// ── Socket.IO transport policy ────────────────────────────────────────────────
+// Long-polling stays enabled by DEFAULT and that is deliberate. The client asks
+// for ['websocket', 'polling'] (pages/dashboard/hooks/useDashboardSocket.js)
+// because some corporate and mobile networks block WebSocket upgrades outright,
+// and a trader on one of those needs the fallback more than the server needs the
+// saving. Forcing websocket-only here would cut them off with no error anyone
+// would think to look for.
+//
+// It IS worth turning off once you know your clients can reach you over
+// WebSocket: polling costs roughly one HTTP request per client per broadcast
+// window, and it is the reason the socket upstream needs sticky routing at all
+// (see deploy/nginx/propfirm.scaleout.conf). So it is an env switch rather than
+// a code change: SOCKET_TRANSPORTS=websocket.
+const SOCKET_TRANSPORTS = String(process.env.SOCKET_TRANSPORTS || 'websocket,polling')
+  .split(',')
+  .map((value) => value.trim().toLowerCase())
+  .filter((value) => value === 'websocket' || value === 'polling')
+
 const io = new Server(httpServer, {
   cors: {
     origin: function (origin, callback) {
@@ -222,11 +248,44 @@ const io = new Server(httpServer, {
     },
     methods: ['GET', 'POST'],
     credentials: true
-  }
+  },
+  transports: SOCKET_TRANSPORTS.length > 0 ? SOCKET_TRANSPORTS : ['websocket', 'polling'],
+
+  // Default is 1 MB, per socket, per frame. Nothing a client legitimately sends
+  // comes close: the largest is a subscribe_instruments list, capped at 60
+  // symbols by realtimeFanout.MAX_SUBSCRIPTIONS — under 1 KB. At 10K sockets the
+  // default is a cheap way for connected clients to make the gateway allocate
+  // gigabytes, and it is the one socket limit with no legitimate use.
+  maxHttpBufferSize: 16 * 1024,
+
+  // Defaults are 20s/25s, so a client that vanishes without a FIN — a laptop
+  // lid, a dropped mobile connection — is only reaped after up to 45s. Until
+  // then it holds a socketRegistry entry, its room memberships and its write
+  // buffer. That is tolerable at hundreds of sockets and is 10K stale entries
+  // during a gateway restart at the target scale.
+  //
+  // 20s/15s brings the worst case to 35s while staying forgiving enough for a
+  // phone on a bad connection: price and equity frames are volatile, so a slow
+  // client drops frames rather than being disconnected for being slow.
+  pingInterval: 20000,
+  pingTimeout: 15000
 })
 
 // ── Socket.IO — auth middleware + connection handler (extracted to services) ──
-configureSocket(io, pool)
+// Engine and API nodes still construct `io`: the engine emits through it, and
+// the shutdown path closes it either way. What they must not do is accept
+// browsers, so they get a rejecting middleware instead of the auth + connection
+// handlers. Rejecting explicitly beats simply not registering handlers — a
+// misrouted client gets a clear error rather than an idle socket that silently
+// receives nothing.
+if (role.servesSockets()) {
+  configureSocket(io, pool)
+} else {
+  io.use(function rejectSocketsOnNonGatewayRole(socket, next) {
+    next(new Error(`Socket connections are not served by ROLE=${role.ROLE}`))
+  })
+}
+require('./services/realtimeFanout').attach(io)
 setNewsIo(io)
 setWeekendIo(io)
 setFlatByCloseIo(io)
@@ -247,7 +306,7 @@ app.use(sentryRequestHandler())
 app.use(sentryTracingHandler())
 
 app.use(helmet({
-  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'", 'https://s3.tradingview.com'], styleSrc: ["'self'", "'unsafe-inline'"], imgSrc: ["'self'", 'data:', 'https:'], connectSrc: ["'self'", 'wss:'], fontSrc: ["'self'"], frameSrc: ['https://www.tradingview.com', 'https://s.tradingview.com', 'https://www.tradingview-widget.com'], objectSrc: ["'none'"], upgradeInsecureRequests: [] } } : false,
+  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'", 'https://s3.tradingview.com'], styleSrc: ["'self'", "'unsafe-inline'"], imgSrc: ["'self'", 'data:', 'https:'], connectSrc: ["'self'", 'wss:'], fontSrc: ["'self'"], frameSrc: ['https://www.tradingview.com', 'https://s.tradingview.com', 'https://www.tradingview-widget.com'], frameAncestors: ["'none'"], objectSrc: ["'none'"], upgradeInsecureRequests: [] } } : false,
   crossOriginEmbedderPolicy: false,
   hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
   frameguard: { action: 'deny' },
@@ -266,6 +325,24 @@ app.use(cookieParser())
 app.disable('x-powered-by')
 app.use(logger.httpMiddleware)
 app.use(prometheusMetrics.metricsMiddleware)
+
+// ─── Role guard ───────────────────────────────────────────────────────────────
+// Nodes that do not serve the API answer 503 to everything except the endpoints
+// that keep them observable. Deliberately mounted AFTER the logging and metrics
+// middleware so a misrouted request still shows up on a graph instead of
+// vanishing.
+//
+// The load balancer is the primary enforcement — an engine node should not be in
+// its pool at all. This is the second line: a config mistake becomes an obvious
+// 503 rather than an engine node quietly serving traffic while its event loop is
+// busy running the tick that decides whether somebody's stop-loss fires.
+if (!role.servesHttp()) {
+  const OBSERVABILITY_PATHS = ['/api/health', '/api/price-status', '/api/metrics', '/api/metrics/prometheus']
+  app.use(function roleHttpGuard(req, res, next) {
+    if (OBSERVABILITY_PATHS.includes(req.path)) return next()
+    res.status(503).json({ error: `This node runs ROLE=${role.ROLE} and does not serve API traffic` })
+  })
+}
 
 // ─── Secure uploads ───────────────────────────────────────────────────────────
 const uploadsRoot = path.resolve(__dirname, 'uploads')
@@ -543,7 +620,12 @@ app.get('/api/price-status', async function (req, res) {
         mode: String(process.env.ENGINE_MODE || 'interval').trim().toLowerCase(),
         event_path_armed: require('./services/priceBroadcast').isEngineEnabled(),
         ...require('./services/tradeEngine').getEngineStats()
-      }
+      },
+      // Fan-out counters. `priceInstrumentsEmitted / priceFramesEmitted` is the
+      // delta compression actually being achieved — near 45 would mean the full
+      // map is still going out and something has regressed.
+      fanout: require('./services/realtimeFanout').getFanoutStats(),
+      role: role.describe()
     })
   } catch (error) {
     logger.error('Price status error:', { error: error.message })
@@ -579,11 +661,30 @@ app.use(function (err, req, res, next) {
 
 
 async function startBackgroundWork() {
+  // Gateways and API nodes must never build a trade index or start a scheduler.
+  // A second index would hold a stale view of trades another process opened and
+  // closed, and would disagree with it about floating PnL — the sweeps are
+  // advisory-locked so they would not double-act, but the index is not, and
+  // nothing would tell you it had drifted.
+  if (!role.runsEngine()) {
+    logger.info('[role] engine workloads disabled on this node', role.describe())
+    return
+  }
+
   // ─── Start price feed pipeline ────────────────────────────────────────────────
-  startPriceFeedPipeline(io, { registerTrackedInterval, registerTrackedTimeout })
-    .catch((error) => {
-      logger.error('Failed to start price feed pipeline:', { error: error.message })
-    })
+  // Awaited, unlike before: startAllSchedulers below must know whether the event
+  // engine actually ARMED, and that is only decided inside this call. Reading
+  // ENGINE_MODE instead meant a failed initializeEngine() left the interval loops
+  // demoted to their 5s safety cadence while being the only path left — a silent
+  // 10x regression in stop-loss reaction.
+  //
+  // This costs no startup latency: startBackgroundWork() is itself called without
+  // await from startServer(), so httpServer.listen() is not behind it.
+  try {
+    await startPriceFeedPipeline(io, { registerTrackedInterval, registerTrackedTimeout })
+  } catch (error) {
+    logger.error('Failed to start price feed pipeline:', { error: error.message })
+  }
 
   // ─── Start news service and schedulers ────────────────────────────────────────
   startNewsService()
@@ -601,7 +702,12 @@ async function startBackgroundWork() {
     pruneOldPriceHistory:          require('./priceFeed').pruneOldPriceHistory,
     syncHourlyPriceHistory:        require('./priceFeed').syncHourlyPriceHistory,
     syncDedicatedPriceFeedWatchers: require('./priceFeed').syncDedicatedPriceFeedWatchers,
-    processQueuedNotifications:    require('./services/notificationDeliveryService').processQueuedNotifications
+    processQueuedNotifications:    require('./services/notificationDeliveryService').processQueuedNotifications,
+    runAccountLinkingScan:         require('./services/accountLinkingService').runAccountLinkingScan,
+    pruneIdentitySignals:          require('./services/accountLinkingService').pruneIdentitySignals,
+    reapIdempotencyClaims:         require('./utils/idempotency').reapIdempotencyClaims
+  }, {
+    eventEngineArmed: require('./services/priceBroadcast').isEngineEnabled()
   })
 }
 
@@ -616,13 +722,21 @@ async function startServer() {
     // client. Without it, Socket.IO rooms are per-process and any second
     // instance silently drops roughly half of all realtime events.
     await attachRedisAdapter(io)
+    // Engine→gateway bridge for price deltas and batched equity. A no-op under
+    // ROLE=all, where the engine and the sockets are the same process and a
+    // Redis hop would be pure overhead.
+    await require('./services/realtimeFanout').startRedisBridge()
     await initializeKafka()
 
     // Only now is it safe: the startup DDL has run and Redis is connected.
     startBackgroundWork()
 
     httpServer.listen(PORT, function () {
-      logger.info('Server started:', { port: PORT, env: process.env.NODE_ENV || 'development' })
+      logger.info('Server started:', {
+        port: PORT,
+        env: process.env.NODE_ENV || 'development',
+        ...role.describe()
+      })
     })
 
     async function gracefulShutdown(signal) {
@@ -640,6 +754,9 @@ async function startServer() {
       if (typeof forceExitTimer.unref === 'function') forceExitTimer.unref()
 
       clearTrackedTimers()
+      // Before io.close(): the bridge's subscriber would otherwise keep pushing
+      // frames at sockets that are being torn down.
+      try { await require('./services/realtimeFanout').stopRedisBridge() } catch (error) { logger.warn('Failed to stop realtime fan-out cleanly', { error: error.message }) }
       try { stopNewsService() } catch (error) { logger.warn('Failed to stop news service cleanly', { error: error.message }) }
       try { stopPriceFeedWatchers?.() } catch (error) { logger.warn('Failed to stop price feed watchers cleanly', { error: error.message }) }
       try { await new Promise((resolve) => io.close(() => resolve())) } catch (error) { logger.warn('Socket.IO close error during shutdown', { error: error.message }) }

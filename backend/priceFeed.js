@@ -6,6 +6,7 @@ require('./loadEnv')
 const logger = require('./utils/logger')
 const { INSTRUMENTS, DEFAULT_SPREADS, getPointMultiplier, getPriceDecimals } = require('./constants')
 const { getInstrumentSpreadMarkup } = require('./utils/tenantSettings')
+const { recordPriceFeedIngest } = require('./utils/prometheusMetrics')
 const { getTenantFeedConfig, getTenantSettings } = require('./services/tenantPolicyService')
 const {
   SHARED_FEED_SOURCE_KEY,
@@ -226,9 +227,32 @@ function stopPriceFeedWatchers() {
   dedicatedSourceWatchers.clear()
 }
 
-function getFileChangeSignature(filePath) {
+/**
+ * Readable-check for the per-tick path, in one async syscall.
+ *
+ * Replaces `fs.existsSync(p) || !canReadFile(p)` — two blocking syscalls where
+ * access(R_OK) already answers both questions. canReadFile stays for the watcher
+ * ATTACH paths, which are synchronous by shape and run once rather than per tick.
+ */
+async function isReadableFile(filePath) {
   try {
-    const stats = fs.statSync(filePath)
+    await fs.promises.access(filePath, fs.constants.R_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Size+mtime fingerprint used to skip re-parsing an unchanged feed file.
+ *
+ * Async because this runs on every tick. fs.statSync here blocked the event loop
+ * that is simultaneously serving every connected socket — cheap per call, and
+ * directly in the path the sub-100ms target is measured along.
+ */
+async function getFileChangeSignature(filePath) {
+  try {
+    const stats = await fs.promises.stat(filePath)
     return `${stats.size}:${stats.mtimeMs}`
   } catch {
     return null
@@ -251,28 +275,31 @@ function buildRealtimePriceMap(priceRows = [], updatedAt = new Date()) {
   )
 }
 
-function readDWXFileSafe(filePath, maxRetries = 3, delayMs = 50) {
-  return new Promise((resolve, reject) => {
-    let attempts = 0
-
-    function attempt() {
-      try {
-        const raw = fs.readFileSync(filePath, 'utf8').trim()
-        resolve(raw)
-      } catch (err) {
-        if (err.code === 'EBUSY' && attempts < maxRetries) {
-          attempts++
-          setTimeout(attempt, delayMs)
-        } else if (err.code === 'EBUSY') {
-          resolve(null)
-        } else {
-          reject(err)
-        }
-      }
+/**
+ * Read a DWX file, retrying past the EBUSY window while MT5 rewrites it.
+ *
+ * The retry loop is why this exists: the terminal truncates and rewrites the
+ * market data file in place, so a read landing mid-write fails with EBUSY on
+ * Windows rather than returning a partial file.
+ *
+ * Uses fs.promises.readFile, not readFileSync. The old version returned a
+ * Promise while doing a BLOCKING read inside it — the shape said async and the
+ * behaviour was not, which is the kind of thing that never shows up in a
+ * profile of this function and shows up as latency jitter everywhere else. It
+ * runs on the fs.watch callback, i.e. once per price tick, on the event loop
+ * that is also serving every socket.
+ */
+async function readDWXFileSafe(filePath, maxRetries = 3, delayMs = 50) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const raw = await fs.promises.readFile(filePath, 'utf8')
+      return raw.trim()
+    } catch (err) {
+      if (err.code !== 'EBUSY') throw err
+      if (attempt >= maxRetries) return null
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
     }
-
-    attempt()
-  })
+  }
 }
 
 function parseMt5ExportTimestampMs(value) {
@@ -586,7 +613,8 @@ async function fetchAndStorePrices() {
     return sharedFetchInFlightPromise
   }
 
-  sharedFetchInFlightPromise = (async () => {
+  const ingestStartedAt = process.hrtime.bigint()
+  const run = (async () => {
   if (!MARKET_DATA_FILE) {
     setSourceRuntimeState(SHARED_FEED_SOURCE_KEY, {
       live_feed_available: false,
@@ -602,7 +630,7 @@ async function fetchAndStorePrices() {
   }
 
   try {
-    if (!fs.existsSync(MARKET_DATA_FILE) || !canReadFile(MARKET_DATA_FILE)) {
+    if (!(await isReadableFile(MARKET_DATA_FILE))) {
       setSourceRuntimeState(SHARED_FEED_SOURCE_KEY, {
         live_feed_available: false,
         market_data_configured: true,
@@ -620,7 +648,7 @@ async function fetchAndStorePrices() {
       return { updated: false, liveFeedAvailable: false, reason: 'market_data_missing' }
     }
 
-    const fileSignature = getFileChangeSignature(MARKET_DATA_FILE)
+    const fileSignature = await getFileChangeSignature(MARKET_DATA_FILE)
     if (fileSignature && fileSignature === lastProcessedSharedMarketDataSignature && lastProcessedSharedRealtimePrices) {
       setSourceRuntimeState(SHARED_FEED_SOURCE_KEY, {
         live_feed_available: true,
@@ -689,7 +717,28 @@ async function fetchAndStorePrices() {
     })
     return { updated: false, liveFeedAvailable: false, reason: 'market_data_error', error: error.message }
   }
-  })().finally(() => {
+  })()
+
+  // Measured around the whole chain — stat, read, parse, and the throttled
+  // persistence — because that is exactly the work that happens before the
+  // engine sees a new price. It is the one segment of the stop-loss reaction
+  // path that was never on a graph, and it decides whether moving the feed into
+  // its own process would buy latency or only isolation.
+  //
+  // Observed on `run` rather than on the returned promise, and with BOTH
+  // handlers supplied, so this branch can never reject: an unhandled rejection
+  // from a metrics chain would be a fine way to take down the feed for the sake
+  // of a histogram.
+  run.then(
+    (result) => recordPriceFeedIngest(
+      result?.reason || (result?.updated ? 'updated' : 'unknown'),
+      Number(process.hrtime.bigint() - ingestStartedAt) / 1e6
+    ),
+    () => recordPriceFeedIngest('threw', Number(process.hrtime.bigint() - ingestStartedAt) / 1e6)
+  )
+
+  // Callers get the settle-and-clear promise, exactly as before.
+  sharedFetchInFlightPromise = run.finally(() => {
     sharedFetchInFlightPromise = null
   })
 
@@ -958,7 +1007,7 @@ async function fetchAndStoreDedicatedSourcePrices(source) {
   if (!sourceKey || !files.marketDataFile) return
 
   try {
-    if (!fs.existsSync(files.marketDataFile) || !canReadFile(files.marketDataFile)) {
+    if (!(await isReadableFile(files.marketDataFile))) {
       await markPriceFeedSourceError(sourceKey, 'DWX market data file not found')
       setSourceRuntimeState(sourceKey, {
         live_feed_available: false,

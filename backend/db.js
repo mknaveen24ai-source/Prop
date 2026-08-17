@@ -1,5 +1,6 @@
 const { Pool } = require('pg')
 const logger = require('./utils/logger')
+const role = require('./config/role')
 require('./loadEnv')
 
 const isNodeTest = process.env.NODE_ENV === 'test' || process.argv.includes('--test')
@@ -12,10 +13,27 @@ const isNodeTest = process.env.NODE_ENV === 'test' || process.argv.includes('--t
 //
 // connectionTimeoutMillis and statement_timeout were previously unset, so a
 // wedged connection or a runaway query could hang indefinitely.
+
+/**
+ * Default write-pool size for this process's role.
+ *
+ * A gateway serves sockets and nothing else. Its only recurring query is the
+ * five-minute session re-check per socket (services/socketService.js), so 60
+ * connections would be 55 idle ones — and idle connections are not free: every
+ * replica multiplies them against the same `max_connections`, which is the
+ * ceiling that actually bites when you scale out.
+ *
+ * `all` keeps 60 exactly as before, so a deploy that does not set ROLE is
+ * unchanged.
+ */
+function defaultWritePoolMax() {
+  return role.ROLE === 'gateway' ? 10 : 60
+}
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   allowExitOnIdle: true,
-  max: Number(process.env.DB_POOL_MAX) || 60,
+  max: Number(process.env.DB_POOL_MAX) || defaultWritePoolMax(),
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
   statement_timeout: 30000
@@ -101,11 +119,19 @@ readPool.__rawQuery = readPool.query.bind(readPool)
 //
 // Point DIRECT_DATABASE_URL at Postgres itself, bypassing any pooler. Without
 // PgBouncer this is simply DATABASE_URL and the distinction costs nothing.
-// Small on purpose: only the scheduler locks use it.
+//
+// Sizing: withAdvisoryLock holds one connection for the WHOLE job, not just the
+// lock acquisition, so this needs one connection per job that can be in flight
+// at once — not one per job that exists. schedulerService starts fourteen, and
+// their cadences coincide: at t=30s the challenge, competition, referral-season,
+// SL/TP, pending-order, drawdown, news and notification jobs all fire together.
+// At max=5 the overflow blocked for connectionTimeoutMillis and then threw, and
+// runLockedSchedulerJob's .catch swallowed it — so the challenge engine silently
+// skipped runs under exactly the load where it matters most.
 const directPool = new Pool({
   connectionString: process.env.DIRECT_DATABASE_URL || process.env.DATABASE_URL,
   allowExitOnIdle: true,
-  max: Number(process.env.DB_DIRECT_POOL_MAX) || 5,
+  max: Number(process.env.DB_DIRECT_POOL_MAX) || 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000
   // No statement_timeout: this pool holds a lock while a scheduler job runs,

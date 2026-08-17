@@ -13,6 +13,9 @@ const jwt = require('jsonwebtoken')
 const logger = require('../utils/logger')
 const { BUILT_IN_ROLES } = require('../routes/middleware')
 const { getRedisClient } = require('../utils/tokenCache')
+const { isValidUUID } = require('../utils/validation')
+const socketRegistry = require('./socketRegistry')
+const realtimeFanout = require('./realtimeFanout')
 
 // How often a live socket re-checks that its session is still good. The
 // handshake alone is not enough: a Socket.IO connection can outlive a ban or a
@@ -126,7 +129,11 @@ function buildSocketAuthMiddleware(pool) {
         // this handshake was granted on.
         socket.data.tokenVersion = userDecoded.tv
         socket.join(socket.data.userId)
-        socket.join('prices')
+        // Default to receiving every instrument. A client that calls
+        // subscribe_instruments is moved out of this room and pays only for what
+        // it asked for; one that never does keeps today's behaviour, still as a
+        // delta rather than the full map.
+        socket.join(realtimeFanout.ALL_PRICES_ROOM)
       }
 
       if (adminDecoded) {
@@ -154,6 +161,19 @@ function buildSocketAuthMiddleware(pool) {
  * The first tick is jittered across the window: without it every socket
  * connected during a restart would re-query in the same instant, which at a few
  * thousand traders is a self-inflicted thundering herd on the pool.
+ *
+ * ── Do not route this through utils/tokenCache ──
+ *
+ * It looks like an obvious optimisation and it is not. That cache is what the
+ * HTTP path reads, and its own documentation names this function as the reason a
+ * failed cache invalidation is survivable: HTTP access can go stale for up to
+ * CACHE_TTL, but a live WebSocket is cut because THIS check goes straight to the
+ * database. Reading the cache here would remove that second line of defence and
+ * let a banned trader keep a live feed for the whole TTL.
+ *
+ * The load it would save does not justify that. One query per socket per five
+ * minutes is ~33/second at 10,000 connections — noise next to everything else on
+ * the pool, and spread flat by the jitter above.
  */
 function startSessionRevalidation(pool, socket) {
   const firstDelay = Math.floor(Math.random() * SESSION_REVALIDATE_MS)
@@ -213,6 +233,28 @@ function buildConnectionHandler(pool) {
     })
 
     startSessionRevalidation(pool, socket)
+    // Per-user events (equity snapshots) are written straight to local sockets
+    // rather than through a room, so the Redis adapter does not turn each one
+    // into its own publish. See services/socketRegistry.js.
+    socketRegistry.register(socket)
+
+    // ── subscribe_instruments ─────────────────────────────────────────────────
+    // Narrows this socket's price feed to the instruments it actually displays:
+    // the open chart, the watchlist and whatever it holds positions in. A trader
+    // watching one symbol stops being sent the other 44.
+    //
+    // Unauthenticated by design beyond the handshake — prices are the same
+    // public quotes for everyone, so there is nothing to authorise. The only
+    // limit is on list length, so one client cannot make the server join
+    // thousands of rooms.
+    socket.on('subscribe_instruments', function (instruments) {
+      try {
+        const result = realtimeFanout.setSocketSubscriptions(socket, instruments)
+        socket.emit('subscribed_instruments', result)
+      } catch (error) {
+        logger.warn('Socket subscribe_instruments failed:', { socketId: socket.id, error: error.message })
+      }
+    })
 
     // ── join_account ──────────────────────────────────────────────────────────
     socket.on('join_account', async function (userId) {
@@ -224,7 +266,13 @@ function buildConnectionHandler(pool) {
           socket.join(requested); return
         }
 
-        if (/^\d+$/.test(requested)) {
+        // UUID, not digits. users.id has been `uuid DEFAULT gen_random_uuid()`
+        // since the core schema — the old /^\d+$/ guard is a leftover from the
+        // pre-UUID ids and could never match a real user, so every admin
+        // join_account fell through to "Unauthorized room join". The membership
+        // check below is the actual authorisation; the format check only keeps
+        // a malformed id from reaching the query as a cast error.
+        if (isValidUUID(requested)) {
           try {
             const result = await pool.query(
               `SELECT id FROM users WHERE id = $1 LIMIT 1`,
@@ -314,6 +362,7 @@ function buildConnectionHandler(pool) {
     // ── disconnect ────────────────────────────────────────────────────────────
     socket.on('disconnect', function () {
       stopSessionRevalidation(socket)
+      socketRegistry.unregister(socket)
       logger.http('Socket disconnected:', { socketId: socket.id })
     })
   }

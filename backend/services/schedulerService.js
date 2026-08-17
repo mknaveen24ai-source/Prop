@@ -37,6 +37,10 @@ const EVENT_FALLBACK_CADENCES = {
 const PEAK_EQUITY_FLUSH_MS = 1000
 const INDEX_RECONCILE_MS = 30000
 
+/**
+ * What the operator ASKED for. Not the same thing as what the engine is
+ * actually doing — see startAllSchedulers' eventEngineArmed option.
+ */
 function isEventMode() {
   return String(process.env.ENGINE_MODE || 'interval').trim().toLowerCase() === 'event'
 }
@@ -97,8 +101,12 @@ function runLockedSchedulerJob(lockName, label, fn) {
  *   syncDedicatedPriceFeedWatchers: Function,
  *   processQueuedNotifications: Function,
  * }} deps
+ * @param {{ eventEngineArmed?: boolean }} [options]
+ *   Whether the event engine ACTUALLY armed, from priceBroadcast.isEngineEnabled().
+ *   Omitted, it falls back to the ENGINE_MODE env var, which is what the operator
+ *   asked for rather than what happened — see the demotion guard below.
  */
-function startAllSchedulers(io, deps) {
+function startAllSchedulers(io, deps, options = {}) {
   const {
     checkSLTP,
     checkPendingOrders,
@@ -113,12 +121,42 @@ function startAllSchedulers(io, deps) {
     pruneOldPriceHistory,
     syncHourlyPriceHistory,
     syncDedicatedPriceFeedWatchers,
-    processQueuedNotifications
+    processQueuedNotifications,
+    runAccountLinkingScan,
+    pruneIdentitySignals,
+    reapIdempotencyClaims
   } = deps
 
   // ── Trading engine ──────────────────────────────────────────────────────────
-  const eventMode = isEventMode()
-  const cadences = eventMode ? EVENT_FALLBACK_CADENCES : INTERVAL_CADENCES
+  //
+  // Cadence follows what the engine IS doing, not what ENGINE_MODE asked for.
+  //
+  // These two used to be the same value, and the gap between them was the whole
+  // bug: startPriceFeedPipeline sets _engineEnabled = false if initializeEngine()
+  // throws (a bad index build, an unreachable database at boot), but the env var
+  // still said `event`. The loops were therefore demoted to the 5s/5s/10s safety
+  // net at the exact moment they became the ONLY path — so stop-loss reaction
+  // silently went from 50-80ms to five seconds, with one log line as the only
+  // signal anywhere.
+  //
+  // Falling back to the env var when the caller passes nothing keeps the old
+  // behaviour for any caller that has not been updated (today: the tests).
+  const eventEngineArmed = options.eventEngineArmed === undefined
+    ? isEventMode()
+    : Boolean(options.eventEngineArmed)
+
+  if (isEventMode() && !eventEngineArmed) {
+    // Loud, and phrased so the consequence is in the message rather than left to
+    // be inferred from the cadence numbers.
+    logger.error(
+      '[schedulerService] ENGINE_MODE=event but the event engine did NOT arm. ' +
+      'Falling back to the full interval cadences so stop-loss reaction stays at ' +
+      `${INTERVAL_CADENCES.checkSLTP}ms instead of degrading to ` +
+      `${EVENT_FALLBACK_CADENCES.checkSLTP}ms. Investigate the engine init failure logged above.`
+    )
+  }
+
+  const cadences = eventEngineArmed ? EVENT_FALLBACK_CADENCES : INTERVAL_CADENCES
 
   registerTrackedInterval(function () {
     runLockedSchedulerJob('jobs:check_sltp', 'check_sltp', () => checkSLTP(io))
@@ -133,7 +171,10 @@ function startAllSchedulers(io, deps) {
   }, cadences.checkFloatingDrawdown)
 
   // ── Event-engine upkeep ─────────────────────────────────────────────────────
-  if (eventMode) {
+  // Gated on "armed", not on the env var: reconcileIndex against an index that
+  // was never built is noise at best, and flushDirtyPeaks has nothing to flush
+  // when no tick is running.
+  if (eventEngineArmed) {
     const tradeEngine = require('./tradeEngine')
 
     // Peak equity / locked floors accumulated by the tick, written as one bulk
@@ -152,7 +193,7 @@ function startAllSchedulers(io, deps) {
       })
     }, INDEX_RECONCILE_MS)
 
-    logger.info('[schedulerService] ENGINE_MODE=event — trading loops demoted to safety fallbacks', cadences)
+    logger.info('[schedulerService] event engine armed — trading loops demoted to safety fallbacks', cadences)
   }
 
   // ── Challenge engine ────────────────────────────────────────────────────────
@@ -212,6 +253,36 @@ function startAllSchedulers(io, deps) {
     registerTrackedInterval(() => {
       runLockedSchedulerJob('jobs:notification_delivery', 'notification_delivery', () => processQueuedNotifications(io))
     }, 20 * 1000)
+  }
+
+  // ── Account sharing / passing-service detection ─────────────────────────────
+  // A batch analytic over identity_signals and recent trades, not a hot path —
+  // 15 minutes is well inside the window in which an admin would act on a
+  // finding, and keeps the pairwise simultaneity scoring off the trading loop.
+  if (runAccountLinkingScan) {
+    registerTrackedInterval(() => {
+      runLockedSchedulerJob('jobs:account_linking', 'account_linking', runAccountLinkingScan)
+    }, 15 * 60 * 1000)
+  }
+
+  // ── Idempotency claim reaper ────────────────────────────────────────────────
+  // Two jobs in one: delete claims abandoned by a process that died mid-request
+  // (without this a crashed payout permanently 409s every retry of that key —
+  // a trader who can never resubmit their withdrawal), and expire completed
+  // claims, which nothing ever deleted. Hourly is far tighter than the 15-minute
+  // stale threshold and the 7-day retention both need.
+  if (reapIdempotencyClaims) {
+    registerTrackedInterval(() => {
+      runLockedSchedulerJob('jobs:idempotency_reap', 'idempotency_reap', reapIdempotencyClaims)
+    }, 60 * 60 * 1000)
+  }
+
+  // identity_signals grows with every login and trade; nothing older than the
+  // 30-day detection lookback is ever read.
+  if (pruneIdentitySignals) {
+    registerTrackedInterval(() => {
+      runLockedSchedulerJob('jobs:identity_signal_prune', 'identity_signal_prune', pruneIdentitySignals)
+    }, 24 * 60 * 60 * 1000)
   }
 
   // ── Price feed maintenance ──────────────────────────────────────────────────
