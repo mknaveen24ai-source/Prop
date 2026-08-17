@@ -13,7 +13,12 @@ const { checkSLTP } = require('../services/tradeEngine')
 // test: it makes the loser return zero rows immediately instead of blocking
 // until the winner commits and then closing an already-closed trade.
 
-const OPEN_TRADES_QUERY = /FROM trades t\s+JOIN accounts a ON t\.account_id = a\.id\s+WHERE t\.status = 'open'\s+AND \(/
+// Matched on the SL/TP clause rather than on "the first AND after status".
+// checkSLTP now also filters a.status = 'active' (it walked failed and passed
+// accounts before), which made a position-based pattern ambiguous with
+// checkFloatingDrawdown's query. The stop_loss/take_profit predicate is what
+// actually distinguishes this one.
+const OPEN_TRADES_QUERY = /FROM trades t\s+JOIN accounts a[\s\S]*t\.stop_loss IS NOT NULL/
 const OPEN_TIME = new Date(Date.now() - 10 * 60 * 1000)
 
 const TRIGGERED_TRADE = {
@@ -40,6 +45,15 @@ function makeMockClient({ lockRows = [{ id: 'trade-race' }] } = {}) {
     release() {}
   }
 }
+
+// See challengeEngineLifecycle.test.js — `pool` is a shared singleton, so the
+// mock has to be put back or it leaks into every suite that runs after this one.
+const REAL_POOL_QUERY = pool.query
+const REAL_POOL_CONNECT = pool.connect
+test.after(() => {
+  pool.query = REAL_POOL_QUERY
+  pool.connect = REAL_POOL_CONNECT
+})
 
 function installPoolMock(client) {
   pool.query = async (sql) => {

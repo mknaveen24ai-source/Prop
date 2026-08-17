@@ -85,13 +85,52 @@ test('both auto-close paths settle a priceless trade identically', () => {
   // FIX (M-04): autoCloseAndFail closed at open_price with zero PnL and carried
   // on, while autoCloseAndPass threw and aborted the whole promotion. A feed
   // outage therefore failed accounts but could never pass them.
+  //
+  // This used to assert that the string `close_price = open_price` appeared in
+  // both function bodies — i.e. that two independent copies of the rule happened
+  // to agree. They now share ONE decision (settlementFor), so the assertion is
+  // that neither has its own: a single implementation cannot drift from itself,
+  // which is a stronger guarantee than matching two copies of it.
   const failSource = functionBody('autoCloseAndFail', 'autoCloseAndPass', engineSource)
   const passSource = functionBody('autoCloseAndPass', 'checkFloatingDrawdown', engineSource)
 
   for (const [name, source] of [['autoCloseAndFail', failSource], ['autoCloseAndPass', passSource]]) {
-    assert.match(source, /close_price = open_price/, `${name} must settle a priceless trade flat`)
+    assert.match(
+      source, /settlementFor\(trade, priceMap\[trade\.instrument\]\)/,
+      `${name} must settle through the shared settlementFor, not its own copy of the rule`
+    )
     assert.doesNotMatch(source, /throw new Error\(`Missing live price/, `${name} must not abort on a missing price`)
+    assert.doesNotMatch(
+      source, /const close_price = trade\.direction === 'buy'/,
+      `${name} must not reintroduce its own close-price derivation`
+    )
   }
+})
+
+test('settlementFor closes a priceless trade flat, at the open price, for zero PnL', () => {
+  // The behaviour the assertions above delegate to. Worth testing directly now
+  // that it is one function: this is what makes a feed outage settle a trade the
+  // same way whether the account is failing or passing.
+  const { settlementFor } = require('../services/tradeEngine')
+
+  const trade = {
+    direction: 'buy',
+    open_price: '1.10000',
+    lot_size: '1',
+    instrument: 'EURUSD',
+    commission: '7'
+  }
+
+  const priceless = settlementFor(trade, null)
+  assert.equal(priceless.priceless, true)
+  assert.equal(priceless.closePrice, 1.1, 'a priceless trade closes at its open price')
+  assert.equal(priceless.pnl, 0, 'flat means zero PnL — not even the commission is charged')
+
+  // And the ordinary case still prices off the correct side of the book.
+  const priced = settlementFor(trade, { bid: 1.10500, ask: 1.10520 })
+  assert.equal(priced.priceless, false)
+  assert.equal(priced.closePrice, 1.105, 'a BUY closes at the bid')
+  assert.ok(priced.pnl > 0, 'a profitable buy should settle positive')
 })
 
 test('challengeEngine failAccount does not swallow close failures before failing account', () => {

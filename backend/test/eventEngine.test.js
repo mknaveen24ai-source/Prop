@@ -202,3 +202,41 @@ test('overlapping ticks coalesce instead of double-counting', async () => {
   const expected = calculatePnL('buy', 1.10000, 1.10100, 1, 'EURUSD', 0)
   assert.ok(Math.abs(tradeIndex.getFloatingPnl('acc-1') - expected) < 0.01)
 })
+
+test('a failed peak-equity flush is re-queued rather than dropped', async () => {
+  // These are the trailing-drawdown floors. Dropping a raise on a transient DB
+  // error leaves it in memory only, so after the next restart the index reloads
+  // the older, LOWER floor — and an account that should have breached does not.
+  // The failure is silent by construction, which is why it needs a test.
+  tradeIndex.upsertAccount(accountRow())
+  tradeIndex.addTrade(tradeRow('eur-1', 'EURUSD'))
+  tradeIndex.__setReadyForTest(true)
+
+  priceCache.__setPricesForTest({ EURUSD: price(1.10000) })
+  tradeEngine.reseedFloatingPnl()
+
+  // A move into profit raises equity above the starting balance, which is what
+  // makes resolveEffectiveFloor report a new peak and mark the account dirty.
+  priceCache.__setPricesForTest({ EURUSD: price(1.20000) })
+  await tradeEngine.onPriceTick(null, ['EURUSD'])
+
+  pool.query = async () => { throw new Error('connection terminated') }
+  assert.equal(await tradeEngine.flushDirtyPeaks(), 0, 'a failed flush writes nothing')
+
+  // The retry must still carry the account. Before the fix _dirtyPeaks was
+  // cleared before the write, so this second flush had nothing to send and
+  // returned without ever issuing a query.
+  let flushed = null
+  pool.query = async (sql, params) => {
+    flushed = { sql, params }
+    return { rows: [], rowCount: 1 }
+  }
+  const written = await tradeEngine.flushDirtyPeaks()
+
+  assert.equal(written, 1, 'the re-queued update must reach the database on retry')
+  assert.ok(flushed, 'the retry must issue a query')
+  assert.ok(
+    flushed.params[0].includes('acc-1'),
+    'the re-queued batch must still name the account whose floor moved'
+  )
+})

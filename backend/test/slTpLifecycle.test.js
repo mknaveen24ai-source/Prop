@@ -13,7 +13,9 @@ const { checkSLTP } = require('../services/tradeEngine')
 // Same mocking approach as the existing engine tests: swap the shared `pool`
 // singleton, then assert on the SQL the engine issued.
 
-const OPEN_TRADES_QUERY = /FROM trades t\s+JOIN accounts a ON t\.account_id = a\.id\s+WHERE t\.status = 'open'\s+AND \(/
+// The SL/TP predicate, not the first AND after status: checkSLTP now also
+// filters a.status = 'active', which shifted the clause this used to anchor on.
+const OPEN_TRADES_QUERY = /FROM trades t\s+JOIN accounts a[\s\S]*t\.stop_loss IS NOT NULL/
 
 // Well clear of the 60s default min hold time.
 const OPEN_TIME = new Date(Date.now() - 10 * 60 * 1000)

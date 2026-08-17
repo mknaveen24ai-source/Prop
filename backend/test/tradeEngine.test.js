@@ -55,8 +55,12 @@ function installPoolMock({ queryHandlers = [], connectClient = null } = {}) {
   return calls
 }
 
-const OPEN_TRADES_QUERY = /FROM trades t\s+JOIN accounts a ON t\.account_id = a\.id\s+WHERE t\.status = 'open'\s+AND \(/
-const DRAWDOWN_QUERY = /FROM trades t\s+JOIN accounts a ON t\.account_id = a\.id\s+WHERE t\.status = 'open'\s+AND a\.status = 'active'/
+// Both of these select open trades joined to active accounts — checkSLTP gained
+// the a.status filter it was missing — so they are told apart by what only one
+// of them asks for: checkSLTP by its SL/TP predicate, checkFloatingDrawdown by
+// the trailing-drawdown columns it needs.
+const OPEN_TRADES_QUERY = /FROM trades t\s+JOIN accounts a[\s\S]*t\.stop_loss IS NOT NULL/
+const DRAWDOWN_QUERY = /a\.eod_peak_equity, a\.eod_trailing_floor[\s\S]*FROM trades t\s+JOIN accounts a/
 const PENDING_ORDERS_QUERY = /FROM trades t\s+JOIN accounts a ON t\.account_id = a\.id\s+WHERE t\.status = 'pending'/
 
 test('checkSLTP closes a BUY trade when price falls to the stop loss and records the correct PnL', async () => {

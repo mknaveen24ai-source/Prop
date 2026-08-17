@@ -44,7 +44,7 @@ const tradingDaysService = require('./tradingDaysService')
 const { calculatePnL } = require('../utils/pnlCalculator')
 const { getUsdRateForInstrument } = require('../utils/fxRates')
 const { fetchStepModelBySlug } = require('../utils/stepModels')
-const { fetchProgressionSettings, promotePassedAccount } = require('./progressionService')
+const { createPendingPromotionReview } = require('./progressionService')
 const { getCurrentPricesForTenant } = require('../priceFeed')
 const { recordEngineTick, registerEngineStatsSource } = require('../utils/prometheusMetrics')
 const {
@@ -104,10 +104,16 @@ async function checkSLTP(io) {
        FROM trades t
        JOIN accounts a ON t.account_id = a.id
        WHERE t.status = 'open'
-       AND (
-         t.stop_loss IS NOT NULL
-         OR t.take_profit IS NOT NULL
-       )`
+         -- checkFloatingDrawdown has always filtered on this and checkSLTP did
+         -- not, so this pass walked open trades belonging to failed and passed
+         -- accounts too. Those are settled by autoCloseAndFail/Pass inside a
+         -- transaction, so acting on one here is at best wasted work on rows
+         -- that are about to be closed anyway.
+         AND a.status = 'active'
+         AND (
+           t.stop_loss IS NOT NULL
+           OR t.take_profit IS NOT NULL
+         )`
     )
 
     const priceMap = await getLivePriceMap()
@@ -485,12 +491,106 @@ async function fillPendingOrder(io, order, rules, priceMap, prices) {
   }
 }
 
+/**
+ * Close price and PnL for one position being force-settled.
+ *
+ * ── Why this is shared rather than written twice ──
+ *
+ * M-04 was exactly this logic drifting apart: autoCloseAndFail settled a trade
+ * with no live price flat at the open price and carried on, while
+ * autoCloseAndPass threw and aborted the whole promotion. A feed outage could
+ * therefore fail an account but never pass one — a house-favouring asymmetry
+ * that stranded traders who had legitimately hit their target.
+ *
+ * The two paths were then fixed to agree, and the agreement was guarded by a
+ * regex over both function bodies. One function is a better guarantee than two
+ * copies and a pattern match: there is now a single decision, so they cannot
+ * drift again.
+ *
+ * A priceless trade settles at `open_price` for zero PnL — flat, so the outcome
+ * never depends on which rule fired.
+ *
+ * @param {object} trade    row with direction, open_price, lot_size, instrument, commission
+ * @param {object|null} priceData  live bid/ask, or null/undefined when unavailable
+ * @returns {{ closePrice: number, pnl: number, priceless: boolean }}
+ */
+function settlementFor(trade, priceData) {
+  const openPrice = parseFloat(trade.open_price)
+
+  if (!priceData) {
+    return { closePrice: openPrice, pnl: 0, priceless: true }
+  }
+
+  // BUY closes at BID, SELL closes at ASK.
+  const closePrice = trade.direction === 'buy'
+    ? parseFloat(priceData.bid)
+    : parseFloat(priceData.ask)
+
+  return {
+    closePrice,
+    pnl: calculatePnL(
+      trade.direction,
+      openPrice,
+      closePrice,
+      parseFloat(trade.lot_size),
+      trade.instrument,
+      parseFloat(trade.commission || 0)
+    ),
+    priceless: false
+  }
+}
+
+/**
+ * Close a set of positions in ONE statement.
+ *
+ * Both auto-close paths used to issue an UPDATE per trade inside their
+ * transaction, holding the account row lock and every trade's FOR UPDATE lock
+ * across N sequential round-trips. That is the mass-breach path — the moment
+ * when the engine is least able to afford N of anything — and closeTriggeredTrades
+ * already had the bulk shape. This gives the other two the same one.
+ */
+async function bulkCloseTrades(client, settlements, closeReason) {
+  if (settlements.length === 0) return
+  await client.query(
+    `UPDATE trades SET
+       status = 'closed',
+       close_price = v.close_price,
+       close_time = NOW(),
+       demo_pnl = v.pnl,
+       close_reason = $4
+     FROM (
+       SELECT unnest($1::uuid[])    AS id,
+              unnest($2::numeric[]) AS close_price,
+              unnest($3::numeric[]) AS pnl
+     ) v
+     WHERE trades.id = v.id`,
+    [
+      settlements.map((s) => s.id),
+      settlements.map((s) => s.closePrice),
+      settlements.map((s) => s.pnl),
+      closeReason
+    ]
+  )
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // autoCloseAndFail — balance update race condition resolved.
 // Collects all trade PnLs first, then applies a single summed balance UPDATE
 // after all trades are closed inside the same transaction.
 // ─────────────────────────────────────────────────────────────────────────────
-async function autoCloseAndFail(acc, reason, io) {
+async function autoCloseAndFail(acc, reason, io, sharedPriceMap = null) {
+  // Fetched before BEGIN on purpose. getCurrentPricesForTenant() runs
+  // `SELECT * FROM price_feed` (plus a settings lookup) on a *separate* pool
+  // connection; issuing it mid-transaction held this account's row lock and the
+  // FOR UPDATE locks on every one of its open trades for the duration of an
+  // unrelated round-trip. Prices are a read-only snapshot either way, so
+  // hoisting changes nothing about the close arithmetic.
+  //
+  // sharedPriceMap lets a caller settling MANY accounts fetch it once instead of
+  // once per account — see settleAccountOutcomes. A market gap that breaches 500
+  // accounts issued 500 identical price queries. Same snapshot, same arithmetic.
+  const priceMap = sharedPriceMap || await getCurrentPricesForTenant()
+
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
@@ -509,11 +609,11 @@ async function autoCloseAndFail(acc, reason, io) {
        FROM trades WHERE account_id = $1 AND status = 'open' FOR UPDATE`,
       [acc.id]
     )
-    const priceMap = await getCurrentPricesForTenant()
 
     // FIX (AUDIT): Use Decimal accumulator — native float += on many trades
     // causes sub-penny rounding drift in the final balance update.
     let totalPnlDec = new Decimal(0)
+    const settlements = []
 
     for (const trade of openTrades.rows) {
       // FIX (M-03): this loop used to wrap each trade in its own try/catch and
@@ -526,53 +626,25 @@ async function autoCloseAndFail(acc, reason, io) {
       //
       // Now errors propagate to the outer handler, the transaction rolls back
       // cleanly, and the next engine pass retries the whole account.
-      {
-        const priceData = priceMap[trade.instrument]
-        if (!priceData) {
-          await client.query(
-            `UPDATE trades SET
-               status = 'closed',
-               close_price = open_price,
-               close_time = NOW(),
-               demo_pnl = 0,
-               close_reason = 'Account Failed'
-             WHERE id = $1`,
-            [trade.id]
-          )
-          continue
-        }
-
-        const close_price = trade.direction === 'buy'
-          ? parseFloat(priceData.bid)
-          : parseFloat(priceData.ask)
-
-        const demo_pnl = calculatePnL(
-          trade.direction,
-          parseFloat(trade.open_price),
-          close_price,
-          parseFloat(trade.lot_size),
-          trade.instrument,
-          parseFloat(trade.commission || 0)
-        )
-
-        totalPnlDec = totalPnlDec.plus(demo_pnl)
-
-        await client.query(
-          `UPDATE trades SET
-             status = 'closed',
-             close_price = $1,
-             close_time = NOW(),
-             demo_pnl = $2,
-             close_reason = 'Account Failed'
-           WHERE id = $3`,
-           [close_price, demo_pnl, trade.id]
-        )
+      //
+      // The loop no longer issues statements at all — it computes, and
+      // bulkCloseTrades writes every row in one. See settlementFor for the
+      // priceless case, which both auto-close paths now share.
+      const settlement = settlementFor(trade, priceMap[trade.instrument])
+      if (settlement.priceless) {
+        logger.warn(`autoCloseAndFail: no live price for ${trade.instrument} — closing trade ${trade.id} flat`, {
+          accountId: acc.id, tradeId: trade.id
+        })
       }
+      totalPnlDec = totalPnlDec.plus(settlement.pnl)
+      settlements.push({ id: trade.id, closePrice: settlement.closePrice, pnl: settlement.pnl })
     }
 
     // FIX (BUG-C001): Convert Decimal accumulator to number — was previously
     // referencing undefined `totalPnl` instead of `totalPnlDec`.
     const totalPnl = totalPnlDec.toDecimalPlaces(2).toNumber()
+
+    await bulkCloseTrades(client, settlements, 'Account Failed')
 
     // Single balance update after all trades are closed — no race condition
     if (totalPnl !== 0) {
@@ -662,7 +734,13 @@ async function autoCloseAndFail(acc, reason, io) {
 // ─────────────────────────────────────────────────────────────────────────────
 // autoCloseAndPass — same single-update pattern as autoCloseAndFail
 // ─────────────────────────────────────────────────────────────────────────────
-async function autoCloseAndPass(acc, io) {
+async function autoCloseAndPass(acc, io, sharedPriceMap = null) {
+  // Hoisted above BEGIN for the same reason as autoCloseAndFail: this is a read
+  // on a separate pool connection, and running it inside the transaction held
+  // the account and trade row locks across an unrelated round-trip.
+  // sharedPriceMap serves the same batching purpose as it does there.
+  const priceMap = sharedPriceMap || await getCurrentPricesForTenant()
+
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
@@ -685,71 +763,35 @@ async function autoCloseAndPass(acc, io) {
        FROM trades WHERE account_id = $1 AND status = 'open' FOR UPDATE`,
       [acc.id]
     )
-    const priceMap = await getCurrentPricesForTenant()
 
     const closeReason = acc.account_type === 'phase1' ? 'Phase 1 Passed' : 'Phase 2 Passed'
     // FIX (AUDIT): Use Decimal accumulator — native float += on many trades
     // causes sub-penny rounding drift in the final balance update.
     let totalPnlDec = new Decimal(0)
+    const settlements = []
 
     for (const trade of openTrades.rows) {
-      {
-        const priceData = priceMap[trade.instrument]
-        // FIX (M-04): this used to throw, aborting the entire promotion, while
-        // autoCloseAndFail closed the same trade at open_price with zero PnL
-        // and carried on. A feed outage therefore failed accounts but could
-        // never pass them — a house-favouring asymmetry in an edge case, and
-        // one that stranded a trader who had legitimately hit their target if
-        // the instrument's feed stayed down.
-        //
-        // Both paths now settle a priceless trade the same way: flat, at the
-        // open price, so the outcome does not depend on which rule fired.
-        if (!priceData) {
-          logger.warn(`autoCloseAndPass: no live price for ${trade.instrument} — closing trade ${trade.id} flat`, {
-            accountId: acc.id, tradeId: trade.id
-          })
-          await client.query(
-            `UPDATE trades SET
-               status = 'closed',
-               close_price = open_price,
-               close_time = NOW(),
-               demo_pnl = 0,
-               close_reason = $1
-             WHERE id = $2`,
-            [closeReason, trade.id]
-          )
-          continue
-        }
-
-        const close_price = trade.direction === 'buy'
-          ? parseFloat(priceData.bid)
-          : parseFloat(priceData.ask)
-
-        const demo_pnl = calculatePnL(
-          trade.direction,
-          parseFloat(trade.open_price),
-          close_price,
-          parseFloat(trade.lot_size),
-          trade.instrument,
-          parseFloat(trade.commission || 0)
-        )
-
-        totalPnlDec = totalPnlDec.plus(demo_pnl)
-
-        await client.query(
-          `UPDATE trades SET
-             status = 'closed',
-             close_price = $1,
-             close_time = NOW(),
-             demo_pnl = $2,
-             close_reason = $3
-           WHERE id = $4`,
-           [close_price, demo_pnl, closeReason, trade.id]
-        )
+      // FIX (M-04): the priceless case used to throw here, aborting the entire
+      // promotion, while autoCloseAndFail closed the same trade at open_price
+      // with zero PnL and carried on. A feed outage therefore failed accounts
+      // but could never pass them — a house-favouring asymmetry that stranded a
+      // trader who had legitimately hit their target.
+      //
+      // settlementFor is now the single decision for both paths, so the two
+      // cannot drift apart again.
+      const settlement = settlementFor(trade, priceMap[trade.instrument])
+      if (settlement.priceless) {
+        logger.warn(`autoCloseAndPass: no live price for ${trade.instrument} — closing trade ${trade.id} flat`, {
+          accountId: acc.id, tradeId: trade.id
+        })
       }
+      totalPnlDec = totalPnlDec.plus(settlement.pnl)
+      settlements.push({ id: trade.id, closePrice: settlement.closePrice, pnl: settlement.pnl })
     }
 
     const totalPnl = totalPnlDec.toDecimalPlaces(2).toNumber()
+
+    await bulkCloseTrades(client, settlements, closeReason)
 
     // Single balance update AND status update after all trades are closed
     await client.query(
@@ -771,9 +813,17 @@ async function autoCloseAndPass(acc, io) {
       [closeReason, acc.id]
     )
 
-    const settings    = await fetchProgressionSettings(client)
-    const promoted    = await promotePassedAccount(client, acc, settings)
-    const newAccountId = promoted ? promoted.new_account_id : null
+    // Passing raises a promotion review rather than creating the next account
+    // outright — an admin approves it from /admin/promotion-reviews. Mirrors
+    // challengeEngine.js's passAccount; both are auto-pass paths.
+    const review = await createPendingPromotionReview(client, acc, {
+      triggeredBy: 'auto_pass',
+      reason: 'Floating profit target reached',
+      payload: { source: 'tradeEngine', account_type: acc.account_type, account_size: acc.account_size }
+    })
+    if (!review) {
+      throw new Error('Failed to raise promotion review for passed account')
+    }
 
     await client.query('COMMIT')
 
@@ -782,21 +832,31 @@ async function autoCloseAndPass(acc, io) {
     }
     tradeIndex.removeAccount(acc.id)
 
-    const passMsg = acc.account_type === 'phase1'
-      ? `🏆 Phase 1 PASSED! Floating profit target hit. All trades closed. Phase 2 activating shortly.`
-      : `🎉 Phase 2 PASSED! Floating profit target hit. All trades closed. Funded account activating shortly.`
+    // Was a phase1/phase2 ternary, which mislabelled a passed phase3 account as
+    // Phase 2. The target comes off the review row, so it is right for any
+    // step model.
+    const phaseLabel = /^phase(\d+)$/.test(acc.account_type)
+      ? `Phase ${acc.account_type.slice(5)}`
+      : acc.account_type
+    const passMsg =
+      `🏆 ${phaseLabel} PASSED! Floating profit target hit. All trades closed. ` +
+      `Your ${review.target_account_type === 'funded' ? 'funded account' : review.target_account_type} is awaiting admin approval.`
 
     if (io) {
       io.to(String(acc.user_id)).emit('account_update', {
         message: passMsg,
         pnl: totalPnl,
         account_id: acc.id,
-        new_account_id: newAccountId,
-        event: promoted?.event || (acc.account_type === 'phase1' ? 'phase1_passed' : 'phase2_passed')
+        review_id: review.id,
+        target_account_type: review.target_account_type,
+        event: 'promotion_pending_review'
       })
     }
 
-    logger.info(`Account ${acc.id} PASSED via floating equity (${acc.account_type})`)
+    logger.info(
+      `Account ${acc.id} PASSED via floating equity (${acc.account_type}) — ` +
+      `promotion review #${review.id} raised for ${review.target_account_type}`
+    )
 
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {})
@@ -1400,52 +1460,78 @@ async function closeTriggeredTrades(io, candidates) {
  */
 async function settleAccountOutcomes(io, breachCandidates, passCandidates) {
   let handled = 0
+  if (breachCandidates.length === 0 && passCandidates.length === 0) return handled
+
+  // ── Everything the whole batch needs, resolved once ──
+  //
+  // Three separate N+1s used to live in this function: a two-query confirmation
+  // per candidate, a getTodayRealizedPnl call per daily candidate against an API
+  // that already takes an array, and a price-map query per account inside each
+  // autoClose. On a gap that breaches 500 accounts that was well over a thousand
+  // sequential round-trips with the tick held open.
+  const confirmed = await confirmAccountEquityBatch([
+    ...breachCandidates.map((candidate) => candidate.account.id),
+    ...passCandidates.map((candidate) => candidate.account.id)
+  ])
+  if (confirmed.size === 0) return handled
+
+  // Only the daily-loss candidates need today's realised PnL, and only the ones
+  // that survived confirmation.
+  const dailyAccountIds = breachCandidates
+    .filter((candidate) => candidate.kind !== 'trailing' && confirmed.has(candidate.account.id))
+    .map((candidate) => candidate.account.id)
+  const realizedMap = dailyAccountIds.length > 0
+    ? await tradingDaysService.getTodayRealizedPnl(pool, dailyAccountIds)
+    : new Map()
+
+  // One snapshot for every close below. Prices are a read-only snapshot, so
+  // sharing it changes nothing about the arithmetic — see autoCloseAndFail.
+  const priceMap = await getCurrentPricesForTenant()
 
   for (const candidate of breachCandidates) {
     const { account } = candidate
-    const confirmed = await confirmAccountEquity(account.id)
-    if (!confirmed) continue
+    const confirmation = confirmed.get(account.id)
+    if (!confirmation) continue
 
     if (candidate.kind === 'trailing') {
       const floorDec = new Decimal(candidate.floor)
-      if (confirmed.equity.gte(floorDec)) continue // float was optimistic — stand down
+      if (confirmation.equity.gte(floorDec)) continue // float was optimistic — stand down
 
-      const drawdownPctUsed = new Decimal(confirmed.startingBalance)
-        .minus(confirmed.equity)
-        .div(confirmed.startingBalance)
+      const drawdownPctUsed = new Decimal(confirmation.startingBalance)
+        .minus(confirmation.equity)
+        .div(confirmation.startingBalance)
         .times(100)
-      const reason = `Trailing drawdown breach — equity $${confirmed.equity.toFixed(2)} fell below the $${floorDec.toFixed(2)} floor (${drawdownPctUsed.toFixed(2)}% of a ${candidate.maxDrawdownPct}% limit)`
+      const reason = `Trailing drawdown breach — equity $${confirmation.equity.toFixed(2)} fell below the $${floorDec.toFixed(2)} floor (${drawdownPctUsed.toFixed(2)}% of a ${candidate.maxDrawdownPct}% limit)`
       logger.info(`Account ${account.id} DRAWDOWN BREACH: ${reason}`)
-      await autoCloseAndFail(confirmed.acc, reason, io)
+      await autoCloseAndFail(confirmation.acc, reason, io, priceMap)
       handled++
       continue
     }
 
-    // Daily loss — recompute today's realised PnL from the database rather than
-    // trusting the cached running total.
-    const realizedMap = await tradingDaysService.getTodayRealizedPnl(pool, [account.id])
+    // Daily loss — uses today's realised PnL read from the database rather than
+    // the cached running total.
     const todayRealized = realizedMap.get(account.id) || 0
-    const todayTotal = new Decimal(todayRealized).plus(confirmed.floatingPnl)
+    const todayTotal = new Decimal(todayRealized).plus(confirmation.floatingPnl)
     const todayLossPct = todayTotal.isNegative()
-      ? todayTotal.abs().div(confirmed.startingBalance).times(100)
+      ? todayTotal.abs().div(confirmation.startingBalance).times(100)
       : new Decimal(0)
     if (!todayLossPct.gte(candidate.dailyDrawdownPct)) continue
 
     const reason = `Daily loss limit breach — today's loss ${todayLossPct.toFixed(2)}% reached the ${candidate.dailyDrawdownPct}% daily limit`
     logger.info(`Account ${account.id} DAILY LOSS BREACH: ${reason}`)
-    await autoCloseAndFail(confirmed.acc, reason, io)
+    await autoCloseAndFail(confirmation.acc, reason, io, priceMap)
     handled++
   }
 
   for (const candidate of passCandidates) {
     const { account, profitTarget } = candidate
-    const confirmed = await confirmAccountEquity(account.id)
-    if (!confirmed) continue
+    const confirmation = confirmed.get(account.id)
+    if (!confirmation) continue
 
-    const equityProfit = confirmed.equity.minus(confirmed.startingBalance)
+    const equityProfit = confirmation.equity.minus(confirmation.startingBalance)
     if (!equityProfit.gte(profitTarget)) continue
 
-    await autoCloseAndPass(confirmed.acc, io)
+    await autoCloseAndPass(confirmation.acc, io, priceMap)
     handled++
   }
 
@@ -1453,73 +1539,128 @@ async function settleAccountOutcomes(io, breachCandidates, passCandidates) {
 }
 
 /**
- * Recompute an account's equity from the database with Decimal precision.
+ * Recompute MANY accounts' equity from the database with Decimal precision.
  *
  * This is the confirm half of "float detects, Decimal confirms" — it re-reads
- * the account row and its open trades rather than trusting the in-memory index,
- * so a stale index entry cannot fail an account either.
+ * the account rows and their open trades rather than trusting the in-memory
+ * index, so a stale index entry cannot fail an account either.
  *
- * @returns {Promise<{acc:object, equity:Decimal, floatingPnl:Decimal, startingBalance:number}|null>}
+ * ── Why this is batched ──
+ *
+ * The per-account version was called in a loop from settleAccountOutcomes, so a
+ * market gap that breached 500 accounts issued 1,000 sequential queries plus 500
+ * price-map resolutions — all inside the tick, with _tickRunning held, so every
+ * incoming price was coalesced away and the engine was frozen for the duration.
+ * A mass breach is the worst possible moment for the engine to stop reacting.
+ *
+ * Two queries and one price map now serve the whole batch.
+ *
+ * @param {string[]} accountIds
+ * @returns {Promise<Map<string, {acc:object, equity:Decimal, floatingPnl:Decimal, startingBalance:number}>>}
+ *   Accounts that are missing or no longer active are simply absent from the map.
  */
-async function confirmAccountEquity(accountId) {
+async function confirmAccountEquityBatch(accountIds) {
+  const confirmed = new Map()
+  if (!accountIds || accountIds.length === 0) return confirmed
+
+  const ids = Array.from(new Set(accountIds.map(String)))
+
   const accountResult = await pool.query(
     `SELECT id, user_id, current_balance, starting_balance, peak_balance,
             max_drawdown_pct, account_type, profit_target, account_size,
             eod_peak_equity, eod_trailing_floor, challenge_model_slug,
             daily_drawdown_pct, status
-       FROM accounts WHERE id = $1 AND status = 'active'`,
-    [accountId]
+       FROM accounts WHERE id = ANY($1::uuid[]) AND status = 'active'`,
+    [ids]
   )
-  if (accountResult.rows.length === 0) return null
+  if (accountResult.rows.length === 0) return confirmed
 
-  const row = accountResult.rows[0]
   const tradesResult = await pool.query(
-    `SELECT direction, open_price, lot_size, instrument, commission
-       FROM trades WHERE account_id = $1 AND status = 'open'`,
-    [accountId]
+    `SELECT account_id, direction, open_price, lot_size, instrument, commission
+       FROM trades WHERE account_id = ANY($1::uuid[]) AND status = 'open'`,
+    [ids]
   )
+
+  const tradesByAccount = new Map()
+  for (const trade of tradesResult.rows) {
+    const list = tradesByAccount.get(trade.account_id)
+    if (list) list.push(trade)
+    else tradesByAccount.set(trade.account_id, [trade])
+  }
 
   const priceMap = await getLivePriceMap()
-  let floatingPnl = new Decimal(0)
-  for (const trade of tradesResult.rows) {
-    const priceData = priceMap[trade.instrument]
-    if (!priceData) continue
-    const currentPrice = trade.direction === 'buy'
-      ? parseFloat(priceData.bid)
-      : parseFloat(priceData.ask)
-    floatingPnl = floatingPnl.plus(calculatePnL(
-      trade.direction,
-      parseFloat(trade.open_price),
-      currentPrice,
-      parseFloat(trade.lot_size),
-      trade.instrument,
-      parseFloat(trade.commission || 0)
-    ))
+
+  for (const row of accountResult.rows) {
+    let floatingPnl = new Decimal(0)
+    for (const trade of tradesByAccount.get(row.id) || []) {
+      const priceData = priceMap[trade.instrument]
+      if (!priceData) continue
+      const currentPrice = trade.direction === 'buy'
+        ? parseFloat(priceData.bid)
+        : parseFloat(priceData.ask)
+      // calculatePnL throws FxRateUnavailableError when the instrument's
+      // QUOTE/USD rate source is not in the price cache. Skipping that trade
+      // matches what the `!priceData` guard above and checkFloatingDrawdown
+      // already do, and it matters more here: unguarded, one instrument with a
+      // dark rate source would throw out of the batch and abort the whole tick
+      // — remaining breaches, pass checks and pending fills included.
+      //
+      // Skipping understates floating loss, so the confirmation fails CLOSED
+      // (no breach) and the next tick retries with a complete picture. That is
+      // the safe direction: it never fails an account on partial data.
+      try {
+        floatingPnl = floatingPnl.plus(calculatePnL(
+          trade.direction,
+          parseFloat(trade.open_price),
+          currentPrice,
+          parseFloat(trade.lot_size),
+          trade.instrument,
+          parseFloat(trade.commission || 0)
+        ))
+      } catch (error) {
+        logger.warn('[tradeEngine] confirm skipped a trade with no USD rate:', {
+          accountId: row.id, instrument: trade.instrument, error: error.message
+        })
+      }
+    }
+
+    const startingBalance = parseFloat(row.starting_balance)
+    const acc = {
+      id: row.id,
+      user_id: row.user_id,
+      current_balance: parseFloat(row.current_balance),
+      starting_balance: startingBalance,
+      peak_balance: parseFloat(row.peak_balance),
+      max_drawdown_pct: parseFloat(row.max_drawdown_pct),
+      account_type: row.account_type,
+      account_size: parseFloat(row.account_size),
+      profit_target: parseFloat(row.profit_target || 0),
+      eod_peak_equity: row.eod_peak_equity,
+      eod_trailing_floor: row.eod_trailing_floor,
+      challenge_model_slug: row.challenge_model_slug,
+      daily_drawdown_pct: row.daily_drawdown_pct != null ? parseFloat(row.daily_drawdown_pct) : null
+    }
+
+    confirmed.set(row.id, {
+      acc,
+      equity: new Decimal(acc.current_balance).plus(floatingPnl),
+      floatingPnl,
+      startingBalance
+    })
   }
 
-  const startingBalance = parseFloat(row.starting_balance)
-  const acc = {
-    id: row.id,
-    user_id: row.user_id,
-    current_balance: parseFloat(row.current_balance),
-    starting_balance: startingBalance,
-    peak_balance: parseFloat(row.peak_balance),
-    max_drawdown_pct: parseFloat(row.max_drawdown_pct),
-    account_type: row.account_type,
-    account_size: parseFloat(row.account_size),
-    profit_target: parseFloat(row.profit_target || 0),
-    eod_peak_equity: row.eod_peak_equity,
-    eod_trailing_floor: row.eod_trailing_floor,
-    challenge_model_slug: row.challenge_model_slug,
-    daily_drawdown_pct: row.daily_drawdown_pct != null ? parseFloat(row.daily_drawdown_pct) : null
-  }
+  return confirmed
+}
 
-  return {
-    acc,
-    equity: new Decimal(acc.current_balance).plus(floatingPnl),
-    floatingPnl,
-    startingBalance
-  }
+/**
+ * Single-account confirmation. Kept as the exported entry point; the engine's
+ * own settlement path uses the batch form directly.
+ *
+ * @returns {Promise<{acc:object, equity:Decimal, floatingPnl:Decimal, startingBalance:number}|null>}
+ */
+async function confirmAccountEquity(accountId) {
+  const confirmed = await confirmAccountEquityBatch([accountId])
+  return confirmed.get(String(accountId)) || null
 }
 
 /**
@@ -1709,11 +1850,40 @@ async function reconcileIndex() {
 }
 
 /**
+ * Highest of two peak/floor values, where null means "this field did not change"
+ * rather than zero.
+ *
+ * Written out rather than done with `??  0` and `|| null`: a locked floor is an
+ * account balance and may legitimately be 0 or negative, and coercing through
+ * zero would both invent a raise that never happened and turn a real 0 back into
+ * null on the way out.
+ */
+function higherPeakValue(a, b) {
+  if (a == null) return b == null ? null : b
+  if (b == null) return a
+  return a > b ? a : b
+}
+
+/**
  * Persist peak equity / locked floors accumulated since the last flush.
  *
  * The interval engine wrote these one UPDATE per account per tick. Driven off
  * price ticks that would be the single heaviest thing the engine does, so the
  * writes are batched behind a timer instead.
+ *
+ * ── Why a failed flush is re-queued rather than logged ──
+ *
+ * These are the trailing-drawdown floors. Dropping them leaves the raise in
+ * memory only: the index keeps serving the new floor, the database keeps the old
+ * one, and after the next restart the index reloads the STALE, LOWER floor. An
+ * account that should have breached then does not, and nothing anywhere reports
+ * it — the only trace is one log line from a transient error minutes earlier.
+ *
+ * So the batch goes back into _dirtyPeaks on failure. Ticks that ran during the
+ * flush may already have written a newer value for the same account, hence the
+ * max rather than a plain overwrite; the underlying statement only ever raises
+ * these columns, so re-applying a stale entry is a no-op rather than a
+ * regression.
  */
 async function flushDirtyPeaks() {
   if (_dirtyPeaks.size === 0) return 0
@@ -1726,7 +1896,17 @@ async function flushDirtyPeaks() {
   try {
     return await drawdownService.flushPeakEquityUpdates(pool, updates)
   } catch (error) {
-    logger.error('[tradeEngine] peak equity flush failed:', { error: error.message })
+    for (const update of updates) {
+      const pending = _dirtyPeaks.get(update.accountId)
+      _dirtyPeaks.set(update.accountId, {
+        peak: higherPeakValue(pending?.peak ?? null, update.peak),
+        lockedFloor: higherPeakValue(pending?.lockedFloor ?? null, update.lockedFloor)
+      })
+    }
+    logger.error('[tradeEngine] peak equity flush failed — re-queued for the next flush:', {
+      error: error.message,
+      requeued: updates.length
+    })
     return 0
   }
 }
@@ -1763,6 +1943,8 @@ module.exports = {
   syncPendingOrder,
   syncClosedTrade,
   confirmAccountEquity,
+  confirmAccountEquityBatch,
+  settlementFor,
   getEngineStats,
   DIRECTION_BUY
 }
