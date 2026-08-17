@@ -30,7 +30,7 @@ const {
 const { validateCouponForCheckout, recordCouponRedemption } = require('../utils/coupons')
 const { generateAccountUid } = require('../utils/accountIds')
 const { issueGiftVoucherForOrder, redeemGiftVoucher } = require('../utils/giftVouchers')
-const { isValidEmail } = require('../utils/validation')
+const { isValidEmail, isValidUUID } = require('../utils/validation')
 
 const createAccountLimiter = createLimiter('create-account', {
   windowMs: 60 * 60 * 1000,     // 1 hour
@@ -139,8 +139,13 @@ function buildResolvedRules(account, settings = {}) {
 
 router.get('/rules/:account_id', authenticateToken, async function(req, res) {
   try {
+    // Account ids are UUIDs, not integers. The old `isNaN(parseInt(id))` guard
+    // was left over from the pre-UUID schema and rejected every id whose first
+    // character is a letter — roughly a sixth of all accounts — with a 400,
+    // so the account listed fine in the selector but none of its per-account
+    // reads ever loaded.
     const accountIdStr = String(req.params.account_id || '').trim()
-    if (!accountIdStr || isNaN(parseInt(accountIdStr))) {
+    if (!isValidUUID(accountIdStr)) {
       return res.status(400).json({ error: 'Invalid account ID' })
     }
 
@@ -599,8 +604,9 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
   try {
     const account_id = req.params.account_id
 
+    // See /rules/:account_id — same pre-UUID integer guard, same 400.
     const accountIdStr = String(account_id || '').trim()
-    if (!accountIdStr || isNaN(parseInt(accountIdStr))) {
+    if (!isValidUUID(accountIdStr)) {
       return res.status(400).json({ error: 'Invalid account ID' })
     }
 
@@ -776,13 +782,28 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
         const increasePerMilestonePct = parseFloat(scalingModel.scaling_increase_per_milestone_pct || 0)
         const maxAccountSize = parseFloat(scalingModel.scaling_max_account_size || 0)
         if (targetPct > 0 && starting > 0) {
+          // Two different sums, previously conflated into one.
+          //
+          // `allAdjustments` isolates trading profit: by the ledger invariant,
+          // trading P&L = current - starting - SUM(every adjustment). Filtering
+          // to scaling injections alone let admin credits read as trading
+          // profit, overstating milestone progress here exactly as it did in
+          // challengeEngine.js's evaluateScalingPlan.
+          //
+          // `totalIncreased` is scaling-injected capital specifically, and
+          // still has to be the filtered sum — it drives the
+          // scaling_max_account_size headroom check and the displayed total,
+          // neither of which should count an admin adjustment.
           const injectedResult = await pool.query(
-            `SELECT COALESCE(SUM(amount), 0) AS total FROM balance_adjustments
-              WHERE account_id = $1 AND source = 'scaling_capital_increase'`,
+            `SELECT COALESCE(SUM(amount), 0) AS total,
+                    COALESCE(SUM(amount) FILTER (WHERE source = 'scaling_capital_increase'), 0) AS scaling_total
+               FROM balance_adjustments
+              WHERE account_id = $1`,
             [accountIdStr]
           )
-          const totalIncreased = parseFloat(injectedResult.rows[0].total || 0)
-          const netTradingProfitPct = ((current - starting - totalIncreased) / starting) * 100
+          const allAdjustments = parseFloat(injectedResult.rows[0].total || 0)
+          const totalIncreased = parseFloat(injectedResult.rows[0].scaling_total || 0)
+          const netTradingProfitPct = ((current - starting - allAdjustments) / starting) * 100
           const milestonesClaimed = parseInt(account.scaling_milestones_claimed || 0, 10)
           const progressWithinMilestonePct = Math.max(0, netTradingProfitPct - milestonesClaimed * targetPct)
           const headroomReached = maxAccountSize > 0 && (starting + totalIncreased + (starting * increasePerMilestonePct / 100)) > maxAccountSize
