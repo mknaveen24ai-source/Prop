@@ -65,14 +65,35 @@ async function runEnsureFeatureTables() {
     CREATE TABLE IF NOT EXISTS admin_balance_adjustments (
       id BIGSERIAL PRIMARY KEY,
       account_id TEXT NOT NULL,
-      user_id TEXT NOT NULL,
+      user_id TEXT,
       amount NUMERIC(15,2) NOT NULL,
+      balance_before NUMERIC(15,2),
+      balance_after NUMERIC(15,2),
       reason TEXT NOT NULL DEFAULT '',
       adjustment_type TEXT NOT NULL DEFAULT 'manual',
       created_by TEXT NOT NULL DEFAULT 'admin',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `)
+  // CREATE TABLE IF NOT EXISTS is a no-op against a table that already exists in
+  // an older shape, so the DDL above silently did nothing on databases carrying
+  // the hand-built version of this table — and adjust-balance failed on every
+  // call with `column "user_id" does not exist`. Reconciling ALTERs are what
+  // make the declaration above actually authoritative; see migration 031 and
+  // the same pattern in services/violationEngine.js.
+  //
+  // The other tables in this file have the same latent hazard and no known
+  // drift; if one ever does, extend it the same way rather than editing the
+  // CREATE and expecting it to take effect.
+  for (const [column, definition] of [
+    ['user_id', `TEXT`],
+    ['balance_before', `NUMERIC(15,2)`],
+    ['balance_after', `NUMERIC(15,2)`],
+    ['adjustment_type', `TEXT NOT NULL DEFAULT 'manual'`],
+    ['created_by', `TEXT NOT NULL DEFAULT 'admin'`]
+  ]) {
+    await pool.query(`ALTER TABLE admin_balance_adjustments ADD COLUMN IF NOT EXISTS ${column} ${definition}`)
+  }
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_admin_balance_adjustments_account_created ON admin_balance_adjustments(account_id, created_at DESC)`)
 
   await pool.query(`

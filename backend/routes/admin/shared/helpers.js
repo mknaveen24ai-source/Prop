@@ -162,7 +162,7 @@ function normalizeAdminTag(value) {
 
 function normalizeEntityType(value) {
   const normalized = String(value || '').trim().toLowerCase()
-  return ['user', 'account', 'payout', 'trade', 'case', 'violation', 'dispute'].includes(normalized) ? normalized : null
+  return ['user', 'account', 'payout', 'trade', 'case', 'violation', 'dispute', 'account_link'].includes(normalized) ? normalized : null
 }
 
 function parseListPaging(req, { defaultPageSize = 25, maxPageSize = 100 } = {}) {

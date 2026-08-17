@@ -34,7 +34,11 @@ router.get('/settings', authenticateAdmin, async (req, res) => {
 
 const WRITABLE_SETTINGS_KEYS = new Set([
   'challenge_start_requires_kyc', 'hide_unavailable_sizes_on_landing', 'sold_out_message',
-  'promotion_requires_admin_review', 'promotion_review_sla_hours', 'failed_account_visibility_days',
+  // 'promotion_requires_admin_review' was writable here but read nowhere, so the
+  // toggle did nothing. Admin review is now unconditional — every passed
+  // challenge raises a review — so the key is gone rather than left as a
+  // control that silently has no effect.
+  'promotion_review_sla_hours', 'failed_account_visibility_days',
   'passed_account_visibility_days', 'expired_account_visibility_days',
   'funded_max_drawdown_pct', 'profit_share_pct', 'payouts_enabled', 'min_payout_amount',
   'payout_request_cooldown_hours', 'payout_requires_kyc_approved', 'payout_requires_no_open_positions',

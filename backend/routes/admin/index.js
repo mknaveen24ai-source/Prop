@@ -32,6 +32,9 @@ router.use(require('./exportData'))
 router.use(require('./emailJobs'))
 router.use(require('./traders'))
 router.use(require('./accounts'))
+// Paths here (/promotion-reviews, /account-batches) do not collide with
+// ./accounts' /accounts* space, so this slots in after it without shadowing.
+router.use(require('./promotionReviews'))
 router.use(require('./trades'))
 router.use(require('./payouts'))
 router.use(require('./commandCenter'))
@@ -40,6 +43,9 @@ router.use(require('./reporting'))
 router.use(require('./settings'))
 router.use(require('./stepModels'))
 router.use(require('./compliance'))
+// /account-links* is its own path space — no collision with ./compliance's
+// /enforcement, /payout-fraud-scores or /device-link-graph.
+router.use(require('./accountLinking'))
 router.use(require('./riskGuards'))
 router.use(require('./analytics'))
 router.use(require('./kycReview'))

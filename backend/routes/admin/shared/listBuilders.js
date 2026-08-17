@@ -707,11 +707,18 @@ async function createAdminIssuedAccount(client, { userId, accountType, accountSi
   const accountUid = await generateAccountUid(client, { accountType: normalizedType, challengeModelSlug: null })
 
   const result = await client.query(
+    // eod_peak_equity is seeded to the account size, matching
+    // routes/accounts.js's paid-challenge INSERT and progressionService's
+    // promotion INSERTs. Omitting it left the column NULL here, which
+    // resolveEffectiveFloor tolerates (it falls back to starting_balance) but
+    // which made admin-issued accounts the only ones whose drawdown anchor was
+    // implicit rather than stored.
     `INSERT INTO accounts (
        user_id, account_type, account_size, current_balance, starting_balance,
-       peak_balance, profit_target, max_drawdown_pct, status, phase_start_date, phase_end_date, account_uid
+       peak_balance, profit_target, max_drawdown_pct, status, phase_start_date, phase_end_date, account_uid,
+       eod_peak_equity
      ) VALUES (
-       $1, $2, $3, $4, $3, $5, $6, $7, 'active', NOW(), $8, $9
+       $1, $2, $3, $4, $3, $5, $6, $7, 'active', NOW(), $8, $9, $3
      )
      RETURNING id, user_id, account_type, account_size, current_balance, starting_balance,
                peak_balance, profit_target, max_drawdown_pct, status, phase_start_date, phase_end_date,

@@ -50,6 +50,7 @@ export function buildAdminNavResults({ isSuperAdmin, navigate }) {
         ['/admin/trading-economics', 'Trading Economics'],
         ...(isSuperAdmin ? [['/admin/step-models', 'Challenge Models']] : []),
         ['/admin/violations', 'Violations'],
+        ['/admin/account-linking', 'Account Linking'],
         ['/admin/leaderboard', 'Leaderboard'],
       ],
     },

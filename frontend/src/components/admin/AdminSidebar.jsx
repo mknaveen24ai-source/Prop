@@ -168,6 +168,7 @@ export default function AdminSidebar({
               catch-all. */}
           <NavGroup id="risk" label="Risk" isCollapsed={isCollapsed} collapsedGroups={collapsedGroups} onToggle={toggleGroup}>
             <NavItem to="/admin/violations" icon="violations" label="Violations" badge={counts.violations > 0 ? { val: counts.violations, color: 'red' } : null} />
+            <NavItem to="/admin/account-linking" icon="users" label="Account Linking" />
             <NavItem to="/admin/leaderboard" icon="leaderboard" label="Leaderboard" />
           </NavGroup>
         </div>

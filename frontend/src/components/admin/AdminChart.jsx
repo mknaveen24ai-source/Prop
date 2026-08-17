@@ -21,7 +21,11 @@ export default function AdminChart({
         </div>
       ) : (
         <div style={{ width: '100%', height }}>
-          <ResponsiveContainer width="100%" height="100%">
+          {/* initialDimension overrides ResponsiveContainer's -1x-1 default,
+              which otherwise logs "The width(-1) and height(-1) of chart
+              should be greater than 0" on the frame before ResizeObserver
+              reports the real size. */}
+          <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 600, height }}>
             {children}
           </ResponsiveContainer>
         </div>

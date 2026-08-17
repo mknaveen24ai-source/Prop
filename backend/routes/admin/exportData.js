@@ -21,6 +21,7 @@ const {
 } = require('./shared/listBuilders')
 
 const { buildEmailJobListResult } = require('./shared/emailJobList')
+const { buildAccountLinkListResult } = require('./shared/accountLinkList')
 
 router.post('/export', authenticateAdmin, async function(req, res) {
   try {
@@ -95,6 +96,22 @@ router.post('/export', authenticateAdmin, async function(req, res) {
         { header: 'Preview Path', key: 'preview_url' },
         { header: 'Unique Key', key: 'unique_key' },
         { header: 'Last Error', key: 'last_error' }
+      ]
+    } else if (resource === 'account_links') {
+      result = await buildAccountLinkListResult({ query })
+      columns = [
+        { header: 'Cluster ID', key: 'id' },
+        { header: 'Score', key: 'score' },
+        { header: 'Confidence', key: 'confidence' },
+        { header: 'Status', key: 'status' },
+        { header: 'Members', key: 'member_count' },
+        { header: 'Member Emails', key: 'member_emails' },
+        { header: 'Signals', key: 'signal_types' },
+        { header: 'Evidence Items', key: 'evidence_count' },
+        { header: 'First Detected', key: 'first_detected_at' },
+        { header: 'Last Detected', key: 'last_detected_at' },
+        { header: 'Resolved By', key: 'resolved_by' },
+        { header: 'Resolution Note', key: 'resolution_note' }
       ]
     } else if (resource === 'trades') {
       const filters = query.filters || {}
@@ -561,7 +578,7 @@ router.post('/export', authenticateAdmin, async function(req, res) {
         { header: 'Updated At', key: 'updated_at' }
       ]
     } else {
-      return res.status(400).json({ error: 'resource must be traders, accounts, payouts, email_jobs, trades, leaderboard, bbook, chat_conversations, violations, or disputes' })
+      return res.status(400).json({ error: 'resource must be traders, accounts, payouts, email_jobs, account_links, trades, leaderboard, bbook, chat_conversations, violations, or disputes' })
     }
 
     const csv = serializeCsv(result.allRows || [], columns)

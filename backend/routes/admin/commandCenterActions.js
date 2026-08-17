@@ -10,7 +10,6 @@ const {
   requireAdminCapability,
   requireSuperAdmin
 } = require('../middleware')
-const Decimal = require('decimal.js')
 const logger = require('../../utils/logger')
 const { invalidateAllUserTokens } = require('../../utils/tokenCache')
 const { emitAdminEvent } = require('../../utils/realtime')
@@ -36,6 +35,8 @@ const {
 const {
   forceCloseOpenTradesForAccount, cancelPendingTradesForAccount
 } = require('./shared/tradeOps')
+const { fromLockedRow } = require('../../domain/account')
+const { approvePayout } = require('../../domain/payout')
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DASHBOARD ENDPOINTS
@@ -116,11 +117,17 @@ router.post('/command-center/bulk-action', authenticateAdmin, adminBulkLimiter, 
             }
             closeResult = await forceCloseOpenTradesForAccount(client, account.id)
             cancelledCount = await cancelPendingTradesForAccount(client, account.id, 'Bulk Restore With Reset')
+            // Same reset semantics as the single-account route — balance and
+            // drawdown anchors together. Leaving eod_peak_equity behind here
+            // meant a bulk-restored account could be failed on the next tick.
+            await fromLockedRow(client, account).resetToStarting({
+              reason: reason || 'Bulk restore with reset',
+              createdBy: getAdminActorLabel(req.admin),
+              metadata: { action: 'restore_with_reset', bulk: true }
+            })
             await client.query(
               `UPDATE accounts
                   SET status = 'active',
-                      current_balance = starting_balance,
-                      peak_balance = starting_balance,
                       phase_start_date = NOW(),
                       phase_end_date = $2,
                       review_flagged = FALSE,
@@ -414,34 +421,16 @@ router.post('/command-center/bulk-action', authenticateAdmin, adminBulkLimiter, 
             updatedPayout = result.rows[0]
             message = 'Payout unflagged'
           } else if (action === 'approve_payout') {
-            if (String(payout.status || '').toLowerCase() !== 'pending') {
-              throw createHttpError('Only pending payouts can be approved', 400)
-            }
-            const accountBalance = await client.query(
-              `SELECT current_balance, starting_balance FROM accounts WHERE id = $1 FOR UPDATE`,
-              [payout.account_id]
-            )
-            if (accountBalance.rows.length === 0) throw createHttpError('Account not found for payout', 404)
-            const availableProfit = new Decimal(accountBalance.rows[0].current_balance).minus(accountBalance.rows[0].starting_balance)
-            if (availableProfit.lt(payout.amount_requested)) {
-              throw createHttpError('Insufficient realized profit for payout', 400)
-            }
-            await client.query(
-              `UPDATE accounts SET current_balance = current_balance - $1 WHERE id = $2`,
-              [payout.amount_requested, payout.account_id]
-            )
-            const result = await client.query(
-              `UPDATE payouts
-                  SET status = 'paid',
-                      paid_at = NOW(),
-                      transaction_id = COALESCE($2, transaction_id),
-                      updated_at = NOW()
-                WHERE id = $1
-                RETURNING id, user_id, account_id, amount_requested, amount_payable,
-                          status, is_flagged, flag_reason, admin_notes`,
-              [payout.id, options?.transaction_id ? String(options.transaction_id) : null]
-            )
-            updatedPayout = result.rows[0]
+            // Single approval path, shared with routes/admin/payouts.js. This
+            // block used to be a near-verbatim copy of that route's logic and,
+            // like it, re-checked only `pending` plus the profit guard — so a
+            // payout requested before the account failed, was locked, or had
+            // its KYC revoked could still be approved and paid.
+            const approval = await approvePayout(client, payout.id, {
+              transactionId: options?.transaction_id || null,
+              actor: getAdminActorLabel(req.admin)
+            })
+            updatedPayout = approval.payout
             message = 'Payout approved'
           } else if (action === 'reject_payout') {
             const result = await client.query(

@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import axios from 'axios'
 import { io } from 'socket.io-client'
 import { API_BASE_URL as API_URL, SOCKET_URL } from '../config/apiBase'
+import closeSocket from '../utils/closeSocket'
 
 
 const adminAxios = axios.create({
@@ -79,9 +80,7 @@ export function AdminSessionProvider({ children }) {
   useEffect(() => {
     if (!session.authenticated) {
       setSocket((current) => {
-        if (current) {
-          current.disconnect()
-        }
+        closeSocket(current)
         return null
       })
       return undefined
@@ -99,7 +98,7 @@ export function AdminSessionProvider({ children }) {
     setSocket(socketInstance)
 
     return () => {
-      socketInstance.disconnect()
+      closeSocket(socketInstance)
       setSocket(null)
     }
   }, [session.authenticated])

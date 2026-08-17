@@ -12,6 +12,7 @@ const {
 } = require('../middleware')
 const bcrypt = require('bcryptjs')
 const { createLimiter } = require('../../utils/security')
+const { getRequestIp } = require('../../utils/requestIp')
 const qrcode = require('qrcode')
 const logger = require('../../utils/logger')
 const totp   = require('../../utils/totp')
@@ -454,7 +455,7 @@ router.post('/2fa/verify-setup', authenticateAdmin, async function(req, res) {
 })
 
 router.post('/2fa/validate', adminTwoFaValidateLimiter, authenticateAdminPre2FA, async function(req, res) {
-  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || 'admin_ip'
+  const ip = getRequestIp(req, 'admin_ip')
   const rl = totp.checkRateLimit(`admin:${ip}`)
   if (rl.blocked) {
     return res.status(429).json({ error: `Too many failed attempts. Try again in ${rl.remaining} minute(s).` })
