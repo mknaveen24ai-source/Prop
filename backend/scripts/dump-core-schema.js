@@ -25,6 +25,7 @@ const path = require('path')
 const pool = require('../db')
 
 const OUTPUT = path.join(__dirname, '..', 'migrations', '000_core_schema.sql')
+const MANIFEST = path.join(__dirname, '..', 'migrations', '000_core_schema.manifest.json')
 
 // Every column that holds an amount of money, and the table it lives on.
 const MONEY_COLUMNS = [
@@ -93,7 +94,7 @@ async function auditMoneyColumns() {
   return inexact
 }
 
-function dumpSchema() {
+async function dumpSchema() {
   const connectionString = process.env.DATABASE_URL
   if (!connectionString) throw new Error('DATABASE_URL is not set')
 
@@ -109,9 +110,38 @@ function dumpSchema() {
 
   // knex_migrations tracks which migrations have run. Including it would make a
   // fresh database believe it had already applied everything.
+  //
+  // ── Making pg_dump output safe for knex.raw() ──
+  //
+  // 000_core_schema.js applies this file with knex.raw(), which sends it to the
+  // SERVER as one multi-statement query. pg_dump writes for psql instead, and
+  // three of its habits break that. All three were found by actually migrating a
+  // clean database; none of them fail on the database the dump came from.
+  //
+  //   1. \restrict / \unrestrict — PostgreSQL 18 wraps output in these to stop a
+  //      hostile dump injecting psql meta-commands at restore time. They are
+  //      psql CLIENT commands, not SQL: the server answers with
+  //      `syntax error at or near "\"` and the whole migration fails. Dropping
+  //      them costs nothing, because the psql interpretation they guard against
+  //      is exactly what never happens here.
+  //
+  //   2. CREATE SCHEMA public — every fresh database already has it, so this
+  //      fails with `schema "public" already exists`. Made conditional rather
+  //      than removed, so the file still stands alone if fed to psql.
+  //
+  //   3. set_config('search_path', '') — pg_dump blanks the search path because
+  //      its own statements are all schema-qualified. Ours are not: later
+  //      migrations (002_hot_path_indexes and friends) index bare `trades`, and
+  //      they run on the same pooled connection. Leaving this in means they fail
+  //      with `relation "trades" does not exist`.
   const filtered = sql
     .split(/\n(?=CREATE |ALTER |COPY |--)/)
     .filter((chunk) => !/knex_migrations/i.test(chunk))
+    .join('\n')
+    .split('\n')
+    .filter((line) => !/^\\(un)?restrict\b/.test(line))
+    .filter((line) => !/^SELECT pg_catalog\.set_config\('search_path'/.test(line))
+    .map((line) => line.replace(/^CREATE SCHEMA public;/, 'CREATE SCHEMA IF NOT EXISTS public;'))
     .join('\n')
 
   const header = [
@@ -119,8 +149,8 @@ function dumpSchema() {
     '-- Core schema — committed dump (audit finding C-02).',
     '--',
     '-- Regenerate with: npm run schema:dump',
-    '-- Applied by migrations/000_core_schema.js, which no-ops when the tables',
-    '-- already exist. Do not hand-edit: write a new migration instead.',
+    '-- Applied by scripts/baseline-schema.js when provisioning a clean database.',
+    '-- Do not hand-edit: write a new migration instead.',
     '--',
     `-- Generated: ${new Date().toISOString()}`,
     '--',
@@ -130,16 +160,38 @@ function dumpSchema() {
   fs.writeFileSync(OUTPUT, header + filtered, 'utf8')
   const tables = (filtered.match(/CREATE TABLE/g) || []).length
   console.log(`  wrote ${path.relative(process.cwd(), OUTPUT)} — ${tables} tables, ${Math.round(filtered.length / 1024)} KB`)
+
+  // ── The manifest: which migrations this dump already contains ──
+  //
+  // Without it, baselining has to guess, and the only available guess — "every
+  // migration file present right now" — is wrong the moment someone adds one
+  // after the dump was taken. That migration gets recorded as applied without
+  // ever running, and its changes are silently missing from every clean
+  // database. (Observed: 035 was stamped and its partial index never created.)
+  //
+  // Recording the source database's own knex_migrations makes it exact: the
+  // dump contains the effects of precisely these, so baseline stamps precisely
+  // these, and migrate:latest runs whatever came after.
+  const applied = await pool.query('SELECT name FROM knex_migrations ORDER BY id')
+  const manifest = {
+    generatedAt: new Date().toISOString(),
+    note: 'Migrations whose effects are already contained in 000_core_schema.sql. '
+      + 'scripts/baseline-schema.js records exactly these as applied; anything not '
+      + 'listed is run normally by knex migrate:latest.',
+    migrations: applied.rows.map((row) => row.name)
+  }
+  fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2) + '\n', 'utf8')
+  console.log(`  wrote ${path.relative(process.cwd(), MANIFEST)} — ${manifest.migrations.length} migrations covered`)
 }
 
 async function main() {
   console.log('Core schema dump (C-02)')
   console.log('='.repeat(64))
-  dumpSchema()
+  await dumpSchema()
   const inexact = await auditMoneyColumns()
 
   console.log('\n' + '='.repeat(64))
-  console.log('Next: commit migrations/000_core_schema.sql.')
+  console.log('Next: commit migrations/000_core_schema.sql and its .manifest.json.')
   console.log('CI will then verify a clean database migrates from empty on every PR.')
   if (inexact > 0) console.log(`\nWARNING: ${inexact} money column(s) are binary floats — see above.`)
   console.log('')

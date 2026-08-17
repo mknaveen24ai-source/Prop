@@ -18,6 +18,8 @@
         "email:worker": "node workers/emailWorker.js",
         "launch:smoke": "node scripts/launch-smoke.js",
         "loadtest": "node scripts/seed-load-test.js",
+        "loadtest:sockets": "node scripts/socket-load-test.js",
+        "engine:equivalence": "node scripts/engine-equivalence.js",
         "schema:dump": "node scripts/dump-core-schema.js",
         "schema:verify": "node scripts/verify-schema.js",
         "fx:cutover-check": "node scripts/verify-fx-cutover.js",
@@ -25,7 +27,8 @@
         "migrate:make": "knex migrate:make",
         "migrate:rollback": "knex migrate:rollback",
         "migrate:status": "knex migrate:status",
-        "migrate:list": "node scripts/list-migrations.js"
+        "migrate:list": "node scripts/list-migrations.js",
+        "schema:baseline": "node scripts/baseline-schema.js"
     },
     "keywords": [],
     "author": "",
@@ -42,7 +45,6 @@
         "dotenv": "^17.3.1",
         "express": "^5.2.1",
         "express-rate-limit": "^8.3.1",
-        "glob": "^13.0.6",
         "helmet": "^8.3.0",
         "jsonwebtoken": "^9.0.3",
         "kafkajs": "^2.2.4",
@@ -63,8 +65,10 @@
     "devDependencies": {
         "@eslint/js": "^10.0.1",
         "eslint": "^10.8.1",
+        "glob": "^13.0.6",
         "globals": "^17.11.0",
         "nodemon": "^3.1.14",
+        "socket.io-client": "^4.8.3",
         "supertest": "^7.2.2"
     }
 }

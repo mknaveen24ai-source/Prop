@@ -20,6 +20,18 @@
  *
  * It is a no-op on any database that already has the tables, so it is safe to
  * apply to production — existing environments record it and move on.
+ *
+ * ── Provisioning a CLEAN database uses `npm run schema:baseline`, not this ──
+ *
+ * The dump is the schema as it is TODAY, i.e. after every migration here has
+ * already run. Applying it and then replaying 001..034 on top re-runs finished
+ * steps against a finished schema, and the ones that assumed an intermediate
+ * state fail — 005 indexes tenant_monthly_quotas(tenant_id), a column 008 later
+ * drops, so it is not in the dump and the index cannot be built.
+ *
+ * scripts/baseline-schema.js applies the dump and records those migrations as
+ * already applied, which is the only ordering that works. This file stays for
+ * the existing-environment path, where it correctly no-ops.
  */
 
 const fs = require('fs')
@@ -55,9 +67,22 @@ exports.up = async function (knex) {
     )
   }
 
-  await knex.raw(fs.readFileSync(SCHEMA_FILE, 'utf8'))
-  console.log('✓ core schema applied from 000_core_schema.sql')
-  return true
+  // Reaching here means a clean database is being provisioned through
+  // migrate:latest, which cannot work — see the header. Fail with the command
+  // that does, rather than applying the dump and letting 005 fail confusingly
+  // several migrations later.
+  throw new Error(
+    'This database has no core tables, so it is being provisioned from scratch.\n' +
+    '\n' +
+    '`knex migrate:latest` cannot do that: 000_core_schema.sql is the CURRENT\n' +
+    'schema, and replaying the later migrations on top of it re-applies finished\n' +
+    'steps to a finished schema (005 indexes a column 008 drops, and fails).\n' +
+    '\n' +
+    'Use:\n' +
+    '\n' +
+    '    npm run schema:baseline     # applies the dump, records migrations as applied\n' +
+    '    npx knex migrate:latest     # then runs anything newer than the dump\n'
+  )
 }
 
 exports.down = async function () {

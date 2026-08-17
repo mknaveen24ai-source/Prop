@@ -1,19 +1,33 @@
 exports.up = async function(knex) {
-  await knex.raw(`
-    ALTER TABLE tenant_price_feeds
-    ALTER COLUMN spread_markup_points_json DROP NOT NULL
-  `).catch(() => {})
+  // tenant_price_feeds belongs to the tenant system that 008 removes, so it is
+  // absent from a database provisioned from scratch.
+  //
+  // These three statements used to be `.catch(() => {})`, which cannot work:
+  // knex runs each migration inside a transaction, and in Postgres ANY statement
+  // error aborts the whole transaction. Catching the JavaScript rejection left
+  // the transaction dead, so the createTable below failed with `current
+  // transaction is aborted, commands ignored until end of transaction block` —
+  // and migration 004 became the point at which a clean provision stopped.
+  //
+  // Invisible on every existing environment, where the table did exist when 004
+  // first ran and where 004 is already recorded as applied.
+  if (await knex.schema.hasTable('tenant_price_feeds')) {
+    await knex.raw(`
+      ALTER TABLE tenant_price_feeds
+      ALTER COLUMN spread_markup_points_json DROP NOT NULL
+    `)
 
-  await knex.raw(`
-    ALTER TABLE tenant_price_feeds
-    ALTER COLUMN spread_markup_points_json DROP DEFAULT
-  `).catch(() => {})
+    await knex.raw(`
+      ALTER TABLE tenant_price_feeds
+      ALTER COLUMN spread_markup_points_json DROP DEFAULT
+    `)
 
-  await knex.raw(`
-    UPDATE tenant_price_feeds
-       SET spread_markup_points_json = NULL
-     WHERE spread_markup_points_json = '{}'::jsonb
-  `).catch(() => {})
+    await knex.raw(`
+      UPDATE tenant_price_feeds
+         SET spread_markup_points_json = NULL
+       WHERE spread_markup_points_json = '{}'::jsonb
+    `)
+  }
 
   const exists = await knex.schema.hasTable('idempotency_requests')
   if (!exists) {
@@ -43,17 +57,21 @@ exports.up = async function(knex) {
 exports.down = async function(knex) {
   await knex.raw(`DROP INDEX IF EXISTS idempotency_requests_created_idx`)
   await knex.schema.dropTableIfExists('idempotency_requests')
-  await knex.raw(`
-    ALTER TABLE tenant_price_feeds
-    ALTER COLUMN spread_markup_points_json SET DEFAULT '{}'::jsonb
-  `).catch(() => {})
-  await knex.raw(`
-    UPDATE tenant_price_feeds
-       SET spread_markup_points_json = '{}'::jsonb
-     WHERE spread_markup_points_json IS NULL
-  `).catch(() => {})
-  await knex.raw(`
-    ALTER TABLE tenant_price_feeds
-    ALTER COLUMN spread_markup_points_json SET NOT NULL
-  `).catch(() => {})
+  // Guarded rather than caught, for the same reason as up(): a swallowed error
+  // still leaves the migration's transaction aborted.
+  if (await knex.schema.hasTable('tenant_price_feeds')) {
+    await knex.raw(`
+      ALTER TABLE tenant_price_feeds
+      ALTER COLUMN spread_markup_points_json SET DEFAULT '{}'::jsonb
+    `)
+    await knex.raw(`
+      UPDATE tenant_price_feeds
+         SET spread_markup_points_json = '{}'::jsonb
+       WHERE spread_markup_points_json IS NULL
+    `)
+    await knex.raw(`
+      ALTER TABLE tenant_price_feeds
+      ALTER COLUMN spread_markup_points_json SET NOT NULL
+    `)
+  }
 }

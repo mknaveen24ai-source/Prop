@@ -160,27 +160,39 @@ jobs:
         run: npm ci
 
       # ── Audit finding C-02 ──────────────────────────────────────────────────
-      # This job already ran migrations against an empty database, but nothing
-      # in the repo ever created users/accounts/trades/payouts — 001 creates
-      # only platform_settings, and 002 indexes `trades` directly. So this step
-      # could not have been passing: the schema for every money table existed
-      # only inside a hand-built database.
+      # Nothing in the repo ever created users/accounts/trades/payouts — 001
+      # creates only platform_settings, and 002 indexes `trades` directly. The
+      # schema for every money table existed only inside a hand-built database,
+      # so this job could not have been passing on a genuinely empty one.
       #
-      # migrations/000_core_schema.js applies the committed dump and no-ops
-      # where the tables already exist. Until that dump is generated
-      # (`npm run schema:dump`) and committed, say so explicitly rather than
-      # letting a red step look like flakiness.
+      # Both files are required. The manifest records WHICH migrations the dump
+      # already contains; without it, baselining falls back to stamping every
+      # file on disk, which marks any migration added since the dump as applied
+      # without running it.
       - name: Check for the committed core schema
-        id: schema
         run: |
-          if [ -f migrations/000_core_schema.sql ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::error title=C-02 unresolved::migrations/000_core_schema.sql is missing, so a clean database cannot be provisioned and this job cannot pass. Run 'npm run schema:dump' against a known-good database and commit the result."
-          fi
+          MISSING=0
+          [ -f migrations/000_core_schema.sql ] || {
+            echo "::error title=C-02 unresolved::migrations/000_core_schema.sql is missing, so a clean database cannot be provisioned. Run 'npm run schema:dump' against a known-good database and commit the result."
+            MISSING=1
+          }
+          [ -f migrations/000_core_schema.manifest.json ] || {
+            echo "::error title=C-02 unresolved::migrations/000_core_schema.manifest.json is missing. Regenerate with 'npm run schema:dump' and commit it alongside the .sql."
+            MISSING=1
+          }
+          exit $MISSING
 
-      - name: Run migrations from scratch
+      # Provisioning is baseline-then-migrate, not migrate alone.
+      #
+      # The dump is the schema as it is TODAY. Replaying 001..NNN on top of it
+      # re-applies finished steps to a finished schema, and the ones that assumed
+      # an intermediate state fail — 005 indexes a column that 008 drops, so it
+      # is not in the dump and the index cannot be built. `migrate:latest` on an
+      # empty database therefore fails deliberately, with that explanation.
+      - name: Provision a clean database from the committed schema
+        run: npm run schema:baseline
+
+      - name: Apply anything newer than the dump
         run: npm run migrate
 
       - name: Assert no migrations left pending
