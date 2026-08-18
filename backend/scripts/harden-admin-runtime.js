@@ -143,23 +143,32 @@ async function main() {
       createdAdmin = true
     }
 
-    const rotated = {
-      JWT_SECRET: randomBase64Url(48),
-      ADMIN_JWT_SECRET: randomBase64Url(48),
-      ADMIN_PASSWORD: await bcrypt.hash(randomBase64Url(24), 12)
-    }
-
+    // `--no-rotate-env` exists for deploy.sh, which runs this INSIDE the backend
+    // container. There, `../.env` is /app/.env — a container-local file that is
+    // discarded on exit and is not the compose `env_file`. Rotating into it
+    // changes nothing while reporting `secrets_rotated`, which is a lie the
+    // operator would act on. deploy.sh has already generated fresh secrets
+    // seconds earlier, so there is nothing to rotate.
+    const rotateEnv = args['no-rotate-env'] !== true
     const enrolledTotpAdmins = counts.activePlatformAdminsWithTotp
-    const shouldRotateTotpKey = enrolledTotpAdmins === 0 || args['force-rotate-totp-key'] === true
-    if (shouldRotateTotpKey) {
-      rotated.TOTP_ENCRYPTION_KEY = randomHex(32)
-    }
+    const shouldRotateTotpKey = rotateEnv
+      && (enrolledTotpAdmins === 0 || args['force-rotate-totp-key'] === true)
 
-    let envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : ''
-    for (const [key, value] of Object.entries(rotated)) {
-      envContent = upsertEnvValue(envContent, key, value)
+    const rotated = {}
+    if (rotateEnv) {
+      rotated.JWT_SECRET = randomBase64Url(48)
+      rotated.ADMIN_JWT_SECRET = randomBase64Url(48)
+      rotated.ADMIN_PASSWORD = await bcrypt.hash(randomBase64Url(24), 12)
+      if (shouldRotateTotpKey) {
+        rotated.TOTP_ENCRYPTION_KEY = randomHex(32)
+      }
+
+      let envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : ''
+      for (const [key, value] of Object.entries(rotated)) {
+        envContent = upsertEnvValue(envContent, key, value)
+      }
+      fs.writeFileSync(envPath, envContent, 'utf8')
     }
-    fs.writeFileSync(envPath, envContent, 'utf8')
 
     const verification = await pool.query(
       `SELECT COUNT(*)::int AS total,
@@ -169,7 +178,7 @@ async function main() {
     )
 
     const summary = {
-      envPath,
+      envPath: rotateEnv ? envPath : null,
       admin_created: createdAdmin,
       admin_reactivated: reactivatedAdmin,
       bootstrap_email: createdAdmin || reactivatedAdmin ? email : null,
@@ -178,7 +187,7 @@ async function main() {
       secrets_rotated: Object.keys(rotated),
       totp_key_rotated: shouldRotateTotpKey,
       active_totp_enrollments: enrolledTotpAdmins,
-      restart_required: true
+      restart_required: rotateEnv
     }
 
     console.log(JSON.stringify(summary, null, 2))

@@ -125,6 +125,29 @@ jobs:
           done
           echo "build args OK"
 
+      - name: Assert every VITE_* the app reads is actually supplied
+        # The REVERSE of the check above, and the direction that was missing.
+        #
+        # VITE_FX_CONVERSION_ENABLED was read by src/utils/instruments.js to
+        # decide which instruments may be opened, and was declared in neither the
+        # Dockerfile nor docker-compose. It defaulted to false, which happened to
+        # match — so nothing looked wrong. The moment FX_CONVERSION_ENABLED was
+        # flipped on the backend, the frontend would have gone on restricting
+        # instruments with no way to be told otherwise.
+        #
+        # Vite inlines these at BUILD time, so an undeclared one cannot be fixed
+        # by an environment variable at runtime. It has to be caught here.
+        run: |
+          set -e
+          MISSING=0
+          for var in $(grep -rhoE 'import\.meta\.env\.VITE_[A-Z_]+' frontend/src | sed 's/.*env\.//' | sort -u); do
+            grep -q "ARG $var" frontend/Dockerfile || {
+              echo "::error::frontend/src reads import.meta.env.$var but frontend/Dockerfile declares no 'ARG $var'. Vite inlines these at build time, so it will be undefined in every container build."
+              MISSING=1
+            }
+          done
+          exit $MISSING
+
   migrations:
     name: Migrations apply cleanly
     runs-on: ubuntu-latest
@@ -189,11 +212,24 @@ jobs:
       # an intermediate state fail — 005 indexes a column that 008 drops, so it
       # is not in the dump and the index cannot be built. `migrate:latest` on an
       # empty database therefore fails deliberately, with that explanation.
-      - name: Provision a clean database from the committed schema
-        run: npm run schema:baseline
+      #
+      # ── Why this calls db:provision rather than open-coding the two steps ──
+      #
+      # It used to run `schema:baseline` then `migrate` as two workflow steps.
+      # That proved the MIGRATIONS worked while never testing the command
+      # production actually runs — and production ran `npm run migrate` alone,
+      # which cannot provision a clean database. docker-compose's migrate service
+      # exited non-zero on every fresh volume, and because `backend` waits on it
+      # via service_completed_successfully, the entire stack never started.
+      # CI was green throughout.
+      #
+      # So CI now runs the same entrypoint the compose `migrate` service and the
+      # Railway startCommand do. If it breaks, this breaks.
+      - name: Provision a clean database (the command production runs)
+        run: npm run db:provision
 
-      - name: Apply anything newer than the dump
-        run: npm run migrate
+      - name: Provisioning is idempotent (deploys re-run it on every boot)
+        run: npm run db:provision
 
       - name: Assert no migrations left pending
         # Guards against a migration file being written but never committed —
@@ -212,3 +248,116 @@ jobs:
         # double-precision balance silently discards the precision the whole
         # application layer is built on.
         run: npm run schema:verify
+
+  fresh-deploy:
+    name: Fresh deploy boots and trades
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    # ── Why this job exists ──
+    #
+    # Every other job here passes against a broken deployment. Unit tests mock
+    # the database; the migrations job tests the schema; lint cannot see inside a
+    # SQL string. None of them start the application.
+    #
+    # Two defects that shipped anyway, both caught only by doing this:
+    #   1. `npm run migrate` on an empty database fails by design, so the compose
+    #      migrate service never completed and the whole stack never started.
+    #   2. trades.account_id is uuid and trade_logs.account_id is text; one query
+    #      compared both to the same $1, so Postgres resolved it as uuid and
+    #      EVERY trade open returned 500. Reproducible only against a real
+    #      Postgres with both tables present.
+    #
+    # So: provision from empty, boot the real server, and trade on it.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: propfirm_ci
+          POSTGRES_USER: propfirm
+          POSTGRES_PASSWORD: ci_password_not_a_secret
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql://propfirm:ci_password_not_a_secret@localhost:5432/propfirm_ci
+      NODE_ENV: development
+      PORT: '5000'
+      DWX_PATH: /tmp/dwx-bridge
+      SMOKE_BASE_URL: http://127.0.0.1:5000
+      # Short, because CI does not need to prove the 60s hold rule a second time
+      # — the smoke test waits it out, and the rule has its own unit coverage.
+      SMOKE_MAX_HOLD_WAIT_SECONDS: '75'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Provision from empty
+        run: npm run db:provision
+
+      - name: Create the bootstrap admin
+        id: admin
+        # --no-rotate-env: rotating secrets into a CI checkout's .env is
+        # pointless and would make the printed summary claim something untrue.
+        run: |
+          mkdir -p /tmp/dwx-bridge
+          OUT=$(node scripts/harden-admin-runtime.js --email ci-admin@example.com --no-rotate-env)
+          echo "$OUT"
+          PASS=$(echo "$OUT" | sed -nE 's/.*"bootstrap_password": "([^"]*)".*/\1/p' | head -1)
+          echo "::add-mask::$PASS"
+          echo "password=$PASS" >> "$GITHUB_OUTPUT"
+
+      - name: Start the synthetic price feed
+        # The feed is file-based and there is no MetaTrader in CI, so without
+        # this there are no prices and no trade can be opened at all.
+        run: |
+          nohup node scripts/fake-dwx-feed.js \
+            --file=/tmp/dwx-bridge/DWX_Market_Data.txt --hz=5 --symbols=6 \
+            > /tmp/feed.log 2>&1 &
+          sleep 3
+          test -s /tmp/dwx-bridge/DWX_Market_Data.txt
+
+      - name: Boot the server
+        run: |
+          nohup node server.js > /tmp/server.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:5000/api/health > /dev/null; then
+              echo "backend is up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::backend never answered /api/health"
+          cat /tmp/server.log
+          exit 1
+
+      - name: Seed the platform (first-run endpoint)
+        run: |
+          curl -sf -X POST http://127.0.0.1:5000/api/setup/init \
+            -H 'Content-Type: application/json' -d '{}' | tee /tmp/setup.json
+          grep -q '"success"' /tmp/setup.json
+
+      - name: Smoke the money path
+        env:
+          SMOKE_SUPER_ADMIN_EMAIL: ci-admin@example.com
+          SMOKE_SUPER_ADMIN_PASSWORD: ${{ steps.admin.outputs.password }}
+        run: node scripts/launch-smoke.js --provision
+
+      - name: Engine equivalence (event is the default — this is its gate)
+        run: node scripts/engine-equivalence.js --ticks=60
+
+      - name: Server log on failure
+        if: failure()
+        run: tail -100 /tmp/server.log || true

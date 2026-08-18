@@ -5,9 +5,7 @@
     "dockerfilePath": "Dockerfile",
     "buildArgs": {
       "VITE_API_URL": "$VITE_API_URL",
-      "VITE_FIRM_NAME": "$VITE_FIRM_NAME",
-      "VITE_PRIMARY_COLOR": "$VITE_PRIMARY_COLOR",
-      "VITE_SUPPORT_EMAIL": "$VITE_SUPPORT_EMAIL"
+      "VITE_FX_CONVERSION_ENABLED": "$FX_CONVERSION_ENABLED"
     }
   },
   "deploy": {

@@ -560,6 +560,73 @@ function resetInMemoryState() {
   priceCache.__reset()
 }
 
+// ─── Accepted divergences ─────────────────────────────────────────────────────
+/**
+ * Differences that are known, understood, and deliberately accepted.
+ *
+ * There is exactly one, and it is not cosmetic. `accounts.eod_peak_equity` comes
+ * out HIGHER under the event path, because that path evaluates on every tick
+ * while the interval path samples once a second and misses intermediate highs.
+ *
+ * The event figure is the truer high-water mark — but eod_peak_equity feeds the
+ * trailing drawdown floor, so a higher peak means a HIGHER FLOOR and traders
+ * breach marginally earlier. That fairness trade was taken deliberately on
+ * 2026-08-17 when `event` became the default (see .env.template): the gap is
+ * ~0.2% of a 10% drawdown allowance, and the interval path was under-measuring
+ * a peak its own rule is defined in terms of.
+ *
+ * Recording it here rather than leaving it in the failure list is the point.
+ * Before, this harness reported DIVERGENT and printed "Do NOT flip
+ * ENGINE_MODE=event" against a codebase where event IS the default — a gate that
+ * contradicts the shipped configuration is a gate everybody learns to ignore,
+ * and the next real divergence would have been ignored with it.
+ *
+ * ONLY the direction below is accepted. An event value LOWER than interval is a
+ * genuine divergence and still fails.
+ */
+const ACCEPTED_DIVERGENCES = [
+  {
+    table: 'accounts',
+    column: 'eod_peak_equity',
+    reason: 'event evaluates every tick and catches intermediate highs; documented 2026-08-17',
+    accepts: (finding) => {
+      const interval = Number(finding.interval)
+      const event = Number(finding.event)
+      if (!Number.isFinite(interval) || !Number.isFinite(event)) return false
+      return event >= interval
+    }
+  }
+]
+
+function partitionFindings(findings) {
+  const real = []
+  const accepted = []
+  for (const finding of findings) {
+    const rule = ACCEPTED_DIVERGENCES.find((candidate) =>
+      candidate.table === finding.table &&
+      candidate.column === finding.column &&
+      finding.kind === 'value' &&
+      candidate.accepts(finding)
+    )
+    if (rule) accepted.push({ ...finding, reason: rule.reason })
+    else real.push(finding)
+  }
+  return { real, accepted }
+}
+
+function reportAccepted(accepted) {
+  if (accepted.length === 0) return
+  process.stdout.write(`\nAccepted divergences (${accepted.length}) — known and deliberate:\n`)
+  const seen = new Set()
+  for (const finding of accepted) {
+    const key = `${finding.table}.${finding.column}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    process.stdout.write(`  ${key}\n    ${finding.reason}\n`)
+  }
+  process.stdout.write('  (event >= interval only; a lower event value would still fail)\n')
+}
+
 // ─── Reporting ────────────────────────────────────────────────────────────────
 function report(findings, scenarios) {
   if (findings.length === 0) {
@@ -643,13 +710,16 @@ async function main() {
     await replayEvent()
     const eventSnapshot = await snapshot()
 
-    const findings = []
+    const allFindings = []
     for (const table of [...SEEDED_TABLES, ...DERIVED_TABLES]) {
-      findings.push(...diffTable(table, intervalSnapshot[table], eventSnapshot[table]))
+      allFindings.push(...diffTable(table, intervalSnapshot[table], eventSnapshot[table]))
     }
 
-    report(findings, scenarios)
-    process.exitCode = findings.length === 0 ? 0 : 1
+    const { real, accepted } = partitionFindings(allFindings)
+
+    report(real, scenarios)
+    reportAccepted(accepted)
+    process.exitCode = real.length === 0 ? 0 : 1
   } finally {
     logger.level = originalLevel
     if (seeded && !args.keep) {

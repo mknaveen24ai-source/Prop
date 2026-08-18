@@ -263,8 +263,17 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
                AND status = 'closed'
              ORDER BY close_time DESC LIMIT 1)                                  AS last_closed_setup,
 
+           -- $1::text, not a bare $1. trades.account_id is uuid while
+           -- trade_logs.account_id is text, and both are compared to the same
+           -- parameter in this one statement. Postgres resolves a parameter's
+           -- type ONCE, from its first determining context -- the uuid column
+           -- above -- so a bare $1 here resolved to text = uuid and EVERY trade
+           -- open failed with 500 "Could not open trade".
+           -- The cast is on the parameter, not the column, so the index on
+           -- trade_logs(account_id) is still used.
+           -- Guarded by scripts/check-param-type-collisions.js.
            (SELECT COUNT(*)::int FROM trade_logs
-             WHERE account_id = $1
+             WHERE account_id = $1::text
                AND logged_at >= date_trunc('day', NOW() AT TIME ZONE 'UTC')
                AND logged_at <  date_trunc('day', NOW() AT TIME ZONE 'UTC') + INTERVAL '1 day')
                                                                                 AS trades_today,

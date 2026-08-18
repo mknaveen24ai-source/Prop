@@ -31,6 +31,13 @@
  * Refuses to touch a database that already has an `accounts` table. Baselining
  * a live environment would mark migrations complete without running them, so
  * this fails closed rather than asking.
+ *
+ * ── Also used as a library ──
+ *
+ * scripts/provision-db.js calls `baselineSchema()` directly. The two must not
+ * drift, so the logic lives here once and the CLI below is a thin wrapper —
+ * note that the export does NOT close the pool, because its caller has more
+ * work to do on the same connection.
  */
 
 require('../loadEnv')
@@ -74,7 +81,25 @@ function baselinedMigrations() {
   return { names, source: 'directory' }
 }
 
-async function main() {
+/**
+ * Is the core schema already present?
+ *
+ * `accounts` is the probe because it is the table the schema dump exists to
+ * provide and the one 002 indexes. Exported so provision-db.js asks the question
+ * exactly the same way rather than inventing a second definition of "empty" —
+ * two probes that could disagree is how a baseline gets run on a live database.
+ */
+async function isProvisioned() {
+  const provisioned = await pool.query(`
+    SELECT EXISTS (
+      SELECT FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'accounts'
+    ) AS present
+  `)
+  return provisioned.rows[0].present === true
+}
+
+async function baselineSchema() {
   console.log('\nSchema baseline (C-02)')
   console.log('='.repeat(56))
 
@@ -85,13 +110,7 @@ async function main() {
     )
   }
 
-  const provisioned = await pool.query(`
-    SELECT EXISTS (
-      SELECT FROM information_schema.tables
-      WHERE table_schema = 'public' AND table_name = 'accounts'
-    ) AS present
-  `)
-  if (provisioned.rows[0].present) {
+  if (await isProvisioned()) {
     console.error(
       '\nRefusing to baseline: this database already has an `accounts` table.\n' +
       'Baselining marks migrations applied WITHOUT running them, which on a live\n' +
@@ -99,8 +118,7 @@ async function main() {
       '\n' +
       'For an existing environment the correct command is `npx knex migrate:latest`.\n'
     )
-    process.exitCode = 1
-    return
+    return false
   }
 
   const client = await pool.connect()
@@ -149,6 +167,7 @@ async function main() {
     }
     console.log('\nNext: npx knex migrate:latest')
     console.log('      (runs anything added after the dump was taken)')
+    return true
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {})
     throw error
@@ -157,10 +176,17 @@ async function main() {
   }
 }
 
-main()
-  .then(() => pool.end())
-  .catch(async (error) => {
-    console.error('\nBaseline failed:', error.message)
-    process.exitCode = 1
-    await pool.end().catch(() => {})
-  })
+module.exports = { baselineSchema, isProvisioned }
+
+if (require.main === module) {
+  baselineSchema()
+    .then(async (applied) => {
+      if (!applied) process.exitCode = 1
+      await pool.end()
+    })
+    .catch(async (error) => {
+      console.error('\nBaseline failed:', error.message)
+      process.exitCode = 1
+      await pool.end().catch(() => {})
+    })
+}

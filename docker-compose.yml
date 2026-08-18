@@ -105,6 +105,13 @@ services:
   # exactly once no matter how many backend replicas you run. Previously the
   # backend's own CMD ran `npm run migrate` on every container start, which
   # races itself the moment you scale past one.
+  #
+  # The command is `db:provision`, NOT `migrate`. `knex migrate:latest` cannot
+  # provision a clean database and fails by design (see
+  # backend/migrations/000_core_schema.js) — so on a fresh volume this service
+  # exited non-zero and, because `backend` waits on it completing successfully,
+  # the entire stack never started. db:provision baselines an empty database,
+  # migrates an existing one, and verifies the result either way.
   migrate:
     build:
       context: ./backend
@@ -119,7 +126,7 @@ services:
       # transaction pooling.
       DATABASE_URL: postgresql://${DB_USER:-propfirm}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-propfirm}
     entrypoint: ["dumb-init", "--"]
-    command: ["npm", "run", "migrate"]
+    command: ["npm", "run", "db:provision"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -150,11 +157,14 @@ services:
       # Falls back to DATABASE_URL when unset.
       READ_DATABASE_URL: ${READ_DATABASE_URL:-}
       REDIS_URL:    redis://:${REDIS_PASSWORD:-redispass}@redis:6379
-      # Trade engine mode. `interval` (default) keeps the original polling loops
-      # at their original cadence. `event` drives SL/TP, pending fills, drawdown
-      # and profit targets off the price tick itself, demoting those loops to
-      # safety fallbacks. Flip back to `interval` and restart to roll back.
-      ENGINE_MODE:  ${ENGINE_MODE:-interval}
+      # Trade engine mode. `event` (default since 2026-08-17) drives SL/TP,
+      # pending fills, drawdown and profit targets off the price tick itself,
+      # demoting the polling loops to safety fallbacks. `interval` keeps the
+      # original 500ms/1s polling cadence. Both make identical decisions —
+      # verified by scripts/engine-equivalence.js. Flip back to `interval` and
+      # restart to roll back; no migration needs reverting. The default here
+      # must match .env.template, which documents the decision in full.
+      ENGINE_MODE:  ${ENGINE_MODE:-event}
       # Where the MT5/DWX bridge files are mounted inside the container.
       DWX_PATH:     /app/mt5-bridge
     depends_on:
@@ -226,6 +236,11 @@ services:
         VITE_API_URL:     "${VITE_API_URL-}"
         VITE_APP_VERSION: ${APP_VERSION:-1.0.0}
         VITE_SENTRY_DSN:  ${FRONTEND_SENTRY_DSN:-}
+        # Fed from the backend's own flag, not a separate variable, so the two
+        # cannot be set to different values. Vite inlines this at BUILD time,
+        # so flipping FX_CONVERSION_ENABLED needs `docker compose up -d --build
+        # frontend` — restarting the container alone will not pick it up.
+        VITE_FX_CONVERSION_ENABLED: ${FX_CONVERSION_ENABLED:-false}
     # container_name is deliberately absent: Docker refuses duplicate
     # names, so setting it makes `docker compose up --scale` fail outright.
     # (audit finding H-08 — this service is horizontally scalable.)
@@ -237,6 +252,43 @@ services:
       retries: 5
     networks:
       - external
+
+  # ── Demo price feed (opt-in) ─────────────────────────────────────────────────
+  # The real feed is file-based: a MetaTrader 5 terminal outside these containers
+  # writes DWX_Market_Data.txt into MT5_BRIDGE_PATH. Until one is attached there
+  # are no prices, so nothing on the platform can be exercised end-to-end — which
+  # makes a first deploy impossible to verify.
+  #
+  # This writes the same file with SYNTHETIC prices, into the same bridge
+  # directory the backend reads. Start it with:
+  #
+  #     docker compose --profile demo up -d      (or: ./deploy.sh --demo)
+  #
+  # OPT-IN, and the script itself refuses to run under NODE_ENV=production
+  # unless ALLOW_DEMO_FEED=true is set explicitly — random walks pricing real
+  # trades is the one accident this must never have. Stop it before attaching a
+  # real terminal, or both will write the same file:
+  #
+  #     docker compose --profile demo stop dwx-demo
+  dwx-demo:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: propfirm_dwx_demo
+    profiles: ["demo"]
+    restart: unless-stopped
+    environment:
+      # Deliberately NOT `env_file: .env` — that would set NODE_ENV=production
+      # and trip the guard for the demo case this service exists to serve. The
+      # override stays an explicit choice made in .env, not one inherited here.
+      NODE_ENV: development
+      DWX_MARKET_DATA_FILE: /app/mt5-bridge/DWX_Market_Data.txt
+    entrypoint: ["dumb-init", "--"]
+    command: ["node", "scripts/fake-dwx-feed.js", "--hz=5", "--symbols=6"]
+    volumes:
+      - ${MT5_BRIDGE_PATH:-./deploy/mt5-bridge}:/app/mt5-bridge
+    networks:
+      - internal
 
   # ═══════════════════════════════════════════════════════════════════════════
   # SPLIT ROLES (opt-in) — the topology for 10K+ concurrent traders

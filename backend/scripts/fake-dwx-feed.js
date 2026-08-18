@@ -57,6 +57,35 @@ if (!FILE) {
   process.exit(1)
 }
 
+// ── Production guard ─────────────────────────────────────────────────────────
+// These are random walks, not market data. Feeding them to a production stack
+// would price real trades, move real balances, and trigger real drawdown
+// breaches off numbers that came from Math.random(). Nothing about the file it
+// writes distinguishes it from MT5's, so the refusal has to happen here.
+//
+// ALLOW_DEMO_FEED=true is the deliberate override for a staging environment
+// that runs NODE_ENV=production on purpose.
+if (String(process.env.NODE_ENV || '').toLowerCase() === 'production'
+    && String(process.env.ALLOW_DEMO_FEED || '').toLowerCase() !== 'true') {
+  console.error(
+    '\nRefusing to run: NODE_ENV=production.\n' +
+    '\n' +
+    'This writes SYNTHETIC prices in the same format MT5 does. In production they\n' +
+    'would price real trades and trigger real drawdown breaches off random walks.\n' +
+    '\n' +
+    'If this is a staging environment that runs NODE_ENV=production deliberately,\n' +
+    'set ALLOW_DEMO_FEED=true to override.\n'
+  )
+  process.exit(1)
+}
+
+console.warn(
+  '\n╔══════════════════════════════════════════════════════════════════════════╗\n' +
+  '║  SYNTHETIC PRICE FEED — these are random walks, NOT market data.          ║\n' +
+  '║  Every price, PnL and drawdown breach derived from them is fictional.     ║\n' +
+  '╚══════════════════════════════════════════════════════════════════════════╝\n'
+)
+
 // Plausible starting levels so the numbers look like prices rather than noise.
 // Exact values do not matter — only that they move, and that bid < ask.
 function seedPrice(symbol) {

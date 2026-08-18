@@ -1,0 +1,19 @@
+# MT5 / DWX bridge directory — the default for MT5_BRIDGE_PATH.
+#
+# This directory is bind-mounted into the backend at /app/mt5-bridge. It exists
+# in git because Docker creates a missing bind-mount source as a ROOT-OWNED
+# directory, and the backend container runs as uid 1001 and must WRITE here —
+# it writes DWX_Commands_0.txt to subscribe to symbols. Without this the mount
+# succeeded and symbol subscription failed with EACCES.
+#
+# deploy.sh chowns it to 1001:1001. If you set MT5_BRIDGE_PATH somewhere else,
+# that directory needs the same ownership.
+#
+# Files a real MetaTrader 5 terminal (with the DWX expert advisor attached)
+# writes here:
+#   DWX_Market_Data.txt      — the tick stream the price feed reads
+#   DWX_Commands_0.txt       — written BY the backend, to subscribe to symbols
+#   DWX_History_Export.json  — candle history for the charts
+#
+# The terminal runs OUTSIDE these containers: the backend image is
+# node:20-alpine and contains no MetaTrader. See DEPLOYMENT_CHECKLIST.md.

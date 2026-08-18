@@ -16,6 +16,10 @@
  *      calculatePnL can compensate for it.
  *
  *     node scripts/verify-schema.js
+ *
+ * scripts/provision-db.js also calls `verifySchema()` directly, so a provision
+ * that exits 0 but left a money column as `double precision` still fails. The
+ * export returns a failure count and leaves the pool open for its caller.
  */
 
 require('../loadEnv')
@@ -38,7 +42,7 @@ const MONEY_COLUMNS = [
 
 const EXACT_TYPES = new Set(['numeric', 'decimal'])
 
-async function main() {
+async function verifySchema() {
   let failures = 0
   console.log('\nSchema verification')
   console.log('='.repeat(56))
@@ -90,13 +94,17 @@ async function main() {
     return 0
   }
   console.log(`${failures} check(s) failed.\n`)
-  return 1
+  return failures
 }
 
-main()
-  .then(async (code) => { await pool.end().catch(() => {}); process.exit(code) })
-  .catch(async (error) => {
-    console.error('\nVerification could not run:', error.message)
-    await pool.end().catch(() => {})
-    process.exit(1)
-  })
+module.exports = { verifySchema }
+
+if (require.main === module) {
+  verifySchema()
+    .then(async (failures) => { await pool.end().catch(() => {}); process.exit(failures === 0 ? 0 : 1) })
+    .catch(async (error) => {
+      console.error('\nVerification could not run:', error.message)
+      await pool.end().catch(() => {})
+      process.exit(1)
+    })
+}
