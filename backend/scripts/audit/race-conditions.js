@@ -116,6 +116,74 @@ function summarize(results) {
   return statuses
 }
 
+/**
+ * The distinct rejection messages behind a stampede.
+ *
+ * An UNVERIFIED check is only actionable if it says WHY nothing contended.
+ * "every open was refused" sends someone reading the harness; "Maximum 1.00
+ * lots per trade" sends them to the setting that needs changing.
+ */
+/**
+ * A news protection window blocks every trade open for 30 minutes (15 before an
+ * event, 15 after), so a harness run inside one produces nothing but refusals.
+ * Worth naming specifically: "every open was refused" reads like a bug, whereas
+ * "a news window is active, re-run after it clears" is an instruction.
+ */
+function newsWindowActive(reasonList) {
+  return reasonList.some((r) => /news event/i.test(r))
+}
+
+function reasons(results) {
+  const seen = new Set()
+  for (const r of results) {
+    if (r.status !== 'fulfilled') { seen.add('request failed'); continue }
+    const body = r.value.data
+    const message = body && (body.error || body.message)
+    if (message && r.value.status >= 400) seen.add(String(message).slice(0, 160))
+  }
+  return [...seen]
+}
+
+/**
+ * Did this check actually race anything?
+ *
+ * A stampede where every request was rejected for the same unrelated reason --
+ * all 404 because the row was already gone, all 429 because a limiter ate them,
+ * all 400 because the request was invalid -- contends over nothing. Reporting
+ * that as a pass is the same false-pass failure the authorization matrix had:
+ * the harness says "no double-spend observed" when what happened is "no spend
+ * was attempted".
+ *
+ * A race needs at least one request to have reached the contended resource.
+ */
+function raced(statuses) {
+  const succeeded = Object.entries(statuses)
+    .filter(([code]) => Number(code) >= 200 && Number(code) < 300)
+    .reduce((n, [, count]) => n + count, 0)
+  const throttled = Number(statuses['429'] || 0)
+
+  // `meaningful` asks only whether the contended resource was reached at all.
+  // If nothing succeeded, the stampede fought over nothing.
+  const meaningful = succeeded >= 1
+
+  // Separately: WHICH defence turned the others away.
+  //
+  // A stampede stopped almost entirely by 429s got its correct outcome from a
+  // rate limiter, not from a database lock. That is a real defence and it did
+  // work -- but it is a different one with a different failure mode. The limiter
+  // is Redis-backed and falls back to in-process counters when Redis is
+  // unavailable (utils/security.js makeSharedStore), and in-process counters do
+  // not span instances. On a multi-instance deploy with Redis down, concurrent
+  // requests can land on different instances, each pass their own limiter, and
+  // leave the row lock as the only thing between a trader and a double payout.
+  //
+  // So the invariant is reported as holding while the lock behind it is recorded
+  // as unproven, rather than quietly credited for someone else's work.
+  const lockExercised = succeeded >= 1 && throttled < CONCURRENCY - 1
+
+  return { succeeded, throttled, meaningful, lockExercised }
+}
+
 async function main() {
   if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required')
 
@@ -152,13 +220,19 @@ async function main() {
       "SELECT COUNT(*)::int AS n FROM trades WHERE account_id = $1 AND status = 'open'",
       [accountId]
     )
+    const st1 = summarize(results)
+    const st1Reasons = reasons(results)
+    const ev1 = raced(st1)
     checks.push({
       name: 'concurrent identical trade opens (same idempotency key)',
       concurrency: CONCURRENCY,
-      statuses: summarize(results),
+      statuses: st1,
+      evidence: ev1,
+      reasons: st1Reasons,
       observed: `${rows[0].n} open position(s)`,
       expected: 'exactly 1',
-      pass: rows[0].n === 1,
+      pass: ev1.meaningful ? rows[0].n === 1 : null,
+      inconclusive: ev1.meaningful ? null : 'no request reached the contended row',
       accountId
     })
   }
@@ -180,12 +254,21 @@ async function main() {
     })
     const accountId = issued.data?.account?.id
 
-    // 20 lots of EURUSD is ~$2M notional — far beyond what $10,000 of equity
-    // can margin, so only a few may be admitted however they interleave.
+    // Sized against the platform's REAL cap, so some must be admitted and some
+    // must be refused.
+    //
+    // A $10,000 account is capped at 1.00 combined forex lots (0.1 per $1k), not
+    // by margin. Two earlier attempts -- 20 lots then 2 lots -- were each above
+    // the cap on their own, so all eight were refused, nothing contended, and
+    // the check reported a pass having tested nothing.
+    //
+    // 8 x 0.2 lots asks for 1.6 against a 1.0 cap: roughly five should be
+    // admitted and three refused. A lost update shows up as MORE than 1.0 lots
+    // open, which is the gate having read a stale exposure total.
     const results = await stampede(CONCURRENCY, () => http('post', '/api/trades/open', {
       cookie: trader.cookie,
       idempotencyKey: `trades:open:${crypto.randomUUID()}`,
-      data: { account_id: accountId, instrument: 'EURUSD', direction: 'buy', lots: 20 }
+      data: { account_id: accountId, instrument: 'EURUSD', direction: 'buy', lots: 0.2 }
     }))
 
     const { rows } = await db.query(
@@ -194,13 +277,26 @@ async function main() {
       [accountId]
     )
     const account = await db.query('SELECT current_balance FROM accounts WHERE id = $1', [accountId])
+    const st2 = summarize(results)
+    const st2Reasons = reasons(results)
+    const ev2 = raced(st2)
+    // At 1:100 leverage, 2 lots of EURUSD needs roughly $2,300 of margin, so
+    // $10,000 of equity supports about four. Admitting all eight would mean the
+    // gate read a stale balance.
+    const admitted = Number(rows[0].n)
+    const totalLots = Number(rows[0].lots)
     checks.push({
-      name: 'concurrent oversized opens must respect margin',
+      name: 'concurrent opens must respect the exposure cap (8 x 0.2 lots vs a 1.0 cap)',
       concurrency: CONCURRENCY,
-      statuses: summarize(results),
-      observed: `${rows[0].n} open, ${rows[0].lots} lots, balance ${account.rows[0]?.current_balance}`,
-      expected: 'admitted lots must be affordable — not all 8',
-      pass: Number(rows[0].n) < CONCURRENCY,
+      statuses: st2,
+      evidence: ev2,
+      reasons: st2Reasons,
+      observed: `${admitted} open, ${totalLots} lots total, balance ${account.rows[0]?.current_balance}`,
+      expected: 'combined open lots must never exceed the 1.0 cap',
+      // The cap is the invariant, not the request count. Admitting five 0.2-lot
+      // trades is correct; admitting eight would put 1.6 lots on a 1.0 account.
+      pass: ev2.meaningful ? totalLots <= 1.0 + 1e-9 : null,
+      inconclusive: ev2.meaningful ? null : 'every open was refused, so nothing contended for the cap',
       accountId
     })
   }
@@ -238,20 +334,45 @@ async function main() {
         pass: null
       })
     } else {
-      // The platform enforces a minimum holding time; wait it out rather than
-      // racing the guard, which would test the wrong thing.
-      let closable = false
-      for (let i = 0; i < 20 && !closable; i++) {
-        const probe = await http('post', '/api/trades/close', {
-          cookie: trader.cookie,
-          idempotencyKey: `trades:close:probe:${crypto.randomUUID()}`,
-          data: { trade_id: opened, account_id: accountId }
+      // Wait out the minimum holding period by WATCHING THE CLOCK, never by
+      // probing with a real close.
+      //
+      // The first version polled /trades/close until it stopped answering
+      // "minimum trade duration" -- and the request that stopped answering it
+      // was a successful close. The stampede then raced a position that no
+      // longer existed, all eight came back 404, and the check reported a clean
+      // pass having contended over nothing.
+      const openedAt = Date.now()
+      const HOLD_MS = 65000
+      while (Date.now() - openedAt < HOLD_MS) {
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+      }
+
+      // Confirm the position is STILL OPEN immediately before the stampede.
+      //
+      // It has to survive a 65-second holding period, and during that window the
+      // engine can legitimately close it on a stop, a drawdown breach or a news
+      // event. When that happened the stampede raced a position that no longer
+      // existed, all eight came back 404, and the check swung between real
+      // evidence and nothing depending on market noise. An intermittently
+      // meaningless check is worse than an honest one, because whoever reads it
+      // cannot tell which kind of run they are looking at.
+      const stillOpen = await db.query(
+        "SELECT status FROM trades WHERE id = $1 AND status = 'open'", [opened]
+      )
+      if (stillOpen.rows.length === 0) {
+        checks.push({
+          name: 'concurrent closes of one position',
+          skipped: 'the position was closed by the engine during the 65s holding period ' +
+                   '(stop, drawdown or news), so there was nothing left to race. Re-run.',
+          pass: null
         })
-        if (!/Minimum trade duration/i.test(JSON.stringify(probe.data))) {
-          closable = true
-          break
-        }
-        await new Promise((resolve) => setTimeout(resolve, 5000))
+        await db.end()
+        const partial = { baseUrl: BASE_URL, concurrency: CONCURRENCY, checks }
+        if (JSON_OUT) console.log(JSON.stringify(partial, null, 2))
+        else report(partial)
+        process.exitCode = 1
+        return
       }
 
       const before = await db.query('SELECT current_balance FROM accounts WHERE id = $1', [accountId])
@@ -266,13 +387,21 @@ async function main() {
       )
       const after = await db.query('SELECT current_balance FROM accounts WHERE id = $1', [accountId])
 
+      const st3 = summarize(results)
+      const st3Reasons = reasons(results)
+      const ev3 = raced(st3)
       checks.push({
         name: 'concurrent closes of one position',
         concurrency: CONCURRENCY,
-        statuses: summarize(results),
+        statuses: st3,
+        evidence: ev3,
+      reasons: st3Reasons,
         observed: `${closedRows.rows[0].n} closed row(s), balance ${before.rows[0]?.current_balance} -> ${after.rows[0]?.current_balance}`,
         expected: 'exactly 1 closed row; PnL booked once',
-        pass: closedRows.rows[0].n === 1,
+        pass: ev3.meaningful ? closedRows.rows[0].n === 1 : null,
+        inconclusive: ev3.meaningful
+          ? null
+          : 'no close succeeded - the position was already gone, so nothing raced',
         accountId
       })
     }
@@ -293,23 +422,74 @@ async function main() {
     })
     const accountId = issued.data?.account?.id
 
+    // Put the account into a state where a payout is genuinely eligible, then
+    // race it. Racing an ineligible request only proves the eligibility check
+    // runs; the LOCK is exercised only when two VALID requests contend for the
+    // same realised profit.
+    //
+    // domain/payoutEligibility.js requires all of: account_type = 'funded',
+    // users.kyc_status = 'approved', and realised profit above the configured
+    // minimum. Missing any one of them returns 403 before the lock is reached,
+    // which is what the first three attempts at this check were measuring.
+    await db.query(
+      `UPDATE accounts
+          SET account_type = 'funded',
+              status = 'active',
+              current_balance = current_balance + 2000,
+              peak_balance = GREATEST(peak_balance, current_balance + 2000)
+        WHERE id = $1`,
+      [accountId]
+    )
+    await db.query(
+      `UPDATE users SET kyc_status = 'approved'
+        WHERE id = (SELECT user_id FROM accounts WHERE id = $1)`,
+      [accountId]
+    )
+
+    // The contract is { account_id, amount_requested, payment_method,
+    // payment_details } -- `amount` alone returns "All fields are required",
+    // which is a validation refusal, not the lock being exercised.
     const results = await stampede(CONCURRENCY, () => http('post', '/api/payouts/request', {
       cookie: trader.cookie,
       idempotencyKey: `payouts:request:${crypto.randomUUID()}`,
-      data: { account_id: accountId, amount: 100 }
+      data: {
+        account_id: accountId,
+        amount_requested: 100,
+        // The enum is crypto-only: usdt_trc20 | usdt_bep20 | usdt_erc20 |
+        // usdt_polygon | btc | ltc. 'bank_transfer' is refused as invalid, which
+        // is validation, not the lock.
+        payment_method: 'usdt_trc20',
+        payment_details: { wallet_address: 'TRaceProbeWalletAddressForAuditOnly1' }
+      }
     }))
 
     const { rows } = await db.query(
       `SELECT COUNT(*)::int AS n FROM payouts WHERE account_id = $1 AND status IN ('pending','under_review','approved')`,
       [accountId]
     )
+    const st4 = summarize(results)
+    const st4Reasons = reasons(results)
+    const ev4 = raced(st4)
     checks.push({
-      name: 'concurrent payout requests',
+      name: 'concurrent payout requests on an account with realised profit',
       concurrency: CONCURRENCY,
-      statuses: summarize(results),
+      statuses: st4,
+      evidence: ev4,
+      reasons: st4Reasons,
       observed: `${rows[0].n} live payout row(s)`,
-      expected: 'at most 1 — the eligibility rules forbid a second pending payout',
-      pass: rows[0].n <= 1,
+      expected: 'at most 1 - the rules forbid a second pending payout',
+      // Two distinct failures are possible and only one is a race: more than one
+      // row means the lock lost, while zero successes means the request never
+      // became eligible and the lock was never reached at all.
+      pass: ev4.meaningful ? rows[0].n <= 1 : null,
+      inconclusive: ev4.meaningful
+        ? (ev4.lockExercised
+            ? null
+            : `outcome correct, but ${ev4.throttled} of ${CONCURRENCY} were stopped by the 24h payout rate ` +
+              'limiter, so the database row lock was never contended. That limiter is Redis-backed and falls ' +
+              'back to in-process counters, which do not span instances - on a multi-instance deploy with ' +
+              'Redis down the row lock is the only remaining defence, and it stays unproven here.')
+        : 'no payout request succeeded - eligibility refused them all, so the lock was never exercised',
       accountId
     })
   }
@@ -320,8 +500,11 @@ async function main() {
   if (JSON_OUT) console.log(JSON.stringify(result, null, 2))
   else report(result)
 
+  // An unverified check exits non-zero too. "Nothing was proven" must not read
+  // as "everything is fine" to CI or to anyone skimming the exit status.
   const failed = checks.filter((c) => c.pass === false)
-  process.exitCode = failed.length > 0 ? 1 : 0
+  const unverified = checks.filter((c) => c.pass === null)
+  process.exitCode = failed.length > 0 || unverified.length > 0 ? 1 : 0
 }
 
 function report(r) {
@@ -337,16 +520,30 @@ function report(r) {
       console.log('')
       continue
     }
-    console.log(`  ${c.pass ? '✓' : '✗'} ${c.name}`)
+    const mark = c.pass === true ? '✓' : c.pass === false ? '✗' : '⚠'
+    console.log(`  ${mark} ${c.name}`)
     console.log(`      HTTP      ${JSON.stringify(c.statuses)}`)
     console.log(`      observed  ${c.observed}`)
     console.log(`      expected  ${c.expected}`)
+    if (c.inconclusive) console.log(`      UNVERIFIED - ${c.inconclusive}`)
+    if (c.reasons && newsWindowActive(c.reasons)) {
+      console.log('      NOTE      a 30-minute news protection window is active (15 min either side of a')
+      console.log('                high-impact event). No trade can open until it clears. Re-run after.')
+    }
+    if (c.reasons && c.reasons.length > 0) {
+      for (const reason of c.reasons) console.log(`      reason    ${reason}`)
+    }
     console.log('')
   }
   const failed = r.checks.filter((c) => c.pass === false)
-  const skipped = r.checks.filter((c) => c.pass === null)
-  if (failed.length === 0) {
-    console.log(`  ✓ no lost update or double-spend observed${skipped.length ? ` (${skipped.length} unverified)` : ''}`)
+  const unverified = r.checks.filter((c) => c.pass === null)
+  const caveated = r.checks.filter((c) => c.pass === true && c.inconclusive)
+  if (failed.length === 0 && unverified.length === 0 && caveated.length === 0) {
+    console.log('  ✓ no lost update or double-spend observed, and every check genuinely contended')
+  } else if (failed.length === 0 && unverified.length === 0) {
+    console.log(`  ✓ every invariant held (${caveated.length} with a caveat above)`)
+  } else if (failed.length === 0) {
+    console.log(`  ⚠ no race confirmed, but ${unverified.length} check(s) proved nothing - see UNVERIFIED above`)
   } else {
     console.log(`  ✗ ${failed.length} race condition(s) confirmed`)
   }

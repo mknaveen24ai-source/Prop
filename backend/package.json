@@ -25,6 +25,8 @@
     "check:sql-columns": "node scripts/check-sql-columns.js",
     "check:sql-prepare": "node scripts/audit/sql-prepare-check.js",
     "audit:authz": "node scripts/audit/authz-matrix.js",
+    "audit:money": "node scripts/audit/money-integrity.js",
+    "audit:races": "node scripts/audit/race-conditions.js",
     "audit:routes": "node scripts/audit/route-inventory.js",
         "fx:cutover-check": "node scripts/verify-fx-cutover.js",
         "db:provision": "node scripts/provision-db.js",
