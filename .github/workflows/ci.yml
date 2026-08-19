@@ -249,6 +249,14 @@ jobs:
         # application layer is built on.
         run: npm run schema:verify
 
+      - name: Verify every column the SQL writes actually exists
+        # `payouts.updated_at` was written by four code paths and created by no
+        # migration, so every admin payout approve/reject/flag/unflag returned
+        # 500 against a correct database. The payout tests mock the pg pool, so
+        # no SQL on that path had ever executed. This job has the one thing that
+        # can tell the difference: a schema built by the real migrations.
+        run: npm run check:sql-columns
+
   fresh-deploy:
     name: Fresh deploy boots and trades
     runs-on: ubuntu-latest

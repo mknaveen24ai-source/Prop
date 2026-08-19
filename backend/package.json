@@ -22,6 +22,7 @@
         "engine:equivalence": "node scripts/engine-equivalence.js",
         "schema:dump": "node scripts/dump-core-schema.js",
         "schema:verify": "node scripts/verify-schema.js",
+    "check:sql-columns": "node scripts/check-sql-columns.js",
         "fx:cutover-check": "node scripts/verify-fx-cutover.js",
         "db:provision": "node scripts/provision-db.js",
         "migrate": "knex migrate:latest",

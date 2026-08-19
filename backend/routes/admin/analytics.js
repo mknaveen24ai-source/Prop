@@ -91,7 +91,7 @@ router.get('/cohort-analytics', authenticateAdmin, async (req, res) => {
        payout_agg AS (
          SELECT
            p.user_id,
-           COALESCE(SUM(p.amount) FILTER (WHERE p.status = 'paid'), 0)::numeric AS paid_out
+           COALESCE(SUM(p.amount_payable) FILTER (WHERE p.status = 'paid'), 0)::numeric AS paid_out
          FROM payouts p
          GROUP BY p.user_id
        )
