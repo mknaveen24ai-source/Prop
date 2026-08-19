@@ -37,6 +37,7 @@ const {
 } = require('./shared/tradeOps')
 const { fromLockedRow } = require('../../domain/account')
 const { approvePayout } = require('../../domain/payout')
+const { deliverCertificate } = require('../../services/certificateService')
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DASHBOARD ENDPOINTS
@@ -71,6 +72,7 @@ router.post('/command-center/bulk-action', authenticateAdmin, adminBulkLimiter, 
 
     for (const rawId of ids) {
       let postCommitInvalidateUserId = null
+      const pendingCertificateDeliveries = []
 
       try {
         await client.query('BEGIN')
@@ -432,6 +434,15 @@ router.post('/command-center/bulk-action', authenticateAdmin, adminBulkLimiter, 
             })
             updatedPayout = approval.payout
             message = 'Payout approved'
+            // Delivered after COMMIT below, not here — the same rule the
+            // single-approval route follows. Only a fresh mint is delivered, so
+            // re-running a bulk action cannot email a trader twice.
+            if (approval.certificateCreated) {
+              pendingCertificateDeliveries.push({
+                certificate: approval.certificate,
+                email: approval.recipient?.email || null
+              })
+            }
           } else if (action === 'reject_payout') {
             const result = await client.query(
               `UPDATE payouts
@@ -470,6 +481,10 @@ router.post('/command-center/bulk-action', authenticateAdmin, adminBulkLimiter, 
             entity_id: payout.id,
             action
           })
+
+          for (const delivery of pendingCertificateDeliveries.splice(0)) {
+            await deliverCertificate(req.app.get('io'), delivery.certificate, { email: delivery.email })
+          }
 
           results.push({
             id: rawId,

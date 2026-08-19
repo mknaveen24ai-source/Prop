@@ -204,10 +204,10 @@ else
   chmod 600 "$ENV_FILE"
   ok "created from .env.template (mode 600)"
 
-  for key in DB_PASSWORD REDIS_PASSWORD JWT_SECRET ADMIN_JWT_SECRET ADMIN_PASSWORD KYC_FILE_ENCRYPTION_KEY TOTP_ENCRYPTION_KEY; do
+  for key in DB_PASSWORD REDIS_PASSWORD JWT_SECRET ADMIN_JWT_SECRET ADMIN_PASSWORD KYC_FILE_ENCRYPTION_KEY TOTP_ENCRYPTION_KEY CERTIFICATE_SIGNING_SECRET; do
     set_env "$key" "$(gen_secret)"
   done
-  ok "generated 7 secrets (32 random bytes each)"
+  ok "generated 8 secrets (32 random bytes each)"
 
   if [ -z "$DOMAIN" ] && [ "$ASSUME_YES" = "0" ]; then
     prompt DOMAIN "Public domain (used for CORS and email links)" "localhost"

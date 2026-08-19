@@ -28,6 +28,14 @@ deploy.sh       text eol=lf
 # Binary — never touch.
 *.png           binary
 *.jpg           binary
+# Fonts are embedded into rendered certificates by backend/services/
+# certificateRenderer.js. Left to the text=auto heuristic a single mangled byte
+# turns into a font resvg silently refuses to load, and certificates render in a
+# fallback face on the server that produced them — declare them binary outright.
+*.ttf           binary
+*.otf           binary
+*.woff          binary
+*.woff2         binary
 *.jpeg          binary
 *.gif           binary
 *.ico           binary

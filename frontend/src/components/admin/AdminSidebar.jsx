@@ -128,6 +128,7 @@ export default function AdminSidebar({
             <NavItem to="/admin/challenges" icon="challenges" label="Challenges" badge={counts.challenges > 0 ? { val: counts.challenges, color: 'neutral' } : null} />
             <NavItem to="/admin/promotion-reviews" icon="approve" label="Promotion Review" />
             <NavItem to="/admin/funded" icon="funded" label="Funded Accounts" badge={counts.funded > 0 ? { val: counts.funded, color: 'gold' } : null} />
+            <NavItem to="/admin/certificates" icon="leaderboard" label="Certificates" />
           </NavGroup>
 
           <NavGroup id="trading" label="Trading" isCollapsed={isCollapsed} collapsedGroups={collapsedGroups} onToggle={toggleGroup}>

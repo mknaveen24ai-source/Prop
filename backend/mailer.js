@@ -23,7 +23,8 @@ const EMAIL_TEMPLATE_KEYS = Object.freeze([
   'affiliate_payout_rejected',
   'competition_prize_voucher',
   'gift_challenge_voucher',
-  'referral_season_prize_voucher'
+  'referral_season_prize_voucher',
+  'certificate_awarded'
 ])
 
 let transporter = null
@@ -679,7 +680,86 @@ function buildReferralSeasonPrizeVoucherEmail(payload) {
   }
 }
 
-function buildEmailMessage(templateKey, payload = {}) {
+/**
+ * Certificate award email — the only template that carries attachments.
+ *
+ * The queued job stores just the certificate's public_id, never a base64 PDF:
+ * `email_jobs.payload_json` is JSONB and a megabyte of encoded PDF per row
+ * would be both slow and unloggable. The certificate is fetched and rendered
+ * here, at send time.
+ *
+ * The preview image is attached with a Content-ID and referenced as
+ * `cid:certificate-preview` rather than linked from the server. Most mail
+ * clients block remote images by default, so a hosted URL would leave the
+ * single most celebratory email the platform sends looking blank.
+ *
+ * Rendering failure degrades to a link-only email rather than throwing — a
+ * trader should still hear that they passed even if the renderer is broken.
+ */
+async function buildCertificateAwardedEmail(payload) {
+  const to = String(payload?.toEmail || '').trim()
+  const fullName = String(payload?.fullName || 'Trader')
+  const title = String(payload?.title || 'Certificate of Achievement')
+  const publicId = String(payload?.certificatePublicId || '')
+  const context = resolveMailContext()
+  const verifyUrl = `${context.baseUrl}/verify/${encodeURIComponent(publicId)}`
+  const dashboardUrl = `${context.baseUrl}/dashboard/certificates`
+
+  const attachments = []
+  let previewBlock = ''
+
+  try {
+    const pool = require('./db')
+    const { getByPublicId } = require('./services/certificateService')
+    const { getTemplateById } = require('./services/certificateTemplateService')
+    const { renderCertificatePng, renderCertificatePdf } = require('./services/certificateRenderer')
+
+    const certificate = await getByPublicId(pool, publicId)
+    if (certificate) {
+      const template = certificate.template_id
+        ? await getTemplateById(pool, certificate.template_id)
+        : null
+
+      const [preview, pdf] = await Promise.all([
+        renderCertificatePng(certificate, template, { width: 900, brandName: context.firmName }),
+        renderCertificatePdf(certificate, template, { brandName: context.firmName })
+      ])
+
+      attachments.push(
+        { filename: `certificate-${publicId}.png`, content: preview, cid: 'certificate-preview', contentType: 'image/png' },
+        { filename: `certificate-${publicId}.pdf`, content: pdf, contentType: 'application/pdf' }
+      )
+      previewBlock = '<p style="margin:24px 0;"><img src="cid:certificate-preview" alt="' +
+        `${title}" style="width:100%;max-width:456px;border:1px solid #1e2d3d;" /></p>`
+    }
+  } catch (error) {
+    console.error(`[mail] Could not render certificate ${publicId}, sending links only:`, error.message)
+  }
+
+  return {
+    to,
+    subject: `${context.firmName} - ${title}`,
+    html: htmlWrap(`Congratulations ${fullName}!`, `
+      <p>You have earned your <strong style="color:#c9a84c;">${title}</strong> certificate.</p>
+      ${previewBlock}
+      <p>It is attached as a PDF, and it is always available in your dashboard. Anyone can confirm it is genuine using the verification link or the QR code on the certificate itself.</p>
+      <p style="margin:24px 0;">
+        <a href="${dashboardUrl}" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">View &amp; Share</a>
+      </p>
+      <p style="font-size:13px;color:#aaa;">Certificate ID: <strong style="color:#c9a84c;">${publicId}</strong><br>
+      Verify at <a href="${verifyUrl}" style="color:#c9a84c;">${verifyUrl}</a></p>
+    `),
+    text: `Congratulations ${fullName}! You have earned your ${title} certificate (ID ${publicId}).\n\n` +
+      `View and share it: ${dashboardUrl}\nVerify it: ${verifyUrl}`,
+    attachments
+  }
+}
+
+// Async because buildCertificateAwardedEmail renders the certificate at send
+// time. Both callers (sendWithTemplate here, processEmailJob in
+// utils/emailQueue.js) were already inside async functions, so this is an
+// `await` at two call sites and nothing else.
+async function buildEmailMessage(templateKey, payload = {}) {
   const normalizedKey = String(templateKey || '').trim().toLowerCase()
 
   switch (normalizedKey) {
@@ -723,6 +803,8 @@ function buildEmailMessage(templateKey, payload = {}) {
       return buildGiftChallengeVoucherEmail(payload)
     case 'referral_season_prize_voucher':
       return buildReferralSeasonPrizeVoucherEmail(payload)
+    case 'certificate_awarded':
+      return buildCertificateAwardedEmail(payload)
     default:
       throw new Error(`Unsupported email template: ${normalizedKey || 'unknown'}`)
   }
@@ -732,12 +814,19 @@ async function sendEmailMessage(message) {
   try {
     const context = resolveMailContext()
     const mailer = await getMailTransporter()
+    // `attachments` was previously omitted here, so any template that built
+    // one had it silently discarded before nodemailer ever saw it. The
+    // certificate email is the first template to need attachments, and this one
+    // line is what makes them actually send.
     const info = await mailer.sendMail({
       from: `"${context.fromName}" <${context.fromEmail}>`,
       to: message.to,
       subject: message.subject,
       html: message.html,
-      text: message.text
+      text: message.text,
+      ...(Array.isArray(message.attachments) && message.attachments.length > 0
+        ? { attachments: message.attachments }
+        : {})
     })
     let previewUrl = nodemailer.getTestMessageUrl(info) || null
     if (!previewUrl && info?.message) {
@@ -764,9 +853,12 @@ async function sendEmailMessage(message) {
   }
 }
 
-async function sendWithTemplate(templateKey, payload = {}, options = {}) {
-  const message = buildEmailMessage(templateKey, payload, options)
-  const result = await sendEmailMessage(message, options)
+async function sendWithTemplate(templateKey, payload = {}) {
+  // The third `options` argument this used to forward was accepted by neither
+  // buildEmailMessage nor sendEmailMessage — it was silently discarded, so it
+  // is dropped rather than propagated.
+  const message = await buildEmailMessage(templateKey, payload)
+  const result = await sendEmailMessage(message)
   return result.ok
 }
 

@@ -15,6 +15,8 @@ export function buildAdminNavResults({ isSuperAdmin, navigate }) {
         ['/admin/challenges', 'Challenges'],
         ['/admin/promotion-reviews', 'Promotion Review'],
         ['/admin/funded', 'Funded Accounts'],
+        ['/admin/certificates', 'Certificates'],
+        ['/admin/certificates/templates', 'Certificate Templates'],
       ],
     },
     {

@@ -32,6 +32,7 @@ const {
   buildPayoutListResult
 } = require('./shared/listBuilders')
 const { approvePayout } = require('../../domain/payout')
+const { deliverCertificate } = require('../../services/certificateService')
 
 router.get('/payouts', authenticateAdmin, requireAdminCapability('payout:read:scoped'), async function(req, res) {
   try {
@@ -105,6 +106,13 @@ router.post('/payouts/approve', authenticateAdmin, requireAdminCapability('payou
           title: 'Payout Approved',
           message: `Your payout of $${parseFloat(amount_payable).toFixed(2)} has been approved and paid.`
         })
+      }
+
+      // The certificate row committed with the payout above; only its delivery
+      // is best-effort, and only when this approval is what minted it — a
+      // retried approval must not email the trader a second time.
+      if (approval.certificateCreated) {
+        await deliverCertificate(io, approval.certificate, { email })
       }
     } catch (notifyErr) {
       logger.error('Payout paid but trader could not be notified:', {

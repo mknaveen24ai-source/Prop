@@ -21,6 +21,7 @@ const TraderProfile = lazy(() => import('./pages/TraderProfile'))
 const Competitions = lazy(() => import('./pages/Competitions'))
 const CompetitionDetail = lazy(() => import('./pages/CompetitionDetail'))
 const Transparency = lazy(() => import('./pages/Transparency'))
+const VerifyCertificate = lazy(() => import('./pages/VerifyCertificate'))
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'))
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
 const AdminUsers = lazy(() => import('./pages/admin/AdminUsers'))
@@ -29,6 +30,8 @@ const AdminChallenges = lazy(() => import('./pages/admin/AdminChallenges'))
 const AdminFunded = lazy(() => import('./pages/admin/AdminFunded'))
 const AdminTrades = lazy(() => import('./pages/admin/AdminTrades'))
 const AdminPayouts = lazy(() => import('./pages/admin/AdminPayouts'))
+const AdminCertificates = lazy(() => import('./pages/admin/AdminCertificates'))
+const AdminCertificateTemplates = lazy(() => import('./pages/admin/AdminCertificateTemplates'))
 const AdminPlatformPnL = lazy(() => import('./pages/admin/AdminPlatformPnL'))
 const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'))
 // FIX (M-02): AdminEmailJobs.jsx is a complete 492-line page calling live,
@@ -164,6 +167,8 @@ function AnimatedRoutes({ user, login, logout }) {
             <Route path="trades" element={<AdminTrades />} />
             <Route path="analytics" element={<AdminAnalytics />} />
             <Route path="payouts" element={<AdminPayouts />} />
+            <Route path="certificates" element={<AdminCertificates />} />
+            <Route path="certificates/templates" element={<AdminCertificateTemplates />} />
             <Route path="affiliates" element={<AdminAffiliates />} />
             <Route path="affiliates/payouts" element={<AdminAffiliatePayouts />} />
             <Route path="affiliates/:userId" element={<AdminAffiliateDetail />} />
@@ -198,6 +203,7 @@ function AnimatedRoutes({ user, login, logout }) {
           <Route path="/competitions" element={<Competitions />} />
           <Route path="/competitions/:slug" element={<CompetitionDetail />} />
           <Route path="/transparency" element={<Transparency />} />
+          <Route path="/verify/:publicId" element={<VerifyCertificate />} />
 
           <Route
             path="*"

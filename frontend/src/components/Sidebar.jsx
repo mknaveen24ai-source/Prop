@@ -51,6 +51,7 @@ const NAV_GROUPS = [
       { id: 'kyc', icon: 'kyc', label: 'KYC' },
       { id: 'payouts', icon: 'payouts', label: 'Payouts' },
       { id: 'affiliate', icon: 'affiliate', label: 'Affiliate' },
+      { id: 'certificates', icon: 'leaderboard', label: 'Certificates' },
     ],
   },
   {

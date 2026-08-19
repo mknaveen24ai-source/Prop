@@ -223,6 +223,31 @@ async function enqueueReferralSeasonPrizeVoucherEmail(toEmail, fullName, seasonT
   return enqueueTemplateEmail('referral_season_prize_voucher', { toEmail, fullName, seasonTitle, voucherCode, accountSize, expiresAt }, options)
 }
 
+/**
+ * Queue the certificate award email.
+ *
+ * The payload deliberately carries only the certificate's public_id and the
+ * display fields — the PDF and preview image are rendered by the mailer at send
+ * time. Storing a rendered PDF in payload_json would put megabytes of base64
+ * into a JSONB column that is read on every queue sweep.
+ *
+ * uniqueKey makes the whole thing idempotent for free: a replayed promotion or
+ * a double-clicked payout approval hits the unique index on email_jobs and is
+ * deduped rather than emailing the trader twice.
+ */
+async function enqueueCertificateAwardedEmail(toEmail, certificate, options = {}) {
+  return enqueueTemplateEmail(
+    'certificate_awarded',
+    {
+      toEmail,
+      fullName: certificate?.recipient_name || 'Trader',
+      title: certificate?.title || 'Certificate of Achievement',
+      certificatePublicId: certificate?.public_id || ''
+    },
+    { ...options, uniqueKey: options.uniqueKey || `certificate:${certificate?.public_id || ''}` }
+  )
+}
+
 async function claimPendingEmailJobs(limit = 10) {
   await ensureEmailQueueInfrastructure()
   await pool.query(
@@ -293,7 +318,7 @@ async function processEmailJob(job) {
     const payload = job.payload_json && typeof job.payload_json === 'object'
       ? job.payload_json
       : JSON.parse(job.payload_json || '{}')
-    const message = buildEmailMessage(job.template_key, payload)
+    const message = await buildEmailMessage(job.template_key, payload)
     const result = await sendEmailMessage(message)
     if (result.ok) {
       await markEmailJobSent(job.id, result)
@@ -596,6 +621,7 @@ module.exports = {
   enqueueCompetitionPrizeVoucherEmail,
   enqueueGiftChallengeVoucherEmail,
   enqueueReferralSeasonPrizeVoucherEmail,
+  enqueueCertificateAwardedEmail,
   claimPendingEmailJobs,
   processEmailQueueBatch,
   runEmailAutomationPass,

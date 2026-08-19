@@ -30,8 +30,8 @@ test('email templates expose supported queue keys', () => {
   assert.equal(isSupportedEmailTemplate('unknown_template'), false)
 })
 
-test('buildEmailMessage composes password reset email payload', () => {
-  const message = buildEmailMessage('password_reset', {
+test('buildEmailMessage composes password reset email payload', async () => {
+  const message = await buildEmailMessage('password_reset', {
     toEmail: 'trader@example.com',
     resetLink: 'https://example.com/reset',
     resetToken: 'ABC123'
@@ -42,8 +42,8 @@ test('buildEmailMessage composes password reset email payload', () => {
   assert.match(message.text, /ABC123/)
 })
 
-test('buildEmailMessage composes onboarding email payload', () => {
-  const message = buildEmailMessage('welcome_onboarding', {
+test('buildEmailMessage composes onboarding email payload', async () => {
+  const message = await buildEmailMessage('welcome_onboarding', {
     toEmail: 'trader@example.com',
     fullName: 'Example Trader',
     traderUid: 'uid-123',
@@ -56,8 +56,8 @@ test('buildEmailMessage composes onboarding email payload', () => {
   assert.match(message.html, /AFF123/)
 })
 
-test('buildEmailMessage composes payout requested email payload', () => {
-  const message = buildEmailMessage('payout_requested', {
+test('buildEmailMessage composes payout requested email payload', async () => {
+  const message = await buildEmailMessage('payout_requested', {
     toEmail: 'trader@example.com',
     fullName: 'Example Trader',
     amountRequested: 125,
@@ -71,8 +71,8 @@ test('buildEmailMessage composes payout requested email payload', () => {
   assert.match(message.text, /\$100\.00/)
 })
 
-test('buildEmailMessage composes challenge expiry reminder payload', () => {
-  const message = buildEmailMessage('challenge_expiry_reminder', {
+test('buildEmailMessage composes challenge expiry reminder payload', async () => {
+  const message = await buildEmailMessage('challenge_expiry_reminder', {
     toEmail: 'trader@example.com',
     fullName: 'Example Trader',
     accountType: 'phase1',
@@ -86,8 +86,8 @@ test('buildEmailMessage composes challenge expiry reminder payload', () => {
   assert.match(message.text, /phase1/i)
 })
 
-test('buildEmailMessage composes challenge inactivity reminder payload', () => {
-  const message = buildEmailMessage('challenge_inactivity_reminder', {
+test('buildEmailMessage composes challenge inactivity reminder payload', async () => {
+  const message = await buildEmailMessage('challenge_inactivity_reminder', {
     toEmail: 'trader@example.com',
     fullName: 'Example Trader',
     accountType: 'phase2',

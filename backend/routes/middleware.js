@@ -11,7 +11,8 @@ const SUPER_ADMIN_PERMISSIONS = [
   'kyc:*',
   'violation:*',
   'command_center:*',
-  'bulk:*'
+  'bulk:*',
+  'certificate:*'
 ]
 
 // Least-privileged built-in roles — real capability sets, not the
@@ -22,9 +23,16 @@ const SUPER_ADMIN_PERMISSIONS = [
 // account was forced to be super_admin regardless of this table's existence.
 const ROLE_PERMISSIONS = {
   kyc_reviewer: ['kyc:review:scoped', 'trader:read', 'account:read:scoped'],
-  support_agent: ['chat:read:scoped', 'chat:reply:scoped', 'trader:read'],
+  support_agent: ['chat:read:scoped', 'chat:reply:scoped', 'trader:read', 'certificate:read:scoped'],
   risk_ops: ['violation:read:scoped', 'violation:resolve:scoped', 'trader:read', 'trader:moderate:scoped', 'account:read:scoped', 'account:override'],
-  finance_ops: ['payout:read:scoped', 'payout:review:scoped', 'payout:flag', 'trader:read', 'account:read:scoped'],
+  // certificate:issue/revoke sit with finance_ops because the payout reward
+  // certificate is the one they already mint by approving a payout. Registering
+  // them here matters: a capability absent from EVERY role entry is reachable
+  // only by super_admin via the platform:* wildcard, which is exactly how
+  // account:promotion_review:scoped ended up unusable by any scoped role.
+  // certificate:template:manage is deliberately NOT listed — changing the
+  // artwork every certificate is minted against is a super_admin action.
+  finance_ops: ['payout:read:scoped', 'payout:review:scoped', 'payout:flag', 'trader:read', 'account:read:scoped', 'certificate:read:scoped', 'certificate:issue', 'certificate:revoke'],
 }
 const BUILT_IN_ROLES = ['super_admin', ...Object.keys(ROLE_PERMISSIONS)]
 

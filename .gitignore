@@ -52,3 +52,6 @@ fix_encoding.js
 patch*.js
 patch*.py
 test_news.js
+
+# Smoke-test scratch directory (launch-smoke.js writes process logs + EA here)
+backend/tmp-smoke/

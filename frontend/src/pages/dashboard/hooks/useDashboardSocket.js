@@ -27,7 +27,8 @@ export default function useDashboardSocket({
   pushNotification,
   refreshSelectedAccount,
   fetchAccounts,
-  fetchAccountHistory
+  fetchAccountHistory,
+  onCertificateAwarded
 }) {
   const [connected, setConnected] = useState(false)
   const socketRef = useRef(null)
@@ -62,7 +63,8 @@ export default function useDashboardSocket({
       pushNotification,
       refreshSelectedAccount,
       fetchAccounts,
-      fetchAccountHistory
+      fetchAccountHistory,
+      onCertificateAwarded
     }
   })
 
@@ -152,6 +154,20 @@ export default function useDashboardSocket({
         icon: renderIcon('payouts', { size: 16, color: 'var(--accent-gold)' }),
         style: { borderLeft: '3px solid var(--warn)' }
       })
+    })
+    // A certificate is minted server-side the moment a promotion is approved or
+    // a payout is paid. The toast is the floor; Dashboard.jsx opens a full
+    // celebration on top of it, because this is the payoff moment of the
+    // entire product and a corner toast under-delivers it.
+    socket.on('certificate_awarded', (data) => {
+      if (!data?.public_id) return
+      toast.success(`Certificate earned: ${data.title || 'new award'}`, {
+        duration: 8000,
+        icon: renderIcon('leaderboard', { size: 16, color: 'var(--accent-gold)' }),
+        style: { borderLeft: '3px solid var(--warn)' }
+      })
+      handlersRef.current.pushNotification?.(`Certificate earned: ${data.title || 'new award'}`, 'success')
+      handlersRef.current.onCertificateAwarded?.(data)
     })
     socket.on('kyc_status_changed', (data) => {
       if (!data?.status) return

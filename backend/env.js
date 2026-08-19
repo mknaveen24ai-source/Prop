@@ -19,6 +19,7 @@ const RECOMMENDED = [
   'SMTP_HOST',
   'SMTP_USER',
   'SMTP_PASS',
+  'CERTIFICATE_SIGNING_SECRET', // utils/certificateSignature.js throws in production without it
 ]
 
 function validateEnv() {

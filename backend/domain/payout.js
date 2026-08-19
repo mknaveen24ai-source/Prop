@@ -22,6 +22,8 @@ const Decimal = require('decimal.js')
 const { loadForUpdate } = require('./account')
 const { evaluatePayoutEligibility } = require('./payoutEligibility')
 const { InvariantViolation, NotFound } = require('./errors')
+const logger = require('../utils/logger')
+const { issueCertificate, buildCertificateTitle } = require('../services/certificateService')
 
 /**
  * Approve and pay a pending payout, inside the caller's transaction.
@@ -107,8 +109,12 @@ async function approvePayout(client, payoutId, {
     [payout.id, transactionId ? String(transactionId) : null]
   )
 
+  const award = await awardPayoutCertificate(client, payout)
+
   return {
     payout: updated.rows[0],
+    certificate: award.certificate,
+    certificateCreated: award.created,
     recipient: {
       userId: payout.user_id,
       email: payout.email,
@@ -116,6 +122,53 @@ async function approvePayout(client, payoutId, {
       amountPayable: payout.amount_payable,
       paymentMethod: payout.payment_method
     }
+  }
+}
+
+/**
+ * Mint the payout reward certificate inside the approval transaction.
+ *
+ * SAVEPOINT-wrapped for the same reason as the promotion award: the
+ * certificate must not survive a rolled-back approval, but it must also never
+ * be the reason a payout fails. Money has moved by this point in the
+ * transaction — a broken renderer must not undo it. Any failed statement aborts
+ * the whole Postgres transaction, so the savepoint is what makes "log it and
+ * carry on" actually possible here.
+ */
+async function awardPayoutCertificate(client, payout) {
+  // approvePayout documents that `client` must already be inside a transaction,
+  // so the savepoint normally succeeds. Probing rather than assuming means a
+  // caller that broke that contract loses the rollback protection it never had,
+  // not the certificate itself.
+  let savepointHeld = false
+  try {
+    await client.query('SAVEPOINT payout_certificate')
+    savepointHeld = true
+  } catch {
+    savepointHeld = false
+  }
+
+  try {
+    const { certificate, created } = await issueCertificate(client, {
+      userId: payout.user_id,
+      accountId: payout.account_id,
+      kind: 'payout',
+      title: buildCertificateTitle({ kind: 'payout', amount: payout.amount_payable }),
+      recipientName: payout.full_name,
+      amount: payout.amount_payable,
+      metadata: { payout_id: String(payout.id), payment_method: payout.payment_method },
+      sourceKey: `payout:${payout.id}`
+    })
+
+    if (savepointHeld) await client.query('RELEASE SAVEPOINT payout_certificate')
+    return { certificate, created }
+  } catch (error) {
+    if (savepointHeld) await client.query('ROLLBACK TO SAVEPOINT payout_certificate').catch(() => {})
+    logger.error('[payout] Certificate award failed; payout approval continues', {
+      payout_id: String(payout.id),
+      error: error.message
+    })
+    return { certificate: null, created: false }
   }
 }
 

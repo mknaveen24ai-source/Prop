@@ -5,7 +5,7 @@
 
 import axios from 'axios'
 import { setMemoryItem } from '../utils/memoryStore'
-import { API_BASE_URL as API_URL } from '../config/apiBase'
+import { API_BASE_URL as API_URL, apiUrl } from '../config/apiBase'
 import { getDeviceSignature, initDeviceSignature, getDeviceSignatureAsync } from '../utils/deviceSignature'
 
 // Start fingerprint collection as soon as the API layer loads, so the signature
@@ -376,6 +376,38 @@ export const notificationsAPI = {
 
   clearAll: () =>
     api.delete('/api/notifications')
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Certificates API — the trader's own awards
+//
+// Render URLs are plain <img src> / download targets rather than axios calls,
+// so they go through apiUrl() like the KYC document preview and statement
+// download already do.
+// ─────────────────────────────────────────────────────────────────────────────
+export const certificatesAPI = {
+  getMine: () =>
+    api.get('/api/certificates'),
+
+  getOne: (publicId) =>
+    api.get(`/api/certificates/${encodeURIComponent(publicId)}`),
+
+  /** Inline preview image. `width` keeps the viewer light; downloads use full resolution. */
+  imageUrl: (publicId, width) =>
+    apiUrl(`/api/certificates/${encodeURIComponent(publicId)}/render.png${width ? `?w=${width}` : ''}`),
+
+  downloadPngUrl: (publicId) =>
+    apiUrl(`/api/certificates/${encodeURIComponent(publicId)}/render.png?download=1`),
+
+  downloadPdfUrl: (publicId) =>
+    apiUrl(`/api/certificates/${encodeURIComponent(publicId)}/render.pdf`),
+
+  /** Public, unauthenticated — used by the /verify page and social previews. */
+  verifyUrl: (publicId) =>
+    apiUrl(`/api/certificates/public/${encodeURIComponent(publicId)}`),
+
+  publicImageUrl: (publicId, width) =>
+    apiUrl(`/api/certificates/public/${encodeURIComponent(publicId)}/render.png${width ? `?w=${width}` : ''}`)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

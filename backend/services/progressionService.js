@@ -3,6 +3,7 @@ const logger = require('../utils/logger')
 const { getTenantSettings } = require('./tenantPolicyService')
 const { generateAccountUid } = require('../utils/accountIds')
 const { resolvePromotionTarget } = require('./promotionTarget')
+const { issueCertificate, buildCertificateTitle } = require('./certificateService')
 const {
   createPromotionReview,
   markPromotionReviewApproved
@@ -135,6 +136,7 @@ async function buildPhase2InsertArgs(acc, settings, db) {
                ON CONFLICT (date) DO UPDATE
                SET accounts_passed = bbook_pnl.accounts_passed + 1`,
     bbookValues: [],
+    targetAccountType: 'phase2',
     socketEvent: 'phase1_passed',
     socketMessage: `Phase 1 PASSED! Your Phase 2 challenge is now active. Target: ${settings.phase2_profit_target_pct}%`
   }
@@ -154,6 +156,7 @@ async function buildFundedInsertArgs(acc, settings, db) {
                ON CONFLICT (date) DO UPDATE
                SET new_funded = bbook_pnl.new_funded + 1`,
     bbookValues: [],
+    targetAccountType: 'funded',
     socketEvent: 'phase2_passed',
     socketMessage: 'Phase 2 PASSED! You are now a Funded Trader. Welcome to the team!'
   }
@@ -216,6 +219,7 @@ async function buildNextPhaseStepModelPlan(acc, stepModel, db, target) {
                  ON CONFLICT (date) DO UPDATE
                  SET accounts_passed = bbook_pnl.accounts_passed + 1`,
       bbookValues: [],
+      targetAccountType: target.targetAccountType,
       socketEvent: `phase${currentStep}_passed`,
       socketMessage: `${currentPhaseName} PASSED! Your Phase ${nextStep} challenge is now active. Target: ${profitTargetPct}%`
     }
@@ -245,6 +249,7 @@ async function buildNextPhaseStepModelPlan(acc, stepModel, db, target) {
                ON CONFLICT (date) DO UPDATE
                SET new_funded = bbook_pnl.new_funded + 1`,
     bbookValues: [],
+    targetAccountType: 'funded',
     socketEvent: `phase${currentStep}_passed`,
     socketMessage: `${currentPhaseName} PASSED! You are now a Funded Trader. Welcome to the team!`
   }
@@ -264,6 +269,83 @@ async function buildPromotionPlan(acc, settings, db = pool) {
   if (target.targetAccountType === 'phase2') return buildPhase2InsertArgs(acc, settings, db)
   if (target.targetAccountType === 'funded') return buildFundedInsertArgs(acc, settings, db)
   return null
+}
+
+/**
+ * Mint the milestone certificate for a promotion, inside the promotion's own
+ * transaction.
+ *
+ * Wrapped in a SAVEPOINT deliberately. Two things have to be true at once:
+ *
+ *   1. A certificate must never exist for a promotion that later rolls back —
+ *      hence issuing inside the transaction rather than after it.
+ *   2. A promotion must never fail because the award failed. Being promoted to
+ *      funded is the thing the trader earned; the certificate is a memento, and
+ *      an admin can always issue one manually.
+ *
+ * A plain try/catch cannot deliver both: any failed statement aborts the whole
+ * Postgres transaction, so without the SAVEPOINT a broken renderer or a full
+ * disk would block every promotion on the platform.
+ */
+async function awardPromotionCertificate(executor, acc, plan, newAccountId) {
+  const empty = { certificate: null, created: false, email: null }
+
+  // SAVEPOINT is only legal inside a transaction block. Every production caller
+  // supplies either a pool (promotePassedAccount opens its own transaction) or
+  // a client already in one, but a caller that did neither would otherwise lose
+  // the certificate silently to an error nobody sees. Probing for it means the
+  // award still happens — just without rollback protection it does not need,
+  // there being no enclosing transaction to protect.
+  let savepointHeld = false
+  try {
+    await executor.query('SAVEPOINT certificate_award')
+    savepointHeld = true
+  } catch {
+    savepointHeld = false
+  }
+
+  try {
+    const recipient = await executor.query(
+      `SELECT full_name, email FROM users WHERE id = $1`,
+      [acc.user_id]
+    )
+    if (recipient.rows.length === 0) {
+      if (savepointHeld) await executor.query('ROLLBACK TO SAVEPOINT certificate_award')
+      return empty
+    }
+
+    const kind = plan.targetAccountType === 'funded' ? 'funded' : 'phase_passed'
+    const { certificate, created } = await issueCertificate(executor, {
+      userId: acc.user_id,
+      accountId: newAccountId,
+      kind,
+      // The award names the phase the trader just CLEARED (acc.account_type),
+      // not the one they are entering.
+      title: buildCertificateTitle({
+        kind,
+        accountType: acc.account_type,
+        accountSize: acc.account_size
+      }),
+      recipientName: recipient.rows[0].full_name,
+      amount: acc.account_size,
+      metadata: {
+        source_account_id: String(acc.id),
+        target_account_type: plan.targetAccountType
+      },
+      sourceKey: `promotion:${newAccountId}`
+    })
+
+    if (savepointHeld) await executor.query('RELEASE SAVEPOINT certificate_award')
+    return { certificate, created, email: recipient.rows[0].email }
+  } catch (error) {
+    if (savepointHeld) await executor.query('ROLLBACK TO SAVEPOINT certificate_award').catch(() => {})
+    logger.error('[progression] Certificate award failed; promotion continues', {
+      account_id: String(acc.id),
+      new_account_id: String(newAccountId),
+      error: error.message
+    })
+    return empty
+  }
 }
 
 async function promotePassedAccount(db, acc, settings) {
@@ -293,12 +375,17 @@ async function promotePassedAccount(db, acc, settings) {
     const newAccount = await executor.query(plan.sql, plan.values)
     await executor.query(plan.bbookSql, plan.bbookValues || [])
 
+    const award = await awardPromotionCertificate(executor, acc, plan, newAccount.rows[0].id)
+
     if (client) await client.query('COMMIT')
 
     return {
       new_account_id: newAccount.rows[0].id,
       event: plan.socketEvent,
-      message: plan.socketMessage
+      message: plan.socketMessage,
+      certificate: award.certificate,
+      certificate_created: award.created,
+      recipient_email: award.email
     }
   } catch (err) {
     if (client) await client.query('ROLLBACK').catch(() => {})

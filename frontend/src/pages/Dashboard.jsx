@@ -36,6 +36,7 @@ import useAccountActions from './dashboard/hooks/useAccountActions'
 import useKycForm from './dashboard/hooks/useKycForm'
 import useKycStatusPolling from './dashboard/hooks/useKycStatusPolling'
 import useDashboardSocket from './dashboard/hooks/useDashboardSocket'
+import CertificateCelebrationModal from '../components/CertificateCelebrationModal'
 
 const TradingPanel = lazy(() => import('../components/TradingPanel'))
 const Analytics = lazy(() => import('./Analytics'))
@@ -45,6 +46,7 @@ const Analytics = lazy(() => import('./Analytics'))
 // chunk loads on demand).
 const DashboardPayoutsPage = lazy(() => import('./DashboardPayoutsPage'))
 const DashboardAffiliatePage = lazy(() => import('./DashboardAffiliatePage'))
+const DashboardCertificatesPage = lazy(() => import('./DashboardCertificatesPage'))
 const DashboardTradeHistoryPage = lazy(() => import('./DashboardTradeHistoryPage'))
 
 // Header breadcrumb + page title per screen (Modern Gazette handoff spec
@@ -66,6 +68,7 @@ const PAGE_TITLES = {
   'get-challenge': ['Programme', 'New Challenge'],
   affiliate: ['Account', 'Affiliate'],
   support: ['Support', 'Support'],
+  certificates: ['Account', 'Certificates & Achievements'],
   profile: ['Account', 'Profile'],
 }
 
@@ -186,6 +189,10 @@ function Dashboard({ user, onLogout }) {
     fetchPayouts
   })
 
+  // Set by the certificate_awarded socket event; cleared when the trader
+  // dismisses the celebration.
+  const [awardedCertificate, setAwardedCertificate] = useState(null)
+
   useDashboardSocket({
     user,
     pricesRef,
@@ -197,7 +204,8 @@ function Dashboard({ user, onLogout }) {
     pushNotification,
     refreshSelectedAccount,
     fetchAccounts,
-    fetchAccountHistory
+    fetchAccountHistory,
+    onCertificateAwarded: setAwardedCertificate
   })
 
   const fundedAccount = accounts.find(a => a.account_type === 'funded' && a.status === 'active')
@@ -518,6 +526,15 @@ function Dashboard({ user, onLogout }) {
           </ErrorBoundary>
         )}
 
+        {/* Certificates & Achievements */}
+        {activePage === 'certificates' && (
+          <ErrorBoundary variant="section" label="Certificates">
+            <Suspense fallback={<DashboardSectionFallback label="Loading certificates..." />}>
+              <DashboardCertificatesPage />
+            </Suspense>
+          </ErrorBoundary>
+        )}
+
         {/* Affiliate Page */}
         {activePage === 'affiliate' && (
           <ErrorBoundary variant="section" label="Affiliate">
@@ -560,6 +577,16 @@ function Dashboard({ user, onLogout }) {
 
       </div>
       </div>
+
+      {/* Sits at the shell root, outside the page-content wrapper, so it
+          overlays whichever tab the trader happens to be on when the award
+          lands. */}
+      <CertificateCelebrationModal
+        certificate={awardedCertificate}
+        open={Boolean(awardedCertificate)}
+        onClose={() => setAwardedCertificate(null)}
+        onView={() => { setAwardedCertificate(null); setActivePage('certificates') }}
+      />
     </div>
   )
 }
