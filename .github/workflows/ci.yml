@@ -257,6 +257,14 @@ jobs:
         # can tell the difference: a schema built by the real migrations.
         run: npm run check:sql-columns
 
+      - name: Type-check every static query against Postgres
+        # Stronger than the column check, which cannot see ambiguous references
+        # or type mismatches. PREPARE makes Postgres parse, resolve and plan each
+        # statement without running it -- it caught GET /api/auth/profile/:userId
+        # (ambiguous `id` across a join, 500 on every request since it shipped)
+        # and the Stripe challenge checkout (text = bigint, 500 for every caller).
+        run: npm run check:sql-prepare
+
   fresh-deploy:
     name: Fresh deploy boots and trades
     runs-on: ubuntu-latest

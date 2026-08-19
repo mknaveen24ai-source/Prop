@@ -153,11 +153,17 @@ async function createChallengePaymentSession({ req, orderId, userId = null }) {
     return { configured: false, checkout_url: null }
   }
 
+  // challenge_orders.user_id is TEXT holding a uuid, while id is bigint. Casting
+  // $2 to bigint in the null-guard pinned the parameter's type for the whole
+  // statement, so the ownership comparison became `text = bigint` and Postgres
+  // refused to plan it -- every challenge checkout returned 500, ownership check
+  // included. The cast goes on the PARAMETER, never the column, so any index on
+  // user_id still applies.
   const orderResult = await pool.query(
     `SELECT id, user_id, amount, currency, account_size, status
        FROM challenge_orders
       WHERE id = $1
-        AND ($2::bigint IS NULL OR user_id = $2)
+        AND ($2::text IS NULL OR user_id = $2::text)
       LIMIT 1`,
     [orderId, userId]
   )

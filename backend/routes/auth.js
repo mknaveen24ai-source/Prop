@@ -692,8 +692,12 @@ router.get('/profile/:userId', async function(req, res) {
       return res.status(400).json({ error: 'Invalid user ID' })
     }
 
+    // Columns are qualified and the parameter is passed as the uuid it is.
+    // Unqualified `id` across this join is ambiguous with accounts.id, and
+    // parseInt() on a uuid yields an integer that no uuid column can be
+    // compared to — either one alone made this endpoint 500 on every request.
     const userResult = await pool.query(
-      `SELECT id, full_name, country, created_at,
+      `SELECT u.id, u.full_name, u.country, u.created_at,
               COUNT(a.id) FILTER (WHERE a.account_type = 'funded') as funded_accounts,
               COUNT(a.id) as total_accounts,
               COUNT(a.id) FILTER (WHERE a.status = 'passed') as total_phases_passed,
@@ -704,7 +708,7 @@ router.get('/profile/:userId', async function(req, res) {
          AND COALESCE(u.leaderboard_visible, TRUE) = TRUE
          AND COALESCE(u.is_banned, FALSE) = FALSE
        GROUP BY u.id`,
-      [parseInt(userId)]
+      [userId]
     )
 
     if (userResult.rows.length === 0) {
@@ -726,7 +730,7 @@ router.get('/profile/:userId', async function(req, res) {
        FROM trades t
        JOIN accounts a ON t.account_id = a.id
        WHERE a.user_id = $1 AND t.status = 'closed'`,
-      [parseInt(userId)]
+      [userId]
     )
 
     const s = statsResult.rows[0]
