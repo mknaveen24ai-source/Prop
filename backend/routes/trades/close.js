@@ -317,6 +317,23 @@ router.post('/close', authenticateToken, tradeCloseLimiter, async function(req, 
     })
 
   } catch (error) {
+    // A missing QUOTE/USD rate is a transient feed condition, not a bug in the
+    // request, and it is the one close failure a trader can act on. Reported as
+    // a retryable 503 with a specific message rather than a generic 500: the
+    // position is still open and still exposed, so "try again shortly" is
+    // materially different advice from "something went wrong".
+    //
+    // Deliberately NOT falling back to a stale or last-known rate. Booking a
+    // realised PnL at a rate nobody can vouch for puts a wrong number in the
+    // ledger permanently, which is worse than a retry. Choosing a fallback rate
+    // is a risk decision for the operator, not a default worth assuming.
+    if (error.name === 'FxRateUnavailableError') {
+      logger.warn('Close trade deferred: no USD rate for the instrument', { error: error.message })
+      return res.status(503).json({
+        error: 'This position cannot be closed right now because a currency rate is unavailable. ' +
+               'Your position is unchanged. Please try again shortly.'
+      })
+    }
     logger.error('Close trade error:', { error: error.message })
     res.status(500).json({ error: 'Could not close trade' })
   }

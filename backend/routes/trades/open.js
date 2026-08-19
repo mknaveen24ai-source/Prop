@@ -424,7 +424,30 @@ router.post('/open', authenticateToken, tradingLimiter, async function(req, res)
         const livePrice = livePrices[t.instrument]
         if (!livePrice) continue
         const currentPrice = t.direction === 'buy' ? parseFloat(livePrice.bid) : parseFloat(livePrice.ask)
-        floatingPnl = floatingPnl.plus(calculatePnL(t.direction, parseFloat(t.open_price), currentPrice, parseFloat(t.lot_size), t.instrument, parseFloat(t.commission || 0)))
+        try {
+          floatingPnl = floatingPnl.plus(calculatePnL(t.direction, parseFloat(t.open_price), currentPrice, parseFloat(t.lot_size), t.instrument, parseFloat(t.commission || 0)))
+        } catch (error) {
+          // Under FX conversion, calculatePnL throws when the instrument's
+          // QUOTE/USD rate source is missing from the price cache. The cross-JPY
+          // pairs all take their rate from USDJPY, so one dark symbol can leave
+          // several open positions unvaluable.
+          //
+          // This must REFUSE, not skip. The engine's equivalent loop skips
+          // safely because understating floating loss there means declining to
+          // declare a breach. Here the sum is the equity behind a margin check,
+          // so understating loss OVERSTATES equity and would admit a trade that
+          // should have been refused for insufficient margin. Failing closed is
+          // the only safe direction on this path.
+          if (error.name !== 'FxRateUnavailableError') throw error
+          await client.query('ROLLBACK')
+          logger.warn('[trades/open] refused: an open position cannot be valued', {
+            accountId: account.id, instrument: t.instrument, error: error.message
+          })
+          return res.status(503).json({
+            error: 'Your open positions cannot be valued right now because a currency rate is unavailable. ' +
+                   'No new trade was opened. Please try again shortly.'
+          })
+        }
       }
       
       const equity = new Decimal(account.current_balance).plus(floatingPnl)
