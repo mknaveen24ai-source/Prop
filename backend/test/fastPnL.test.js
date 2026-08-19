@@ -25,15 +25,38 @@ const { INSTRUMENTS } = require('../constants')
 
 const TOLERANCE = 0.01
 
-function agree(direction, openPrice, closePrice, lots, instrument, commission) {
-  const precise = calculatePnL(direction, openPrice, closePrice, lots, instrument, commission)
+// Rates are passed EXPLICITLY to both sides rather than resolved from the feed.
+//
+// Two reasons, and the second is the point of this file. First, rates live in
+// the server's in-process price cache, so under FX_CONVERSION_ENABLED=true
+// calculatePnL throws FxRateUnavailableError in a bare test process — correct
+// fail-closed behaviour that would otherwise just break the suite.
+//
+// Second and more important: leaving the rate implicit meant parity was only
+// ever asserted at rate 1. That is exactly the blind spot utils/fastPnL.js warns
+// about — "a confirm step only catches what the two implementations disagree
+// about" — and it is how C-01 stayed invisible, because BOTH functions shared
+// the same wrong assumption. Asserting agreement only on the unconverted path
+// leaves the converted path, which is now the production path for 31 of 45
+// instruments, untested on both sides at once.
+const RATES_UNDER_TEST = [
+  1,          // USD-quoted: the common case
+  1 / 158.47, // JPY: the largest divergence, and the one C-01 got wrong
+  1.1664,     // EUR
+  0.7237,     // CAD
+  1 / 7.8     // HKD, pegged
+]
+
+function agree(direction, openPrice, closePrice, lots, instrument, commission, usdRate = 1) {
+  const precise = calculatePnL(direction, openPrice, closePrice, lots, instrument, commission, usdRate)
   const fast = fastPnL(
     directionSign(direction),
     openPrice,
     closePrice,
     lots,
     contractSizeFor(instrument),
-    commission
+    commission,
+    usdRate
   )
   return { precise, fast, delta: Math.abs(precise - fast) }
 }
@@ -50,6 +73,42 @@ test('fastPnL agrees with calculatePnL across every instrument, both directions'
       )
     }
   }
+})
+
+test('fastPnL agrees with calculatePnL at every conversion rate, not just 1', () => {
+  for (const instrument of INSTRUMENTS) {
+    for (const direction of ['buy', 'sell']) {
+      for (const usdRate of RATES_UNDER_TEST) {
+        const { precise, fast, delta } = agree(direction, 1.10000, 1.10500, 0.5, instrument, 3.5, usdRate)
+        assert.ok(
+          delta < TOLERANCE,
+          `${instrument} ${direction} @rate ${usdRate}: Decimal=${precise} float=${fast} delta=${delta}`
+        )
+      }
+    }
+  }
+})
+
+test('commission is subtracted after conversion on both paths', () => {
+  // If either implementation scaled commission by the rate, the two would still
+  // agree with each other while both being wrong. Pinning the absolute value is
+  // what catches that: a $7 fee must cost $7 whatever the instrument settles in.
+  const usdRate = 1 / 158.47
+  const withFee = agree('buy', 150.0, 150.1, 1, 'USDJPY', 7, usdRate)
+  const withoutFee = agree('buy', 150.0, 150.1, 1, 'USDJPY', 0, usdRate)
+
+  assert.ok(Math.abs((withoutFee.precise - withFee.precise) - 7) < 0.01,
+    `Decimal path: fee moved PnL by ${withoutFee.precise - withFee.precise}, expected 7`)
+  assert.ok(Math.abs((withoutFee.fast - withFee.fast) - 7) < 0.01,
+    `float path: fee moved PnL by ${withoutFee.fast - withFee.fast}, expected 7`)
+})
+
+test('a JPY position books roughly 1/158th of its quote-currency amount', () => {
+  // The concrete C-01 regression, stated as a number rather than as parity.
+  // 1 lot over 10 pips is 10,000 JPY; at ~158 JPY/USD that is ~$63, not $10,000.
+  const usdRate = 1 / 158.47
+  const { precise } = agree('buy', 150.0, 150.1, 1, 'USDJPY', 0, usdRate)
+  assert.ok(precise > 55 && precise < 75, `expected roughly $63, got $${precise}`)
 })
 
 test('fastPnL agrees with calculatePnL across lot sizes and price magnitudes', () => {
