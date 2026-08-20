@@ -19,7 +19,11 @@ import { triggerDownload } from '../utils/certificateShare'
  */
 
 const CONFETTI_COUNT = 60
-const GOLD = ['#E8B400', '#F5C518', '#EDE9E0', '#8C7A2E']
+// Confetti reads from the theme rather than a fixed gold ramp. The literals it
+// replaced (#E8B400, #F5C518, #EDE9E0, #8C7A2E) were the DARK palette's values,
+// so in light mode the celebration threw pale-parchment confetti onto a
+// pale-parchment page and two of the four colours were effectively invisible.
+const GOLD = ['var(--warn)', 'var(--accent)', 'var(--ink)', 'var(--muted)']
 
 /**
  * Confetti geometry is generated once at module load, not per render.

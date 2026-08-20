@@ -97,6 +97,92 @@ function readScale(css, prefix) {
   return values
 }
 
+/**
+ * Per-line opt-out: `design-drift-allow: <reason>` in a comment on the same line
+ * or the line above.
+ *
+ * Preferred over the file-level allowlist, which is blunt: allowlisting
+ * Transparency.jsx for its chart fallbacks would also hide a genuinely
+ * hardcoded colour added to it next week. A line-level marker sits next to the
+ * thing it excuses, and a reviewer reading the diff sees the reason without
+ * opening another file.
+ *
+ * The reason is mandatory. A bare marker is not honoured -- an opt-out nobody
+ * had to justify is how a checker quietly stops checking.
+ */
+function suppressionReason(lines, lineNumber) {
+  // Same line, then up to three lines above. A one-line lookback was too tight:
+  // a two-line reason puts the marker on the FIRST of the two, which is already
+  // out of range, and the exception silently failed to apply.
+  const candidates = [
+    lines[lineNumber - 1],
+    lines[lineNumber - 2],
+    lines[lineNumber - 3],
+    lines[lineNumber - 4]
+  ]
+  for (const line of candidates) {
+    if (!line) continue
+    const m = line.match(/design-drift-allow:\s*(\S.*?)\s*(?:\*\/|$)/)
+    if (m && m[1].length > 0) return m[1]
+  }
+  return null
+}
+
+/**
+ * Blank out comments, preserving byte offsets so line numbers stay correct.
+ *
+ * Without this the checker reads its own documentation as evidence: the comment
+ * explaining why CertificateCelebrationModal's gold ramp was REPLACED cited the
+ * four hex values it removed, and all four were promptly re-reported as
+ * hardcoded colours. A checker that flags the note explaining a fix teaches
+ * people not to write the note.
+ *
+ * String-aware on purpose. A naive scan for "//" treats the slashes in
+ * `href="https://..."` as the start of a comment and blanks the rest of that
+ * line, silently hiding every violation after it -- a false PASS, which is the
+ * one result this tool must never produce.
+ */
+function stripComments(src) {
+  let out = ''
+  let i = 0
+  let quote = null
+
+  while (i < src.length) {
+    const ch = src[i]
+
+    if (quote) {
+      if (ch === '\\') { out += src.slice(i, i + 2); i += 2; continue }
+      if (ch === quote) quote = null
+      out += ch
+      i++
+      continue
+    }
+
+    if (ch === "'" || ch === '"' || ch === '`') {
+      quote = ch
+      out += ch
+      i++
+      continue
+    }
+
+    if (ch === '/' && src[i + 1] === '/') {
+      while (i < src.length && src[i] !== '\n') { out += ' '; i++ }
+      continue
+    }
+
+    if (ch === '/' && src[i + 1] === '*') {
+      const end = src.indexOf('*/', i + 2)
+      const stop = end === -1 ? src.length : end + 2
+      while (i < stop) { out += src[i] === '\n' ? '\n' : ' '; i++ }
+      continue
+    }
+
+    out += ch
+    i++
+  }
+  return out
+}
+
 function lineOf(src, index) {
   let line = 1
   for (let i = 0; i < index; i++) if (src.charCodeAt(i) === 10) line++
@@ -114,17 +200,67 @@ function main() {
 
   const files = jsxFiles()
   const findings = { color: [], fontSize: [], spacing: [], spacingLiteral: [] }
+  const suppressed = []
 
   for (const file of files) {
-    const src = fs.readFileSync(file, 'utf8')
+    const raw = fs.readFileSync(file, 'utf8')
+    // Scan with comments blanked, but keep line numbers and suppression
+    // markers resolving against the original, which still has them.
+    const src = stripComments(raw)
+    const srcLines = raw.split(String.fromCharCode(10))
     const relPath = rel(file)
+    const record = (bucket, index, extra) => {
+      const line = lineOf(src, index)
+      const reason = suppressionReason(srcLines, line)
+      if (reason) {
+        suppressed.push({ file: relPath, line, reason, ...extra })
+        return
+      }
+      findings[bucket].push({ file: relPath, line, ...extra })
+    }
 
     // ── hardcoded colour ────────────────────────────────────────────────────
+    //
+    // A hex is only a violation when it is the ACTUAL value. Two shapes look
+    // like hardcoded colour and are not:
+    //
+    //   var(--rule, #3A3733)          the CSS custom-property fallback
+    //   getCssVar('--rule') || '#3A3733'   the same idea in JS, for canvas
+    //
+    // Both read the token first and fall back only if it cannot be resolved --
+    // which is exactly what a chart painting to canvas has to do, since canvas
+    // cannot resolve var(). Counting them made 12 of the 32 reported violations
+    // unfixable by definition: removing the fallback would not tokenise
+    // anything, it would just delete the safety net.
+    //
+    // Matched as patterns rather than by allowlisting the files, so a genuine
+    // hardcoded colour added to Transparency.jsx tomorrow is still caught.
     if (!isAllowlisted(relPath)) {
+      const fallbackRanges = []
+      const fallbackPatterns = [
+        /var\(\s*--[a-z0-9-]+\s*,\s*(#[0-9a-fA-F]{3,8})\s*\)/g,
+        /\|\|\s*'(#[0-9a-fA-F]{3,8})'/g,
+        /\|\|\s*"(#[0-9a-fA-F]{3,8})"/g,
+        // A helper taking the token name and a fallback:
+        //   readToken('--rule', '#3a3a3a')
+        // Same semantic as the two above, different shape. Analytics.jsx builds
+        // its whole canvas chart theme this way.
+        /'--[a-z0-9-]+'\s*,\s*'(#[0-9a-fA-F]{3,8})'/g
+      ]
+      for (const pattern of fallbackPatterns) {
+        let f
+        while ((f = pattern.exec(src))) {
+          const start = f.index + f[0].indexOf(f[1])
+          fallbackRanges.push([start, start + f[1].length])
+        }
+      }
+      const isFallback = (i) => fallbackRanges.some(([a, b]) => i >= a && i < b)
+
       const re = /#[0-9a-fA-F]{3,8}\b/g
       let m
       while ((m = re.exec(src))) {
-        findings.color.push({ file: relPath, line: lineOf(src, m.index), value: m[0] })
+        if (isFallback(m.index)) continue
+        record('color', m.index, { value: m[0] })
       }
     }
 
@@ -135,7 +271,7 @@ function main() {
       while ((m = re.exec(src))) {
         const value = parseFloat(m[1])
         if (fontScale.size === 0 || !fontScale.has(value)) {
-          findings.fontSize.push({ file: relPath, line: lineOf(src, m.index), value: m[1] + 'px' })
+          record('fontSize', m.index, { value: m[1] + 'px' })
         }
       }
     }
@@ -165,7 +301,7 @@ function main() {
           // 1px is a hairline rule, not a spacing step.
           if (value === 0 || value === 1) continue
           const bucket = spaceScale.has(value) ? 'spacingLiteral' : 'spacing'
-          findings[bucket].push({ file: relPath, line: lineOf(src, m.index), value: part, prop: m[1] })
+          record(bucket, m.index, { value: part, prop: m[1] })
         }
       }
     }
@@ -198,6 +334,7 @@ function main() {
     adoption,
     skeletonUsers,
     allowlisted: COLOR_ALLOWLIST.length,
+    suppressed,
     findings
   }
 
@@ -233,6 +370,10 @@ function report(r, findings) {
   console.log('    spacing untokenised  ' + String(r.violations.spacingLiteral).padStart(5) +
     '   (already on scale - pure rename)')
   console.log('    ' + 'total'.padEnd(20) + ' ' + String(r.violations.total).padStart(5))
+  if (r.suppressed.length > 0) {
+    console.log('    suppressed inline    ' + String(r.suppressed.length).padStart(5) +
+      '   (each with a stated reason)')
+  }
   console.log('')
   console.log('  Adoption of components that already exist')
   for (const [name, a] of Object.entries(r.adoption)) {

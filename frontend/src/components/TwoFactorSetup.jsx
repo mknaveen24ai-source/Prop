@@ -259,6 +259,8 @@ function TwoFactorSetup({ apiBase = '' }) {
         {qrUrl && (
           <div style={{ textAlign: 'center', marginBottom: 'var(--space-5)' }}>
             <div style={{
+              // design-drift-allow: a QR code needs a white quiet zone to scan reliably;
+              // theming this surface breaks authenticator apps in dark mode.
               display: 'inline-block', background: '#fff',
               padding: 'var(--space-3)', border: '1px solid var(--rule)'
             }}>

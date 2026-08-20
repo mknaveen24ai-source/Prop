@@ -135,6 +135,8 @@ function WebcamCapture({ onCapture, onCancel }) {
           </div>
         ) : (
           <>
+            {/* design-drift-allow: letterbox behind a camera preview is black in every
+                theme, the same way a video player's bars are */}
             <div style={{ position: 'relative', overflow: 'hidden', background: '#000', aspectRatio: '16/9' }}>
               {!captured ? (
                 <video
@@ -434,6 +436,8 @@ export default function KYCUploadForm({
                         setSelfie(null);
                         setSelfiePreview(null);
                       }}
+                      // design-drift-allow: white on a fixed rgba(0,0,0,.6) scrim - the scrim is not
+                      // themed, so the label on it cannot be either
                       style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', color: '#fff', cursor: 'pointer', fontSize: 'var(--fs-md)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                     >
                       x
