@@ -47,6 +47,11 @@ module.exports = defineConfig({
     ignoreHTTPSErrors: true
   },
 
+  // @visual is opt-in: it needs a Storybook build served somewhere and only
+  // produces meaningful results inside the pinned image. Running it by accident
+  // from a developer's machine yields a wall of red about font rasterisation.
+  grepInvert: process.env.PLAYWRIGHT_PINNED_IMAGE === '1' ? undefined : /@visual/,
+
   projects: [
     {
       name: 'chromium',
@@ -59,6 +64,26 @@ module.exports = defineConfig({
       name: 'mobile',
       use: { ...devices['Pixel 7'] },
       grep: /@mobile/
+    },
+    {
+      // Visual regression over the design system, served from a Storybook build
+      // rather than the app: stories render fixed content, so the same input
+      // produces the same pixels. See tests/visual.spec.js for why that matters.
+      //
+      // Its own baseURL, because it points at storybook-static rather than at
+      // whatever E2E_BASE_URL is aimed at, and a fixed viewport so a screenshot
+      // never depends on the window the runner happened to open.
+      name: 'visual',
+      grep: /@visual/,
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: process.env.STORYBOOK_URL || 'http://localhost:6006',
+        viewport: { width: 1280, height: 900 },
+        // Baselines are rendered at 1x. A retina runner would otherwise produce
+        // images at twice the size and every comparison would fail on
+        // dimensions before it ever looked at a pixel.
+        deviceScaleFactor: 1
+      }
     }
   ]
 })

@@ -50,6 +50,62 @@ jobs:
       - name: Run tests
         run: npm test
 
+
+  visual:
+    name: Visual regression (design system)
+    runs-on: ubuntu-latest
+    # The whole point of this job is that it runs somewhere with FIXED font
+    # rasterisation. Baselines produced on a developer's Windows or macOS
+    # machine will not match a Linux runner's, and the permanent red that
+    # results is the most common reason screenshot suites get deleted. The image
+    # tag must stay in step with @playwright/test in e2e/package.json.
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build Storybook
+        working-directory: frontend
+        # Stories render fixed content and hit no backend, so the same input
+        # produces the same pixels -- which is what makes a screenshot diff
+        # mean something. Screenshotting the app instead would report a diff on
+        # every run, because its pages show live balances and timestamps.
+        run: npm run build-storybook -- --quiet
+
+      - name: Install e2e dependencies
+        working-directory: e2e
+        run: npm ci
+
+      - name: Serve Storybook
+        working-directory: frontend
+        run: npx --yes http-server storybook-static -p 6006 --silent &
+
+      - name: Wait for Storybook
+        run: npx --yes wait-on http://localhost:6006 --timeout 60000
+
+      - name: Visual regression
+        working-directory: e2e
+        env:
+          PLAYWRIGHT_PINNED_IMAGE: '1'
+          STORYBOOK_URL: http://localhost:6006
+        run: npm run test:visual
+
+      - name: Upload diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-diffs
+          path: e2e/test-results/
+          retention-days: 7
+
   frontend:
     name: Frontend (lint + audit + tests + build)
     runs-on: ubuntu-latest
