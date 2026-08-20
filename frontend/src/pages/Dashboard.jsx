@@ -240,8 +240,8 @@ function Dashboard({ user, onLogout }) {
         return (
           <div style={{
             background: c.bg, borderBottom: `1px solid ${c.border}`,
-            padding: '10px 24px',
-            display: 'flex', alignItems: 'center', gap: '10px',
+            padding: 'var(--space-2-5) var(--space-6)',
+            display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)',
             position: 'sticky', top: '57px', zIndex: 90
           }}>
             <span style={{ display: 'inline-flex' }}>
@@ -302,7 +302,7 @@ function Dashboard({ user, onLogout }) {
             card/margin, that's what was creating the visible gap around it). */}
       <div className="nav dashboard-topbar" style={{
         margin: 0,
-        padding: '14px 24px',
+        padding: 'var(--space-3-5) var(--space-6)',
         display: 'flex', alignItems: 'center', gap: 'var(--space-4)',
         background: 'var(--glass)',
         backdropFilter: 'blur(18px)',

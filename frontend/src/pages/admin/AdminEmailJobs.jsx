@@ -271,7 +271,7 @@ export default function AdminEmailJobs() {
       render: (job) => (
         <div>
           <AdminBadge status={normalizeStatusTone(job.status)} label={job.status} />
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)', marginTop: '6px' }}>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)', marginTop: 'var(--space-1-5)' }}>
             {job.attempt_count} attempt{job.attempt_count === 1 ? '' : 's'}
           </div>
         </div>
@@ -430,20 +430,20 @@ export default function AdminEmailJobs() {
               style={{ width: 'min(960px, calc(100vw - 32px))', maxHeight: '88vh', overflowY: 'auto', margin: 0 }}
               onMouseDown={(event) => event.stopPropagation()}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)', alignItems: 'flex-start', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)', alignItems: 'flex-start', marginBottom: 'var(--space-4-5)' }}>
                 <div>
-                  <h2 className="admin-h2" style={{ marginBottom: '6px' }}>Email Job MAIL-{String(drawerRow.id).padStart(6, '0')}</h2>
+                  <h2 className="admin-h2" style={{ marginBottom: 'var(--space-1-5)' }}>Email Job MAIL-{String(drawerRow.id).padStart(6, '0')}</h2>
                   <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)' }}>{drawerRow.to_email}</div>
                 </div>
                 <button className="admin-modal-close" onClick={() => setDrawerRow(null)}>×</button>
               </div>
 
-              <div className="admin-entity-badge-row" style={{ marginBottom: '18px' }}>
+              <div className="admin-entity-badge-row" style={{ marginBottom: 'var(--space-4-5)' }}>
                 <AdminBadge status={normalizeStatusTone(drawerRow.status)} label={drawerRow.status} />
                 <AdminBadge status={drawerRow.delivery_type === 'automation' ? 'info' : 'neutral'} label={drawerRow.delivery_type} />
               </div>
 
-              <div className="admin-entity-info-grid" style={{ marginBottom: '18px' }}>
+              <div className="admin-entity-info-grid" style={{ marginBottom: 'var(--space-4-5)' }}>
                 <div><span>Template</span><strong>{formatTemplateLabel(drawerRow.template_key)}</strong></div>
                 <div><span>Attempts</span><strong>{drawerRow.attempt_count}</strong></div>
                 <div><span>Scheduled</span><strong>{formatDateTime(drawerRow.scheduled_for)}</strong></div>
@@ -451,7 +451,7 @@ export default function AdminEmailJobs() {
                 <div><span>Sent</span><strong>{formatDateTime(drawerRow.sent_at)}</strong></div>
               </div>
 
-              <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: 'var(--space-4-5)' }}>
                 {Array.isArray(drawerRow.allowed_actions) && drawerRow.allowed_actions.includes('retry_email_job') && (
                   <button className="admin-btn admin-btn-primary" onClick={() => retryJob(drawerRow)} disabled={retryingId === String(drawerRow.id)}>
                     {retryingId === String(drawerRow.id) ? 'Re-queuing...' : 'Retry Now'}
@@ -466,13 +466,13 @@ export default function AdminEmailJobs() {
 
               <Card style={{ margin: 0, background: 'var(--admin-bg)' }}>
                 <h3 className="admin-h3">Provider / Preview</h3>
-                <div style={{ display: 'grid', gap: 'var(--space-2)', marginBottom: '14px' }}>
+                <div style={{ display: 'grid', gap: 'var(--space-2)', marginBottom: 'var(--space-3-5)' }}>
                   <div><strong style={{ display: 'block', marginBottom: 'var(--space-1)' }}>Provider Message ID</strong><span className="admin-font-mono">{drawerRow.provider_message_id || '—'}</span></div>
                   <div><strong style={{ display: 'block', marginBottom: 'var(--space-1)' }}>Preview Path</strong><span className="admin-font-mono">{drawerRow.preview_url || '—'}</span></div>
                   <div><strong style={{ display: 'block', marginBottom: 'var(--space-1)' }}>Unique Key</strong><span className="admin-font-mono">{drawerRow.unique_key || '—'}</span></div>
                 </div>
                 <div>
-                  <strong style={{ display: 'block', marginBottom: '6px' }}>Last Error</strong>
+                  <strong style={{ display: 'block', marginBottom: 'var(--space-1-5)' }}>Last Error</strong>
                   <div style={{ color: 'var(--admin-text-muted)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{drawerRow.last_error || 'No error recorded.'}</div>
                 </div>
               </Card>

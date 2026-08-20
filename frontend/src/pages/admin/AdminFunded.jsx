@@ -357,7 +357,7 @@ export default function AdminFunded() {
         render: (account) => (
           <div>
             {account.risk_tier ? <AdminBadge status={account.risk_tier === 'critical' ? 'danger' : account.risk_tier === 'high' ? 'warning' : 'info'} label={account.risk_tier} /> : <span style={{ color: 'var(--admin-text-faint)' }}>-</span>}
-            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)', marginTop: '6px' }}>
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)', marginTop: 'var(--space-1-5)' }}>
               {account.review_flagged ? 'Review flagged' : account.classification || 'No classification'}
             </div>
           </div>
@@ -367,7 +367,7 @@ export default function AdminFunded() {
         header: 'Tags',
         key: 'tags',
         render: (account) => (
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-1-5)', flexWrap: 'wrap' }}>
             {(account.tags || []).slice(0, 3).map((tag) => (
               <span key={tag} className="admin-tag-pill static">{tag}</span>
             ))}
@@ -523,7 +523,7 @@ export default function AdminFunded() {
               ].map((card) => (
                 <div key={card.label} style={{ background: 'var(--admin-bg)', padding: 'var(--space-4)', border: '1px solid var(--admin-border)' }}>
                   <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>{card.label}</div>
-                  <div style={{ marginTop: '6px', fontSize: 'var(--fs-3xl)', fontFamily: 'var(--admin-font-mono)', fontWeight: 700 }}>
+                  <div style={{ marginTop: 'var(--space-1-5)', fontSize: 'var(--fs-3xl)', fontFamily: 'var(--admin-font-mono)', fontWeight: 700 }}>
                     {card.value}
                   </div>
                 </div>

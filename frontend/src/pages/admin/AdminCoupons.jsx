@@ -126,7 +126,7 @@ export default function AdminCoupons() {
 
   if (loading) {
     return (
-      <div style={{ padding: 'var(--space-8)', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '14px' }}>
+      <div style={{ padding: 'var(--space-8)', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'var(--space-3-5)' }}>
         {Array(4).fill(0).map((_, index) => (
           <div key={index} className="admin-skeleton" style={{ height: '200px' }} />
         ))}

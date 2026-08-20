@@ -162,19 +162,19 @@ function WebcamCapture({ onCapture, onCancel }) {
             <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
               {!captured ? (
                 <>
-                  <button type="button" onClick={takeSnapshot} disabled={!ready} style={{ flex: 1, padding: '14px', fontSize: '15px', fontWeight: 700, cursor: ready ? 'pointer' : 'not-allowed', background: ready ? 'var(--ink)' : 'var(--rule)', border: 'none', color: 'var(--paper)', opacity: ready ? 1 : 0.5 }}>
+                  <button type="button" onClick={takeSnapshot} disabled={!ready} style={{ flex: 1, padding: 'var(--space-3-5)', fontSize: '15px', fontWeight: 700, cursor: ready ? 'pointer' : 'not-allowed', background: ready ? 'var(--ink)' : 'var(--rule)', border: 'none', color: 'var(--paper)', opacity: ready ? 1 : 0.5 }}>
                     Capture Photo
                   </button>
-                  <button type="button" onClick={handleCancel} style={{ padding: '14px 20px', background: 'transparent', border: '1px solid var(--navy-border, rgba(255,255,255,0.1))', color: 'var(--text-muted, #888)', cursor: 'pointer', fontSize: 'var(--fs-md)' }}>
+                  <button type="button" onClick={handleCancel} style={{ padding: 'var(--space-3-5) var(--space-5)', background: 'transparent', border: '1px solid var(--navy-border, rgba(255,255,255,0.1))', color: 'var(--text-muted, #888)', cursor: 'pointer', fontSize: 'var(--fs-md)' }}>
                     Cancel
                   </button>
                 </>
               ) : (
                 <>
-                  <button type="button" onClick={usePhoto} style={{ flex: 1, padding: '14px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', background: 'var(--gain)', border: 'none', color: 'var(--paper)' }}>
+                  <button type="button" onClick={usePhoto} style={{ flex: 1, padding: 'var(--space-3-5)', fontSize: '15px', fontWeight: 700, cursor: 'pointer', background: 'var(--gain)', border: 'none', color: 'var(--paper)' }}>
                     Use This Photo
                   </button>
-                  <button type="button" onClick={() => setCaptured(null)} style={{ padding: '14px 20px', background: 'transparent', border: '1px solid var(--navy-border, rgba(255,255,255,0.1))', color: 'var(--text-muted, #888)', cursor: 'pointer', fontSize: 'var(--fs-md)' }}>
+                  <button type="button" onClick={() => setCaptured(null)} style={{ padding: 'var(--space-3-5) var(--space-5)', background: 'transparent', border: '1px solid var(--navy-border, rgba(255,255,255,0.1))', color: 'var(--text-muted, #888)', cursor: 'pointer', fontSize: 'var(--fs-md)' }}>
                     Retake
                   </button>
                 </>
@@ -301,17 +301,17 @@ export default function KYCUploadForm({
             <div>
               <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--accent-green)', fontWeight: 800, letterSpacing: '0.08em', marginBottom: 'var(--space-2)' }}>UPLOADED</div>
               <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-primary)', wordBreak: 'break-word' }}>{file.name}</div>
-              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '6px' }}>{fileSizeKb(file)}</div>
+              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 'var(--space-1-5)' }}>{fileSizeKb(file)}</div>
             </div>
           ) : (
             <div>
-              <div style={{ fontSize: 'var(--fs-5xl)', lineHeight: 1, marginBottom: '10px', color: 'var(--accent)' }}>+</div>
+              <div style={{ fontSize: 'var(--fs-5xl)', lineHeight: 1, marginBottom: 'var(--space-2-5)', color: 'var(--accent)' }}>+</div>
               <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', fontWeight: 700 }}>Upload file</div>
-              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '6px' }}>JPG, PNG or PDF - max 5MB</div>
+              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 'var(--space-1-5)' }}>JPG, PNG or PDF - max 5MB</div>
             </div>
           )}
         </div>
-        {error && <p style={{ color: 'var(--red)', fontSize: 'var(--fs-sm)', marginTop: '6px' }}>{error}</p>}
+        {error && <p style={{ color: 'var(--red)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-1-5)' }}>{error}</p>}
         <input id={inputId} type="file" accept={accept} style={{ display: 'none' }} onChange={onChange} />
       </div>
     );
@@ -333,7 +333,7 @@ export default function KYCUploadForm({
         </p>
 
         <form onSubmit={onSubmit}>
-          <div style={{ display: 'grid', gap: '14px', marginBottom: '22px' }}>
+          <div style={{ display: 'grid', gap: 'var(--space-3-5)', marginBottom: '22px' }}>
             <div>
               <label htmlFor="kyc_country">Country of Residence</label>
               <select
@@ -457,12 +457,12 @@ export default function KYCUploadForm({
                 )}
               </div>
 
-              {selfieError && <p style={{ color: 'var(--red)', fontSize: 'var(--fs-sm)', marginTop: '6px' }}>{selfieError}</p>}
+              {selfieError && <p style={{ color: 'var(--red)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-1-5)' }}>{selfieError}</p>}
 
               <button
                 type="button"
                 onClick={() => setShowCamera(true)}
-                style={{ marginTop: 'var(--space-2)', width: '100%', padding: '10px', background: 'transparent', border: '1px solid var(--rule)', color: 'var(--accent)', fontSize: 'var(--fs-base)', fontWeight: 600, cursor: 'pointer', transition: 'border-color 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}
+                style={{ marginTop: 'var(--space-2)', width: '100%', padding: 'var(--space-2-5)', background: 'transparent', border: '1px solid var(--rule)', color: 'var(--accent)', fontSize: 'var(--fs-base)', fontWeight: 600, cursor: 'pointer', transition: 'border-color 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}
               >
                 Use Live Camera Instead
               </button>

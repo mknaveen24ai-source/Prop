@@ -185,18 +185,18 @@ function ReferralSeasonTab() {
   return (
     <>
       <Card style={{ marginBottom: 'var(--space-5)', maxWidth: '700px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: '6px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 'var(--space-1-5)' }}>
           <span style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, color: 'var(--text-secondary)' }}>{season.title}</span>
           <StatusBadge status={season.status} />
         </div>
         {season.description && (
-          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: '10px' }}>{season.description}</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: 'var(--space-2-5)' }}>{season.description}</p>
         )}
         <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', margin: 0 }}>
           {new Date(season.start_at).toLocaleDateString()} – {new Date(season.end_at).toLocaleDateString()}
         </p>
         {season.prize_pool?.length > 0 && (
-          <div style={{ marginTop: '14px', paddingTop: 'var(--space-3)', borderTop: '1px solid var(--rule-soft, var(--navy-border))' }}>
+          <div style={{ marginTop: 'var(--space-3-5)', paddingTop: 'var(--space-3)', borderTop: '1px solid var(--rule-soft, var(--navy-border))' }}>
             <div style={{ fontSize: 'var(--fs-xs)', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>Prizes</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
               {season.prize_pool.map((p, i) => (
@@ -209,7 +209,7 @@ function ReferralSeasonTab() {
           </div>
         )}
         {myEntry && (
-          <div style={{ marginTop: '14px', paddingTop: 'var(--space-3)', borderTop: '1px solid var(--rule-soft, var(--navy-border))', display: 'flex', justifyContent: 'space-between' }}>
+          <div style={{ marginTop: 'var(--space-3-5)', paddingTop: 'var(--space-3)', borderTop: '1px solid var(--rule-soft, var(--navy-border))', display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)' }}>Your standing</span>
             <span style={{ fontSize: 'var(--fs-base)', fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>
               {myRank ? `#${myRank}` : 'Unranked'} · {myEntry.new_paying_referrals} new paying referral{myEntry.new_paying_referrals === 1 ? '' : 's'}
@@ -437,14 +437,14 @@ export default function DashboardAffiliatePage() {
             </p>
             <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
               <code ref={referralLinkRef} style={{
-                flex: '1 1 300px', padding: '10px 14px', background: 'var(--bg-surface)',
+                flex: '1 1 300px', padding: 'var(--space-2-5) var(--space-3-5)', background: 'var(--bg-surface)',
                 border: '1px solid var(--border)', borderRadius: '6px', fontSize: 'var(--fs-base)',
                 color: 'var(--text-secondary)', overflowX: 'auto', whiteSpace: 'nowrap'
               }}>
                 {summary?.referral_link || '—'}
               </code>
               <button className="btn btn-secondary" onClick={copyReferralLink} type="button">
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
                   {renderIcon('copy', { size: 14, color: 'currentColor' })}
                   {copied ? 'Copied!' : 'Copy'}
                 </span>
@@ -455,7 +455,7 @@ export default function DashboardAffiliatePage() {
                 Couldn't copy automatically — the link is selected above, press Ctrl/Cmd+C to copy it.
               </p>
             )}
-            <p style={{ marginTop: '10px', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
+            <p style={{ marginTop: 'var(--space-2-5)', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
               Referral code: <strong style={{ color: 'var(--text-secondary)' }}>{summary?.affiliate_code || '—'}</strong>
             </p>
           </Card>
@@ -489,9 +489,9 @@ export default function DashboardAffiliatePage() {
             )}
 
             {allTiers.length > 0 && (
-              <div style={{ marginTop: '18px', paddingTop: '14px', borderTop: '1px solid var(--rule-soft, var(--navy-border))' }}>
-                <div style={{ fontSize: 'var(--fs-xs)', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '10px' }}>Full Tier Ladder</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ marginTop: 'var(--space-4-5)', paddingTop: 'var(--space-3-5)', borderTop: '1px solid var(--rule-soft, var(--navy-border))' }}>
+                <div style={{ fontSize: 'var(--fs-xs)', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 'var(--space-2-5)' }}>Full Tier Ladder</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1-5)' }}>
                   {allTiers.map((t) => {
                     const isCurrent = currentTier && t.tier_rank === currentTier.tier_rank
                     return (
@@ -529,7 +529,7 @@ export default function DashboardAffiliatePage() {
           <button
             onClick={() => exportRowsToCSV(referrals.rows, REFERRAL_EXPORT_COLUMNS, `referrals_${new Date().toISOString().slice(0, 10)}.csv`)}
             className="lx-btn"
-            style={{ padding: '6px 10px', border: '1px solid var(--rule, var(--navy-border))', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2, var(--navy-hover))', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            style={{ padding: 'var(--space-1-5) var(--space-2-5)', border: '1px solid var(--rule, var(--navy-border))', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2, var(--navy-hover))', display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1-5)' }}
           >
             {renderIcon('download', { size: 12 })} Export
           </button>
@@ -554,7 +554,7 @@ export default function DashboardAffiliatePage() {
           <button
             onClick={() => exportRowsToCSV(commissions.rows, COMMISSION_EXPORT_COLUMNS, `commissions_${new Date().toISOString().slice(0, 10)}.csv`)}
             className="lx-btn"
-            style={{ padding: '6px 10px', border: '1px solid var(--rule, var(--navy-border))', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2, var(--navy-hover))', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            style={{ padding: 'var(--space-1-5) var(--space-2-5)', border: '1px solid var(--rule, var(--navy-border))', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2, var(--navy-hover))', display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1-5)' }}
           >
             {renderIcon('download', { size: 12 })} Export
           </button>
@@ -582,7 +582,7 @@ export default function DashboardAffiliatePage() {
             </p>
             {payoutMessage && (
               <div style={{
-                padding: '10px 14px', borderRadius: '6px', marginBottom: 'var(--space-4)', fontSize: 'var(--fs-base)',
+                padding: 'var(--space-2-5) var(--space-3-5)', borderRadius: '6px', marginBottom: 'var(--space-4)', fontSize: 'var(--fs-base)',
                 background: payoutMessage.type === 'success' ? 'color-mix(in srgb, var(--green) 12%, transparent)' : 'color-mix(in srgb, var(--red) 12%, transparent)',
                 color: payoutMessage.type === 'success' ? 'var(--green)' : 'var(--red)'
               }}>
@@ -603,13 +603,13 @@ export default function DashboardAffiliatePage() {
                   step="0.01"
                   required
                 />
-                <div style={{ display: 'flex', gap: '6px', marginTop: 'var(--space-2)' }}>
+                <div style={{ display: 'flex', gap: 'var(--space-1-5)', marginTop: 'var(--space-2)' }}>
                   {[0.25, 0.5, 1].map(pct => (
                     <button
                       key={pct}
                       type="button"
                       className="btn btn-secondary"
-                      style={{ flex: 1, padding: '6px', fontSize: 'var(--fs-xs)' }}
+                      style={{ flex: 1, padding: 'var(--space-1-5)', fontSize: 'var(--fs-xs)' }}
                       onClick={() => setPayoutForm({ ...payoutForm, amount_requested: String(Math.floor((summary?.available_balance || 0) * pct * 100) / 100) })}
                     >
                       {pct === 1 ? 'Max' : `${pct * 100}%`}
@@ -676,7 +676,7 @@ export default function DashboardAffiliatePage() {
             <button
               onClick={() => exportRowsToCSV(payouts.rows, PAYOUT_EXPORT_COLUMNS, `affiliate_payouts_${new Date().toISOString().slice(0, 10)}.csv`)}
               className="lx-btn"
-              style={{ padding: '6px 10px', border: '1px solid var(--rule, var(--navy-border))', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2, var(--navy-hover))', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              style={{ padding: 'var(--space-1-5) var(--space-2-5)', border: '1px solid var(--rule, var(--navy-border))', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2, var(--navy-hover))', display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1-5)' }}
             >
               {renderIcon('download', { size: 12 })} Export
             </button>

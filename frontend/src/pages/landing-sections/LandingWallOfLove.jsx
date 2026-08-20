@@ -61,7 +61,7 @@ export default function LandingWallOfLove() {
             <div key={idx} className="mp-masonry-item">
               <div className="mp-glass-card" style={{ padding: '28px' }}>
                 {/* Role / program attribution — illustrative, not an individual identity */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: '18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4-5)' }}>
                   <div style={{
                     width: '4px', height: '36px',
                     background: 'var(--warn)',

@@ -18,7 +18,7 @@ export default function SimulatedTradingDisclaimer() {
         justifyContent: 'space-between',
         gap: 'var(--space-3)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)' }}>
           <span style={{
             background: 'color-mix(in srgb, var(--muted) 15%, transparent)',
             border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)',

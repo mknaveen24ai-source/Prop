@@ -55,7 +55,7 @@ export function AdminDashboardAlerts({ loading, error, alerts, navigate }) {
         <div
           key={a.kicker}
           style={{
-            display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '14px 16px',
+            display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2-5)', padding: 'var(--space-3-5) var(--space-4)',
             border: `1px solid var(--${a.tone})`, borderRadius: '4px',
             background: 'var(--glass-2)', backdropFilter: 'blur(16px) saturate(140%)',
           }}

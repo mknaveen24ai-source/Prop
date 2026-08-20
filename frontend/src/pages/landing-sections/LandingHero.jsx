@@ -120,7 +120,7 @@ function TerminalIllustration() {
         />
       </svg>
 
-      <div style={{ marginTop: '14px', fontFamily: 'var(--font-mono)', fontSize: '10.5px' }}>
+      <div style={{ marginTop: 'var(--space-3-5)', fontFamily: 'var(--font-mono)', fontSize: '10.5px' }}>
         {HERO_ORDERBOOK.map((row, i) => (
           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2.5px 0', borderBottom: i === 2 ? '1px solid var(--rule-soft)' : 'none' }}>
             <span style={{ color: row.side === 'bid' ? 'var(--gain)' : 'var(--loss)' }}>{row.price}</span>
@@ -292,7 +292,7 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
                 }}>
                   <TerminalIllustration />
                 </div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '0.1em', color: 'var(--muted)', marginTop: '10px', textAlign: 'center' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '0.1em', color: 'var(--muted)', marginTop: 'var(--space-2-5)', textAlign: 'center' }}>
                   Fig. 1 — funded and trading live
                 </div>
               </div>

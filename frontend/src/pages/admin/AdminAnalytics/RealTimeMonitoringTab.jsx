@@ -118,7 +118,7 @@ export default function RealTimeMonitoringTab() {
           {riskAlerts.length === 0 ? (
             <p style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-base)' }}>No instrument exceeds the 30% concentration threshold.</p>
           ) : (
-            <ul style={{ margin: 0, paddingLeft: '18px', fontSize: 'var(--fs-base)' }}>
+            <ul style={{ margin: 0, paddingLeft: 'var(--space-4-5)', fontSize: 'var(--fs-base)' }}>
               {riskAlerts.map((a) => (
                 <li key={a.instrument} style={{ color: 'var(--admin-text)' }}>
                   <span style={{ fontFamily: 'var(--font-mono)' }}>{a.instrument}</span> holds {a.share}% of total firm exposure

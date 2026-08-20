@@ -138,7 +138,7 @@ export default function LandingFAQ() {
         </div>
 
         {/* Category Pills */}
-        <div className="mp-reveal mp-delay-300" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: 'var(--space-9)' }}>
+        <div className="mp-reveal mp-delay-300" style={{ display: 'flex', gap: 'var(--space-2-5)', flexWrap: 'wrap', justifyContent: 'center', marginBottom: 'var(--space-9)' }}>
           {categories.map(c => {
             const isActive = activeCat === c;
             const color = catColors[c] || 'var(--muted)';
@@ -147,7 +147,7 @@ export default function LandingFAQ() {
                 key={c}
                 onClick={() => { setActiveCat(c); setOpenIndex(null); }}
                 style={{
-                  padding: '10px 24px',
+                  padding: 'var(--space-2-5) var(--space-6)',
                   background: 'transparent',
                   color: isActive ? color : 'var(--muted)',
                   border: isActive

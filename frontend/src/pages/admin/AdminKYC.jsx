@@ -682,7 +682,7 @@ export default function AdminKYC() {
               status={getSlaBadgeStatus(row.kyc_sla_status)}
               label={row.kyc_sla_status ? row.kyc_sla_status.replace(/_/g, ' ') : 'No timer'}
             />
-            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)', marginTop: '6px' }}>
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)', marginTop: 'var(--space-1-5)' }}>
               {row.kyc_wait_hours ? formatHours(row.kyc_wait_hours) : 'No wait data'}
             </div>
           </div>
@@ -694,7 +694,7 @@ export default function AdminKYC() {
         render: (row) => (
           <div>
             <AdminBadge status={getQualityBadgeStatus(row.quality_risk)} label={row.quality_risk || 'low'} />
-            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)', marginTop: '6px' }}>
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)', marginTop: 'var(--space-1-5)' }}>
               Score {row.quality_score || 0}{row.missing_files ? ' - missing file' : ''}
             </div>
           </div>
@@ -714,7 +714,7 @@ export default function AdminKYC() {
         key: 'tags',
         header: 'Tags',
         render: (row) => (
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-1-5)', flexWrap: 'wrap' }}>
             {(row.tags || []).slice(0, 3).map((tag) => (
               <span key={tag} className="admin-tag-pill">{tag}</span>
             ))}
@@ -979,7 +979,7 @@ export default function AdminKYC() {
                 { label: 'No quality flags raised', pass: (selectedUser.quality_flags || []).length === 0 },
                 { label: 'Within SLA window', pass: selectedUser.kyc_sla_status !== 'breach' },
               ].map((check) => (
-                <div key={check.label} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 0', borderBottom: '1px solid var(--rule-soft)' }}>
+                <div key={check.label} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)', padding: '9px 0', borderBottom: '1px solid var(--rule-soft)' }}>
                   <span style={{ color: check.pass == null ? 'var(--admin-text-faint)' : check.pass ? 'var(--gain)' : 'var(--loss)' }}>
                     {check.pass == null ? '—' : check.pass ? '✓' : '✕'}
                   </span>
@@ -1001,7 +1001,7 @@ export default function AdminKYC() {
             ) : (
               historyNotes.map((note) => (
                 <div key={note.id} style={{ padding: '9px 0', borderBottom: '1px solid var(--rule-soft)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', fontSize: '12.5px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', fontSize: '12.5px' }}>
                     <span>{note.created_by}</span>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--admin-text-faint)' }}>{formatDate(note.created_at)}</span>
                   </div>

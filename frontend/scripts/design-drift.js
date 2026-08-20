@@ -88,7 +88,10 @@ function rel(file) {
 /** Pull a numeric px scale out of tokens.css: --space-1: 4px -> Set{4, 8, ...}. */
 function readScale(css, prefix) {
   const values = new Set()
-  const re = new RegExp('--' + prefix + '-[a-z0-9]+:\\s*([0-9.]+)px', 'gi')
+  // `-[a-z0-9-]+` rather than `-[a-z0-9]+`: the spacing scale gained fractional
+  // half-steps (--space-1-5), and a pattern stopping at the first hyphen would
+  // silently skip every one while still reporting a scale.
+  const re = new RegExp('--' + prefix + '-[a-z0-9-]+:' + '\\s*([0-9.]+)px', 'gi')
   let m
   while ((m = re.exec(css))) values.add(parseFloat(m[1]))
   return values

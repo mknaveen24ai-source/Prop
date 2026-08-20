@@ -78,7 +78,7 @@ export default function CertificateViewer({ certificate, open, onClose }) {
         />
       </button>
 
-      <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px', margin: 0 }}>
+      <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 'var(--space-1-5) var(--space-4)', margin: 0 }}>
         <Meta label="Issued" value={new Date(certificate.issued_at).toLocaleDateString('en-GB', {
           day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC'
         })} />
@@ -139,7 +139,7 @@ export default function CertificateViewer({ certificate, open, onClose }) {
             <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
               <code style={{
                 fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--muted)',
-                border: '1px solid var(--rule-soft)', padding: '6px 8px', wordBreak: 'break-all', flex: '1 1 220px'
+                border: '1px solid var(--rule-soft)', padding: 'var(--space-1-5) var(--space-2)', wordBreak: 'break-all', flex: '1 1 220px'
               }}>
                 {verifyUrlFor(certificate)}
               </code>

@@ -800,7 +800,7 @@ export default function AdminCommandCenter() {
       render: (row) => (
         <div>
           {row.is_flagged ? <AdminBadge status="warning" label="Flagged" /> : <AdminBadge status="success" label="Clean" />}
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)', marginTop: '6px' }}>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)', marginTop: 'var(--space-1-5)' }}>
             {row.open_disputes_count || 0} disputes, {row.critical_violations_count || 0} critical
           </div>
         </div>
@@ -1100,7 +1100,7 @@ export default function AdminCommandCenter() {
       >
         {actionContext && (
           <div style={{ display: 'grid', gap: 'var(--space-4)' }}>
-            <div style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', padding: '14px' }}>
+            <div style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', padding: 'var(--space-3-5)' }}>
               <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase', marginBottom: 'var(--space-2)' }}>Target Summary</div>
               <div style={{ color: 'var(--admin-text)' }}>
                 {actionContext.scope === 'bulk' ? `${selectedActionRows.length} selected row(s)` : '1 selected row'}

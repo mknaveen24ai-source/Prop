@@ -310,7 +310,7 @@ export default function AdminAccountDetail() {
           </div>
         </div>
 
-        <div style={{ marginTop: 'var(--space-5)', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        <div style={{ marginTop: 'var(--space-5)', display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)', flexWrap: 'wrap' }}>
           <AdminBadge status={account.status} label={formatLabel(account.status)} />
           <AdminBadge status={account.account_type === 'funded' ? 'gold' : 'info'} label={formatAccountType(account.account_type)} />
           {(flagMeta?.review_flagged || account.review_flagged) && <AdminBadge status="warning" label="Flagged For Review" />}
@@ -318,8 +318,8 @@ export default function AdminAccountDetail() {
         </div>
 
         {(flagMeta?.review_flag_reason || account.review_flag_reason) && (
-          <div style={{ marginTop: 'var(--space-4)', background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', padding: '14px' }}>
-            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>Review Flag Reason</div>
+          <div style={{ marginTop: 'var(--space-4)', background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', padding: 'var(--space-3-5)' }}>
+            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase', marginBottom: 'var(--space-1-5)' }}>Review Flag Reason</div>
             <div style={{ color: 'var(--admin-text)' }}>{flagMeta.review_flag_reason || account.review_flag_reason}</div>
           </div>
         )}

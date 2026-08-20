@@ -90,28 +90,28 @@ export default function DashboardComparePage({ accounts = [] }) {
   })
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4-5)' }}>
       {failedIds.length > 0 && (
         <div style={{ padding: 'var(--space-3) var(--space-4)', border: '1px solid var(--warn)', borderRadius: 'var(--radius-sm)', color: 'var(--warn)', fontSize: 'var(--fs-base)' }} role="alert">
           Couldn't load stats for {failedIds.length} account{failedIds.length === 1 ? '' : 's'} — the numbers below may be incomplete.
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(rows.length, 4)}, minmax(220px, 1fr))`, gap: '14px', overflowX: 'auto' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(rows.length, 4)}, minmax(220px, 1fr))`, gap: 'var(--space-3-5)', overflowX: 'auto' }}>
         {rows.map(({ account, stats, failed }) => (
           <Card key={account.id} ruled eyebrow={`${String(account.account_type || '').toUpperCase()} · ${account.account_uid || account.id}`} title={formatCurrency(account.account_size || 0)}>
-            <div style={{ marginBottom: '10px' }}>
+            <div style={{ marginBottom: 'var(--space-2-5)' }}>
               <span className="lx-badge" style={{ color: getStatusToneColor(account.status) }}>{String(account.status || '').toUpperCase()}</span>
             </div>
             {failed || !stats ? (
               <div style={{ color: 'var(--muted)', fontSize: '12.5px', padding: '12px 0' }}>Stats unavailable</div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2-5)' }}>
                 <div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--muted)' }}>Equity</div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '19px', marginTop: '3px', color: 'var(--ink)' }}>{formatCurrency(stats.equity || 0)}</div>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)' }}>
                   <div>
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)' }}>P&amp;L</div>
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-md)', marginTop: '3px', color: stats.equity_profit_pct >= 0 ? 'var(--gain)' : 'var(--loss)' }}>

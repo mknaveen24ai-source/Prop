@@ -243,7 +243,7 @@ export default function AdminAffiliates() {
           {totalPages > 1 && (
             <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)', justifyContent: 'center' }}>
               <button className="admin-btn admin-btn-sm" disabled={data.page <= 1} onClick={() => fetchAffiliates(data.page - 1)}>Previous</button>
-              <span style={{ padding: '6px 12px', fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)' }}>Page {data.page} of {totalPages}</span>
+              <span style={{ padding: 'var(--space-1-5) var(--space-3)', fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)' }}>Page {data.page} of {totalPages}</span>
               <button className="admin-btn admin-btn-sm" disabled={data.page >= totalPages} onClick={() => fetchAffiliates(data.page + 1)}>Next</button>
             </div>
           )}

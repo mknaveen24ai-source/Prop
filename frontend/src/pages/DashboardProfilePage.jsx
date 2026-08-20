@@ -118,7 +118,7 @@ export default function DashboardProfilePage({
         <div style={{ maxWidth: '700px', marginTop: 'var(--space-6)' }}>
           <h3 style={{ marginBottom: 'var(--space-3)', color: 'var(--accent)' }}>Platform Trading Rules</h3>
           <Card>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: '14px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: 'var(--space-3-5)' }}>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', letterSpacing: '.06em', textTransform: 'uppercase' }}>Profit Share</div>
                 <div style={{ fontSize: '15px', marginTop: 'var(--space-1)' }}>{platformRules.profit_share_pct}%</div>

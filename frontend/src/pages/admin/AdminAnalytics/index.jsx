@@ -85,7 +85,7 @@ export default function AdminAnalytics() {
         </p>
       </div>
 
-      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: 'var(--space-5)' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-2-5)', flexWrap: 'wrap', marginBottom: 'var(--space-5)' }}>
         {TABS.map((tab) => (
           <button
             key={tab.key}

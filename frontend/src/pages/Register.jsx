@@ -258,7 +258,7 @@ function Register({ onLogin }) {
           : tenant?.brand?.tagline || 'Join the premium prop firm today'}
       </p>
       {step === STEP_FORM && giftCode && giftPreview?.valid && (
-        <div style={{ marginTop: 'var(--space-4)', padding: '10px 16px', border: '1px solid var(--accent)', borderRadius: '6px', fontSize: 'var(--fs-base)', color: 'var(--accent)' }}>
+        <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-2-5) var(--space-4)', border: '1px solid var(--accent)', borderRadius: '6px', fontSize: 'var(--fs-base)', color: 'var(--accent)' }}>
           🎁 You've been sent a free ${Number(giftPreview.account_size).toLocaleString()} challenge account — sign up to claim it.
         </div>
       )}
@@ -304,7 +304,7 @@ function Register({ onLogin }) {
             return (
               <React.Fragment key={label}>
                 {i > 0 && <div style={{ flex: 1, height: '1px', background: done || step === STEP_OTP ? 'var(--accent)' : 'var(--border)' }} />}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
                   <div style={{
                     width: '22px', height: '22px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 'var(--fs-xs)', fontWeight: 700, fontFamily: 'var(--font-mono)',
@@ -362,7 +362,7 @@ function Register({ onLogin }) {
             {/* Password strength indicator */}
             {form.password.length > 0 && (
               <div style={{ marginTop: 'var(--space-2)', marginBottom: 'var(--space-1)' }}>
-                <div style={{ display: 'flex', gap: 'var(--space-1)', marginBottom: '6px' }}>
+                <div style={{ display: 'flex', gap: 'var(--space-1)', marginBottom: 'var(--space-1-5)' }}>
                   {[1,2,3,4,5].map(i => (
                     <div key={i} style={{
                       flex: 1, height: '3px',
@@ -408,7 +408,7 @@ function Register({ onLogin }) {
 
             {/* Phone — shown with a lock icon since it will be OTP-verified */}
             <div className="input-group">
-              <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
                 PHONE / WHATSAPP
                 <span style={{
                   fontSize: 'var(--fs-2xs)', fontWeight: 600, padding: '2px 7px', borderRadius: 'var(--radius-pill)',
@@ -447,8 +447,8 @@ function Register({ onLogin }) {
 
             {/* Terms checkbox */}
             <div className="auth-consent-panel" style={{
-              display: 'flex', alignItems: 'flex-start', gap: '10px',
-              margin: '20px 0 16px', padding: '14px',
+              display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2-5)',
+              margin: '20px 0 16px', padding: 'var(--space-3-5)',
               borderColor: termsAccepted ? 'var(--accent)' : undefined,
               transition: 'border-color 0.2s ease'
             }}>

@@ -173,13 +173,13 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
   ]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4-5)' }}>
       <button
         onClick={goBack}
         style={{
           background: 'none', border: 'none', color: 'var(--muted)', fontSize: '12.5px',
           fontFamily: 'var(--font-mono)', letterSpacing: '.06em', textTransform: 'uppercase',
-          cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', gap: '6px'
+          cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1-5)'
         }}
       >
         ← Back to Competitions
@@ -194,7 +194,7 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
           </div>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: '34px', lineHeight: 1.08, marginTop: 'var(--space-2)', letterSpacing: '-.015em' }}>{competition.title}</div>
           {competition.description && (
-            <div style={{ fontSize: '13.5px', color: 'var(--muted)', marginTop: '10px', maxWidth: '52ch' }}>{competition.description}</div>
+            <div style={{ fontSize: '13.5px', color: 'var(--muted)', marginTop: 'var(--space-2-5)', maxWidth: '52ch' }}>{competition.description}</div>
           )}
           <div style={{ display: 'flex', gap: '26px', marginTop: 'var(--space-5)', flexWrap: 'wrap' }}>
             {compStats.map((c) => (
@@ -204,7 +204,7 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
               </div>
             ))}
           </div>
-          <div style={{ display: 'flex', gap: '10px', marginTop: '22px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2-5)', marginTop: '22px', flexWrap: 'wrap' }}>
             {myEntry ? (
               <div style={{ padding: '11px 18px', border: '1px solid var(--rule)', borderRadius: '4px', fontSize: '12.5px', color: 'var(--ink)' }}>
                 You're entered — status: <strong>{myEntry.status}</strong>{myEntry.final_rank && ` · finished #${myEntry.final_rank}`}
@@ -263,7 +263,7 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
               </div>
             )}
             {prizePool.map((p, idx) => (
-              <div key={p.rank} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid var(--rule-soft)' }}>
+              <div key={p.rank} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)', padding: '8px 0', borderBottom: '1px solid var(--rule-soft)' }}>
                 <span style={{ width: '9px', height: '9px', background: PRIZE_TONES[idx % PRIZE_TONES.length], flex: '0 0 auto' }} />
                 <span style={{ flex: 1, fontSize: '12.5px' }}>#{p.rank} place</span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12.5px' }}>{p.label}</span>
@@ -275,7 +275,7 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
 
       {showTerms && (
         <Card ruled title="Rules & Terms">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px,1fr))', gap: '14px', fontSize: 'var(--fs-base)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px,1fr))', gap: 'var(--space-3-5)', fontSize: 'var(--fs-base)' }}>
             <div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Starting Balance</div>
               <div style={{ marginTop: 'var(--space-1)' }}>${competition.starting_balance.toLocaleString('en-US')}</div>
@@ -296,7 +296,7 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
             </div>
           </div>
           {competition.rules && Object.keys(competition.rules).length > 0 && (
-            <pre style={{ marginTop: '14px', fontFamily: 'var(--font-mono)', fontSize: '11.5px', color: 'var(--muted)', whiteSpace: 'pre-wrap', overflowWrap: 'break-word' }}>
+            <pre style={{ marginTop: 'var(--space-3-5)', fontFamily: 'var(--font-mono)', fontSize: '11.5px', color: 'var(--muted)', whiteSpace: 'pre-wrap', overflowWrap: 'break-word' }}>
               {JSON.stringify(competition.rules, null, 2)}
             </pre>
           )}
@@ -305,7 +305,7 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
 
       {myVoucher && (
         <Card style={{ border: '1px solid var(--accent)' }}>
-          <div style={{ fontSize: '15px', color: 'var(--accent)', marginBottom: '6px' }}>
+          <div style={{ fontSize: '15px', color: 'var(--accent)', marginBottom: 'var(--space-1-5)' }}>
             You won a free ${Number(myVoucher.account_size).toLocaleString('en-US')} challenge account
           </div>
           <div style={{ fontSize: 'var(--fs-base)', color: 'var(--muted)', marginBottom: 'var(--space-3)' }}>
@@ -355,7 +355,7 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
             <button
               onClick={() => exportRowsToCSV(leaders, STANDINGS_EXPORT_COLUMNS, `${slug}_standings_${new Date().toISOString().slice(0, 10)}.csv`)}
               className="lx-btn"
-              style={{ padding: '6px 10px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              style={{ padding: 'var(--space-1-5) var(--space-2-5)', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)', display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1-5)' }}
             >
               {renderIcon('download', { size: 12 })} Export
             </button>
@@ -401,7 +401,7 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
                 ))}
               </tbody>
             </table>
-            <div style={{ padding: '10px 18px' }}>
+            <div style={{ padding: 'var(--space-2-5) var(--space-4-5)' }}>
               <Pagination page={standingsPage} totalPages={standingsTotalPages} onPageChange={setStandingsPage} pageSize={STANDINGS_PAGE_SIZE} total={leaders.length} />
             </div>
           </>

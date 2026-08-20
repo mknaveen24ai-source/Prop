@@ -98,7 +98,7 @@ export default function LandingFooter({ onFooterCta }) {
           ].map(col => (
             <div key={col.title}>
                 <h4 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-md)', color: 'var(--muted)', marginBottom: 'var(--space-6)', textTransform: 'uppercase', letterSpacing: '0.15em' }}>{col.title}</h4>
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-3-5)' }}>
                 {col.links.map(link => (
                   <li key={link}>
                     <a href={linkHref(link)} style={{
@@ -121,7 +121,7 @@ export default function LandingFooter({ onFooterCta }) {
               that consumer law requires us to publish. */}
           <div>
             <h4 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-md)', color: 'var(--muted)', marginBottom: 'var(--space-6)', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Legal</h4>
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-3-5)' }}>
               {[
                 { to: '/terms', label: 'Terms of Service' },
                 { to: '/privacy', label: 'Privacy Policy' },
@@ -154,7 +154,7 @@ export default function LandingFooter({ onFooterCta }) {
           </p>
           <div className="mp-footer-bottom-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--rule)', paddingTop: 'var(--space-6)', flexWrap: 'wrap', gap: 'var(--space-4)' }}>
             <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--muted)' }}>© {new Date().getFullYear()} PropFirm V2. All rights reserved.</span>
-            <div className="mp-footer-chip-row" style={{ display: 'flex', gap: '10px' }}>
+            <div className="mp-footer-chip-row" style={{ display: 'flex', gap: 'var(--space-2-5)' }}>
               {['WEB PLATFORM', 'FOREX', 'GOLD', 'SILVER'].map(p => (
                 <div key={p} style={{
                   fontSize: 'var(--fs-2xs)', color: 'var(--muted)',

@@ -187,7 +187,7 @@ export default function DashboardTradeHistoryPage({ selectedAccount, accountHist
         </Card>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: '14px', marginBottom: 'var(--space-5)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: 'var(--space-3-5)', marginBottom: 'var(--space-5)' }}>
             <Card stat tone="var(--accent)">
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Win Rate</div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-4xl)', marginTop: 'var(--space-2)', color: 'var(--accent)' }}>{kpis.winRate.toFixed(1)}%</div>
@@ -246,7 +246,7 @@ export default function DashboardTradeHistoryPage({ selectedAccount, accountHist
               <button
                 onClick={() => exportTradesToCSV(filtered, selectedAccount?.account_type, selectedAccount?.account_size)}
                 className="lx-btn"
-                style={{ padding: 'var(--space-2) var(--space-3)', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                style={{ padding: 'var(--space-2) var(--space-3)', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)', display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1-5)' }}
               >
                 {renderIcon('download', { size: 13 })} Export CSV
               </button>
@@ -277,7 +277,7 @@ export default function DashboardTradeHistoryPage({ selectedAccount, accountHist
           <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 'var(--space-3)' }}>
             Past Challenge Accounts
           </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2-5)' }}>
             {accountHistory.map((acc) => {
               const pnl = parseFloat(acc.total_pnl || 0)
               const statusColor = getStatusColor(acc.status)
@@ -285,7 +285,7 @@ export default function DashboardTradeHistoryPage({ selectedAccount, accountHist
                 <Card key={acc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
                   <div style={{ fontSize: 'var(--fs-base)' }}>
                     {String(acc.account_type).toUpperCase()} — ${parseFloat(acc.account_size).toLocaleString('en-US')}
-                    <span style={{ color: statusColor, marginLeft: '10px', fontSize: 'var(--fs-xs)', fontFamily: 'var(--font-mono)' }}>{String(acc.status).toUpperCase()}</span>
+                    <span style={{ color: statusColor, marginLeft: 'var(--space-2-5)', fontSize: 'var(--fs-xs)', fontFamily: 'var(--font-mono)' }}>{String(acc.status).toUpperCase()}</span>
                   </div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-base)', color: pnl >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{formatSigned(pnl)}</div>
                 </Card>
@@ -297,7 +297,7 @@ export default function DashboardTradeHistoryPage({ selectedAccount, accountHist
 
       <Drawer open={!!drawerTrade} onClose={() => setDrawerTrade(null)} title={drawerTrade?.instrument} subtitle={drawerTrade ? `Trade #${drawerTrade.id}` : ''}>
         {drawerTrade && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2-5)' }}>
             {[
               ['Direction', drawerTrade.direction?.toUpperCase()],
               ['Lots', parseFloat(drawerTrade.lot_size).toFixed(2)],
@@ -317,7 +317,7 @@ export default function DashboardTradeHistoryPage({ selectedAccount, accountHist
               </div>
             ))}
             {(drawerTrade.open_screenshot_url || drawerTrade.close_screenshot_url) && (
-              <div style={{ display: 'flex', gap: '10px', marginTop: 'var(--space-2)' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-2-5)', marginTop: 'var(--space-2)' }}>
                 {drawerTrade.open_screenshot_url && (
                   <a href={`${API_URL}${drawerTrade.open_screenshot_url}`} target="_blank" rel="noreferrer" className="lx-btn" style={{ padding: 'var(--space-2) var(--space-3)', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)' }}>
                     {renderIcon('file', { size: 13 })} Open screenshot

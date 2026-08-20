@@ -51,7 +51,7 @@ export default function Leaderboard() {
             <p style={{ color: 'var(--text-muted)' }}>No funded traders yet. Be the first!</p>
           </Card>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2-5)' }}>
             {leaders.map((row, idx) => (
               <Card
                 key={idx}

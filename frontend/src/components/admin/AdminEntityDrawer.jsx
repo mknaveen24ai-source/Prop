@@ -173,7 +173,7 @@ export default function AdminEntityDrawer({
             <>
               <Card>
                 {entityType === 'user' && Array.isArray(activitySpark) && activitySpark.length > 1 && (
-                  <div style={{ height: '64px', marginBottom: '14px' }}>
+                  <div style={{ height: '64px', marginBottom: 'var(--space-3-5)' }}>
                     <Sparkline
                       data={activitySpark}
                       width="100%"

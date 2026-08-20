@@ -323,7 +323,7 @@ export default function AdminDisputes() {
         render: (dispute) => (
           <div>
             <AdminBadge status={formatSlaTone(dispute.sla_status)} label={dispute.sla_status || 'within_sla'} />
-            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)', marginTop: '6px' }}>
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)', marginTop: 'var(--space-1-5)' }}>
               {dispute.age_hours ? `${dispute.age_hours.toFixed(1)}h` : 'No age data'}
             </div>
           </div>

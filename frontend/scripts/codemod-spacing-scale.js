@@ -40,7 +40,8 @@ const SPACING_PROPS = /(padding|margin|gap|rowGap|columnGap)([A-Za-z]*):\s*'([0-
 function readSpacingScale() {
   const css = fs.readFileSync(TOKENS, 'utf8')
   const map = new Map()
-  const re = /--(space-[0-9]+):\s*([0-9.]+)px/gi
+  // Matches the fractional half-steps (--space-1-5) as well as whole steps.
+  const re = /--(space-[0-9-]+):\s*([0-9.]+)px/gi
   let m
   while ((m = re.exec(css))) map.set(parseFloat(m[2]), m[1])
   return map
@@ -132,7 +133,9 @@ function main() {
     // than pretending there is one.
     const range = below === undefined
       ? 'below the scale floor (--' + scale.get(above) + ' is ' + above + 'px)'
-      : 'between --' + scale.get(below) + ' (' + below + 'px) and --' + scale.get(above) + ' (' + above + 'px)'
+      : above === undefined
+        ? 'above the scale ceiling (--' + scale.get(below) + ' is ' + below + 'px)'
+        : 'between --' + scale.get(below) + ' (' + below + 'px) and --' + scale.get(above) + ' (' + above + 'px)'
     console.log('    ' + value.padEnd(7) + ' x' + String(n).padEnd(4) + '  ' + range)
   }
   console.log('')

@@ -35,18 +35,18 @@ function PhaseRow({ model, phase, phaseIndex, onSave, saving }) {
 
   return (
     <tr>
-      <td style={{ padding: '8px 10px', fontWeight: 600 }}>Phase {phaseIndex + 1}</td>
+      <td style={{ padding: 'var(--space-2) var(--space-2-5)', fontWeight: 600 }}>Phase {phaseIndex + 1}</td>
       {fields.map(([key]) => (
-        <td key={key} style={{ padding: '6px 8px' }}>
+        <td key={key} style={{ padding: 'var(--space-1-5) var(--space-2)' }}>
           <input
             type="number"
             value={draft[key]}
             onChange={(e) => update(key, e.target.value)}
-            style={{ width: '90px', padding: '6px 8px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }}
+            style={{ width: '90px', padding: 'var(--space-1-5) var(--space-2)', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }}
           />
         </td>
       ))}
-      <td style={{ padding: '6px 8px' }}>
+      <td style={{ padding: 'var(--space-1-5) var(--space-2)' }}>
         <button
           className="admin-btn admin-btn-sm"
           disabled={saving}
@@ -67,32 +67,32 @@ function PricingRow({ model, sizeInfo, onSave, saving }) {
 
   return (
     <tr>
-      <td style={{ padding: '8px 10px', fontWeight: 600 }}>{formatMoney(sizeInfo.account_size)}</td>
-      <td style={{ padding: '6px 8px' }}>
+      <td style={{ padding: 'var(--space-2) var(--space-2-5)', fontWeight: 600 }}>{formatMoney(sizeInfo.account_size)}</td>
+      <td style={{ padding: 'var(--space-1-5) var(--space-2)' }}>
         <input
           type="number"
           value={price}
           onChange={(e) => setPrice(e.target.value)}
-          style={{ width: '90px', padding: '6px 8px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }}
+          style={{ width: '90px', padding: 'var(--space-1-5) var(--space-2)', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }}
         />
       </td>
-      <td style={{ padding: '6px 8px' }}>
+      <td style={{ padding: 'var(--space-1-5) var(--space-2)' }}>
         <select
           value={isActive ? 'true' : 'false'}
           onChange={(e) => setIsActive(e.target.value === 'true')}
-          style={{ padding: '6px 8px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }}
+          style={{ padding: 'var(--space-1-5) var(--space-2)', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }}
         >
           <option value="true">Active</option>
           <option value="false">Inactive</option>
         </select>
       </td>
-      <td style={{ padding: '6px 8px' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+      <td style={{ padding: 'var(--space-1-5) var(--space-2)' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)', whiteSpace: 'nowrap' }}>
           <input type="checkbox" checked={isUnlimited} onChange={(e) => setIsUnlimited(e.target.checked)} />
           Unlimited
         </label>
       </td>
-      <td style={{ padding: '6px 8px' }}>
+      <td style={{ padding: 'var(--space-1-5) var(--space-2)' }}>
         <input
           type="number"
           min="0"
@@ -100,13 +100,13 @@ function PricingRow({ model, sizeInfo, onSave, saving }) {
           value={slotLimit}
           onChange={(e) => setSlotLimit(e.target.value)}
           placeholder="Total slots"
-          style={{ width: '100px', padding: '6px 8px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit', opacity: isUnlimited ? 0.5 : 1 }}
+          style={{ width: '100px', padding: 'var(--space-1-5) var(--space-2)', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit', opacity: isUnlimited ? 0.5 : 1 }}
         />
       </td>
-      <td style={{ padding: '6px 8px', fontSize: 'var(--fs-sm)', opacity: 0.75, whiteSpace: 'nowrap' }}>
+      <td style={{ padding: 'var(--space-1-5) var(--space-2)', fontSize: 'var(--fs-sm)', opacity: 0.75, whiteSpace: 'nowrap' }}>
         {sizeInfo.used ?? 0} used / {sizeInfo.is_unlimited ? '∞' : (sizeInfo.remaining ?? 0)} left
       </td>
-      <td style={{ padding: '6px 8px' }}>
+      <td style={{ padding: 'var(--space-1-5) var(--space-2)' }}>
         <button
           className="admin-btn admin-btn-sm"
           disabled={saving}
@@ -137,23 +137,23 @@ function ScalingSection({ model, onSave, saving }) {
     setDraft((d) => ({ ...d, [key]: value }))
   }
 
-  const inputStyle = { width: '110px', padding: '6px 8px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }
+  const inputStyle = { width: '110px', padding: 'var(--space-1-5) var(--space-2)', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }
 
   return (
-    <div style={{ marginTop: '18px', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--admin-border)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+    <div style={{ marginTop: 'var(--space-4-5)', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--admin-border)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2-5)' }}>
         <h4 style={{ margin: 0, fontSize: 'var(--fs-md)' }}>Scaling Plan (funded stage)</h4>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--fs-sm)' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)', fontSize: 'var(--fs-sm)' }}>
           <input type="checkbox" checked={!!draft.scaling_enabled} onChange={(e) => update('scaling_enabled', e.target.checked)} />
           Enabled
         </label>
       </div>
-      <p style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '10px' }}>
+      <p style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-2-5)' }}>
         Every milestone injects real capital into the trader's balance (via the ledger-backed balance-adjustment
         path) and raises their lot-size multiplier. Set the capital increase to 0 to keep the multiplier-only
         behavior with no balance change.
       </p>
-      <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-3-5)', flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <label>
           <div style={{ fontSize: 'var(--fs-xs)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Milestone Every (% net profit)</div>
           <input type="number" min="0.1" step="0.1" style={inputStyle} value={draft.scaling_target_pct} onChange={(e) => update('scaling_target_pct', e.target.value)} />
@@ -235,18 +235,18 @@ function StepModelCard({ model, onToggle, onSavePhase, onSavePricing, onSaveScal
         </label>
       </div>
 
-      <div style={{ overflowX: 'auto', marginBottom: '18px' }}>
+      <div style={{ overflowX: 'auto', marginBottom: 'var(--space-4-5)' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-base)' }}>
           <thead>
             <tr style={{ textAlign: 'left', opacity: 0.7 }}>
-              <th style={{ padding: '6px 10px' }}>Phase</th>
-              <th style={{ padding: '6px 8px' }}>Profit Target %</th>
-              <th style={{ padding: '6px 8px' }}>Trailing Max DD %</th>
-              <th style={{ padding: '6px 8px' }}>Daily Loss %</th>
-              <th style={{ padding: '6px 8px' }}>Min Trading Days</th>
-              <th style={{ padding: '6px 8px' }}>Time Limit (days)</th>
-              <th style={{ padding: '6px 8px' }}>Consistency %</th>
-              <th style={{ padding: '6px 8px' }}></th>
+              <th style={{ padding: 'var(--space-1-5) var(--space-2-5)' }}>Phase</th>
+              <th style={{ padding: 'var(--space-1-5) var(--space-2)' }}>Profit Target %</th>
+              <th style={{ padding: 'var(--space-1-5) var(--space-2)' }}>Trailing Max DD %</th>
+              <th style={{ padding: 'var(--space-1-5) var(--space-2)' }}>Daily Loss %</th>
+              <th style={{ padding: 'var(--space-1-5) var(--space-2)' }}>Min Trading Days</th>
+              <th style={{ padding: 'var(--space-1-5) var(--space-2)' }}>Time Limit (days)</th>
+              <th style={{ padding: 'var(--space-1-5) var(--space-2)' }}>Consistency %</th>
+              <th style={{ padding: 'var(--space-1-5) var(--space-2)' }}></th>
             </tr>
           </thead>
           <tbody>
@@ -268,13 +268,13 @@ function StepModelCard({ model, onToggle, onSavePhase, onSavePricing, onSaveScal
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-base)' }}>
           <thead>
             <tr style={{ textAlign: 'left', opacity: 0.7 }}>
-              <th style={{ padding: '6px 10px' }}>Account Size</th>
-              <th style={{ padding: '6px 8px' }}>Price (USD)</th>
-              <th style={{ padding: '6px 8px' }}>Status</th>
-              <th style={{ padding: '6px 8px' }}>Slots</th>
-              <th style={{ padding: '6px 8px' }}>Slot Limit</th>
-              <th style={{ padding: '6px 8px' }}>Usage</th>
-              <th style={{ padding: '6px 8px' }}></th>
+              <th style={{ padding: 'var(--space-1-5) var(--space-2-5)' }}>Account Size</th>
+              <th style={{ padding: 'var(--space-1-5) var(--space-2)' }}>Price (USD)</th>
+              <th style={{ padding: 'var(--space-1-5) var(--space-2)' }}>Status</th>
+              <th style={{ padding: 'var(--space-1-5) var(--space-2)' }}>Slots</th>
+              <th style={{ padding: 'var(--space-1-5) var(--space-2)' }}>Slot Limit</th>
+              <th style={{ padding: 'var(--space-1-5) var(--space-2)' }}>Usage</th>
+              <th style={{ padding: 'var(--space-1-5) var(--space-2)' }}></th>
             </tr>
           </thead>
           <tbody>

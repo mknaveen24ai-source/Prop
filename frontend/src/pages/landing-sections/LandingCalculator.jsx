@@ -125,7 +125,7 @@ export default function LandingCalculator({ onStartAssessment }) {
             display: 'flex',
             justifyContent: 'center',
             flexWrap: 'wrap',
-            gap: '10px',
+            gap: 'var(--space-2-5)',
             marginBottom: 'var(--space-5)',
           }}>
             {models.map((m) => {
@@ -250,7 +250,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                       Price
                     </span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 'var(--space-1-5)' }}>
                     <span style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(22px,2.4vw,28px)', fontWeight: 800, color: isSoldOut ? 'var(--muted)' : inkColor }}>
                       ${size >= 1000 ? `${size / 1000}K` : size}
                     </span>
@@ -258,7 +258,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                       {price != null ? `$${price}` : '—'}
                     </span>
                   </div>
-                  <div style={{ marginBottom: '14px' }}>
+                  <div style={{ marginBottom: 'var(--space-3-5)' }}>
                     <span style={{
                       display: 'inline-block', padding: '2px 8px', fontSize: 'var(--fs-3xs)', fontWeight: 800, fontFamily: 'var(--font-mono)',
                       textTransform: 'uppercase', letterSpacing: '0.08em',
@@ -280,7 +280,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                     style={{
                       width: '100%',
                       padding: 'var(--space-3)',
-                      marginBottom: '18px',
+                      marginBottom: 'var(--space-4-5)',
                       fontFamily: 'var(--font-mono)',
                       fontSize: 'var(--fs-sm)',
                       fontWeight: 700,
@@ -296,7 +296,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                   </button>
 
                   {/* Itemized rules */}
-                  <div style={{ borderTop: `1px solid ${ruleColor}`, paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+                  <div style={{ borderTop: `1px solid ${ruleColor}`, paddingTop: 'var(--space-3-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2-5)', flex: 1 }}>
                     <div>
                       <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: inkColor, marginBottom: 'var(--space-1)' }}>
                         Profit Target
@@ -351,7 +351,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                   </div>
 
                   {!isSoldOut && (
-                    <div style={{ marginTop: '14px' }}>
+                    <div style={{ marginTop: 'var(--space-3-5)' }}>
                       <div style={{ height: '3px', background: ruleColor, overflow: 'hidden' }}>
                         <div style={{
                           height: '100%', width: `${pct}%`,
@@ -363,7 +363,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                   )}
 
                   {isSoldOut && (
-                    <div style={{ marginTop: '14px', fontSize: 'var(--fs-xs)', color: 'var(--muted)' }}>
+                    <div style={{ marginTop: 'var(--space-3-5)', fontSize: 'var(--fs-xs)', color: 'var(--muted)' }}>
                       {price == null ? 'Not offered at this size' : 'All slots claimed — check back soon'}
                     </div>
                   )}

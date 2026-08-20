@@ -1,6 +1,6 @@
 import React from 'react'
 
-const inputStyle = { width: '100%', padding: '8px 10px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }
+const inputStyle = { width: '100%', padding: 'var(--space-2) var(--space-2-5)', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }
 
 const DEFAULT_ACCOUNT_SIZES = [5000, 10000, 25000, 50000, 100000, 200000, 400000]
 
@@ -46,7 +46,7 @@ export default function PrizePoolEditor({ prizes, onChange, stepModels = [], acc
     <div>
       <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-2)' }}>Prizes (shown to traders on the competition page)</div>
       {prizes.map((p, idx) => (
-        <div key={idx} style={{ border: '1px solid var(--admin-border)', borderRadius: '8px', padding: '10px', marginBottom: '10px' }}>
+        <div key={idx} style={{ border: '1px solid var(--admin-border)', borderRadius: '8px', padding: 'var(--space-2-5)', marginBottom: 'var(--space-2-5)' }}>
           <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginBottom: p.voucher ? '10px' : 0 }}>
             <input
               type="number"
@@ -65,7 +65,7 @@ export default function PrizePoolEditor({ prizes, onChange, stepModels = [], acc
             <button type="button" className="admin-btn admin-btn-sm" onClick={() => removeRow(idx)}>Remove</button>
           </div>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--fs-sm)', opacity: 0.85 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)', fontSize: 'var(--fs-sm)', opacity: 0.85 }}>
             <input type="checkbox" checked={!!p.voucher} onChange={(e) => toggleVoucher(idx, e.target.checked)} />
             Grant a free challenge account voucher to this rank
           </label>

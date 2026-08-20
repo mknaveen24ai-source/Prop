@@ -79,7 +79,7 @@ export function CompetitionsListContent({ onSelectSlug }) {
           <p style={{ color: 'var(--muted)' }}>No competitions scheduled right now. Check back soon!</p>
         </Card>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2-5)' }}>
           {competitions.map((c) => (
             <Card
               key={c.slug}
@@ -88,7 +88,7 @@ export function CompetitionsListContent({ onSelectSlug }) {
               style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-5)', padding: 'var(--space-5) var(--space-6)' }}
             >
               <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)', marginBottom: 'var(--space-1-5)' }}>
                   <span style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-lg)', color: 'var(--ink)' }}>{c.title}</span>
                   {statusBadge(c.status)}
                 </div>

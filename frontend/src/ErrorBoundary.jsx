@@ -35,10 +35,10 @@ class ErrorBoundary extends React.Component {
           border: '1px solid var(--loss, #f87171)',
           background: 'var(--paper-2, #1f1f1f)',
         }}>
-          <p style={{ color: 'var(--text-primary)', fontWeight: 700, marginBottom: '6px' }}>
+          <p style={{ color: 'var(--text-primary)', fontWeight: 700, marginBottom: 'var(--space-1-5)' }}>
             {this.props.label ? `${this.props.label} failed to load` : 'This section failed to load'}
           </p>
-          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: '18px' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: 'var(--space-4-5)' }}>
             An unexpected error occurred here — the rest of the app is unaffected.
           </p>
           <button
@@ -48,7 +48,7 @@ class ErrorBoundary extends React.Component {
             Try Again
           </button>
           {import.meta.env.DEV && this.state.error && (
-            <pre style={{ marginTop: '18px', textAlign: 'left', fontSize: 'var(--fs-xs)', color: 'var(--danger)', overflowX: 'auto', maxWidth: '100%' }}>
+            <pre style={{ marginTop: 'var(--space-4-5)', textAlign: 'left', fontSize: 'var(--fs-xs)', color: 'var(--danger)', overflowX: 'auto', maxWidth: '100%' }}>
               {this.state.error.toString()}
               {'\n'}
               {this.state.errorInfo?.componentStack}
@@ -68,7 +68,7 @@ class ErrorBoundary extends React.Component {
           color: 'var(--ink, #e8e4d8)',
           fontFamily: 'var(--font-ui, system-ui, sans-serif)'
         }}>
-          <h1 style={{ color: 'var(--ink, #e8e4d8)', marginBottom: '10px' }}>Something went wrong.</h1>
+          <h1 style={{ color: 'var(--ink, #e8e4d8)', marginBottom: 'var(--space-2-5)' }}>Something went wrong.</h1>
           <p style={{ color: 'var(--muted, #8a8a82)', maxWidth: '500px', textAlign: 'center', lineHeight: '1.5' }}>
             We encountered an unexpected error while rendering this page.
             This might be due to a network interruption or missing data.
@@ -76,13 +76,13 @@ class ErrorBoundary extends React.Component {
           <div style={{ marginTop: '30px', display: 'flex', gap: '15px' }}>
             <button
               onClick={() => window.location.reload()}
-              style={{ padding: '10px 20px', background: 'var(--ink, #e8e4d8)', color: 'var(--paper, #161616)', border: '1px solid var(--ink, #e8e4d8)', cursor: 'pointer', fontWeight: 'bold' }}
+              style={{ padding: 'var(--space-2-5) var(--space-5)', background: 'var(--ink, #e8e4d8)', color: 'var(--paper, #161616)', border: '1px solid var(--ink, #e8e4d8)', cursor: 'pointer', fontWeight: 'bold' }}
             >
               Refresh Page
             </button>
             <button
               onClick={() => window.location.href = '/'}
-              style={{ padding: '10px 20px', background: 'transparent', color: 'var(--ink, #e8e4d8)', border: '1px solid var(--rule, #3a3a3a)', cursor: 'pointer' }}
+              style={{ padding: 'var(--space-2-5) var(--space-5)', background: 'transparent', color: 'var(--ink, #e8e4d8)', border: '1px solid var(--rule, #3a3a3a)', cursor: 'pointer' }}
             >
               Go Home
             </button>

@@ -4,7 +4,7 @@ import { useToast } from '../../components/admin/AdminToast'
 import PrizePoolEditor from '../../components/admin/PrizePoolEditor'
 import Card from '../../components/ui/Card'
 
-const inputStyle = { width: '100%', padding: '8px 10px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }
+const inputStyle = { width: '100%', padding: 'var(--space-2) var(--space-2-5)', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }
 
 function toLocalInputValue(value) {
   const d = new Date(value)
@@ -74,7 +74,7 @@ function SettingsPanel({ competition, onSave, saving, stepModels }) {
           This competition is {competition.status} — dates, balance, and drawdown rules are locked to protect entries already in flight. Only description and prize display text can still be edited.
         </p>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginTop: 'var(--space-3)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-3-5)', marginTop: 'var(--space-3)' }}>
         <label>
           <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Title</div>
           <input style={inputStyle} value={draft.title} disabled={isLocked} onChange={(e) => update('title', e.target.value)} />
@@ -132,7 +132,7 @@ function DisqualifyButton({ onDisqualify }) {
     return <button className="admin-btn admin-btn-sm" onClick={() => setOpen(true)}>Disqualify</button>
   }
   return (
-    <div style={{ display: 'flex', gap: '6px' }}>
+    <div style={{ display: 'flex', gap: 'var(--space-1-5)' }}>
       <input
         style={{ ...inputStyle, width: '160px' }}
         placeholder="Reason (5+ chars)"
@@ -160,7 +160,7 @@ function CorrectBalanceButton({ onCorrect }) {
   }
   const amountValid = Number.isFinite(parseFloat(amount)) && parseFloat(amount) !== 0
   return (
-    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: 'var(--space-1-5)', flexWrap: 'wrap' }}>
       <input
         style={{ ...inputStyle, width: '100px' }}
         type="number"
@@ -268,7 +268,7 @@ function BotRosterPanel({ adminAxios, toast, competition, onEntered }) {
       </p>
 
       {/* Creation controls */}
-      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '18px', padding: '14px', background: 'var(--admin-bg-elevated)', borderRadius: '6px', border: '1px solid var(--admin-border)' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-2-5)', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 'var(--space-4-5)', padding: 'var(--space-3-5)', background: 'var(--admin-bg-elevated)', borderRadius: '6px', border: '1px solid var(--admin-border)' }}>
         {/* Count */}
         <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
           <span style={{ fontSize: 'var(--fs-xs)', opacity: 0.7 }}>Count (1–50)</span>
@@ -298,7 +298,7 @@ function BotRosterPanel({ adminAxios, toast, competition, onEntered }) {
 
         {/* Auto-enter toggle */}
         {canEnter && (
-          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--fs-base)', cursor: 'pointer', paddingBottom: '2px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)', fontSize: 'var(--fs-base)', cursor: 'pointer', paddingBottom: '2px' }}>
             <input
               type="checkbox"
               checked={autoEnter}
@@ -325,19 +325,19 @@ function BotRosterPanel({ adminAxios, toast, competition, onEntered }) {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-base)' }}>
           <thead>
             <tr style={{ textAlign: 'left', opacity: 0.7 }}>
-              <th style={{ padding: '8px 10px' }}>Name</th>
-              <th style={{ padding: '8px 10px' }}>Country</th>
-              <th style={{ padding: '8px 10px' }}>Current Competition</th>
-              <th style={{ padding: '8px 10px' }}></th>
+              <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Name</th>
+              <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Country</th>
+              <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Current Competition</th>
+              <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}></th>
             </tr>
           </thead>
           <tbody>
             {bots.map((bot) => (
               <tr key={bot.id} style={{ borderTop: '1px solid var(--admin-border)' }}>
-                <td style={{ padding: '8px 10px' }}>{bot.full_name}</td>
-                <td style={{ padding: '8px 10px', color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)' }}>{bot.country || '—'}</td>
-                <td style={{ padding: '8px 10px' }}>{bot.competition_title || '—'}</td>
-                <td style={{ padding: '8px 10px' }}>
+                <td style={{ padding: 'var(--space-2) var(--space-2-5)' }}>{bot.full_name}</td>
+                <td style={{ padding: 'var(--space-2) var(--space-2-5)', color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)' }}>{bot.country || '—'}</td>
+                <td style={{ padding: 'var(--space-2) var(--space-2-5)' }}>{bot.competition_title || '—'}</td>
+                <td style={{ padding: 'var(--space-2) var(--space-2-5)' }}>
                   {!bot.competition_id && canEnter && (
                     <button className="admin-btn admin-btn-sm" onClick={() => handleEnter(bot.id)} disabled={busyBotId === bot.id}>
                       {busyBotId === bot.id ? 'Entering...' : 'Enter This Competition'}
@@ -476,35 +476,35 @@ export default function AdminCompetitionDetail() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-base)' }}>
           <thead>
             <tr style={{ textAlign: 'left', opacity: 0.7 }}>
-              <th style={{ padding: '8px 10px' }}>Trader</th>
-              <th style={{ padding: '8px 10px' }}>Account</th>
-              <th style={{ padding: '8px 10px' }}>Balance</th>
-              <th style={{ padding: '8px 10px' }}>Status</th>
-              <th style={{ padding: '8px 10px' }}>Final Rank</th>
-              <th style={{ padding: '8px 10px' }}></th>
+              <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Trader</th>
+              <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Account</th>
+              <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Balance</th>
+              <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Status</th>
+              <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Final Rank</th>
+              <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}></th>
             </tr>
           </thead>
           <tbody>
             {(competition.entries || []).map((entry) => (
               <tr key={entry.id} style={{ borderTop: '1px solid var(--admin-border)' }}>
-                <td style={{ padding: '8px 10px' }}>
+                <td style={{ padding: 'var(--space-2) var(--space-2-5)' }}>
                   {entry.full_name}
                   {entry.is_bot && (
-                    <span style={{ marginLeft: '6px', fontSize: 'var(--fs-2xs)', padding: '2px 6px', borderRadius: '4px', background: 'var(--admin-bg-elevated)', border: '1px solid var(--admin-border)', opacity: 0.8 }}>
+                    <span style={{ marginLeft: 'var(--space-1-5)', fontSize: 'var(--fs-2xs)', padding: '2px 6px', borderRadius: '4px', background: 'var(--admin-bg-elevated)', border: '1px solid var(--admin-border)', opacity: 0.8 }}>
                       DEMO BOT
                     </span>
                   )}
                   <div style={{ fontSize: 'var(--fs-xs)', opacity: 0.6 }}>{entry.email}</div>
                 </td>
-                <td style={{ padding: '8px 10px', fontFamily: 'monospace', fontSize: 'var(--fs-sm)' }}>{entry.account_uid || '—'}</td>
-                <td style={{ padding: '8px 10px' }}>{entry.current_balance != null ? `$${parseFloat(entry.current_balance).toFixed(2)}` : '—'}</td>
-                <td style={{ padding: '8px 10px' }}>
+                <td style={{ padding: 'var(--space-2) var(--space-2-5)', fontFamily: 'monospace', fontSize: 'var(--fs-sm)' }}>{entry.account_uid || '—'}</td>
+                <td style={{ padding: 'var(--space-2) var(--space-2-5)' }}>{entry.current_balance != null ? `$${parseFloat(entry.current_balance).toFixed(2)}` : '—'}</td>
+                <td style={{ padding: 'var(--space-2) var(--space-2-5)' }}>
                   {entry.status}
                   {entry.disqualified_reason && <div style={{ fontSize: 'var(--fs-xs)', opacity: 0.6 }}>{entry.disqualified_reason}</div>}
                 </td>
-                <td style={{ padding: '8px 10px' }}>{entry.final_rank || '—'}</td>
-                <td style={{ padding: '8px 10px' }}>
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                <td style={{ padding: 'var(--space-2) var(--space-2-5)' }}>{entry.final_rank || '—'}</td>
+                <td style={{ padding: 'var(--space-2) var(--space-2-5)' }}>
+                  <div style={{ display: 'flex', gap: 'var(--space-1-5)', flexWrap: 'wrap' }}>
                     {entry.status === 'active' && !entry.is_bot && (
                       <DisqualifyButton onDisqualify={(reason) => handleDisqualify(entry.id, reason)} />
                     )}
@@ -531,26 +531,26 @@ export default function AdminCompetitionDetail() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-base)' }}>
             <thead>
               <tr style={{ textAlign: 'left', opacity: 0.7 }}>
-                <th style={{ padding: '8px 10px' }}>Rank</th>
-                <th style={{ padding: '8px 10px' }}>Trader</th>
-                <th style={{ padding: '8px 10px' }}>Profit %</th>
-                <th style={{ padding: '8px 10px' }}>Profit $</th>
+                <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Rank</th>
+                <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Trader</th>
+                <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Profit %</th>
+                <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Profit $</th>
               </tr>
             </thead>
             <tbody>
               {(competition.leaderboard || []).map((row) => (
                 <tr key={row.entry_id} style={{ borderTop: '1px solid var(--admin-border)' }}>
-                  <td style={{ padding: '8px 10px', fontWeight: 700 }}>#{row.rank}</td>
-                  <td style={{ padding: '8px 10px' }}>
+                  <td style={{ padding: 'var(--space-2) var(--space-2-5)', fontWeight: 700 }}>#{row.rank}</td>
+                  <td style={{ padding: 'var(--space-2) var(--space-2-5)' }}>
                     {row.full_name}
                     {row.is_bot && (
-                      <span style={{ marginLeft: '6px', fontSize: 'var(--fs-2xs)', padding: '2px 6px', borderRadius: '4px', background: 'var(--admin-bg-elevated)', border: '1px solid var(--admin-border)', opacity: 0.8 }}>
+                      <span style={{ marginLeft: 'var(--space-1-5)', fontSize: 'var(--fs-2xs)', padding: '2px 6px', borderRadius: '4px', background: 'var(--admin-bg-elevated)', border: '1px solid var(--admin-border)', opacity: 0.8 }}>
                         DEMO BOT
                       </span>
                     )}
                   </td>
-                  <td style={{ padding: '8px 10px' }}>{row.profit_pct.toFixed(2)}%</td>
-                  <td style={{ padding: '8px 10px' }}>${row.profit_usd.toFixed(2)}</td>
+                  <td style={{ padding: 'var(--space-2) var(--space-2-5)' }}>{row.profit_pct.toFixed(2)}%</td>
+                  <td style={{ padding: 'var(--space-2) var(--space-2-5)' }}>${row.profit_usd.toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>

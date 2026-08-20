@@ -509,7 +509,7 @@ export default function AdminChat() {
                     borderLeft: `3px solid ${selectedConversationId === conversation.id ? 'var(--admin-accent)' : 'transparent'}`
                   }}
                 >
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', gap: 'var(--space-2-5)', alignItems: 'flex-start' }}>
                     <input
                       type="checkbox"
                       checked={selectedIds.includes(String(conversation.id))}
@@ -550,7 +550,7 @@ export default function AdminChat() {
                             fontSize: 'var(--fs-2xs)',
                             fontWeight: 700,
                             borderRadius: 'var(--radius-pill)',
-                            padding: '1px 6px',
+                            padding: '1px var(--space-1-5)',
                             flexShrink: 0
                           }}>
                             {conversation.unread_admin_count}
@@ -562,7 +562,7 @@ export default function AdminChat() {
                         <div style={{
                           color: 'var(--admin-text-faint)',
                           fontSize: 'var(--fs-xs)',
-                          marginTop: '6px',
+                          marginTop: 'var(--space-1-5)',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis'
@@ -571,7 +571,7 @@ export default function AdminChat() {
                         </div>
                       )}
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-2)', gap: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-2)', gap: 'var(--space-2-5)' }}>
                         {visibleColumnKeys.includes('status') && (
                           <span style={{
                             color: statusColor(conversation.status),
@@ -621,7 +621,7 @@ export default function AdminChat() {
                   <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-1)' }}>
                     {selectedConversation.subject || 'No subject'}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)', marginTop: 'var(--space-1-5)' }}>
                     <span style={{ color: statusColor(selectedConversation.status), fontSize: 'var(--fs-xs)', textTransform: 'uppercase', fontWeight: 700 }}>
                       {selectedConversation.status}
                     </span>
@@ -630,7 +630,7 @@ export default function AdminChat() {
                     </span>
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 'var(--space-2-5)', flexWrap: 'wrap' }}>
                   <button className="admin-btn admin-btn-ghost" onClick={assignToMe} disabled={assigning || selectedConversation.assigned_to === session?.email}>
                     {selectedConversation.assigned_to === session?.email ? 'Assigned to you' : 'Assign to me'}
                   </button>
@@ -780,7 +780,7 @@ export default function AdminChat() {
                     { label: 'Country', value: traderSnapshot.country || '—' },
                     { label: 'Joined', value: traderSnapshot.created_at ? formatDate(traderSnapshot.created_at) : '—' },
                   ].map((r) => (
-                    <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', padding: '8px 0', borderBottom: '1px solid var(--admin-border)', fontSize: '12.5px' }}>
+                    <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', padding: '8px 0', borderBottom: '1px solid var(--admin-border)', fontSize: '12.5px' }}>
                       <span style={{ color: 'var(--admin-text-muted)' }}>{r.label}</span>
                       <span style={{ fontFamily: 'var(--admin-font-mono)', color: r.tone || 'var(--admin-text)', textAlign: 'right', textTransform: 'capitalize' }}>{r.value}</span>
                     </div>

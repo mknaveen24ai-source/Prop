@@ -306,7 +306,7 @@ export default function Sidebar({
           {NAV_GROUPS.map((group) => {
             const isGroupCollapsed = !collapsed && !!collapsedGroups[group.id]
             return (
-              <div key={group.id} style={{ marginBottom: '14px' }}>
+              <div key={group.id} style={{ marginBottom: 'var(--space-3-5)' }}>
                 <AnimatePresence>
                   {!collapsed && (
                     <motion.button
@@ -317,7 +317,7 @@ export default function Sidebar({
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: '6px', width: '100%',
+                        display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)', width: '100%',
                         border: 'none', background: 'transparent', cursor: 'pointer',
                         fontFamily: 'inherit',
                         fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--text-muted)',
@@ -345,9 +345,9 @@ export default function Sidebar({
 
 
         {/* Footer — theme toggle + profile (click through to Profile tab) */}
-        <div className="sidebar-footer" style={{ borderTop: '1px solid var(--border)', padding: collapsed ? '16px 8px' : '20px 16px', transition: 'padding 0.25s', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div className="sidebar-footer" style={{ borderTop: '1px solid var(--border)', padding: collapsed ? '16px 8px' : '20px 16px', transition: 'padding 0.25s', display: 'flex', flexDirection: 'column', gap: 'var(--space-2-5)' }}>
           {!collapsed && (
-            <div style={{ display: 'flex', gap: '6px', padding: '3px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper)' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-1-5)', padding: '3px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper)' }}>
               <button
                 type="button"
                 onClick={() => theme !== 'dark' && toggleTheme()}

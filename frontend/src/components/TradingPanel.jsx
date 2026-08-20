@@ -450,7 +450,7 @@ export default function TradingPanel({
           display: 'flex',
           alignItems: 'center',
           gap: 'var(--space-2)',
-          padding: '8px 14px',
+          padding: 'var(--space-2) var(--space-3-5)',
           background: priceFeedBackground,
           border: `1px solid ${priceFeedBorder}`,
           fontSize: 'var(--fs-sm)'
@@ -478,7 +478,7 @@ export default function TradingPanel({
 
       {/* Account Selector */}
       {accounts.length > 0 && (
-        <div style={{ display: 'flex', gap: '10px', marginBottom: 'var(--space-5)', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2-5)', marginBottom: 'var(--space-5)', flexWrap: 'wrap' }}>
           {accounts.map(acc => (
             <button key={acc.id} className={`btn ${selectedAccount?.id === acc.id ? '' : 'glass-panel'}`} onClick={() => setSelectedAccount(acc)}
               style={{
@@ -487,10 +487,10 @@ export default function TradingPanel({
                 border: '1px solid var(--accent)',
                 borderRadius: '0',
                 fontSize: 'var(--fs-sm)',
-                padding: '8px 14px'
+                padding: 'var(--space-2) var(--space-3-5)'
               }}>
               {acc.account_type === 'competition' && acc.competition_title ? acc.competition_title.toUpperCase() : acc.account_type.toUpperCase()} ${parseFloat(acc.account_size).toLocaleString()}
-              <span style={{ marginLeft: '6px', fontSize: 'var(--fs-2xs)', color: selectedAccount?.id === acc.id ? 'var(--navy)' : getStatusColor(acc.status) }}>
+              <span style={{ marginLeft: 'var(--space-1-5)', fontSize: 'var(--fs-2xs)', color: selectedAccount?.id === acc.id ? 'var(--navy)' : getStatusColor(acc.status) }}>
                 ● {acc.status.toUpperCase()}
               </span>
             </button>
@@ -571,7 +571,7 @@ export default function TradingPanel({
               onClick={() => setOrderForm(f => ({ ...f, instrument, stop_loss: '', take_profit: '' }))}
               style={{
                 border:      isSelected ? '1px solid var(--accent)' : '1px solid var(--navy-border)',
-                padding:     '10px 12px',
+                padding: 'var(--space-2-5) var(--space-3)',
                 cursor:      'pointer',
                 transition:  'all 0.15s',
                 minHeight:   '78px',
@@ -690,7 +690,7 @@ export default function TradingPanel({
             <Card ruled flush title="Watchlist" style={{ display: 'flex', flexDirection: 'column', maxHeight: '500px' }}>
               <div style={{ overflowY: 'auto' }}>
                 {pinnedInstruments.length === 0 ? (
-                  <div style={{ padding: '14px 16px', fontSize: '11.5px', color: 'var(--muted)', lineHeight: 1.5 }}>
+                  <div style={{ padding: 'var(--space-3-5) var(--space-4)', fontSize: '11.5px', color: 'var(--muted)', lineHeight: 1.5 }}>
                     Star an instrument below to pin it here.
                   </div>
                 ) : pinnedInstruments.map((instrument) => {

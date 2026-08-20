@@ -287,7 +287,7 @@ export default function AdminPayouts() {
       render: (p) => (
         <div>
           <AdminBadge status={p.status} />
-          {p.is_flagged && <div style={{ marginTop: '6px' }}><AdminBadge status="warning" label="Flagged" /></div>}
+          {p.is_flagged && <div style={{ marginTop: 'var(--space-1-5)' }}><AdminBadge status="warning" label="Flagged" /></div>}
         </div>
       )
     }

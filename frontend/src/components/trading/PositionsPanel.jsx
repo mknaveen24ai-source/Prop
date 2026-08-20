@@ -43,7 +43,7 @@ export default function PositionsPanel({
 
   return (
     <Card className="trade-section-card">
-      <div className="trade-section-pills" style={{ marginBottom: '14px' }}>
+      <div className="trade-section-pills" style={{ marginBottom: 'var(--space-3-5)' }}>
         <span className="trade-summary-pill">{openPositions.length} Open</span>
         <span className="trade-summary-pill">{pendingOrders.length} Pending</span>
         <span className="trade-summary-pill" style={{ color: floatingProfit >= 0 ? 'var(--green)' : 'var(--red)' }}>
@@ -64,7 +64,7 @@ export default function PositionsPanel({
           {batchFeedback.detail && <div className="trade-feedback-detail">{batchFeedback.detail}</div>}
         </div>
       )}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)', gap: '10px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)', gap: 'var(--space-2-5)', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
           <h3 style={{ marginBottom: 0, color: 'var(--accent)', fontSize: '15px' }}>
             Open Positions & Orders ({visibleOpenTrades.length})
@@ -148,7 +148,7 @@ export default function PositionsPanel({
                   {!isPending && partialForm?.id === trade.id && (
                     <tr>
                       <td colSpan="9" style={{ padding: '0' }}>
-                        <div style={{ background: 'var(--navy-card)', border: '1px dashed var(--accent)', padding: 'var(--space-3) var(--space-4)', margin: '4px 0 8px 0', display: 'grid', gap: '10px' }}>
+                        <div style={{ background: 'var(--navy-card)', border: '1px dashed var(--accent)', padding: 'var(--space-3) var(--space-4)', margin: '4px 0 8px 0', display: 'grid', gap: 'var(--space-2-5)' }}>
                           <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text)' }}>Close Fraction (Current: {parseFloat(trade.lot_size).toFixed(2)}):</span>
                             <input type="number" step="0.01" max={Math.max(parseFloat(trade.lot_size) - 0.01, 0.01).toFixed(2)} value={partialForm.val || ''} onChange={e => setPartialForm({ ...partialForm, val: e.target.value })} style={{ width: '80px', padding: 'var(--space-1) var(--space-2)', fontSize: 'var(--fs-sm)' }} />
@@ -168,7 +168,7 @@ export default function PositionsPanel({
                                   disabled={invalid || closingTradeSet.has(trade.id)}
                                   onClick={() => handlePartialClose(trade.id, trade.lot_size, closeLots.toFixed(2))}
                                   style={{
-                                    padding: '6px 10px',
+                                    padding: 'var(--space-1-5) var(--space-2-5)',
                                     borderRadius: 'var(--radius-pill)',
                                     border: '1px solid var(--navy-border)',
                                     background: invalid || closingTradeSet.has(trade.id) ? 'var(--glass)' : 'rgba(var(--brand-primary-rgb),0.08)',
@@ -242,7 +242,7 @@ export default function PositionsPanel({
                             <div style={{ color: 'var(--red)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-2)' }}>{modifyError}</div>
                           )}
                           {modifySuccess && (
-                            <div style={{ color: 'var(--green)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ color: 'var(--green)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
                               {renderIcon('approve', { size: 12, color: 'var(--accent-green)' })}
                               <span>{modifySuccess}</span>
                             </div>
@@ -315,7 +315,7 @@ export default function PositionsPanel({
                             <div style={{ color: 'var(--red)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-2)' }}>{modifyError}</div>
                           )}
                           {modifySuccess && (
-                            <div style={{ color: 'var(--green)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ color: 'var(--green)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
                               {renderIcon('approve', { size: 12, color: 'var(--accent-green)' })}
                               <span>{modifySuccess}</span>
                             </div>

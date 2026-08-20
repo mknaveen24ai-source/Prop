@@ -499,7 +499,7 @@ export default function AdminViolations() {
           <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
             Live rule-breach feed for drawdown failures, opposing trades, and automated risk flags.
           </p>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-sm)', marginTop: '6px' }}>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-1-5)' }}>
             Auto-refresh every 15s{lastUpdatedAt ? ` - Last updated ${lastUpdatedAt.toLocaleTimeString()}` : ''}
           </div>
         </div>
@@ -606,7 +606,7 @@ export default function AdminViolations() {
       <Card>
         <h2 className="admin-h2" style={{ marginBottom: 'var(--space-4)' }}>Top Violation Types (Last 24h)</h2>
         {summary?.top_types_last_24h?.length > 0 ? (
-          <div style={{ display: 'grid', gap: '10px' }}>
+          <div style={{ display: 'grid', gap: 'var(--space-2-5)' }}>
             {summary.top_types_last_24h.map((item) => (
               <div
                 key={item.violation_type}
@@ -614,7 +614,7 @@ export default function AdminViolations() {
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  padding: '12px 14px',
+                  padding: 'var(--space-3) var(--space-3-5)',
                   border: '1px solid var(--admin-border)',
                   background: 'var(--admin-surface)'
                 }}
@@ -690,7 +690,7 @@ export default function AdminViolations() {
               <div style={{
                 background: 'var(--admin-bg)',
                 border: '1px solid var(--admin-border)',
-                padding: '14px',
+                padding: 'var(--space-3-5)',
                 color: 'var(--admin-text)',
                 lineHeight: '1.6'
               }}>
@@ -722,7 +722,7 @@ export default function AdminViolations() {
               <div style={{
                 background: 'var(--admin-bg)',
                 border: '1px solid var(--admin-border)',
-                padding: '14px',
+                padding: 'var(--space-3-5)',
                 color: 'var(--admin-text)',
                 fontSize: 'var(--fs-sm)',
                 fontFamily: 'var(--admin-font-mono)',
@@ -747,7 +747,7 @@ export default function AdminViolations() {
                     {actionLoading === 'force_close_open_trades' ? 'Closing...' : 'Force Close Open Trades'}
                   </button>
                 </div>
-                <p style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-sm)', marginTop: '10px' }}>
+                <p style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-2-5)' }}>
                   These actions use the current admin enforcement and account override APIs.
                 </p>
               </div>
@@ -757,7 +757,7 @@ export default function AdminViolations() {
               <>
                 <div className="admin-form-group">
                   <label className="admin-label">Resolution Type</label>
-                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 'var(--space-2-5)', flexWrap: 'wrap' }}>
                     {['resolved', 'waived', 'false_positive'].map((value) => (
                       <button
                         key={value}

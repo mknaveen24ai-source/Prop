@@ -239,10 +239,10 @@ export default function Checkout() {
               </button>
             ) : (
               <>
-                <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: 'var(--space-2-5)' }}>
                   Redeem a competition prize voucher for a free challenge account — no payment required.
                 </div>
-                <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ display: 'flex', gap: 'var(--space-2-5)' }}>
                   <input
                     type="text"
                     value={voucherCode}
@@ -286,10 +286,10 @@ export default function Checkout() {
               </div>
             ) : (
               <>
-                <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: 'var(--space-2-5)' }}>
                   Enter a coupon code to get a discount on this challenge.
                 </div>
-                <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ display: 'flex', gap: 'var(--space-2-5)' }}>
                   <input
                     type="text"
                     value={couponCode}
@@ -307,7 +307,7 @@ export default function Checkout() {
                     {validatingCoupon ? 'Checking…' : 'Apply'}
                   </button>
                 </div>
-                {couponError && <div className="error" style={{ marginTop: '10px', fontSize: 'var(--fs-sm)' }}>{couponError}</div>}
+                {couponError && <div className="error" style={{ marginTop: 'var(--space-2-5)', fontSize: 'var(--fs-sm)' }}>{couponError}</div>}
               </>
             )}
           </div>
@@ -331,7 +331,7 @@ export default function Checkout() {
                   onChange={(e) => setGiftRecipientEmail(e.target.value)}
                   placeholder="Recipient's email address"
                   className="input"
-                  style={{ width: '100%', marginBottom: '10px' }}
+                  style={{ width: '100%', marginBottom: 'var(--space-2-5)' }}
                 />
                 <textarea
                   value={giftMessage}

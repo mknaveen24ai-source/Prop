@@ -311,7 +311,7 @@ function Chat() {
           alongside it per the "keep real, add spec pieces" pattern used
           on Trade/Competitions. */}
       <div className="chat-pane chat-pane--list" style={{ background: 'var(--glass)', backdropFilter: 'blur(16px)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--rule)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ padding: 'var(--space-3-5) var(--space-4)', borderBottom: '1px solid var(--rule)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontFamily: 'var(--font-display)', fontSize: '15px' }}>Conversations</span>
           <button
             onClick={() => setShowNewChat((v) => !v)}
@@ -360,7 +360,7 @@ function Chat() {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)', marginBottom: 'var(--space-1)' }}>
                     <span style={{ fontSize: 'var(--fs-base)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.subject}</span>
                     {conv.unread_user_count > 0 && (
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', color: 'var(--paper)', background: 'var(--accent)', borderRadius: '99px', padding: '1px 6px', flex: '0 0 auto' }}>{conv.unread_user_count}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', color: 'var(--paper)', background: 'var(--accent)', borderRadius: '99px', padding: '1px var(--space-1-5)', flex: '0 0 auto' }}>{conv.unread_user_count}</span>
                     )}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
@@ -398,7 +398,7 @@ function Chat() {
                   ● {selectedConversation.status}
                 </div>
               </div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)', border: '1px solid var(--rule)', borderRadius: '99px', padding: '4px 10px', flex: '0 0 auto' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)', border: '1px solid var(--rule)', borderRadius: '99px', padding: 'var(--space-1) var(--space-2-5)', flex: '0 0 auto' }}>
                 Ticket #{selectedConversation.id}
               </div>
               {selectedConversation.status !== 'closed' && (
@@ -408,7 +408,7 @@ function Chat() {
               )}
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', padding: '18px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-4-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3-5)' }}>
               {messages.map((msg, index) => {
                 const showDate = index === 0 || formatDate(messages[index - 1]?.created_at) !== formatDate(msg.created_at)
                 return (
@@ -443,7 +443,7 @@ function Chat() {
                 This conversation is closed. Start a new chat if you need further assistance.
               </div>
             ) : (
-              <form onSubmit={sendMessage} style={{ borderTop: '1px solid var(--rule)', padding: 'var(--space-3) var(--space-4)', display: 'flex', alignItems: 'flex-end', gap: '10px' }}>
+              <form onSubmit={sendMessage} style={{ borderTop: '1px solid var(--rule)', padding: 'var(--space-3) var(--space-4)', display: 'flex', alignItems: 'flex-end', gap: 'var(--space-2-5)' }}>
                 <textarea
                   value={newMessage}
                   onChange={handleTyping}
@@ -456,7 +456,7 @@ function Chat() {
                 <button
                   type="submit"
                   disabled={sending || !newMessage.trim()}
-                  style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '12px 18px', border: '1px solid var(--accent)', borderRadius: '4px', background: 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-3) var(--space-4-5)', border: '1px solid var(--accent)', borderRadius: '4px', background: 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer' }}
                 >
                   {sending ? 'Sending…' : 'Send'}
                 </button>
@@ -466,7 +466,7 @@ function Chat() {
         ) : (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ textAlign: 'center', padding: 'var(--space-8)' }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-2xl)', marginBottom: '10px' }}>Welcome to Live Chat Support</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-2xl)', marginBottom: 'var(--space-2-5)' }}>Welcome to Live Chat Support</div>
               <p style={{ color: 'var(--muted)', fontSize: 'var(--fs-base)', margin: '6px 0' }}>Start a conversation and the desk will pick it up here.</p>
               <button
                 onClick={() => setShowNewChat(true)}
@@ -483,24 +483,24 @@ function Chat() {
           rides along under the thread rather than claiming a third column. */}
       <div className="chat-pane chat-pane--meta" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
         {selectedConversation && (
-          <div style={{ background: 'var(--glass)', backdropFilter: 'blur(16px) saturate(140%)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', padding: '16px 18px' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px', borderBottom: '1px solid var(--rule)', paddingBottom: '10px', marginBottom: 'var(--space-1)' }}>This Ticket</div>
+          <div style={{ background: 'var(--glass)', backdropFilter: 'blur(16px) saturate(140%)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', padding: 'var(--space-4) var(--space-4-5)' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px', borderBottom: '1px solid var(--rule)', paddingBottom: 'var(--space-2-5)', marginBottom: 'var(--space-1)' }}>This Ticket</div>
             {ticketMeta.map((r) => (
-              <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', padding: '9px 0', borderBottom: '1px solid var(--rule-soft)', fontSize: '12.5px' }}>
+              <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', padding: '9px 0', borderBottom: '1px solid var(--rule-soft)', fontSize: '12.5px' }}>
                 <span style={{ color: 'var(--muted)' }}>{r.label}</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: r.tone, textAlign: 'right', textTransform: r.label === 'Status' ? 'capitalize' : 'none' }}>{r.value}</span>
               </div>
             ))}
           </div>
         )}
-        <div style={{ background: 'var(--glass)', backdropFilter: 'blur(16px) saturate(140%)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', padding: '16px 18px' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px', borderBottom: '1px solid var(--rule)', paddingBottom: '10px', marginBottom: 'var(--space-3)' }}>Common Answers</div>
+        <div style={{ background: 'var(--glass)', backdropFilter: 'blur(16px) saturate(140%)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', padding: 'var(--space-4) var(--space-4-5)' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px', borderBottom: '1px solid var(--rule)', paddingBottom: 'var(--space-2-5)', marginBottom: 'var(--space-3)' }}>Common Answers</div>
           {FAQS.map((q) => (
             <button
               key={q}
               onClick={() => sendFaq(q)}
               disabled={!selectedConversation || selectedConversation.status === 'closed'}
-              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 10px', marginBottom: '6px', border: '1px solid var(--rule)', borderRadius: '4px', background: 'transparent', color: 'var(--ink)', fontSize: '12.5px', cursor: 'pointer' }}
+              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 10px', marginBottom: 'var(--space-1-5)', border: '1px solid var(--rule)', borderRadius: '4px', background: 'transparent', color: 'var(--ink)', fontSize: '12.5px', cursor: 'pointer' }}
             >
               {q}
             </button>

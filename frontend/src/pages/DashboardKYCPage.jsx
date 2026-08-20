@@ -62,7 +62,7 @@ function ReplaceDocButton({ docType, onUpload, uploading }) {
         onClick={() => inputRef.current?.click()}
         disabled={busy}
         className="lx-btn"
-        style={{ marginTop: 'var(--space-2)', padding: '6px 12px', border: '1px solid var(--warn)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--warn)', fontSize: '11.5px', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}
+        style={{ marginTop: 'var(--space-2)', padding: 'var(--space-1-5) var(--space-3)', border: '1px solid var(--warn)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--warn)', fontSize: '11.5px', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}
       >
         {busy ? 'Uploading…' : 'Replace this document'}
       </button>
@@ -186,17 +186,17 @@ export default function DashboardKYCPage({
   }
 
   return (
-    <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+    <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-4-5)' }}>
       {detailError && (
         <Card style={{ border: '1px solid var(--warn)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3-5)', flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--warn)' }}>Couldn't load your document status</div>
               <div style={{ fontSize: '12.5px', color: 'var(--muted)', marginTop: '5px' }}>
                 {detail ? 'Showing your last known status — this may be out of date.' : "The document cards below can't be confirmed right now, so they may not reflect what you've actually submitted."}
               </div>
             </div>
-            <button type="button" onClick={fetchDetail} className="lx-btn" style={{ padding: '8px 14px', border: '1px solid var(--warn)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--warn)', flex: '0 0 auto' }}>
+            <button type="button" onClick={fetchDetail} className="lx-btn" style={{ padding: 'var(--space-2) var(--space-3-5)', border: '1px solid var(--warn)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--warn)', flex: '0 0 auto' }}>
               Retry
             </button>
           </div>
@@ -211,10 +211,10 @@ export default function DashboardKYCPage({
       )}
 
       {/* Step tracker */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0', background: 'var(--glass)', backdropFilter: 'blur(16px)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', padding: '18px 20px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0', background: 'var(--glass)', backdropFilter: 'blur(16px)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', padding: 'var(--space-4-5) var(--space-5)', flexWrap: 'wrap' }}>
         {steps.map((st) => (
-          <div key={st.label} style={{ flex: '1 1 180px', minWidth: '160px', padding: '4px 14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div key={st.label} style={{ flex: '1 1 180px', minWidth: '160px', padding: 'var(--space-1) var(--space-3-5)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)' }}>
               <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: st.tone, flex: '0 0 auto' }} />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: st.tone }}>{st.state}</div>
@@ -226,7 +226,7 @@ export default function DashboardKYCPage({
       </div>
 
       <div className="ui-split" style={{ alignItems: 'start', '--split': 'minmax(0,1.25fr) minmax(0,1fr)' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3-5)' }}>
           {detailLoading && !detail && !detailError && (
             <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--muted)' }}>Checking your document status…</div>
           )}
@@ -234,14 +234,14 @@ export default function DashboardKYCPage({
             const status = docStatus(doc.present)
             return (
               <Card key={doc.title}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3-5)' }}>
                   {doc.present ? (
                     <DocThumbnail docType={doc.docType} />
                   ) : (
                     <span style={{ width: '44px', height: '56px', flex: '0 0 auto', border: '1px solid var(--rule)', background: 'repeating-linear-gradient(45deg,var(--paper-2),var(--paper-2) 6px,var(--paper) 6px,var(--paper) 12px)' }} />
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)', flexWrap: 'wrap' }}>
                       <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px' }}>{doc.title}</div>
                       <span className="lx-badge" style={{ color: status.tone }}>{status.label}</span>
                     </div>
@@ -297,7 +297,7 @@ export default function DashboardKYCPage({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           <Card ruled title="What we check">
             {KYC_REQS.map((label) => (
-              <div key={label} style={{ display: 'flex', gap: '10px', padding: '9px 0', borderBottom: '1px solid var(--rule-soft)' }}>
+              <div key={label} style={{ display: 'flex', gap: 'var(--space-2-5)', padding: '9px 0', borderBottom: '1px solid var(--rule-soft)' }}>
                 <span style={{ color: 'var(--accent)', marginTop: '2px' }}>·</span>
                 <div style={{ fontSize: '12.5px', lineHeight: 1.55, color: 'var(--muted)' }}>{label}</div>
               </div>

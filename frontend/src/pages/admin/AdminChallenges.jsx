@@ -423,7 +423,7 @@ export default function AdminChallenges() {
               ].map((card) => (
                 <div key={card.label} style={{ background: 'var(--admin-bg)', padding: 'var(--space-4)', border: '1px solid var(--admin-border)' }}>
                   <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>{card.label}</div>
-                  <div style={{ marginTop: '6px', fontSize: 'var(--fs-3xl)', fontFamily: 'var(--admin-font-mono)', fontWeight: 700 }}>
+                  <div style={{ marginTop: 'var(--space-1-5)', fontSize: 'var(--fs-3xl)', fontFamily: 'var(--admin-font-mono)', fontWeight: 700 }}>
                     {card.value}
                   </div>
                 </div>

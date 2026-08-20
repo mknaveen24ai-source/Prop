@@ -76,7 +76,7 @@ function TotpInput({ onSubmit, onBack, loading, error }) {
         style={{
           width: '100%', background: 'transparent',
           border: '1px solid var(--navy-border)', color: 'var(--text-muted)',
-          padding: '10px', cursor: 'pointer',
+          padding: 'var(--space-2-5)', cursor: 'pointer',
           fontSize: 'var(--fs-base)', fontFamily: 'var(--font-ui)'
         }}
       >
@@ -312,7 +312,7 @@ function Login({ onLogin, initialMode = 'login' }) {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', marginTop: '-4px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', cursor: 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', cursor: 'pointer' }}>
                 <input
                   type="checkbox"
                   checked={rememberMe}
@@ -376,7 +376,7 @@ function Login({ onLogin, initialMode = 'login' }) {
               onClick={() => { setMode('login'); setError(''); setSuccess('') }}
               className="auth-secondary-button"
               style={{
-                width: '100%', marginTop: '10px'
+                width: '100%', marginTop: 'var(--space-2-5)'
               }}
             >
               ← Back to Login
@@ -433,7 +433,7 @@ function Login({ onLogin, initialMode = 'login' }) {
 
             {newPassword.length > 0 && (
               <div style={{ marginBottom: 'var(--space-5)' }}>
-                <div style={{ display: 'flex', gap: 'var(--space-1)', marginBottom: '6px' }}>
+                <div style={{ display: 'flex', gap: 'var(--space-1)', marginBottom: 'var(--space-1-5)' }}>
                   {[1,2,3,4,5].map(i => (
                     <div key={i} style={{
                       flex: 1, height: '3px', 

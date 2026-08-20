@@ -135,7 +135,7 @@ function KpiCard({ icon, label, value, delta, sub, tone, sparkData }) {
       <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: 'clamp(20px,1.9vw,26px)', fontWeight: 600, marginTop: '9px', whiteSpace: 'nowrap', letterSpacing: '-.02em' }}>
         {value}
       </div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '10px', marginTop: '6px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 'var(--space-2-5)', marginTop: 'var(--space-1-5)' }}>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', color: tone }}>
           {delta}<span style={{ color: 'var(--muted)' }}> {sub}</span>
         </div>
@@ -209,7 +209,7 @@ function ConsistencyRiskBlock({ consistency, dailyDrawdown, totalDrawdownUsedPct
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
       <Card>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--rule-soft)', paddingBottom: '10px', marginBottom: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--rule-soft)', paddingBottom: 'var(--space-2-5)', marginBottom: 'var(--space-3-5)' }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px' }}>Consistency</div>
         </div>
         {consistency ? (
@@ -238,7 +238,7 @@ function ConsistencyRiskBlock({ consistency, dailyDrawdown, totalDrawdownUsedPct
       </Card>
 
       <Card>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--rule-soft)', paddingBottom: '10px', marginBottom: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--rule-soft)', paddingBottom: 'var(--space-2-5)', marginBottom: 'var(--space-1-5)' }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px' }}>Risk Budget</div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)' }}>Live</div>
         </div>
@@ -347,7 +347,7 @@ function SessionHeat({ matrix, hours }) {
           ))}
         </div>
       ))}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: '10px', borderTop: '1px solid var(--rule-soft)', paddingTop: 'var(--space-2)', fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-2-5)', borderTop: '1px solid var(--rule-soft)', paddingTop: 'var(--space-2)', fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)' }}>
         <span style={{ color: 'var(--loss)' }}>Loss</span>
         <span style={{ flex: '0 0 60px', height: '4px', background: 'linear-gradient(90deg, var(--loss), var(--rule-soft), var(--gain))', borderRadius: '2px' }} />
         <span style={{ color: 'var(--gain)' }}>Gain</span>
@@ -387,7 +387,7 @@ function PayoutCycleBanner({ payoutCycle, onRequestPayout }) {
         </div>
       </div>
       {boxes.map((b) => (
-        <div key={b.l} style={{ minWidth: '70px', textAlign: 'center', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper)', padding: '10px 12px' }}>
+        <div key={b.l} style={{ minWidth: '70px', textAlign: 'center', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper)', padding: 'var(--space-2-5) var(--space-3)' }}>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xl)', color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>{b.v}</div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: 'var(--space-1)' }}>{b.l}</div>
         </div>
@@ -414,12 +414,12 @@ function ScalingProgressCard({ scaling }) {
   const nextMilestone = scaling.milestones_claimed + 1
   return (
     <Card>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--rule-soft)', paddingBottom: '10px', marginBottom: '14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--rule-soft)', paddingBottom: 'var(--space-2-5)', marginBottom: 'var(--space-3-5)' }}>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px' }}>Scaling Plan</div>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', color: 'var(--accent)' }}>{scaling.multiplier.toFixed(2)}x lot size</div>
       </div>
 
-      <div style={{ display: 'flex', gap: '18px', marginBottom: '14px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-4-5)', marginBottom: 'var(--space-3-5)', flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Milestones Claimed</div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xl)', marginTop: '3px' }}>{scaling.milestones_claimed}</div>
@@ -793,7 +793,7 @@ export default function DashboardHome({
 
   return (
     <PageWrapper>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4-5)' }}>
         <AccountChipsRow
           accounts={accounts}
           selectedAccount={selectedAccount}
@@ -803,7 +803,7 @@ export default function DashboardHome({
           onStartChallenge={onStartChallenge}
         />
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px,1fr))', gap: '14px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px,1fr))', gap: 'var(--space-3-5)' }}>
           {/* `key` is destructured out rather than left in the spread: React 19
               errors on a key arriving via {...props}, and it was also being
               forwarded to KpiCard as a normal prop. */}

@@ -6,7 +6,7 @@ import Card from '../../components/ui/Card'
 function StatCard({ label, value }) {
   return (
     <Card stat>
-      <div style={{ fontSize: 'var(--fs-xs)', opacity: 0.7, marginBottom: '6px' }}>{label}</div>
+      <div style={{ fontSize: 'var(--fs-xs)', opacity: 0.7, marginBottom: 'var(--space-1-5)' }}>{label}</div>
       <div style={{ fontSize: 'var(--fs-2xl)', fontWeight: 700 }}>{value}</div>
     </Card>
   )
@@ -59,7 +59,7 @@ export default function AdminCompetitionAnalytics() {
         Participant trading performance for this competition's window only.
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '14px', marginBottom: 'var(--space-6)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 'var(--space-3-5)', marginBottom: 'var(--space-6)' }}>
         <StatCard label="Participants" value={summary.participant_count} />
         <StatCard label="Total Trades" value={summary.total_trades} />
         <StatCard label="Overall Win Rate" value={`${summary.overall_win_rate}%`} />
@@ -68,7 +68,7 @@ export default function AdminCompetitionAnalytics() {
       </div>
 
       <Card style={{ padding: 'var(--space-5)', overflowX: 'auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 'var(--space-3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)', marginBottom: 'var(--space-3)' }}>
           <span style={{ fontSize: 'var(--fs-sm)', opacity: 0.7 }}>Sort by:</span>
           {SORT_OPTIONS.map((opt) => (
             <button
@@ -85,29 +85,29 @@ export default function AdminCompetitionAnalytics() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-base)' }}>
           <thead>
             <tr style={{ textAlign: 'left', opacity: 0.7 }}>
-              <th style={{ padding: '8px 10px' }}>Trader</th>
-              <th style={{ padding: '8px 10px' }}>Trades</th>
-              <th style={{ padding: '8px 10px' }}>Win Rate</th>
-              <th style={{ padding: '8px 10px' }}>Profit Factor</th>
-              <th style={{ padding: '8px 10px' }}>Avg Win</th>
-              <th style={{ padding: '8px 10px' }}>Avg Loss</th>
-              <th style={{ padding: '8px 10px' }}>Best Trade</th>
-              <th style={{ padding: '8px 10px' }}>Worst Trade</th>
-              <th style={{ padding: '8px 10px' }}>Realized P&L</th>
+              <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Trader</th>
+              <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Trades</th>
+              <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Win Rate</th>
+              <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Profit Factor</th>
+              <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Avg Win</th>
+              <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Avg Loss</th>
+              <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Best Trade</th>
+              <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Worst Trade</th>
+              <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Realized P&L</th>
             </tr>
           </thead>
           <tbody>
             {sortedEntries.map((e) => (
               <tr key={e.entry_id} style={{ borderTop: '1px solid var(--admin-border)' }}>
-                <td style={{ padding: '8px 10px' }}>{e.full_name}<div style={{ fontSize: 'var(--fs-xs)', opacity: 0.6 }}>{e.email}</div></td>
-                <td style={{ padding: '8px 10px' }}>{e.total_trades} <span style={{ opacity: 0.6 }}>({e.winning_trades}W/{e.losing_trades}L)</span></td>
-                <td style={{ padding: '8px 10px' }}>{e.win_rate}%</td>
-                <td style={{ padding: '8px 10px' }}>{e.profit_factor}</td>
-                <td style={{ padding: '8px 10px' }}>${e.avg_win.toFixed(2)}</td>
-                <td style={{ padding: '8px 10px' }}>${e.avg_loss.toFixed(2)}</td>
-                <td style={{ padding: '8px 10px' }}>${e.best_trade.toFixed(2)}</td>
-                <td style={{ padding: '8px 10px' }}>${e.worst_trade.toFixed(2)}</td>
-                <td style={{ padding: '8px 10px', fontWeight: 700, color: e.realized_pnl >= 0 ? 'var(--admin-success)' : 'var(--admin-danger, #d33)' }}>
+                <td style={{ padding: 'var(--space-2) var(--space-2-5)' }}>{e.full_name}<div style={{ fontSize: 'var(--fs-xs)', opacity: 0.6 }}>{e.email}</div></td>
+                <td style={{ padding: 'var(--space-2) var(--space-2-5)' }}>{e.total_trades} <span style={{ opacity: 0.6 }}>({e.winning_trades}W/{e.losing_trades}L)</span></td>
+                <td style={{ padding: 'var(--space-2) var(--space-2-5)' }}>{e.win_rate}%</td>
+                <td style={{ padding: 'var(--space-2) var(--space-2-5)' }}>{e.profit_factor}</td>
+                <td style={{ padding: 'var(--space-2) var(--space-2-5)' }}>${e.avg_win.toFixed(2)}</td>
+                <td style={{ padding: 'var(--space-2) var(--space-2-5)' }}>${e.avg_loss.toFixed(2)}</td>
+                <td style={{ padding: 'var(--space-2) var(--space-2-5)' }}>${e.best_trade.toFixed(2)}</td>
+                <td style={{ padding: 'var(--space-2) var(--space-2-5)' }}>${e.worst_trade.toFixed(2)}</td>
+                <td style={{ padding: 'var(--space-2) var(--space-2-5)', fontWeight: 700, color: e.realized_pnl >= 0 ? 'var(--admin-success)' : 'var(--admin-danger, #d33)' }}>
                   ${e.realized_pnl.toFixed(2)}
                 </td>
               </tr>

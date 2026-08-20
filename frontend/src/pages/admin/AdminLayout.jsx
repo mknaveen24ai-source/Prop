@@ -152,7 +152,7 @@ export function AdminLoginScreen({ onLoginSuccess }) {
         </div>
 
         {errorMsg && (
-          <div style={{ background: 'color-mix(in srgb, var(--admin-danger) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--admin-danger) 20%, transparent)', color: 'var(--admin-danger)', padding: '10px', marginBottom: 'var(--space-4)', fontSize: 'var(--fs-base)', textAlign: 'center' }}>
+          <div style={{ background: 'color-mix(in srgb, var(--admin-danger) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--admin-danger) 20%, transparent)', color: 'var(--admin-danger)', padding: 'var(--space-2-5)', marginBottom: 'var(--space-4)', fontSize: 'var(--fs-base)', textAlign: 'center' }}>
             {errorMsg}
           </div>
         )}

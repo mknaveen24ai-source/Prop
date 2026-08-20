@@ -247,7 +247,7 @@ export default function AdminSettings() {
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
           {dirty && (
-            <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--admin-warning)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--admin-warning)', display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--admin-warning)', display: 'inline-block' }} />
               Unsaved changes
             </span>
@@ -341,7 +341,7 @@ export default function AdminSettings() {
               const isBooleanToggle = field.type === 'select' && Array.isArray(field.options)
                 && field.options.length === 2 && field.options.includes('true') && field.options.includes('false')
               return isBooleanToggle ? (
-                <div key={field.key} style={{ display: 'flex', alignItems: 'center', gap: '18px', padding: '14px 0', borderBottom: '1px solid var(--admin-border)' }}>
+                <div key={field.key} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4-5)', padding: '14px 0', borderBottom: '1px solid var(--admin-border)' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '13.5px' }}>{field.label}</div>
                     {field.hint && <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)', marginTop: '3px', lineHeight: 1.5 }}>{field.hint}</div>}
@@ -400,7 +400,7 @@ export default function AdminSettings() {
         ))}
       </div>
 
-      <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingBottom: 'var(--space-2)', marginTop: 'var(--space-6)' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-2-5)', justifyContent: 'flex-end', paddingBottom: 'var(--space-2)', marginTop: 'var(--space-6)' }}>
         <button className="admin-btn admin-btn-ghost" onClick={loadSettings} disabled={saving}>Discard</button>
         <button className="admin-btn admin-btn-primary" onClick={handleSave} disabled={saving || !dirty}>
           {saving ? 'Saving...' : 'Save changes'}

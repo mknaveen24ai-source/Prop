@@ -46,10 +46,10 @@ function CreateSeasonForm({ onCreate, creating }) {
     })
   }
 
-  const inputStyle = { width: '100%', padding: '8px 10px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }
+  const inputStyle = { width: '100%', padding: 'var(--space-2) var(--space-2-5)', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }
 
   return (
-    <form onSubmit={submit} className="lx-card" style={{ marginBottom: 'var(--space-6)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+    <form onSubmit={submit} className="lx-card" style={{ marginBottom: 'var(--space-6)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-3-5)' }}>
       <div style={{ gridColumn: '1 / -1' }}>
         <h3 style={{ margin: '0 0 4px' }}>Create Referral Season</h3>
       </div>

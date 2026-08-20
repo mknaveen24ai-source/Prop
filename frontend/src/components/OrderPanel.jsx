@@ -8,7 +8,7 @@ import useOrderTicket from './trading/hooks/useOrderTicket'
 function renderPendingExplanation(pendingType, ask, bid) {
   if (pendingType === 'buy_limit') {
     return (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
         {renderIcon('floating_down', { size: 12, color: 'var(--accent-green)' })}
         <span><strong style={{ color: 'var(--green)' }}>Buy Limit</strong> - Set price <strong>below</strong> current ask ({ask}). Order fills when market drops to your price.</span>
       </span>
@@ -17,7 +17,7 @@ function renderPendingExplanation(pendingType, ask, bid) {
 
   if (pendingType === 'sell_limit') {
     return (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
         {renderIcon('floating_up', { size: 12, color: 'var(--accent-red)' })}
         <span><strong style={{ color: 'var(--red)' }}>Sell Limit</strong> - Set price <strong>above</strong> current bid ({bid}). Order fills when market rises to your price.</span>
       </span>
@@ -26,7 +26,7 @@ function renderPendingExplanation(pendingType, ask, bid) {
 
   if (pendingType === 'buy_stop') {
     return (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
         {renderIcon('floating_up', { size: 12, color: 'var(--accent-green)' })}
         <span><strong style={{ color: 'var(--green)' }}>Buy Stop</strong> - Set price <strong>above</strong> current ask ({ask}). Order fills when market breaks up to your price.</span>
       </span>
@@ -34,7 +34,7 @@ function renderPendingExplanation(pendingType, ask, bid) {
   }
 
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
       {renderIcon('floating_down', { size: 12, color: 'var(--accent-red)' })}
       <span><strong style={{ color: 'var(--red)' }}>Sell Stop</strong> - Set price <strong>below</strong> current bid ({bid}). Order fills when market breaks down to your price.</span>
     </span>
@@ -87,8 +87,8 @@ export default function OrderPanel({
           background: 'var(--danger-bg)',
           border: '1px solid var(--red)',
           borderRadius: '0',
-          padding: '10px 14px',
-          marginBottom: '14px',
+          padding: 'var(--space-2-5) var(--space-3-5)',
+          marginBottom: 'var(--space-3-5)',
           display: 'flex',
           alignItems: 'center',
           gap: 'var(--space-2)'
@@ -108,11 +108,11 @@ export default function OrderPanel({
           background: 'var(--success-bg)',
           border: '1px solid var(--green)',
           borderRadius: '0',
-          padding: '10px 14px',
+          padding: 'var(--space-2-5) var(--space-3-5)',
           marginBottom: 'var(--space-4)',
           display: 'flex',
           alignItems: 'center',
-          gap: '10px'
+          gap: 'var(--space-2-5)'
         }}>
           <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--green-light)', boxShadow: '0 0 6px var(--green-light)', display: 'inline-block', flexShrink: 0 }} />
           <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--green-light)', fontWeight: '700', letterSpacing: '0.08em' }}>MARKET OPEN</span>
@@ -120,7 +120,7 @@ export default function OrderPanel({
       )}
 
       <div style={{ marginBottom: 'var(--space-4)' }}>
-        <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>INSTRUMENT</label>
+        <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: 'var(--space-1-5)', display: 'block' }}>INSTRUMENT</label>
         <div style={{ display: 'flex', gap: 'var(--space-1)', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
           {[
             { key: 'all', label: 'All', color: 'var(--accent)' },
@@ -164,7 +164,7 @@ export default function OrderPanel({
           ))}
         </select>
         {availableInstruments.length === 0 && (
-          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--red)', marginTop: '6px' }}>
+          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--red)', marginTop: 'var(--space-1-5)' }}>
             No live instruments are currently available on this feed.
           </div>
         )}
@@ -184,7 +184,7 @@ export default function OrderPanel({
         </div>
       </div>
 
-      <div className="order-panel-mode-toggle" style={{ display: 'flex', gap: '6px' }}>
+      <div className="order-panel-mode-toggle" style={{ display: 'flex', gap: 'var(--space-1-5)' }}>
         <Button
           variant={orderMode === 'market' ? 'primary' : 'ghost'}
           size="sm"
@@ -206,8 +206,8 @@ export default function OrderPanel({
         </Button>
       </div>
 
-      <div style={{ marginBottom: '14px' }}>
-        <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+      <div style={{ marginBottom: 'var(--space-3-5)' }}>
+        <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: 'var(--space-1-5)', display: 'block' }}>
           LOT SIZE <span style={{ color: 'var(--text-dim)' }}>(min 0.01 - steps of 0.01)</span>
         </label>
         <input
@@ -226,8 +226,8 @@ export default function OrderPanel({
         />
       </div>
 
-      <div style={{ marginBottom: '14px' }}>
-        <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+      <div style={{ marginBottom: 'var(--space-3-5)' }}>
+        <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: 'var(--space-1-5)', display: 'block' }}>
           STOP LOSS <span style={{ color: 'var(--text-dim)' }}>(optional)</span>
         </label>
         <input
@@ -242,8 +242,8 @@ export default function OrderPanel({
         />
       </div>
 
-      <div style={{ marginBottom: '14px' }}>
-        <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+      <div style={{ marginBottom: 'var(--space-3-5)' }}>
+        <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: 'var(--space-1-5)', display: 'block' }}>
           TAKE PROFIT <span style={{ color: 'var(--text-dim)' }}>(optional)</span>
         </label>
         <input
@@ -263,7 +263,7 @@ export default function OrderPanel({
           background: 'color-mix(in srgb, var(--muted) 4%, transparent)',
           border: '1px solid color-mix(in srgb, var(--muted) 15%, transparent)',
           borderRadius: '0',
-          padding: '10px 12px',
+          padding: 'var(--space-2-5) var(--space-3)',
           marginBottom: 'var(--space-4)',
           fontSize: 'var(--fs-sm)'
         }}>
@@ -271,7 +271,7 @@ export default function OrderPanel({
             R:R CALCULATOR ({previewDirection.toUpperCase()} PREVIEW)
           </div>
           {orderMode === 'market' && (
-            <div style={{ display: 'inline-flex', gap: '6px', marginBottom: '10px' }}>
+            <div style={{ display: 'inline-flex', gap: 'var(--space-1-5)', marginBottom: 'var(--space-2-5)' }}>
               {[
                 { value: 'buy', label: 'Preview BUY', color: 'var(--green)' },
                 { value: 'sell', label: 'Preview SELL', color: 'var(--red)' }
@@ -283,7 +283,7 @@ export default function OrderPanel({
                     type="button"
                     onClick={() => setMarketPreviewDirection(option.value)}
                     style={{
-                      padding: '4px 10px',
+                      padding: 'var(--space-1) var(--space-2-5)',
                       borderRadius: 'var(--radius-pill)',
                       border: `1px solid ${active ? option.color : 'color-mix(in srgb, var(--muted) 20%, transparent)'}`,
                       background: active ? `color-mix(in srgb, ${option.color} 12%, transparent)` : 'transparent',
@@ -328,8 +328,8 @@ export default function OrderPanel({
 
       {orderMode === 'pending' && (
         <div style={{ marginBottom: 'var(--space-4)' }}>
-          <div style={{ marginBottom: '14px' }}>
-            <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>ORDER TYPE</label>
+          <div style={{ marginBottom: 'var(--space-3-5)' }}>
+            <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: 'var(--space-1-5)', display: 'block' }}>ORDER TYPE</label>
             {/* Columns live in .order-panel-type-grid (App.css) so the mobile
                 query can collapse them; an inline grid would outrank it. */}
             <div className="order-panel-type-grid">
@@ -344,7 +344,7 @@ export default function OrderPanel({
                   type="button"
                   onClick={() => setPendingType(opt.value)}
                   style={{
-                    padding: '10px 8px',
+                    padding: 'var(--space-2-5) var(--space-2)',
                     borderRadius: '0',
                     border: pendingType === opt.value ? `1px solid ${opt.color}` : '1px solid var(--navy-border)',
                     background: pendingType === opt.value ? `color-mix(in srgb, ${opt.color} 10%, transparent)` : 'var(--navy-card)',
@@ -362,8 +362,8 @@ export default function OrderPanel({
           <div style={{
             background: 'var(--navy)',
             borderRadius: '0',
-            padding: '10px 12px',
-            marginBottom: '14px',
+            padding: 'var(--space-2-5) var(--space-3)',
+            marginBottom: 'var(--space-3-5)',
             fontSize: 'var(--fs-xs)',
             color: 'var(--text-muted)',
             lineHeight: '1.5'
@@ -371,8 +371,8 @@ export default function OrderPanel({
             {renderPendingExplanation(pendingType, ask, bid)}
           </div>
 
-          <div style={{ marginBottom: '14px' }}>
-            <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>ORDER PRICE</label>
+          <div style={{ marginBottom: 'var(--space-3-5)' }}>
+            <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: 'var(--space-1-5)', display: 'block' }}>ORDER PRICE</label>
             <input
               className="input-field"
               type="number"
@@ -400,14 +400,14 @@ export default function OrderPanel({
               border: '1px solid color-mix(in srgb, var(--muted) 15%, transparent)',
               borderRadius: '0',
               padding: 'var(--space-3)',
-              marginBottom: '14px'
+              marginBottom: 'var(--space-3-5)'
             }}>
               <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>OCO SIBLING ORDER</div>
               <select
                 className="select-field"
                 value={orderForm.oco_order_type || 'sell_stop'}
                 onChange={(e) => updateForm({ oco_order_type: e.target.value })}
-                style={{ width: '100%', marginBottom: '10px' }}
+                style={{ width: '100%', marginBottom: 'var(--space-2-5)' }}
               >
                 <option value="buy_limit">Buy Limit</option>
                 <option value="sell_limit">Sell Limit</option>
@@ -437,7 +437,7 @@ export default function OrderPanel({
             onMouseEnter={() => setMarketPreviewDirection('sell')}
             onFocus={() => setMarketPreviewDirection('sell')}
             disabled={!selectedAccount || !priceData || !marketStatus.open || isSubmitting}
-            style={{ flexDirection: 'column', padding: '16px 14px', fontWeight: 800, borderColor: 'var(--loss)', color: 'var(--loss)' }}
+            style={{ flexDirection: 'column', padding: 'var(--space-4) var(--space-3-5)', fontWeight: 800, borderColor: 'var(--loss)', color: 'var(--loss)' }}
           >
             <div style={{ fontSize: 'var(--fs-2xs)', marginBottom: 'var(--space-1)', opacity: 0.7, letterSpacing: '0.1em' }}>SELL</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xl)' }}>{isSubmitting ? '...' : bid}</div>
@@ -448,7 +448,7 @@ export default function OrderPanel({
             onMouseEnter={() => setMarketPreviewDirection('buy')}
             onFocus={() => setMarketPreviewDirection('buy')}
             disabled={!selectedAccount || !priceData || !marketStatus.open || isSubmitting}
-            style={{ flexDirection: 'column', padding: '16px 14px', fontWeight: 800, borderColor: 'var(--gain)', color: 'var(--gain)' }}
+            style={{ flexDirection: 'column', padding: 'var(--space-4) var(--space-3-5)', fontWeight: 800, borderColor: 'var(--gain)', color: 'var(--gain)' }}
           >
             <div style={{ fontSize: 'var(--fs-2xs)', marginBottom: 'var(--space-1)', opacity: 0.7, letterSpacing: '0.1em' }}>BUY</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xl)' }}>{isSubmitting ? '...' : ask}</div>
@@ -463,7 +463,7 @@ export default function OrderPanel({
           onClick={handlePendingOrder}
           disabled={!selectedAccount || !priceData || !pendingPrice || parseFloat(pendingPrice) <= 0 || !marketStatus.open || isSubmitting}
           style={{
-            padding: '14px',
+            padding: 'var(--space-3-5)',
             fontWeight: 700,
             borderColor: pendingType.startsWith('buy') ? 'var(--gain)' : 'var(--loss)',
             color: pendingType.startsWith('buy') ? 'var(--gain)' : 'var(--loss)',

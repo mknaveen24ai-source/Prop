@@ -79,7 +79,7 @@ export default function Pagination({ page, totalPages, onPageChange, pageSize, t
         {totalShown}
       </span>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
         {/* Prev */}
         <motion.button
           whileHover={canPrev ? { scale: 1.05 } : {}}

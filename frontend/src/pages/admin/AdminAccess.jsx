@@ -339,9 +339,9 @@ export default function AdminAccess() {
       </div>
 
       <Card style={{ marginBottom: 'var(--space-6)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)', alignItems: 'center', marginBottom: '18px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)', alignItems: 'center', marginBottom: 'var(--space-4-5)' }}>
           <div>
-            <h2 className="admin-h2" style={{ marginBottom: '6px' }}>Admin 2FA</h2>
+            <h2 className="admin-h2" style={{ marginBottom: 'var(--space-1-5)' }}>Admin 2FA</h2>
             <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
               Each DB-backed admin account has its own authenticator secret and backup codes.
             </div>
@@ -361,11 +361,11 @@ export default function AdminAccess() {
         ) : setupPayload ? (
           <div style={{ display: 'grid', gap: 'var(--space-5)', gridTemplateColumns: 'minmax(240px, 320px) minmax(280px, 1fr)' }}>
             <Card style={{ marginBottom: 0, background: 'var(--admin-bg)' }}>
-              <div style={{ fontWeight: 600, marginBottom: '10px' }}>Scan QR Code</div>
-              <img src={setupPayload.qr} alt="Admin 2FA QR" style={{ width: '100%', maxWidth: '240px', background: 'var(--paper)', padding: '10px' }} />
+              <div style={{ fontWeight: 600, marginBottom: 'var(--space-2-5)' }}>Scan QR Code</div>
+              <img src={setupPayload.qr} alt="Admin 2FA QR" style={{ width: '100%', maxWidth: '240px', background: 'var(--paper)', padding: 'var(--space-2-5)' }} />
             </Card>
             <Card style={{ marginBottom: 0, background: 'var(--admin-bg)' }}>
-              <div style={{ fontWeight: 600, marginBottom: '10px' }}>Verify Setup</div>
+              <div style={{ fontWeight: 600, marginBottom: 'var(--space-2-5)' }}>Verify Setup</div>
               <div style={{ fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)', marginBottom: 'var(--space-3)' }}>
                 Manual secret: <span className="admin-font-mono" style={{ color: 'var(--admin-text)' }}>{setupPayload.secret}</span>
               </div>
@@ -391,7 +391,7 @@ export default function AdminAccess() {
         ) : (
           <div style={{ display: 'grid', gap: 'var(--space-4)', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
             <Card style={{ marginBottom: 0, background: 'var(--admin-bg)' }}>
-              <div style={{ fontWeight: 600, marginBottom: '10px' }}>Enrollment</div>
+              <div style={{ fontWeight: 600, marginBottom: 'var(--space-2-5)' }}>Enrollment</div>
               <div style={{ fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)', marginBottom: 'var(--space-4)' }}>
                 {twoFaStatus?.totp_enabled
                   ? 'This admin account already requires TOTP during login.'
@@ -406,7 +406,7 @@ export default function AdminAccess() {
 
             {twoFaStatus?.totp_enabled && (
               <Card style={{ marginBottom: 0, background: 'var(--admin-bg)' }}>
-                <div style={{ fontWeight: 600, marginBottom: '10px' }}>Disable 2FA</div>
+                <div style={{ fontWeight: 600, marginBottom: 'var(--space-2-5)' }}>Disable 2FA</div>
                 <div style={{ fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)', marginBottom: 'var(--space-3)' }}>
                   Enter an authenticator code or a remaining backup code to remove 2FA from this admin account.
                 </div>
@@ -436,7 +436,7 @@ export default function AdminAccess() {
             <div style={{ fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)', marginBottom: 'var(--space-3)' }}>
               Save these codes securely. Each code can be used only once if your authenticator app is unavailable.
             </div>
-            <div style={{ display: 'grid', gap: '10px', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+            <div style={{ display: 'grid', gap: 'var(--space-2-5)', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
               {backupCodes.map((code) => (
                 <div key={code} className="admin-font-mono" style={{ padding: 'var(--space-3)', border: '1px solid var(--admin-border)', background: 'var(--admin-surface)' }}>
                   {code}
@@ -482,16 +482,16 @@ export default function AdminAccess() {
           </div>
 
           <Card style={{ marginBottom: 'var(--space-6)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)', alignItems: 'center', marginBottom: '18px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)', alignItems: 'center', marginBottom: 'var(--space-4-5)' }}>
               <div>
-                <h2 className="admin-h2" style={{ marginBottom: '6px' }}>Create Platform Admin</h2>
+                <h2 className="admin-h2" style={{ marginBottom: 'var(--space-1-5)' }}>Create Platform Admin</h2>
                 <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
                   Create DB-backed super-admin accounts so you no longer rely on a single `.env` password.
                 </div>
               </div>
               <AdminBadge status="info" label={`${accessData.platform_admins.length} total`} />
             </div>
-            <form onSubmit={handleCreatePlatformAdmin} style={{ display: 'grid', gap: '14px', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+            <form onSubmit={handleCreatePlatformAdmin} style={{ display: 'grid', gap: 'var(--space-3-5)', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
               <div className="admin-form-group" style={{ marginBottom: 0 }}>
                 <label className="admin-label">Email</label>
                 <input className="admin-input" type="email" value={adminForm.email} onChange={(event) => setAdminForm((current) => ({ ...current, email: event.target.value }))} required />
@@ -523,7 +523,7 @@ export default function AdminAccess() {
           <Card style={{ marginBottom: 'var(--space-6)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
               <div>
-                <h2 className="admin-h2" style={{ marginBottom: '6px' }}>Platform Admin Accounts</h2>
+                <h2 className="admin-h2" style={{ marginBottom: 'var(--space-1-5)' }}>Platform Admin Accounts</h2>
                 <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
                   Manage DB-backed platform admins, revoke their sessions, and disable old accounts.
                 </div>
@@ -597,7 +597,7 @@ export default function AdminAccess() {
 
           <Card style={{ marginBottom: 'var(--space-6)' }}>
             <div style={{ marginBottom: 'var(--space-4)' }}>
-              <h2 className="admin-h2" style={{ marginBottom: '6px' }}>Permission Matrix</h2>
+              <h2 className="admin-h2" style={{ marginBottom: 'var(--space-1-5)' }}>Permission Matrix</h2>
               <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
                 Read-only reference — the exact capability strings each role is granted, straight from backend/routes/middleware.js. This is what requireAdminCapability(...) actually checks on every gated route, not a separate approximation.
               </div>
@@ -615,7 +615,7 @@ export default function AdminAccess() {
                     <tr key={role}>
                       <td className="admin-td" style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{ROLE_LABELS[role]}</td>
                       <td className="admin-td">
-                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: 'var(--space-1-5)', flexWrap: 'wrap' }}>
                           {ROLE_PERMISSIONS[role].map((cap) => (
                             <span key={cap} className="admin-font-mono" style={{ fontSize: 'var(--fs-xs)', padding: '3px 8px', border: '1px solid var(--admin-border)', borderRadius: 'var(--radius-sm)', color: 'var(--admin-text-muted)' }}>
                               {cap}
@@ -633,7 +633,7 @@ export default function AdminAccess() {
           <Card style={{ marginBottom: 'var(--space-6)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
               <div>
-                <h2 className="admin-h2" style={{ marginBottom: '6px' }}>Admin Action Audit Log</h2>
+                <h2 className="admin-h2" style={{ marginBottom: 'var(--space-1-5)' }}>Admin Action Audit Log</h2>
                 <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
                   Chronological, tamper-evident record of admin logins, approvals, and setting changes.
                 </div>
@@ -672,7 +672,7 @@ export default function AdminAccess() {
               </table>
             </div>
             {auditHasMore && auditEntries.length > 0 && (
-              <div style={{ marginTop: '14px', textAlign: 'center' }}>
+              <div style={{ marginTop: 'var(--space-3-5)', textAlign: 'center' }}>
                 <button
                   className="admin-btn admin-btn-ghost admin-btn-sm"
                   onClick={() => loadAuditLog({ offset: auditEntries.length, append: true })}

@@ -43,7 +43,7 @@ export function TraderProfileContent({ userId, onBack }) {
         </div>
         <h2 style={{ color: 'var(--accent)', marginBottom: 'var(--space-3)' }}>Profile Not Found</h2>
         <p style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-6)' }}>This trader profile is private or does not exist.</p>
-        <button onClick={goBack} className="btn" style={{ border: '1px solid var(--navy-border)', padding: '10px 24px', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
+        <button onClick={goBack} className="btn" style={{ border: '1px solid var(--navy-border)', padding: 'var(--space-2-5) var(--space-6)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
           ← Back
         </button>
       </div>
@@ -65,7 +65,7 @@ export function TraderProfileContent({ userId, onBack }) {
         onClick={goBack}
         style={{
           background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 'var(--fs-base)',
-          cursor: 'pointer', padding: 0, marginBottom: 'var(--space-5)', display: 'inline-flex', alignItems: 'center', gap: '6px'
+          cursor: 'pointer', padding: 0, marginBottom: 'var(--space-5)', display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1-5)'
         }}
       >
         ← Back
@@ -87,7 +87,7 @@ export function TraderProfileContent({ userId, onBack }) {
 
           {/* Name + badges */}
           <div style={{ flex: 1 }}>
-    <h1 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', fontSize: 'var(--fs-3xl)', marginBottom: '6px' }}>
+    <h1 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', fontSize: 'var(--fs-3xl)', marginBottom: 'var(--space-1-5)' }}>
               {trader.full_name}
             </h1>
             <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', alignItems: 'center' }}>

@@ -167,7 +167,7 @@ function SupportTicketsSection() {
           <div>
             <div className="admin-form-group">
               <label className="admin-label">Status</label>
-              <div style={{ display: 'flex', gap: '10px' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-2-5)' }}>
                 {['open', 'resolved', 'closed'].map((status) => (
                   <button key={status} className={`admin-filter-chip ${selected.status === status ? 'active' : ''}`} onClick={() => setStatus(status)}>{TICKET_STATUS_LABELS[status]}</button>
                 ))}
@@ -348,7 +348,7 @@ function BreachAppealsSection() {
               {historyFor(selected.user_id).length === 0 ? (
                 <p style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-base)' }}>No prior appeals.</p>
               ) : (
-                <ul style={{ margin: 0, paddingLeft: '18px', fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)' }}>
+                <ul style={{ margin: 0, paddingLeft: 'var(--space-4-5)', fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)' }}>
                   {historyFor(selected.user_id).map((h, i) => (
                     <li key={i}>{h.date} — {h.outcome} ({h.reviewer})</li>
                   ))}
@@ -441,7 +441,7 @@ function NotificationCenterSection() {
 
         <div className="admin-form-group">
           <label className="admin-label">Recipient Scope</label>
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2-5)' }}>
             {[{ id: 'all', label: 'All Traders' }, { id: 'segment', label: 'Segment' }, { id: 'single', label: 'Single Trader' }].map((opt) => (
               <button key={opt.id} className={`admin-filter-chip ${scope === opt.id ? 'active' : ''}`} onClick={() => setScope(opt.id)}>{opt.label}</button>
             ))}
@@ -464,7 +464,7 @@ function NotificationCenterSection() {
 
         <div className="admin-form-group">
           <label className="admin-label">Channel</label>
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2-5)' }}>
             {NOTIFICATION_CHANNELS.map((ch) => (
               <button key={ch} className={`admin-filter-chip ${channel === ch ? 'active' : ''}`} onClick={() => setChannel(ch)}>{ch}</button>
             ))}
@@ -473,7 +473,7 @@ function NotificationCenterSection() {
 
         <div className="admin-form-group">
           <label className="admin-label">Type</label>
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2-5)' }}>
             {NOTIFICATION_TYPES.map((t) => (
               <button key={t} className={`admin-filter-chip ${type === t ? 'active' : ''}`} onClick={() => setType(t)}>{t}</button>
             ))}

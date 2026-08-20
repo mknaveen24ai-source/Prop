@@ -14,9 +14,9 @@ function RejectButton({ onReject }) {
     return <button className="admin-btn admin-btn-sm" onClick={() => setOpen(true)}>Reject</button>
   }
   return (
-    <div style={{ display: 'flex', gap: '6px' }}>
+    <div style={{ display: 'flex', gap: 'var(--space-1-5)' }}>
       <input
-        style={{ width: '160px', padding: '6px 8px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }}
+        style={{ width: '160px', padding: 'var(--space-1-5) var(--space-2)', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }}
         placeholder="Reason"
         value={reason}
         onChange={(e) => setReason(e.target.value)}
@@ -132,7 +132,7 @@ export default function AdminAffiliatePayouts() {
                 <td className="admin-td">{row.status}{row.admin_notes ? ` — ${row.admin_notes}` : ''}</td>
                 <td className="admin-td">
                   {row.status === 'pending' ? (
-                    <div style={{ display: 'flex', gap: '6px' }}>
+                    <div style={{ display: 'flex', gap: 'var(--space-1-5)' }}>
                       <button className="admin-btn admin-btn-sm" onClick={() => approve(row)}>Approve</button>
                       <RejectButton onReject={(reason) => reject(row, reason)} />
                     </div>
@@ -147,7 +147,7 @@ export default function AdminAffiliatePayouts() {
       {totalPages > 1 && (
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)', justifyContent: 'center' }}>
           <button className="admin-btn admin-btn-sm" disabled={data.page <= 1} onClick={() => fetchPayouts(data.page - 1, status)}>Previous</button>
-          <span style={{ padding: '6px 12px', fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)' }}>Page {data.page} of {totalPages}</span>
+          <span style={{ padding: 'var(--space-1-5) var(--space-3)', fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)' }}>Page {data.page} of {totalPages}</span>
           <button className="admin-btn admin-btn-sm" disabled={data.page >= totalPages} onClick={() => fetchPayouts(data.page + 1, status)}>Next</button>
         </div>
       )}

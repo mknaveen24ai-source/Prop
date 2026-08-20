@@ -261,7 +261,7 @@ export default function Landing() {
 
       {/* Glass Navbar */}
       <nav className={`nav-transparent ${scrolled ? 'scrolled' : ''}`}>
-        <div className="mp-nav-brand" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+        <div className="mp-nav-brand" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)', cursor: 'pointer' }}>
           <span style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--fs-2xl)', fontWeight: 800, letterSpacing: '0.08em', color: 'var(--ink)' }}>
             {String(tenant?.logo_text || tenant?.brand?.short_name || tenant?.name || 'PROPFIRM').toUpperCase()}
           </span>

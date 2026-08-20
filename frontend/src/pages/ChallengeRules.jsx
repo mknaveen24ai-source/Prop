@@ -193,11 +193,11 @@ function PhaseTable({ model, currentStepNumber, isFundedAccount, isCurrentModel 
 
   return (
     <Card style={{ marginBottom: 'var(--space-4)', border: isCurrentModel ? '1px solid var(--accent)' : undefined }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: 'var(--space-1)', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-2-5)', marginBottom: 'var(--space-1)', flexWrap: 'wrap' }}>
         <h3 style={{ color: 'var(--accent)', fontSize: 'var(--fs-lg)', margin: 0 }}>{model.name || 'Phase Table'}</h3>
         {isCurrentModel && <span className="badge badge-success" style={{ fontSize: 'var(--fs-2xs)' }}>Your model</span>}
       </div>
-      {model.description && <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)', marginBottom: '14px' }}>{model.description}</p>}
+      {model.description && <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)', marginBottom: 'var(--space-3-5)' }}>{model.description}</p>}
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: `${180 + columns.length * 140}px` }}>
           <thead>
@@ -220,12 +220,12 @@ function PhaseTable({ model, currentStepNumber, isFundedAccount, isCurrentModel 
           <tbody>
             {rows.map((row) => (
               <tr key={row.label}>
-                <td style={{ padding: '10px 12px', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', borderBottom: '1px solid var(--navy-border)' }}>{row.label}</td>
+                <td style={{ padding: 'var(--space-2-5) var(--space-3)', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', borderBottom: '1px solid var(--navy-border)' }}>{row.label}</td>
                 {columns.map((c) => (
                   <td
                     key={c.key}
                     style={{
-                      textAlign: 'right', padding: '10px 12px', fontSize: 'var(--fs-base)', fontFamily: 'var(--font-mono)',
+                      textAlign: 'right', padding: 'var(--space-2-5) var(--space-3)', fontSize: 'var(--fs-base)', fontFamily: 'var(--font-mono)',
                       color: c.isCurrent ? 'var(--accent)' : 'var(--text)',
                       borderBottom: '1px solid var(--navy-border)',
                     }}
@@ -259,7 +259,7 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
   if (!selectedAccount) {
     return (
       <Card style={{ padding: 'var(--space-9)', textAlign: 'center' }}>
-        <h2 className="page-title" style={{ marginBottom: '10px' }}>The Rulebook, in full</h2>
+        <h2 className="page-title" style={{ marginBottom: 'var(--space-2-5)' }}>The Rulebook, in full</h2>
         <p style={{ color: 'var(--text-muted)' }}>Select an account to see the exact rules for that phase.</p>
       </Card>
     )
@@ -308,7 +308,7 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
             Everything that can end this account is printed on this page. Nothing is held in a separate schedule, and nothing changes while a challenge is running.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2-5)' }}>
           <button
             onClick={() => window.print()}
             className="lx-btn"
@@ -328,7 +328,7 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
         </Card>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-3-5)' }}>
             {ruleLimits.map((r) => (
               <Card key={r.label} stat tone={r.tone}>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>{r.label}</div>
@@ -340,7 +340,7 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--glass)', boxShadow: 'var(--elev)' }}>
             {ruleColumns.map((col, colIndex) => (
-              <div key={col.title} style={{ padding: '18px 20px 8px', borderRight: colIndex < ruleColumns.length - 1 ? '1px solid var(--rule)' : 'none' }}>
+              <div key={col.title} style={{ padding: 'var(--space-4-5) var(--space-5) var(--space-2)', borderRight: colIndex < ruleColumns.length - 1 ? '1px solid var(--rule)' : 'none' }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '21px', borderBottom: '1px solid var(--rule)', paddingBottom: '11px', marginBottom: 'var(--space-1)' }}>{col.title}</div>
                 {col.items.map((item) => (
                   <div key={item.title} style={{ display: 'flex', gap: 'var(--space-3)', padding: '13px 0', borderBottom: '1px solid var(--rule-soft)' }}>
@@ -375,7 +375,7 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
           )}
 
           <Card>
-            <h3 style={{ color: 'var(--accent)', marginBottom: '14px', fontSize: 'var(--fs-lg)' }}>Live Status</h3>
+            <h3 style={{ color: 'var(--accent)', marginBottom: 'var(--space-3-5)', fontSize: 'var(--fs-lg)' }}>Live Status</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 32px' }}>
               <div>
                 <RuleRow label="Status" value={String(selectedAccount.status || '—').toUpperCase()} />

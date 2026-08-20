@@ -98,7 +98,7 @@ export default function VerifyCertificate() {
           style={{
             background: 'none', border: '1px solid var(--rule)', color: 'var(--muted)',
             fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '.1em',
-            textTransform: 'uppercase', padding: '6px 10px', cursor: 'pointer'
+            textTransform: 'uppercase', padding: 'var(--space-1-5) var(--space-2-5)', cursor: 'pointer'
           }}
         >
           {theme === 'dark' ? 'Light' : 'Dark'}
@@ -122,7 +122,7 @@ export default function VerifyCertificate() {
                 display: 'inline-flex', alignItems: 'center', gap: 8,
                 border: `1px solid ${state.tone}`, color: state.tone,
                 fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '.18em',
-                textTransform: 'uppercase', padding: '8px 14px', marginBottom: 'var(--space-4)'
+                textTransform: 'uppercase', padding: 'var(--space-2) var(--space-3-5)', marginBottom: 'var(--space-4)'
               }}>
                 <Icon size={15} aria-hidden="true" />
                 {state.kicker}

@@ -44,7 +44,7 @@ const STEPS = [
             <div key={label} style={{
               background: 'color-mix(in srgb, var(--muted) 6%, transparent)',
               border: '1px solid color-mix(in srgb, var(--muted) 15%, transparent)',
-              padding: '8px 10px'
+              padding: 'var(--space-2) var(--space-2-5)'
             }}>
               <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-dim)', marginBottom: '2px' }}>{label}</div>
             <div style={{ fontSize: 'var(--fs-base)', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--font-mono)' }}>{val}</div>
@@ -171,7 +171,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
         </button>
 
         {/* Step dots */}
-        <div style={{ display: 'flex', gap: '6px', marginBottom: '28px' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-1-5)', marginBottom: '28px' }}>
           {effectiveSteps.map((_, i) => (
             <button
               key={i}
@@ -198,7 +198,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
             fontFamily: 'var(--font-display)',
           color: 'var(--accent)',
           fontSize: 'var(--fs-2xl)',
-          marginBottom: '14px',
+          marginBottom: 'var(--space-3-5)',
           fontWeight: '700'
         }}>
           {current.title}
@@ -216,7 +216,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
         </div>
 
         {/* Actions */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2-5)', alignItems: 'center' }}>
           {!isFirst && (
             <button
               onClick={() => setStep(s => s - 1)}
@@ -224,7 +224,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
                 background: 'transparent',
                 border: '1px solid var(--navy-border)',
                 color: 'var(--text-muted)',
-                padding: '10px 20px',
+                padding: 'var(--space-2-5) var(--space-5)',
                 fontSize: 'var(--fs-base)',
                 cursor: 'pointer'
               }}
@@ -240,7 +240,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
                 background: 'transparent',
                 border: '1px solid var(--accent)',
                 color: 'var(--accent)',
-                padding: '10px 18px',
+                padding: 'var(--space-2-5) var(--space-4-5)',
                 fontSize: 'var(--fs-base)',
                 cursor: 'pointer',
                 fontWeight: '600'

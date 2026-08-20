@@ -122,7 +122,7 @@ export default function Support({ user }) {
             </div>
 
             <button onClick={handleCreate} disabled={submitting} className="btn btn-primary service-submit-button">
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
                 {submitting
                   ? renderIcon('timer', { size: 14, color: 'currentColor' })
                   : renderIcon('message', { size: 14, color: 'currentColor' })}
@@ -167,7 +167,7 @@ export default function Support({ user }) {
         <div className="service-side-panel">
           {user && (
             <Card style={{ padding: 'var(--space-4) var(--space-5)' }}>
-              <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-dim)', marginBottom: '10px', letterSpacing: '0.08em' }}>SUBMITTING AS</div>
+              <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-dim)', marginBottom: 'var(--space-2-5)', letterSpacing: '0.08em' }}>SUBMITTING AS</div>
               <div style={{ fontSize: 'var(--fs-md)', color: 'var(--text)', fontWeight: '600', marginBottom: 'var(--space-1)' }}>{user.full_name}</div>
               <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{user.email}</div>
             </Card>

@@ -95,6 +95,27 @@
   --space-9: 48px;
   --space-10: 64px;
 
+  /* ── Half-steps ──────────────────────────────────────────────────────────
+     Added 2026-08-20. 6, 10, 14 and 18px account for ~530 hardcoded spacing
+     values, and they are exactly the midpoints of 4/8/12/16/20 -- so the
+     platform has been running a 2-point scale in its dense controls while the
+     tokens only described a 4-point one.
+
+     Treating them as drift and snapping each to a neighbour was the other
+     option, and it was rejected on evidence: admin.css and ui.css use these
+     values too, and `gap: 10px`, `padding: 8px 10px` and `padding: 6px 8px`
+     each repeat dozens of times. That is a density decision somebody made, not
+     an accident, and rounding it away would have visibly loosened every compact
+     control on the platform.
+
+     The 4-point steps remain primary for layout. Reaching for a half-step
+     should feel like a deliberate choice about density, which is why they are
+     named as fractions rather than renumbered into the main sequence. */
+  --space-1-5: 6px;
+  --space-2-5: 10px;
+  --space-3-5: 14px;
+  --space-4-5: 18px;
+
   /* ── Type scale ──────────────────────────────────────────────────────────
      Added 2026-08-20. There was no font-size scale at all: tokens.css defined
      spacing, radii, families and text COLOURS, but nothing for size. The result

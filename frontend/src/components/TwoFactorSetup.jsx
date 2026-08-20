@@ -48,7 +48,7 @@ function Btn({ children, variant = 'default', disabled, onClick, style: s, ...re
       onClick={onClick}
       disabled={disabled}
       style={{
-        padding: '10px 20px',
+        padding: 'var(--space-2-5) var(--space-5)',
         borderRadius: '0',
         border: `1px solid ${c.border}`,
         background: c.bg,
@@ -248,7 +248,7 @@ function TwoFactorSetup({ apiBase = '' }) {
   if (setupPhase === 'qr') {
     return (
       <Card>
-        <h3 style={{ color: 'var(--text)', marginBottom: '6px' }}>🔐 Set Up Two-Factor Authentication</h3>
+        <h3 style={{ color: 'var(--text)', marginBottom: 'var(--space-1-5)' }}>🔐 Set Up Two-Factor Authentication</h3>
         <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: 'var(--space-5)', lineHeight: 1.6 }}>
           Scan the QR code with Google Authenticator or Authy. Then enter the 6-digit code below to confirm.
         </p>
@@ -270,12 +270,12 @@ function TwoFactorSetup({ apiBase = '' }) {
         {/* Manual secret */}
         {plainSecret && (
           <div style={{ marginBottom: 'var(--space-6)' }}>
-            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '6px', letterSpacing: '0.06em' }}>
+            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: 'var(--space-1-5)', letterSpacing: '0.06em' }}>
               CAN'T SCAN? ENTER THIS KEY MANUALLY:
             </div>
             <div style={{
               background: 'var(--navy-hover)', border: '1px solid var(--navy-border)',
-              borderRadius: '0', padding: '12px 14px',
+              borderRadius: '0', padding: 'var(--space-3) var(--space-3-5)',
               fontFamily: 'monospace', fontSize: 'var(--fs-md)',
               color: 'var(--accent)', letterSpacing: '0.12em',
               wordBreak: 'break-all', textAlign: 'center'
@@ -287,7 +287,7 @@ function TwoFactorSetup({ apiBase = '' }) {
 
         {/* 6-digit verify */}
         <div style={{ marginBottom: 'var(--space-4)' }}>
-          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '0.06em', textAlign: 'center' }}>
+          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: 'var(--space-2-5)', letterSpacing: '0.06em', textAlign: 'center' }}>
             ENTER THE 6-DIGIT CODE FROM YOUR APP
           </div>
           <TotpBox onComplete={verifySetup} disabled={setupLoading} />
@@ -342,7 +342,7 @@ function TwoFactorSetup({ apiBase = '' }) {
           </div>
         </div>
 
-        <Btn variant="accent" onClick={copyBackupCodes} style={{ width: '100%', marginBottom: '10px' }}>
+        <Btn variant="accent" onClick={copyBackupCodes} style={{ width: '100%', marginBottom: 'var(--space-2-5)' }}>
           {codesCopied ? '✓ Copied!' : '📋 Copy All Backup Codes'}
         </Btn>
         <Btn variant="ghost" onClick={() => { setSetupPhase('idle'); setBackupCodes([]) }} style={{ width: '100%' }}>
@@ -356,15 +356,15 @@ function TwoFactorSetup({ apiBase = '' }) {
   if (disablePhase === 'confirm') {
     return (
       <Card>
-        <h3 style={{ color: 'var(--text)', marginBottom: '6px' }}>Disable Two-Factor Authentication</h3>
+        <h3 style={{ color: 'var(--text)', marginBottom: 'var(--space-1-5)' }}>Disable Two-Factor Authentication</h3>
         <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: 'var(--space-5)', lineHeight: 1.6 }}>
           Enter your account password and a valid 2FA code to confirm.
         </p>
 
         {disableError && <Alert type="error">{disableError}</Alert>}
 
-        <div style={{ marginBottom: '14px' }}>
-          <label style={{ display: 'block', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '6px', letterSpacing: '0.06em' }}>ACCOUNT PASSWORD</label>
+        <div style={{ marginBottom: 'var(--space-3-5)' }}>
+          <label style={{ display: 'block', fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: 'var(--space-1-5)', letterSpacing: '0.06em' }}>ACCOUNT PASSWORD</label>
           <input
             type="password"
             value={disablePassword}
@@ -372,13 +372,13 @@ function TwoFactorSetup({ apiBase = '' }) {
             placeholder="Your account password"
             style={{
               width: '100%', background: 'var(--navy-hover)', border: '1px solid var(--navy-border)',
-              borderRadius: '0', padding: '10px 12px', color: 'var(--text)', fontSize: 'var(--fs-md)'
+              borderRadius: '0', padding: 'var(--space-2-5) var(--space-3)', color: 'var(--text)', fontSize: 'var(--fs-md)'
             }}
           />
         </div>
 
         <div style={{ marginBottom: 'var(--space-5)' }}>
-          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '0.06em', textAlign: 'center' }}>
+          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: 'var(--space-2-5)', letterSpacing: '0.06em', textAlign: 'center' }}>
             2FA CODE FROM AUTHENTICATOR APP
           </div>
           <TotpBox onComplete={disableTotp} disabled={disableLoading} />
@@ -410,7 +410,7 @@ function TwoFactorSetup({ apiBase = '' }) {
           {is2faEnabled ? '🔐' : '🔓'}
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 'var(--space-1)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)', marginBottom: 'var(--space-1)' }}>
             <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: '15px' }}>
               Two-Factor Authentication
             </span>
@@ -431,7 +431,7 @@ function TwoFactorSetup({ apiBase = '' }) {
         </div>
       </div>
 
-      <div style={{ marginTop: 'var(--space-5)', display: 'flex', gap: '10px' }}>
+      <div style={{ marginTop: 'var(--space-5)', display: 'flex', gap: 'var(--space-2-5)' }}>
         {!is2faEnabled && (
           <Btn variant="accent" onClick={startSetup} disabled={setupLoading}>
             {setupLoading ? 'Loading…' : '🔐 Enable 2FA'}

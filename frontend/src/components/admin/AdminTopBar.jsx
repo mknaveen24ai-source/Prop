@@ -153,7 +153,7 @@ export default function AdminTopBar({ adminAxios, onMobileMenuClick, onLogout, s
               <div style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--admin-border)', marginBottom: 'var(--space-1)' }}>
                 <strong style={{ fontSize: 'var(--fs-base)', display: 'block' }}>{session?.full_name || roleLabel}</strong>
                 <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)' }}>{session?.email || roleLabel}</span>
-                <div style={{ marginTop: '6px', fontSize: 'var(--fs-xs)', color: 'var(--admin-text-faint)' }}>
+                <div style={{ marginTop: 'var(--space-1-5)', fontSize: 'var(--fs-xs)', color: 'var(--admin-text-faint)' }}>
                   {roleLabel} • {scopeLabel} • {authSourceLabel}
                 </div>
               </div>

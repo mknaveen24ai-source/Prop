@@ -153,14 +153,14 @@ function BreakdownCard({ title, subtitle, rows }) {
       {items.length === 0 ? (
         <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>Not enough trades yet.</div>
       ) : (
-        <div style={{ display: 'grid', gap: '10px' }}>
+        <div style={{ display: 'grid', gap: 'var(--space-2-5)' }}>
           {items.map((row) => (
             <div
               key={`${title}-${row.key || row.label}`}
               style={{
                 border: '1px solid var(--navy-border)',
                 borderRadius: '0',
-                padding: '12px 14px',
+                padding: 'var(--space-3) var(--space-3-5)',
                 background: 'var(--glass)'
               }}
             >
@@ -205,7 +205,7 @@ function ScorePanel({ title, score, grade, summary, components, metrics }) {
         action={(
           <div style={{
             minWidth: '82px',
-            padding: '10px 12px',
+            padding: 'var(--space-2-5) var(--space-3)',
             borderRadius: '0',
             border: `1px solid ${getScoreColor(score)}`,
             background: 'var(--glass)',
@@ -216,7 +216,7 @@ function ScorePanel({ title, score, grade, summary, components, metrics }) {
           </div>
         )}
       />
-      <div style={{ display: 'grid', gap: '10px', marginBottom: metricRows.length > 0 ? '14px' : 0 }}>
+      <div style={{ display: 'grid', gap: 'var(--space-2-5)', marginBottom: metricRows.length > 0 ? '14px' : 0 }}>
         {componentRows.map(([key, value]) => (
           <div key={key}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', marginBottom: '5px' }}>
@@ -234,9 +234,9 @@ function ScorePanel({ title, score, grade, summary, components, metrics }) {
         ))}
       </div>
       {metricRows.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 'var(--space-2-5)' }}>
           {metricRows.map(([key, value]) => (
-            <div key={key} style={{ padding: '10px 12px', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
+            <div key={key} style={{ padding: 'var(--space-2-5) var(--space-3)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
               <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                 {formatStrategyLabel(key)}
               </div>
@@ -538,7 +538,7 @@ export default function Analytics({ selectedAccount }) {
                       const tone = pnl > 0 ? 'var(--gain)' : pnl < 0 ? 'var(--loss)' : 'var(--muted)'
                       return (
                         <div key={r.key} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
-                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', color: tone, marginBottom: '6px' }}>{formatSignedCurrency(pnl)}</div>
+                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', color: tone, marginBottom: 'var(--space-1-5)' }}>{formatSignedCurrency(pnl)}</div>
                           <div style={{ width: '100%', height: `${heightPct}%`, background: tone, borderRadius: '2px 2px 0 0', minHeight: '3px' }} />
                           <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: 'var(--space-2)' }}>{r.label.slice(0, 3)}</div>
                         </div>
@@ -595,7 +595,7 @@ export default function Analytics({ selectedAccount }) {
                     const tone = b.label.includes('-') ? 'var(--loss)' : 'var(--gain)'
                     return (
                       <div key={b.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', color: tone, marginBottom: '6px' }}>{b.count}</div>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', color: tone, marginBottom: 'var(--space-1-5)' }}>{b.count}</div>
                         <div style={{ width: '100%', height: `${heightPct}%`, background: tone, borderRadius: '2px 2px 0 0', minHeight: '3px' }} />
                         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.06em', color: 'var(--muted)', marginTop: 'var(--space-2)', textAlign: 'center' }}>{b.label}</div>
                       </div>
@@ -622,7 +622,7 @@ export default function Analytics({ selectedAccount }) {
                   type="button"
                   className="lx-btn"
                   onClick={() => exportExecutionsToCSV(executions)}
-                  style={{ padding: 'var(--space-2) var(--space-3)', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                  style={{ padding: 'var(--space-2) var(--space-3)', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)', display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1-5)' }}
                 >
                   Export CSV
                 </button>
@@ -793,28 +793,28 @@ export default function Analytics({ selectedAccount }) {
               subtitle={holdTime.bias_label}
             />
 
-            <div className="grid-4" style={{ marginBottom: '14px' }}>
+            <div className="grid-4" style={{ marginBottom: 'var(--space-3-5)' }}>
               <div style={{ padding: 'var(--space-3)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
                 <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Average</div>
-                <div style={{ marginTop: '6px', fontSize: 'var(--fs-xl)', fontWeight: '700', color: 'var(--text)' }}>{formatDuration(holdTime.average_mins)}</div>
+                <div style={{ marginTop: 'var(--space-1-5)', fontSize: 'var(--fs-xl)', fontWeight: '700', color: 'var(--text)' }}>{formatDuration(holdTime.average_mins)}</div>
               </div>
               <div style={{ padding: 'var(--space-3)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
                 <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Median</div>
-                <div style={{ marginTop: '6px', fontSize: 'var(--fs-xl)', fontWeight: '700', color: 'var(--text)' }}>{formatDuration(holdTime.median_mins)}</div>
+                <div style={{ marginTop: 'var(--space-1-5)', fontSize: 'var(--fs-xl)', fontWeight: '700', color: 'var(--text)' }}>{formatDuration(holdTime.median_mins)}</div>
               </div>
               <div style={{ padding: 'var(--space-3)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
                 <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Winners Avg</div>
-                <div style={{ marginTop: '6px', fontSize: 'var(--fs-xl)', fontWeight: '700', color: 'var(--green)' }}>{formatDuration(holdTime.winners_average_mins)}</div>
+                <div style={{ marginTop: 'var(--space-1-5)', fontSize: 'var(--fs-xl)', fontWeight: '700', color: 'var(--green)' }}>{formatDuration(holdTime.winners_average_mins)}</div>
               </div>
               <div style={{ padding: 'var(--space-3)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
                 <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Losers Avg</div>
-                <div style={{ marginTop: '6px', fontSize: 'var(--fs-xl)', fontWeight: '700', color: 'var(--red)' }}>{formatDuration(holdTime.losers_average_mins)}</div>
+                <div style={{ marginTop: 'var(--space-1-5)', fontSize: 'var(--fs-xl)', fontWeight: '700', color: 'var(--red)' }}>{formatDuration(holdTime.losers_average_mins)}</div>
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginBottom: '14px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-3-5)' }}>
               <div style={{ padding: 'var(--space-3)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
-                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: 'var(--space-1-5)' }}>
                   Quick exits inside {holdTime.quick_exit_threshold_mins || 0}m
                 </div>
                 <div style={{ fontSize: 'var(--fs-2xl)', fontWeight: '700', color: holdTime.quick_exit_rate >= 35 ? 'var(--red)' : 'var(--green)' }}>
@@ -822,7 +822,7 @@ export default function Analytics({ selectedAccount }) {
                 </div>
               </div>
               <div style={{ padding: 'var(--space-3)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
-                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: 'var(--space-1-5)' }}>
                   Over-holds beyond {formatDuration(holdTime.overhold_threshold_mins)}
                 </div>
                 <div style={{ fontSize: 'var(--fs-2xl)', fontWeight: '700', color: holdTime.overhold_rate >= 35 ? 'var(--red)' : 'var(--green)' }}>
@@ -840,10 +840,10 @@ export default function Analytics({ selectedAccount }) {
             <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 'var(--space-2)' }}>Best Setups</div>
-                <div style={{ display: 'grid', gap: '10px' }}>
+                <div style={{ display: 'grid', gap: 'var(--space-2-5)' }}>
                   {(setupReport.best_setups || []).map((entry) => (
-                    <div key={`best-${entry.setup_type}-${entry.key}`} style={{ padding: '12px 14px', borderRadius: '0', border: '1px solid var(--green)', background: 'var(--success-bg)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' }}>
+                    <div key={`best-${entry.setup_type}-${entry.key}`} style={{ padding: 'var(--space-3) var(--space-3-5)', borderRadius: '0', border: '1px solid var(--green)', background: 'var(--success-bg)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', alignItems: 'center' }}>
                         <div>
                           <div style={{ color: 'var(--text)', fontSize: 'var(--fs-base)', fontWeight: '700' }}>{formatStrategyLabel(entry.label)}</div>
                           <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', marginTop: '3px' }}>{entry.setup_type} | {entry.trades} trades</div>
@@ -860,10 +860,10 @@ export default function Analytics({ selectedAccount }) {
 
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--red)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 'var(--space-2)' }}>Worst Setups</div>
-                <div style={{ display: 'grid', gap: '10px' }}>
+                <div style={{ display: 'grid', gap: 'var(--space-2-5)' }}>
                   {(setupReport.worst_setups || []).map((entry) => (
-                    <div key={`worst-${entry.setup_type}-${entry.key}`} style={{ padding: '12px 14px', borderRadius: '0', border: '1px solid var(--red)', background: 'var(--danger-bg)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' }}>
+                    <div key={`worst-${entry.setup_type}-${entry.key}`} style={{ padding: 'var(--space-3) var(--space-3-5)', borderRadius: '0', border: '1px solid var(--red)', background: 'var(--danger-bg)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', alignItems: 'center' }}>
                         <div>
                           <div style={{ color: 'var(--text)', fontSize: 'var(--fs-base)', fontWeight: '700' }}>{formatStrategyLabel(entry.label)}</div>
                           <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', marginTop: '3px' }}>{entry.setup_type} | {entry.trades} trades</div>
@@ -889,7 +889,7 @@ export default function Analytics({ selectedAccount }) {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
             {Array.isArray(activityHeatmap.weekday_summary) && activityHeatmap.weekday_summary.slice(0, 3).map((row) => (
-              <div key={`weekday-${row.label}`} style={{ padding: '12px 14px', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
+              <div key={`weekday-${row.label}`} style={{ padding: 'var(--space-3) var(--space-3-5)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
                 <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Best Weekday Pocket</div>
                 <div style={{ marginTop: '5px', color: 'var(--text)', fontWeight: '700' }}>{row.label}</div>
                 <div style={{ marginTop: 'var(--space-1)', color: Number(row.total_pnl || 0) >= 0 ? 'var(--green)' : 'var(--red)', fontFamily: 'var(--font-mono)' }}>
@@ -901,7 +901,7 @@ export default function Analytics({ selectedAccount }) {
 
           <div style={{ overflowX: 'auto' }}>
             <div style={{ minWidth: '980px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '100px repeat(24, minmax(28px, 1fr))', gap: 'var(--space-1)', marginBottom: '6px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '100px repeat(24, minmax(28px, 1fr))', gap: 'var(--space-1)', marginBottom: 'var(--space-1-5)' }}>
                 <div />
                 {heatmapHours.map((hour) => (
                   <div key={`hour-header-${hour}`} style={{ textAlign: 'center', fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)' }}>
@@ -952,7 +952,7 @@ export default function Analytics({ selectedAccount }) {
               info when nothing is currently under the cursor. */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-3)',
-            borderTop: '1px solid var(--rule-soft)', paddingTop: '10px',
+            borderTop: '1px solid var(--rule-soft)', paddingTop: 'var(--space-2-5)',
             fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)'
           }}>
             {hoveredHeatCell ? (
@@ -997,26 +997,26 @@ export default function Analytics({ selectedAccount }) {
               subtitle={breachAnalysis.explanation || 'No breach analysis available yet.'}
             />
 
-            <div style={{ display: 'grid', gap: 'var(--space-3)', marginBottom: '14px' }}>
-              <div style={{ padding: '12px 14px', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
+            <div style={{ display: 'grid', gap: 'var(--space-3)', marginBottom: 'var(--space-3-5)' }}>
+              <div style={{ padding: 'var(--space-3) var(--space-3-5)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
                 <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Primary Cause</div>
                 <div style={{ marginTop: '5px', fontSize: 'var(--fs-lg)', color: 'var(--text)', fontWeight: '700' }}>
                   {formatStrategyLabel(breachAnalysis.primary_cause)}
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px' }}>
-                <div style={{ padding: '10px 12px', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 'var(--space-2-5)' }}>
+                <div style={{ padding: 'var(--space-2-5) var(--space-3)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
                   <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Target Progress</div>
                   <div style={{ marginTop: '5px', fontWeight: '700', color: 'var(--accent)' }}>{formatPercent(breachAnalysis.target_progress_pct || 0)}</div>
                 </div>
-                <div style={{ padding: '10px 12px', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
+                <div style={{ padding: 'var(--space-2-5) var(--space-3)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
                   <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Drawdown Usage</div>
                   <div style={{ marginTop: '5px', fontWeight: '700', color: Number(breachAnalysis.drawdown_usage_pct || 0) >= 70 ? 'var(--red)' : 'var(--green)' }}>
                     {formatPercent(breachAnalysis.drawdown_usage_pct || 0)}
                   </div>
                 </div>
-                <div style={{ padding: '10px 12px', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
+                <div style={{ padding: 'var(--space-2-5) var(--space-3)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
                   <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Days Remaining</div>
                   <div style={{ marginTop: '5px', fontWeight: '700', color: 'var(--text)' }}>
                     {breachAnalysis.days_remaining == null ? '-' : breachAnalysis.days_remaining}
@@ -1032,7 +1032,7 @@ export default function Analytics({ selectedAccount }) {
                 </div>
                 <div style={{ display: 'grid', gap: 'var(--space-2)' }}>
                   {breachAnalysis.recent_violations.map((violation, index) => (
-                    <div key={`violation-${index}`} style={{ padding: '10px 12px', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
+                    <div key={`violation-${index}`} style={{ padding: 'var(--space-2-5) var(--space-3)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
                       <div style={{ color: 'var(--text)', fontSize: 'var(--fs-sm)', fontWeight: '700' }}>
                         {formatStrategyLabel(violation.violation_type)}
                       </div>
@@ -1067,30 +1067,30 @@ export default function Analytics({ selectedAccount }) {
               )}
             />
 
-            <div className="grid-4" style={{ marginBottom: '14px' }}>
+            <div className="grid-4" style={{ marginBottom: 'var(--space-3-5)' }}>
               <div style={{ padding: 'var(--space-3)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
                 <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Estimated Payable</div>
-                <div style={{ marginTop: '6px', fontSize: 'var(--fs-xl)', fontWeight: '700', color: Number(payoutForecast.estimated_payable || 0) >= Number(payoutForecast.min_request_amount || 0) ? 'var(--green)' : 'var(--red)' }}>
+                <div style={{ marginTop: 'var(--space-1-5)', fontSize: 'var(--fs-xl)', fontWeight: '700', color: Number(payoutForecast.estimated_payable || 0) >= Number(payoutForecast.min_request_amount || 0) ? 'var(--green)' : 'var(--red)' }}>
                   {formatCurrency(payoutForecast.estimated_payable || 0)}
                 </div>
               </div>
               <div style={{ padding: 'var(--space-3)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
                 <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Profit Share</div>
-                <div style={{ marginTop: '6px', fontSize: 'var(--fs-xl)', fontWeight: '700', color: 'var(--text)' }}>{formatPercent(payoutForecast.profit_share_pct || 0, 0)}</div>
+                <div style={{ marginTop: 'var(--space-1-5)', fontSize: 'var(--fs-xl)', fontWeight: '700', color: 'var(--text)' }}>{formatPercent(payoutForecast.profit_share_pct || 0, 0)}</div>
               </div>
               <div style={{ padding: 'var(--space-3)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
                 <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Min Request</div>
-                <div style={{ marginTop: '6px', fontSize: 'var(--fs-xl)', fontWeight: '700', color: 'var(--text)' }}>{formatCurrency(payoutForecast.min_request_amount || 0)}</div>
+                <div style={{ marginTop: 'var(--space-1-5)', fontSize: 'var(--fs-xl)', fontWeight: '700', color: 'var(--text)' }}>{formatCurrency(payoutForecast.min_request_amount || 0)}</div>
               </div>
               <div style={{ padding: 'var(--space-3)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
                 <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Trend</div>
-                <div style={{ marginTop: '6px', fontSize: 'var(--fs-xl)', fontWeight: '700', color: Number(payoutForecast.trend_pnl_last_5_trades || 0) >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                <div style={{ marginTop: 'var(--space-1-5)', fontSize: 'var(--fs-xl)', fontWeight: '700', color: Number(payoutForecast.trend_pnl_last_5_trades || 0) >= 0 ? 'var(--green)' : 'var(--red)' }}>
                   {formatStrategyLabel(payoutForecast.trend_label)}
                 </div>
               </div>
             </div>
 
-            <div style={{ display: 'grid', gap: '10px', marginBottom: '14px' }}>
+            <div style={{ display: 'grid', gap: 'var(--space-2-5)', marginBottom: 'var(--space-3-5)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--navy-border)' }}>
                 <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>Recent trend (last 5 trades)</span>
                 <span style={{ color: Number(payoutForecast.trend_pnl_last_5_trades || 0) >= 0 ? 'var(--green)' : 'var(--red)', fontSize: 'var(--fs-sm)', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>
@@ -1120,7 +1120,7 @@ export default function Analytics({ selectedAccount }) {
             {Array.isArray(payoutForecast.blockers) && payoutForecast.blockers.length > 0 && (
               <div style={{ display: 'grid', gap: 'var(--space-2)' }}>
                 {payoutForecast.blockers.map((blocker, index) => (
-                  <div key={`blocker-${index}`} style={{ padding: '10px 12px', borderRadius: '0', border: '1px solid var(--red)', background: 'var(--danger-bg)', color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>
+                  <div key={`blocker-${index}`} style={{ padding: 'var(--space-2-5) var(--space-3)', borderRadius: '0', border: '1px solid var(--red)', background: 'var(--danger-bg)', color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>
                     {blocker}
                   </div>
                 ))}
@@ -1137,7 +1137,7 @@ export default function Analytics({ selectedAccount }) {
 
           <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
             {suggestions.map((suggestion, index) => (
-              <div key={`suggestion-${index}`} style={{ padding: '14px 16px', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
+              <div key={`suggestion-${index}`} style={{ padding: 'var(--space-3-5) var(--space-4)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-3)', alignItems: 'center', flexWrap: 'wrap' }}>
                   <div>
                     <div style={{ color: 'var(--text)', fontSize: 'var(--fs-md)', fontWeight: '700' }}>{suggestion.title}</div>

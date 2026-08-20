@@ -4,7 +4,7 @@ import { useToast } from '../../components/admin/AdminToast'
 import AdminStatCard from '../../components/admin/AdminStatCard'
 import Card from '../../components/ui/Card'
 
-const inputStyle = { width: '100%', padding: '8px 10px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }
+const inputStyle = { width: '100%', padding: 'var(--space-2) var(--space-2-5)', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }
 
 function formatMoney(value) {
   return `$${(parseFloat(value) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`

@@ -79,7 +79,7 @@ export default function CommandPalette({ results, placeholder = 'Jump to a pageâ
           overflow: 'hidden',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '11px', padding: '14px 16px', borderBottom: '1px solid var(--rule)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '11px', padding: 'var(--space-3-5) var(--space-4)', borderBottom: '1px solid var(--rule)' }}>
           <Search size={16} color="var(--accent)" />
           <input
             ref={inputRef}
@@ -105,7 +105,7 @@ export default function CommandPalette({ results, placeholder = 'Jump to a pageâ
               key={`${r.group}-${r.label}-${i}`}
               onClick={() => go(r)}
               style={{
-                display: 'flex', alignItems: 'center', gap: 'var(--space-3)', width: '100%', padding: '10px 12px',
+                display: 'flex', alignItems: 'center', gap: 'var(--space-3)', width: '100%', padding: 'var(--space-2-5) var(--space-3)',
                 border: 'none', borderRadius: 'var(--radius-sm)', background: 'transparent',
                 color: 'var(--ink)', textAlign: 'left', cursor: 'pointer', transition: 'background 0.12s',
               }}

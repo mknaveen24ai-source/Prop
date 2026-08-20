@@ -15,7 +15,7 @@ export default function CommandPaletteTrigger({ label = 'Search…' }) {
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)',
         background: 'var(--glass)', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)',
-        padding: '6px 10px', color: 'var(--muted)', cursor: 'pointer', fontSize: 'var(--fs-base)',
+        padding: 'var(--space-1-5) var(--space-2-5)', color: 'var(--muted)', cursor: 'pointer', fontSize: 'var(--fs-base)',
         fontFamily: 'var(--font-ui)',
       }}
     >
