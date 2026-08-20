@@ -31,7 +31,7 @@
 }
 
 .ui-skeleton-card {
-  padding: 18px;
+  padding: var(--space-4-5);
   border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
   border-radius: 4px;
   background: var(--bg-elevated, transparent);
@@ -40,20 +40,20 @@
 .ui-skeleton-stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .ui-skeleton-table {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-2-5);
 }
 
 .ui-skeleton-row {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 10px 0;
+  gap: var(--space-4);
+  padding: var(--space-2-5) 0;
   border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.05));
 }
 

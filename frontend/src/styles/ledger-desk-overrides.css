@@ -20,10 +20,10 @@
   font-variant-caps: all-small-caps;
   letter-spacing: 0.1em;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: var(--fs-base);
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-2-5);
 }
 .mp-badge::after {
   content: '';
@@ -61,8 +61,8 @@
 }
 .ledger-columns > * + * {
   border-left: 1px solid var(--rule);
-  padding-left: 24px;
-  margin-left: 24px;
+  padding-left: var(--space-6);
+  margin-left: var(--space-6);
 }
 .mp-badge-dot { display: none !important; }
 
@@ -81,13 +81,13 @@ th {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--muted);
-  padding: 10px 12px;
+  padding: var(--space-2-5) var(--space-3);
 }
 td {
   border-bottom: 1px solid var(--rule) !important;
-  padding: 10px 12px;
+  padding: var(--space-2-5) var(--space-3);
   font-family: var(--font-mono);
 }
 tr:nth-child(even) td { background: transparent !important; }

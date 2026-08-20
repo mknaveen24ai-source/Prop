@@ -33,15 +33,15 @@
 
 .tr-hero-eyebrow {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--accent);
-  margin-bottom: 20px;
+  margin-bottom: var(--space-5);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .tr-hero-eyebrow::before,
@@ -61,7 +61,7 @@
   color: var(--text-primary);
   line-height: 1.05;
   letter-spacing: -0.02em;
-  margin-bottom: 20px;
+  margin-bottom: var(--space-5);
   position: relative;
 }
 
@@ -82,15 +82,15 @@
 .tr-hero-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
   background: var(--success-bg);
   color: var(--success);
   border: 1px solid rgba(var(--color-success, 79, 190, 110), 0.2);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  padding: 6px 14px;
+  padding: var(--space-1-5) var(--space-3-5);
   position: relative;
 }
 
@@ -126,25 +126,25 @@
   height: 100vh;
   height: 100dvh;
   overflow-y: auto;
-  padding: 32px 0 48px;
+  padding: var(--space-7) 0 var(--space-9);
 }
 
 .tr-sidebar-label {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.15em;
   text-transform: uppercase;
   color: var(--text-muted);
-  padding: 0 24px 12px;
+  padding: 0 var(--space-6) var(--space-3);
 }
 
 .tr-sidebar-tab {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-2-5);
   padding: 11px 24px;
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: var(--fs-md);
   color: var(--text-secondary);
   cursor: pointer;
   border-left: 3px solid transparent;
@@ -190,8 +190,8 @@
 
 /* ── Section Header ── */
 .tr-section-header {
-  margin-bottom: 32px;
-  padding-bottom: 20px;
+  margin-bottom: var(--space-7);
+  padding-bottom: var(--space-5);
   border-bottom: 2px double var(--rule);
 }
 
@@ -200,11 +200,11 @@
   font-size: clamp(22px, 3vw, 32px);
   font-weight: 700;
   color: var(--text-primary);
-  margin-bottom: 6px;
+  margin-bottom: var(--space-1-5);
 }
 
 .tr-section-desc {
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--text-secondary);
   font-family: var(--font-ui);
 }
@@ -213,8 +213,8 @@
 .tr-kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
-  margin-bottom: 32px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-7);
 }
 
 /* Exact column counts for the two KPI blocks that want them. These used to be
@@ -229,7 +229,7 @@
 .tr-kpi-card {
   background: var(--bg-surface);
   border: 1px solid var(--rule-soft);
-  padding: 20px 20px 18px;
+  padding: var(--space-5) var(--space-5) var(--space-4-5);
   position: relative;
   overflow: hidden;
   transition: border-color var(--motion-fast);
@@ -257,11 +257,11 @@
 
 .tr-kpi-label {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-muted);
-  margin-bottom: 10px;
+  margin-bottom: var(--space-2-5);
   font-weight: 600;
 }
 
@@ -271,14 +271,14 @@
   font-weight: 700;
   color: var(--text-primary);
   line-height: 1;
-  margin-bottom: 6px;
+  margin-bottom: var(--space-1-5);
 }
 
 .tr-kpi-value.positive { color: var(--success); }
 .tr-kpi-value.accent   { color: var(--accent); }
 
 .tr-kpi-sub {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   font-family: var(--font-mono);
 }
@@ -289,14 +289,14 @@
 .tr-chart-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: var(--space-4);
   margin-bottom: 24px;
 }
 
 .tr-chart-card {
   background: var(--bg-surface);
   border: 1px solid var(--rule-soft);
-  padding: 24px;
+  padding: var(--space-6);
   position: relative;
 }
 
@@ -309,26 +309,26 @@
   font-size: 17px;
   font-weight: 700;
   color: var(--text-primary);
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .tr-chart-subtitle {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-secondary);
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 /* ── Time-Range Pills ── */
 .tr-range-pills {
   display: flex;
-  gap: 4px;
-  margin-bottom: 20px;
+  gap: var(--space-1);
+  margin-bottom: var(--space-5);
   flex-wrap: wrap;
 }
 
 .tr-pill {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.06em;
   padding: 5px 12px;
   border: 1px solid var(--rule);
@@ -360,19 +360,19 @@
 /* ── Chart Stats Row ── */
 .tr-chart-stats {
   display: flex;
-  gap: 32px;
+  gap: var(--space-7);
   margin-bottom: 16px;
 }
 
 .tr-chart-stat-val {
   font-family: var(--font-mono);
-  font-size: 20px;
+  font-size: var(--fs-2xl);
   font-weight: 700;
   color: var(--success);
 }
 
 .tr-chart-stat-lbl {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   font-family: var(--font-mono);
   text-transform: uppercase;
@@ -384,7 +384,7 @@
   display: flex;
   align-items: flex-end;
   gap: 0;
-  margin-top: 20px;
+  margin-top: var(--space-5);
 }
 
 .tr-funnel-step {
@@ -392,7 +392,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   position: relative;
 }
 
@@ -403,7 +403,7 @@
   top: 50%;
   transform: translateY(-50%);
   color: var(--text-muted);
-  font-size: 18px;
+  font-size: var(--fs-xl);
   z-index: 1;
 }
 
@@ -425,13 +425,13 @@
 
 .tr-funnel-count {
   font-family: var(--font-mono);
-  font-size: 18px;
+  font-size: var(--fs-xl);
   font-weight: 700;
   color: var(--text-primary);
 }
 
 .tr-funnel-label {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-secondary);
   font-family: var(--font-mono);
   text-transform: uppercase;
@@ -440,7 +440,7 @@
 }
 
 .tr-funnel-pct {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   color: var(--success);
   font-family: var(--font-mono);
 }
@@ -450,17 +450,17 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 12px;
-  margin-top: 20px;
+  margin-top: var(--space-5);
 }
 
 .tr-model-card {
   background: var(--bg-surface);
   border: 1px solid var(--rule-soft);
-  padding: 16px 18px;
+  padding: var(--space-4) var(--space-4-5);
 }
 
 .tr-model-name {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   color: var(--text-primary);
   font-family: var(--font-mono);
@@ -474,11 +474,11 @@
   font-size: 26px;
   font-weight: 700;
   color: var(--accent);
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .tr-model-meta {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
 }
 
@@ -491,7 +491,7 @@
   width: 100%;
   border-collapse: collapse;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 
 .tr-table thead tr {
@@ -500,8 +500,8 @@
 
 .tr-table th {
   text-align: left;
-  padding: 10px 14px;
-  font-size: 10px;
+  padding: var(--space-2-5) var(--space-3-5);
+  font-size: var(--fs-2xs);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -531,7 +531,7 @@
   background: var(--bg-hover);
   border: 1px solid var(--rule-soft);
   padding: 2px 8px;
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-secondary);
@@ -541,14 +541,14 @@
 .tr-pagination {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   margin-top: 20px;
   justify-content: center;
 }
 
 .tr-page-btn {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   padding: 7px 14px;
   border: 1px solid var(--rule);
   background: none;
@@ -583,8 +583,8 @@
 .tr-activity-item {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
-  padding: 14px 0;
+  gap: var(--space-3-5);
+  padding: var(--space-3-5) 0;
   border-bottom: 1px solid var(--rule-soft);
   animation: tr-fadein 0.4s ease;
 }
@@ -607,13 +607,13 @@
 .tr-activity-dot.signup { background: var(--text-muted); }
 
 .tr-activity-label {
-  font-size: 14px;
+  font-size: var(--fs-md);
   color: var(--text-primary);
   line-height: 1.4;
 }
 
 .tr-activity-sub {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-secondary);
   font-family: var(--font-mono);
   margin-top: 2px;
@@ -622,7 +622,7 @@
 .tr-activity-time {
   margin-left: auto;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   white-space: nowrap;
   flex-shrink: 0;
@@ -639,7 +639,7 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 16px 0;
+  padding: var(--space-4) 0;
   border-bottom: 1px solid var(--rule-soft);
   transition: background var(--motion-fast);
 }
@@ -650,7 +650,7 @@
 
 .tr-performer-rank {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: var(--fs-base);
   font-weight: 700;
   color: var(--text-muted);
   width: 28px;
@@ -661,13 +661,13 @@
 
 .tr-performer-name {
   flex: 1;
-  font-size: 14px;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .tr-performer-model {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   font-family: var(--font-mono);
   text-transform: uppercase;
@@ -676,13 +676,13 @@
 
 .tr-performer-pct {
   font-family: var(--font-mono);
-  font-size: 18px;
+  font-size: var(--fs-xl);
   font-weight: 700;
   color: var(--success);
 }
 
 .tr-performer-usd {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-secondary);
   font-family: var(--font-mono);
   text-align: right;
@@ -696,7 +696,7 @@
   min-height: 200px;
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: var(--fs-base);
   letter-spacing: 0.08em;
 }
 
@@ -716,13 +716,13 @@
 .tr-refresh-indicator {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1-5);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   color: var(--text-muted);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  margin-top: 24px;
+  margin-top: var(--space-6);
 }
 
 .tr-refresh-dot {
@@ -745,7 +745,7 @@
     position: static;
     border-right: none;
     border-bottom: 1px solid var(--rule);
-    padding: 12px 0;
+    padding: var(--space-3) 0;
     display: flex;
     flex-direction: row;
     overflow-x: auto;
@@ -761,7 +761,7 @@
     white-space: nowrap;
     border-left: none;
     border-bottom: 3px solid transparent;
-    padding: 10px 18px;
+    padding: var(--space-2-5) var(--space-4-5);
     flex-shrink: 0;
   }
 
@@ -829,7 +829,7 @@
 .tr-nav-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-2-5);
 }
 
 .tr-nav-links {
@@ -850,9 +850,9 @@
     flex-wrap: wrap;
     height: auto;
     min-height: 60px;
-    padding-top: 8px;
-    padding-bottom: 8px;
-    gap: 8px;
+    padding-top: var(--space-2);
+    padding-bottom: var(--space-2);
+    gap: var(--space-2);
   }
   /* Without this the logo is the only shrinkable item and collapses to 0. */
   .tr-nav-logo {
@@ -864,17 +864,17 @@
     order: 3;
     flex: 1 0 100%;
     justify-content: flex-start;
-    gap: 18px;
+    gap: var(--space-4-5);
     overflow-x: auto;
     scrollbar-width: none;
   }
   .tr-nav-links::-webkit-scrollbar { display: none; }
   .tr-nav-links > * { white-space: nowrap; flex: 0 0 auto; }
 
-  .tr-nav-actions { gap: 6px; margin-left: auto; }
+  .tr-nav-actions { gap: var(--space-1-5); margin-left: auto; }
   .tr-nav-actions .btn {
-    padding: 8px 10px;
-    font-size: 12px;
+    padding: var(--space-2) var(--space-2-5);
+    font-size: var(--fs-sm);
     white-space: nowrap;
   }
 }

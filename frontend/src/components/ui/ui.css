@@ -47,9 +47,9 @@
 }
 
 /* sizes — padding driven by the spacing scale */
-.lx-btn--sm { padding: var(--space-1) var(--space-3); font-size: 12px; }
-.lx-btn--md { padding: var(--space-2) var(--space-5); font-size: 13px; }
-.lx-btn--lg { padding: var(--space-3) var(--space-7); font-size: 14px; }
+.lx-btn--sm { padding: var(--space-1) var(--space-3); font-size: var(--fs-sm); }
+.lx-btn--md { padding: var(--space-2) var(--space-5); font-size: var(--fs-base); }
+.lx-btn--lg { padding: var(--space-3) var(--space-7); font-size: var(--fs-md); }
 
 /* variants */
 .lx-btn--primary {
@@ -148,7 +148,7 @@
 }
 .lx-card__eyebrow {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
@@ -157,7 +157,7 @@
 .lx-card__title {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 20px;
+  font-size: var(--fs-2xl);
   line-height: 1.2;
   color: var(--ink);
   margin: 0;
@@ -222,7 +222,7 @@
 }
 .lx-stat__label {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
@@ -231,7 +231,7 @@
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
-  font-size: 24px;
+  font-size: var(--fs-4xl);
   line-height: 1.1;
   color: var(--ink);
 }
@@ -239,13 +239,13 @@
 .lx-stat__value--loss { color: var(--loss); }
 .lx-stat__value--warn { color: var(--warn); }
 .lx-stat__value--muted { color: var(--muted); }
-.lx-stat__sub { font-size: 12px; color: var(--muted); }
+.lx-stat__sub { font-size: var(--fs-sm); color: var(--muted); }
 
 /* ── Field ────────────────────────────────────────────────────────────────── */
 .lx-field { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-5); }
 .lx-field__label {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -257,7 +257,7 @@
   border: 1px solid var(--rule);
   color: var(--ink);
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: var(--fs-md);
   padding: var(--space-3) var(--space-4);
   outline: none;
   transition: border-color 0.18s ease;
@@ -266,8 +266,8 @@
 .lx-field__control::placeholder { color: var(--muted); }
 textarea.lx-field__control { resize: vertical; min-height: 84px; }
 .lx-field__control--mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.lx-field__hint { font-size: 12px; color: var(--muted); }
-.lx-field__error { font-size: 12px; color: var(--loss); }
+.lx-field__hint { font-size: var(--fs-sm); color: var(--muted); }
+.lx-field__error { font-size: var(--fs-sm); color: var(--loss); }
 .lx-field__control--invalid { border-color: var(--loss); }
 
 /* reveal-toggle affix (for masked secret fields) */
@@ -303,7 +303,7 @@ textarea.lx-field__control { resize: vertical; min-height: 84px; }
 }
 .lx-table thead th {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -315,7 +315,7 @@ textarea.lx-field__control { resize: vertical; min-height: 84px; }
 .lx-table tbody td {
   padding: var(--space-3);
   border-bottom: 1px solid var(--rule-soft);
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--ink);
   vertical-align: middle;
 }
@@ -329,7 +329,7 @@ textarea.lx-field__control { resize: vertical; min-height: 84px; }
   padding: var(--space-8) var(--space-4);
   text-align: center;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 
 /* ── Card mode (Table mobileCard) ──
@@ -361,7 +361,7 @@ textarea.lx-field__control { resize: vertical; min-height: 84px; }
 button.lx-card-row { cursor: pointer; }
 button.lx-card-row:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .lx-card-row__title {
-  font-size: 14px;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--ink);
   margin-bottom: var(--space-2);
@@ -456,7 +456,7 @@ button.lx-card-row:focus-visible { outline: 2px solid var(--ink); outline-offset
 }
 .lx-sheet__subtitle {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
@@ -502,10 +502,10 @@ button.lx-card-row:focus-visible { outline: 2px solid var(--ink); outline-offset
   display: inline-flex;
   align-items: center;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 6px 12px;
+  padding: var(--space-1-5) var(--space-3);
   border-radius: var(--radius-pill);
   border: 1px solid var(--rule);
   background: transparent;

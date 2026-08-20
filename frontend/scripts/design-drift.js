@@ -48,19 +48,37 @@ const MAX = (() => {
 const { isColorAllowlisted, COLOR_ALLOWLIST, SUPPRESSION_PATTERN } =
   require('../design-tokens.config.js')
 
-/** Every .jsx under src/. */
-function jsxFiles() {
+/** Every file under src/ with one of the given extensions. */
+function filesWithExt(extensions) {
   const out = []
   const walk = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue
       const full = path.join(dir, entry.name)
       if (entry.isDirectory()) walk(full)
-      else if (entry.name.endsWith('.jsx')) out.push(full)
+      else if (extensions.some((ext) => entry.name.endsWith(ext))) out.push(full)
     }
   }
   walk(SRC)
   return out
+}
+
+const jsxFiles = () => filesWithExt(['.jsx'])
+
+/**
+ * Stylesheets are scanned too, and tokens.css itself is excluded.
+ *
+ * Leaving CSS out was a blind spot with an awkward shape: the checker enforced
+ * the type scale in every component while components/ui/ui.css -- the design
+ * system's own stylesheet, the thing components are supposed to defer to --
+ * carried 22 hardcoded font sizes, and admin.css another 50. Holding JSX to a
+ * standard the stylesheets do not meet is how a rule gets argued with.
+ *
+ * tokens.css is where the scale is DEFINED, so every value in it is a
+ * definition rather than a use.
+ */
+function cssFiles() {
+  return filesWithExt(['.css']).filter((f) => !f.endsWith('tokens.css'))
 }
 
 function rel(file) {
@@ -160,6 +178,23 @@ function stripComments(src) {
     }
 
     out += ch
+    i++
+  }
+  return out
+}
+
+/** CSS has only block comments, and no string-quoting subtleties worth tracking. */
+function stripCssComments(src) {
+  let out = ''
+  let i = 0
+  while (i < src.length) {
+    if (src[i] === '/' && src[i + 1] === '*') {
+      const end = src.indexOf('*/', i + 2)
+      const stop = end === -1 ? src.length : end + 2
+      while (i < stop) { out += src[i] === String.fromCharCode(10) ? src[i] : ' '; i++ }
+      continue
+    }
+    out += src[i]
     i++
   }
   return out
@@ -295,6 +330,54 @@ function main() {
     }
   }
 
+  // ── stylesheets ───────────────────────────────────────────────────────────
+  // Same two scales, CSS syntax. Colour is not checked here: a stylesheet is
+  // exactly where a raw colour SHOULD live, since that is what the tokens
+  // themselves are made of.
+  for (const file of cssFiles()) {
+    const raw = fs.readFileSync(file, 'utf8')
+    const src = stripCssComments(raw)
+    const srcLines = raw.split(String.fromCharCode(10))
+    const relPath = rel(file)
+
+    const record = (bucket, index, extra) => {
+      const line = lineOf(src, index)
+      const reason = suppressionReason(srcLines, line)
+      if (reason) {
+        suppressed.push({ file: relPath, line, reason, ...extra })
+        return
+      }
+      findings[bucket].push({ file: relPath, line, ...extra })
+    }
+
+    {
+      // Flags ANY hardcoded px, on-scale or not, matching how the JSX check
+      // behaves. An earlier version here counted only off-scale values, so a
+      // stylesheet full of `font-size: 13px` scored clean while the identical
+      // value in a component was reported. Two rules for the same thing is how
+      // a checker loses the argument.
+      const re = /font-size:\s*([0-9.]+)px/gi
+      let m
+      while ((m = re.exec(src))) {
+        record('fontSize', m.index, { value: m[1] + 'px' })
+      }
+    }
+
+    {
+      const re = /(padding|margin|gap|row-gap|column-gap)[a-z-]*:\s*([^;{}]+)[;}]/gi
+      let m
+      while ((m = re.exec(src))) {
+        const parts = m[2].match(/([0-9.]+)px/g) || []
+        for (const part of parts) {
+          const value = parseFloat(part)
+          if (value === 0 || value === 1) continue
+          const bucket = spaceScale.has(value) ? 'spacingLiteral' : 'spacing'
+          record(bucket, m.index, { value: part, prop: m[1] })
+        }
+      }
+    }
+  }
+
   // ── adoption of components that already exist ─────────────────────────────
   const adminPages = files.filter((f) => rel(f).includes('src/pages/admin/'))
   const adoption = {}
@@ -312,6 +395,7 @@ function main() {
       fontSize: [...fontScale].sort((a, b) => a - b)
     },
     filesScanned: files.length,
+    cssScanned: cssFiles().length,
     violations: {
       color: findings.color.length,
       fontSize: findings.fontSize.length,
@@ -345,7 +429,7 @@ function report(r, findings) {
   const line = '='.repeat(66)
   console.log('Design token drift')
   console.log(line)
-  console.log('  files scanned          ' + r.filesScanned + ' .jsx under src/')
+  console.log('  files scanned          ' + r.filesScanned + ' .jsx, ' + r.cssScanned + ' .css under src/')
   console.log('  spacing scale          ' + (r.scales.spacing.join(', ') || '(none found)'))
   console.log('  font-size scale        ' + (r.scales.fontSize.join(', ') || '(NONE DEFINED - see step 1)'))
   console.log('')

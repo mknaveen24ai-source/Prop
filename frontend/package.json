@@ -31,7 +31,7 @@
     "lint:strict": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",
     "design:drift": "node scripts/design-drift.js",
-    "design:drift:ci": "node scripts/design-drift.js --max 546"
+    "design:drift:ci": "node scripts/design-drift.js --max 753"
   },
   "browserslist": {
     "production": [
