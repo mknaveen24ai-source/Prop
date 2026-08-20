@@ -658,3 +658,26 @@ button.lx-card-row:focus-visible { outline: 2px solid var(--ink); outline-offset
 @media (hover: hover) {
   .lx-table tbody tr:hover td { background: var(--paper-2); }
 }
+
+/* ── Figures ─────────────────────────────────────────────────────────────────
+   Anything set in the mono face is a NUMBER on this platform -- prices, PnL,
+   balances, lot sizes, countdowns, account ids. Proportional digits let a column
+   of them jitter horizontally as the last digit changes, which on a live price
+   feed updating every second reads as the whole table twitching.
+
+   tabular-nums fixes every digit to the same advance width, so a price ticking
+   1.16584 -> 1.16585 changes the glyph and nothing else. Three components had
+   this individually; applying it wherever the mono face is used covers the ones
+   that were missed, and any added later.
+
+   Scoped to the font rather than to a component list on purpose: the rule then
+   cannot go stale when someone adds a new numeric surface.
+   ───────────────────────────────────────────────────────────────────────── */
+[style*="--font-mono"],
+.lx-mono,
+.lx-table td,
+.lx-stat__value,
+.lx-badge {
+  font-variant-numeric: tabular-nums;
+}
+

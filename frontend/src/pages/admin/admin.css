@@ -704,7 +704,13 @@
 }
 .admin-toggle input:checked + .admin-toggle-slider:before {
   transform: translateX(20px);
-  background-color: #fff;
+  /* The knob sits on --admin-accent, which is bright gold in dark mode and a
+     much darker gold in light. A fixed #fff therefore had poor contrast on the
+     dark theme's bright track and was only coincidentally right on the light
+     one. --paper is the ground colour, which inverts with the theme and is the
+     convention the rest of the system already uses for anything sitting on a
+     solid accent surface (see .lx-btn--primary). */
+  background-color: var(--paper);
 }
 .admin-toggle input:disabled + .admin-toggle-slider { opacity: 0.5; cursor: not-allowed; }
 
