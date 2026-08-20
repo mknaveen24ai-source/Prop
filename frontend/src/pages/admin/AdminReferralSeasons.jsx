@@ -54,19 +54,19 @@ function CreateSeasonForm({ onCreate, creating }) {
         <h3 style={{ margin: '0 0 4px' }}>Create Referral Season</h3>
       </div>
       <label style={{ gridColumn: '1 / -1' }}>
-        <div style={{ fontSize: '12px', opacity: 0.7, marginBottom: '4px' }}>Title</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Title</div>
         <input style={inputStyle} value={form.title} onChange={(e) => update('title', e.target.value)} required />
       </label>
       <label style={{ gridColumn: '1 / -1' }}>
-        <div style={{ fontSize: '12px', opacity: 0.7, marginBottom: '4px' }}>Description (shown to traders, optional)</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Description (shown to traders, optional)</div>
         <input style={inputStyle} value={form.description} onChange={(e) => update('description', e.target.value)} />
       </label>
       <label>
-        <div style={{ fontSize: '12px', opacity: 0.7, marginBottom: '4px' }}>Start</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Start</div>
         <input type="datetime-local" style={inputStyle} value={form.start_at} onChange={(e) => update('start_at', e.target.value)} required />
       </label>
       <label>
-        <div style={{ fontSize: '12px', opacity: 0.7, marginBottom: '4px' }}>End</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>End</div>
         <input type="datetime-local" style={inputStyle} value={form.end_at} onChange={(e) => update('end_at', e.target.value)} required />
       </label>
       <div style={{ gridColumn: '1 / -1' }}>
@@ -170,7 +170,7 @@ export default function AdminReferralSeasons() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h1 className="admin-h1">Referral Seasons</h1>
-          <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+          <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
             Time-boxed periods ranking affiliates by new paying referrals, separate from the lifetime
             commission-tier ladder. Winners are ranked automatically when a season ends and, if a rank has a
             voucher configured, receive a free challenge account.

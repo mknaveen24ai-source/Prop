@@ -80,7 +80,7 @@ export default function AdminAnalytics() {
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(22px, 2.4vw, 28px)', fontWeight: 700, color: 'var(--admin-text)', margin: '4px 0 8px' }}>
           {TABS.find((t) => t.key === activeTab)?.label}
         </h1>
-        <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px', maxWidth: '640px' }}>
+        <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)', maxWidth: '640px' }}>
           {TAB_SUBTITLES[activeTab]}
         </p>
       </div>

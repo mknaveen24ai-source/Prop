@@ -69,8 +69,8 @@ export default function Drawer({ open, onClose, title, subtitle, children }) {
           >
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '3px double var(--rule)', paddingBottom: 'var(--space-3)', marginBottom: 'var(--space-5)' }}>
               <div>
-                {title && <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 700, color: 'var(--ink)', margin: 0 }}>{title}</h3>}
-                {subtitle && <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: 'var(--space-1)' }}>{subtitle}</div>}
+                {title && <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-2xl)', fontWeight: 700, color: 'var(--ink)', margin: 0 }}>{title}</h3>}
+                {subtitle && <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: 'var(--space-1)' }}>{subtitle}</div>}
               </div>
               <button
                 type="button"

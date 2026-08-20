@@ -144,13 +144,13 @@ We encourage you to review this policy periodically. Your continued use of the p
       }}>
         <span
           onClick={() => navigate('/')}
-          style={{ fontFamily: 'var(--font-ui)', fontSize: '22px', fontWeight: '700', color: 'var(--accent)', letterSpacing: '0.12em', cursor: 'pointer' }}
+          style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--fs-3xl)', fontWeight: '700', color: 'var(--accent)', letterSpacing: '0.12em', cursor: 'pointer' }}
         >
           PROP FIRM
         </span>
         <button onClick={() => navigate(-1)} className="btn" style={{
           background: 'transparent', border: '1px solid var(--navy-border)',
-          color: 'var(--text-muted)', padding: '8px 20px', fontSize: '13px'
+          color: 'var(--text-muted)', padding: '8px 20px', fontSize: 'var(--fs-base)'
         }}>
           ← Back
         </button>
@@ -165,18 +165,18 @@ We encourage you to review this policy periodically. Your continued use of the p
         <div style={{
           display: 'inline-block', background: 'color-mix(in srgb, var(--muted) 10%, transparent)',
           border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)', borderRadius: 'var(--radius-pill)',
-          padding: '5px 14px', fontSize: '11px', color: 'var(--cyan)',
+          padding: '5px 14px', fontSize: 'var(--fs-xs)', color: 'var(--cyan)',
           letterSpacing: '0.1em', marginBottom: '20px'
         }}>
           LEGAL DOCUMENT
         </div>
         <h1 style={{
-          fontFamily: 'var(--font-display)', fontSize: '40px', fontWeight: '700',
+          fontFamily: 'var(--font-display)', fontSize: 'var(--fs-6xl)', fontWeight: '700',
           marginBottom: '12px', color: 'var(--text)'
         }}>
           Privacy Policy
         </h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>
           Last updated: {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
         </p>
       </div>
@@ -188,7 +188,7 @@ We encourage you to review this policy periodically. Your continued use of the p
           background: 'color-mix(in srgb, var(--muted) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--muted) 15%, transparent)',
             padding: '24px 28px', marginBottom: '40px'
         }}>
-          <p style={{ color: 'var(--text)', lineHeight: '1.8', fontSize: '14px', margin: 0 }}>
+          <p style={{ color: 'var(--text)', lineHeight: '1.8', fontSize: 'var(--fs-md)', margin: 0 }}>
             This Privacy Policy explains how we collect, use, and protect your personal information when you use our platform. We are committed to handling your data responsibly and transparently, in compliance with GDPR and applicable data protection laws.
           </p>
         </div>
@@ -212,11 +212,11 @@ We encourage you to review this policy periodically. Your continued use of the p
                 border: 'none', cursor: 'pointer', color: 'var(--text)', textAlign: 'left'
               }}
             >
-              <span style={{ fontFamily: 'var(--font-ui)', fontSize: '14px', fontWeight: '600', letterSpacing: '0.05em' }}>
+              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--fs-md)', fontWeight: '600', letterSpacing: '0.05em' }}>
                 {section.title}
               </span>
               <span style={{
-                color: 'var(--cyan)', fontSize: '18px', transition: 'transform 0.2s ease',
+                color: 'var(--cyan)', fontSize: 'var(--fs-xl)', transition: 'transform 0.2s ease',
                 transform: activeSection === section.id ? 'rotate(45deg)' : 'rotate(0deg)',
                 display: 'inline-block'
               }}>+</span>
@@ -225,7 +225,7 @@ We encourage you to review this policy periodically. Your continued use of the p
             {activeSection === section.id && (
               <div style={{ padding: '0 24px 24px', borderTop: '1px solid var(--navy-border)' }}>
                 <p style={{
-                  color: 'var(--text-muted)', lineHeight: '1.9', fontSize: '14px',
+                  color: 'var(--text-muted)', lineHeight: '1.9', fontSize: 'var(--fs-md)',
                   whiteSpace: 'pre-line', margin: '20px 0 0'
                 }}>
                   {section.content}
@@ -240,7 +240,7 @@ We encourage you to review this policy periodically. Your continued use of the p
           marginTop: '40px', padding: '24px', background: 'var(--navy-mid)',
           border: '1px solid var(--navy-border)',   textAlign: 'center'
         }}>
-          <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0, lineHeight: '1.7' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', margin: 0, lineHeight: '1.7' }}>
             For privacy-related requests or concerns, contact our data protection team at<br />
             <span style={{ color: 'var(--cyan)' }}>privacy@propfirm.com</span>
           </p>

@@ -92,7 +92,7 @@ export default function RiskViolationTab() {
   };
 
   const drawdownColumns = [
-    { header: 'User ID', render: (row) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>{row.userId}</span> },
+    { header: 'User ID', render: (row) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)' }}>{row.userId}</span> },
     { header: 'Current DD', render: (row) => <span style={{ fontFamily: 'var(--font-mono)', color: row.currentDD >= row.maxAllowedDD ? 'var(--admin-danger)' : 'var(--admin-text)' }}>{row.currentDD}%</span> },
     { header: 'Max Allowed', render: (row) => `${row.maxAllowedDD}%` },
     { header: '14-Day Trend', render: (row) => <Sparkline data={row.ddTrend} dataKey="value" danger={row.currentDD >= row.maxAllowedDD} /> },
@@ -100,11 +100,11 @@ export default function RiskViolationTab() {
   ];
 
   const violationColumns = [
-    { header: 'User ID', render: (row) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>{row.user_id}</span> },
+    { header: 'User ID', render: (row) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)' }}>{row.user_id}</span> },
     { header: 'Violation Type', key: 'violation_type' },
     { header: 'Timestamp', render: (row) => new Date(row.first_detected_at).toLocaleString(), isMono: true },
     { header: 'Account Status', render: (row) => { const b = accountStatusBadgeProps(row.account_status); return <AdminBadge bracket status={b.status} label={b.label} />; } },
-    { header: 'Message', render: (row) => <span style={{ fontSize: '12px', color: 'var(--admin-text-muted)' }}>{row.message}</span> },
+    { header: 'Message', render: (row) => <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)' }}>{row.message}</span> },
   ];
 
   return (
@@ -119,7 +119,7 @@ export default function RiskViolationTab() {
       <AdminChart title="Account Breach Status Overview" height={240}>
         <PieChart>
           <Tooltip {...chartThemeProps.tooltip} />
-          <Legend wrapperStyle={{ fontSize: '12px' }} />
+          <Legend wrapperStyle={{ fontSize: 'var(--fs-sm)' }} />
           <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={78} paddingAngle={4} dataKey="value" stroke="var(--admin-surface)" strokeWidth={2}>
             {pieData.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
           </Pie>
@@ -152,7 +152,7 @@ export default function RiskViolationTab() {
       <AdminModal isOpen={!!evidenceRow} onClose={() => setEvidenceRow(null)} title={evidenceRow ? `Violation #${evidenceRow.id} — ${evidenceRow.violation_type}` : ''} size="lg">
         {evidenceRow && (
           <div>
-            <p style={{ fontSize: '13px', color: 'var(--admin-text-muted)', marginBottom: '16px' }}>{evidenceRow.message}</p>
+            <p style={{ fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)', marginBottom: '16px' }}>{evidenceRow.message}</p>
             <Card flush style={{ marginBottom: '24px' }}>
               <AdminDataTable
                 columns={[

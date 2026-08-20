@@ -179,8 +179,8 @@ export default function AdminSidebar({
             <div className="admin-avatar">{initials}</div>
             {!isCollapsed && (
               <div style={{ flex: 1, overflow: 'hidden' }}>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--ink)' }}>{profileName}</div>
-                <div style={{ fontSize: '11px', color: 'var(--admin-text-faint)' }}>{profileRole}</div>
+                <div style={{ fontSize: 'var(--fs-base)', fontWeight: 600, color: 'var(--ink)' }}>{profileName}</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-faint)' }}>{profileRole}</div>
               </div>
             )}
           </div>

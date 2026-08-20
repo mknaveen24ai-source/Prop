@@ -67,13 +67,13 @@ export default function LandingWallOfLove() {
                     background: 'var(--warn)',
                   }} />
                   <div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '14px', color: 'var(--ink)' }}>{t.role}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'var(--font-mono)' }}>{t.program}</div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 'var(--fs-md)', color: 'var(--ink)' }}>{t.role}</div>
+                    <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'var(--font-mono)' }}>{t.program}</div>
                   </div>
                 </div>
 
                 {/* Text */}
-                <p className="mp-p-body" style={{ fontSize: '14px', lineHeight: 1.7, color: 'var(--muted)' }}>
+                <p className="mp-p-body" style={{ fontSize: 'var(--fs-md)', lineHeight: 1.7, color: 'var(--muted)' }}>
                   {t.text}
                 </p>
               </div>

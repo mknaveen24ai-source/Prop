@@ -113,7 +113,7 @@ export default function AdminTradingEconomics() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
         <div>
           <h1 className="admin-h1">Trading Economics</h1>
-          <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+          <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
             Per-symbol commission and execution slippage, configurable per account tier. Leave a field blank to fall back
             to the tier's "Default" row, then to the platform-wide default (${defaultCommission}/lot commission, {defaultSlippage} pips max adverse slippage).
             Changes take effect within 30 seconds.

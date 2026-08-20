@@ -80,7 +80,7 @@ export default function AdminAffiliatePayouts() {
   return (
     <div style={{ padding: '24px' }}>
       <h1 className="admin-h1">Affiliate Payouts</h1>
-      <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px', marginBottom: '24px' }}>
+      <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)', marginBottom: '24px' }}>
         Approving settles the affiliate's entire current available balance (not just the requested amount, if it has since grown).
       </p>
 
@@ -123,7 +123,7 @@ export default function AdminAffiliatePayouts() {
               <tr key={row.id}>
                 <td className="admin-td">
                   <div>{row.full_name}</div>
-                  <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>{row.email}</div>
+                  <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>{row.email}</div>
                 </td>
                 <td className="admin-td">{formatMoney(row.amount_requested)}</td>
                 <td className="admin-td">{row.payment_method}</td>
@@ -147,7 +147,7 @@ export default function AdminAffiliatePayouts() {
       {totalPages > 1 && (
         <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'center' }}>
           <button className="admin-btn admin-btn-sm" disabled={data.page <= 1} onClick={() => fetchPayouts(data.page - 1, status)}>Previous</button>
-          <span style={{ padding: '6px 12px', fontSize: '13px', color: 'var(--admin-text-muted)' }}>Page {data.page} of {totalPages}</span>
+          <span style={{ padding: '6px 12px', fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)' }}>Page {data.page} of {totalPages}</span>
           <button className="admin-btn admin-btn-sm" disabled={data.page >= totalPages} onClick={() => fetchPayouts(data.page + 1, status)}>Next</button>
         </div>
       )}

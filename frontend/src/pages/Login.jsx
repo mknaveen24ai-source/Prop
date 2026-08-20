@@ -45,10 +45,10 @@ function TotpInput({ onSubmit, onBack, loading, error }) {
             <path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="var(--accent)" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
         </div>
-        <h2 style={{ color: 'var(--text)', fontSize: '20px', margin: '0 0 6px' }}>
+        <h2 style={{ color: 'var(--text)', fontSize: 'var(--fs-2xl)', margin: '0 0 6px' }}>
           Two-Factor Authentication
         </h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '13px', lineHeight: '1.5' }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', lineHeight: '1.5' }}>
           Enter the 6-digit code from your authenticator app.<br />
           Or paste a backup code.
         </p>
@@ -77,7 +77,7 @@ function TotpInput({ onSubmit, onBack, loading, error }) {
           width: '100%', background: 'transparent',
           border: '1px solid var(--navy-border)', color: 'var(--text-muted)',
           padding: '10px', cursor: 'pointer',
-          fontSize: '13px', fontFamily: 'var(--font-ui)'
+          fontSize: 'var(--fs-base)', fontFamily: 'var(--font-ui)'
         }}
       >
         ← Back to login
@@ -243,10 +243,10 @@ function Login({ onLogin, initialMode = 'login' }) {
         {mode !== 'totp' && (
           <div style={{ textAlign: 'center', marginBottom: '32px' }}>
             <span className="auth-eyebrow" style={{ display: 'block', marginBottom: '12px' }}>{modeEyebrow}</span>
-            <h1 style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: '8px' }}>
+            <h1 style={{ fontSize: 'var(--fs-4xl)', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: '8px' }}>
               Sign in to {tenant?.name || 'your portal'}.
             </h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-md)' }}>
               {mode === 'login'  && (tenant?.brand?.tagline || 'Sign in to your account')}
               {mode === 'forgot' && 'Reset your password'}
               {mode === 'reset'  && 'Set new password'}
@@ -312,7 +312,7 @@ function Login({ onLogin, initialMode = 'login' }) {
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', marginTop: '-4px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-muted)', cursor: 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', cursor: 'pointer' }}>
                 <input
                   type="checkbox"
                   checked={rememberMe}
@@ -326,7 +326,7 @@ function Login({ onLogin, initialMode = 'login' }) {
                 onClick={() => { setMode('forgot'); setError(''); setSuccess('') }}
                 className="auth-text-link"
                 style={{
-                  background: 'transparent', border: 'none', fontSize: '12px',
+                  background: 'transparent', border: 'none', fontSize: 'var(--fs-sm)',
                   cursor: 'pointer', padding: 0
                 }}
               >
@@ -348,7 +348,7 @@ function Login({ onLogin, initialMode = 'login' }) {
         {/* ── FORGOT PASSWORD FORM ── */}
         {mode === 'forgot' && (
           <form onSubmit={handleForgot}>
-            <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '20px', lineHeight: '1.6' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: '20px', lineHeight: '1.6' }}>
               Enter the email address associated with your account and we'll send you a reset link.
             </p>
             <div className="input-group">
@@ -387,7 +387,7 @@ function Login({ onLogin, initialMode = 'login' }) {
         {/* ── RESET PASSWORD FORM ── */}
         {mode === 'reset' && (
           <form onSubmit={handleReset}>
-            <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '20px', lineHeight: '1.6' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: '20px', lineHeight: '1.6' }}>
               Enter the reset code from your email, then set a new password.
             </p>
 
@@ -443,18 +443,18 @@ function Login({ onLogin, initialMode = 'login' }) {
                   ))}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Password strength</span>
-                  <span style={{ fontSize: '11px', fontWeight: '600', color: resetStrength.color }}>
+                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)' }}>Password strength</span>
+                  <span style={{ fontSize: 'var(--fs-xs)', fontWeight: '600', color: resetStrength.color }}>
                     {resetStrength.label}
                   </span>
                 </div>
                 <div className="ui-cols ui-cols--keep-2" style={{ '--cols-gap': '3px' }}>
                   {resetStrength.checks.map(c => (
                     <div key={c.label} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <span style={{ fontSize: '10px', color: c.pass ? 'var(--muted)' : 'var(--text-dim)' }}>
+                      <span style={{ fontSize: 'var(--fs-2xs)', color: c.pass ? 'var(--muted)' : 'var(--text-dim)' }}>
                         {c.pass ? '✓' : '○'}
                       </span>
-                      <span style={{ fontSize: '11px', color: c.pass ? 'var(--text-muted)' : 'var(--text-dim)' }}>
+                      <span style={{ fontSize: 'var(--fs-xs)', color: c.pass ? 'var(--text-muted)' : 'var(--text-dim)' }}>
                         {c.label}
                       </span>
                     </div>
@@ -475,7 +475,7 @@ function Login({ onLogin, initialMode = 'login' }) {
         )}
 
         {mode === 'login' && (
-          <p style={{ textAlign: 'center', marginTop: '24px', color: 'var(--text-muted)', fontSize: '14px' }}>
+          <p style={{ textAlign: 'center', marginTop: '24px', color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>
             No account?{' '}
             <Link to="/register" style={{ color: 'var(--accent)' }}>Register here</Link>
           </p>

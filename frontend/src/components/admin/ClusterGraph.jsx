@@ -46,7 +46,7 @@ export default function ClusterGraph({ nodes = [], edges = [] }) {
   }, [nodes]);
 
   if (nodes.length === 0) {
-    return <p style={{ color: 'var(--admin-text-muted)', fontSize: '12px' }}>No graph data.</p>;
+    return <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)' }}>No graph data.</p>;
   }
 
   return (

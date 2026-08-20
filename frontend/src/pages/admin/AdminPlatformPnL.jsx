@@ -302,7 +302,7 @@ export default function AdminPlatformPnL() {
     <>
       <div style={{ marginBottom: '24px' }}>
         <h1 className="admin-h1">Platform P&amp;L</h1>
-        <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+        <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
           Review B-book edge, fee revenue, and recent funded-trade outcomes with saved views and export controls.
         </p>
       </div>
@@ -333,7 +333,7 @@ export default function AdminPlatformPnL() {
                 <XAxis dataKey="month" {...chartThemeProps.xAxis} />
                 <YAxis {...chartThemeProps.yAxis} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
                 <Tooltip {...chartThemeProps.tooltip} formatter={(value) => `$${Number(value).toLocaleString()}`} />
-                <Legend wrapperStyle={{ fontSize: '12px' }} />
+                <Legend wrapperStyle={{ fontSize: 'var(--fs-sm)' }} />
                 <Bar dataKey="fees" fill="var(--gain)" name="Fees" radius={[3, 3, 0, 0]} />
                 <Bar dataKey="payouts" fill="var(--loss)" name="Payouts" radius={[3, 3, 0, 0]} />
               </BarChart>
@@ -393,7 +393,7 @@ export default function AdminPlatformPnL() {
                     <div key={b.label} style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 0', borderBottom: '1px solid var(--rule-soft)' }}>
                       <span style={{ width: '9px', height: '9px', background: ['var(--loss)', 'var(--warn)', 'var(--gain)'][index % 3], flex: '0 0 auto' }} />
                       <span style={{ flex: 1, fontSize: '12.5px' }}>{b.label}</span>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--admin-text-muted)' }}>{formatMoney(b.amount)}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)' }}>{formatMoney(b.amount)}</span>
                     </div>
                   ))}
                 </>
@@ -481,7 +481,7 @@ export default function AdminPlatformPnL() {
           <AdminChart title="Pass / Fail Breakdown">
             <PieChart>
               <Tooltip {...chartThemeProps.tooltip} />
-              <Legend wrapperStyle={{ fontSize: '12px' }} />
+              <Legend wrapperStyle={{ fontSize: 'var(--fs-sm)' }} />
               <Pie
                 data={passFailData}
                 cx="50%"

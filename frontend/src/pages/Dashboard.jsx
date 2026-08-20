@@ -247,13 +247,13 @@ function Dashboard({ user, onLogout }) {
             <span style={{ display: 'inline-flex' }}>
               {renderIcon(c.icon, { size: 16, color: c.text })}
             </span>
-            <span style={{ flex: 1, fontSize: '13px', color: c.text, fontWeight: '500' }}>
+            <span style={{ flex: 1, fontSize: 'var(--fs-base)', color: c.text, fontWeight: '500' }}>
               {announcement.message}
             </span>
             <button
               onClick={dismissAnnouncement}
               aria-label="Dismiss announcement"
-              style={{ background: 'none', border: 'none', color: c.text, cursor: 'pointer', fontSize: '16px', opacity: 0.7, padding: '0 4px' }}
+              style={{ background: 'none', border: 'none', color: c.text, cursor: 'pointer', fontSize: 'var(--fs-lg)', opacity: 0.7, padding: '0 4px' }}
             >
               {renderIcon('close', { size: 16, color: c.text })}
             </button>
@@ -344,7 +344,7 @@ function Dashboard({ user, onLogout }) {
             {notifications.filter(n => !n.read).length > 0 && (
               <span className="lx-badge" style={{
                 position: 'absolute', top: '-6px', right: '-6px', color: 'var(--loss)',
-                padding: '1px 5px', fontSize: '9px',
+                padding: '1px 5px', fontSize: 'var(--fs-3xs)',
               }}>
                 {notifications.filter(n => !n.read).length}
               </span>
@@ -361,22 +361,22 @@ function Dashboard({ user, onLogout }) {
               border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', boxShadow: 'var(--elev-lg)'
             }}>
               <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--rule)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontFamily: 'var(--font-display)', fontSize: '14px', color: 'var(--accent)' }}>Notifications</span>
+                <span style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-md)', color: 'var(--accent)' }}>Notifications</span>
                 {notifications.length > 0 && (
-                  <button onClick={clearNotifications} style={{ border: 'none', background: 'transparent', color: 'var(--muted)', fontSize: '11px', cursor: 'pointer' }}>Clear all</button>
+                  <button onClick={clearNotifications} style={{ border: 'none', background: 'transparent', color: 'var(--muted)', fontSize: 'var(--fs-xs)', cursor: 'pointer' }}>Clear all</button>
                 )}
               </div>
               <div style={{ overflowY: 'auto', maxHeight: '340px' }}>
                 {notifications.length === 0 ? (
-                  <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: '13px' }}>No notifications yet</div>
+                  <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>No notifications yet</div>
                 ) : (
                   notifications.map(n => (
                     <div key={n.id} style={{
                       padding: '12px 16px', borderBottom: '1px solid var(--rule-soft)',
                       borderLeft: `3px solid ${n.type === 'error' ? 'var(--loss)' : n.type === 'success' ? 'var(--gain)' : 'var(--accent)'}`,
                     }}>
-                      <div style={{ fontSize: '13px', color: 'var(--ink)', marginBottom: '4px' }}>{n.message}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--muted)' }}>
+                      <div style={{ fontSize: 'var(--fs-base)', color: 'var(--ink)', marginBottom: '4px' }}>{n.message}</div>
+                      <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--muted)' }}>
                         {new Date(n.time).toLocaleString()}
                       </div>
                     </div>
@@ -448,7 +448,7 @@ function Dashboard({ user, onLogout }) {
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
                 {renderIcon('kyc', { size: 48, color: 'var(--accent)' })}
               </div>
-              <h3 className="page-title" style={{ marginBottom: '12px', fontSize: '20px' }}>KYC Required</h3>
+              <h3 className="page-title" style={{ marginBottom: '12px', fontSize: 'var(--fs-2xl)' }}>KYC Required</h3>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>Complete your identity verification to start trading.</p>
               <button className="btn btn-primary" onClick={() => setActivePage('kyc')} style={{ padding: '12px 32px' }}>Complete KYC</button>
             </Card>

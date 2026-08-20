@@ -97,8 +97,8 @@ export default function OrderPanel({
             {renderIcon('warning', { size: 16, color: 'var(--accent-red)' })}
           </span>
           <div>
-            <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--red)' }}>MARKET CLOSED</div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{marketStatus.reason}</div>
+            <div style={{ fontSize: 'var(--fs-sm)', fontWeight: '700', color: 'var(--red)' }}>MARKET CLOSED</div>
+            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '2px' }}>{marketStatus.reason}</div>
           </div>
         </div>
       )}
@@ -115,12 +115,12 @@ export default function OrderPanel({
           gap: '10px'
         }}>
           <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--green-light)', boxShadow: '0 0 6px var(--green-light)', display: 'inline-block', flexShrink: 0 }} />
-          <span style={{ fontSize: '12px', color: 'var(--green-light)', fontWeight: '700', letterSpacing: '0.08em' }}>MARKET OPEN</span>
+          <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--green-light)', fontWeight: '700', letterSpacing: '0.08em' }}>MARKET OPEN</span>
         </div>
       )}
 
       <div style={{ marginBottom: '16px' }}>
-        <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>INSTRUMENT</label>
+        <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>INSTRUMENT</label>
         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '8px' }}>
           {[
             { key: 'all', label: 'All', color: 'var(--accent)' },
@@ -137,7 +137,7 @@ export default function OrderPanel({
               onClick={() => setSymbolCategory(tab.key)}
               style={{
                 padding: '3px 9px',
-                fontSize: '10px',
+                fontSize: 'var(--fs-2xs)',
                 fontWeight: 700,
                 borderRadius: 'var(--radius-pill)',
                 cursor: 'pointer',
@@ -164,7 +164,7 @@ export default function OrderPanel({
           ))}
         </select>
         {availableInstruments.length === 0 && (
-          <div style={{ fontSize: '11px', color: 'var(--red)', marginTop: '6px' }}>
+          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--red)', marginTop: '6px' }}>
             No live instruments are currently available on this feed.
           </div>
         )}
@@ -172,14 +172,14 @@ export default function OrderPanel({
 
       <div className="order-panel-price-card">
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '10px', color: 'var(--red)', marginBottom: '4px', letterSpacing: '0.08em' }}>BID</div>
-          <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{bid}</div>
+          <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--red)', marginBottom: '4px', letterSpacing: '0.08em' }}>BID</div>
+          <div style={{ fontSize: 'var(--fs-4xl)', fontWeight: '800', color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{bid}</div>
         </div>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '10px', color: 'var(--green)', marginBottom: '4px', letterSpacing: '0.08em' }}>ASK</div>
-          <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{ask}</div>
+          <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--green)', marginBottom: '4px', letterSpacing: '0.08em' }}>ASK</div>
+          <div style={{ fontSize: 'var(--fs-4xl)', fontWeight: '800', color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{ask}</div>
         </div>
-        <div style={{ gridColumn: '1/-1', textAlign: 'center', fontSize: '10px', color: 'var(--text-muted)' }}>
+        <div style={{ gridColumn: '1/-1', textAlign: 'center', fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)' }}>
           Spread: {spread} pts
         </div>
       </div>
@@ -207,7 +207,7 @@ export default function OrderPanel({
       </div>
 
       <div style={{ marginBottom: '14px' }}>
-        <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+        <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
           LOT SIZE <span style={{ color: 'var(--text-dim)' }}>(min 0.01 - steps of 0.01)</span>
         </label>
         <input
@@ -227,7 +227,7 @@ export default function OrderPanel({
       </div>
 
       <div style={{ marginBottom: '14px' }}>
-        <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+        <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
           STOP LOSS <span style={{ color: 'var(--text-dim)' }}>(optional)</span>
         </label>
         <input
@@ -243,7 +243,7 @@ export default function OrderPanel({
       </div>
 
       <div style={{ marginBottom: '14px' }}>
-        <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+        <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
           TAKE PROFIT <span style={{ color: 'var(--text-dim)' }}>(optional)</span>
         </label>
         <input
@@ -265,9 +265,9 @@ export default function OrderPanel({
           borderRadius: '0',
           padding: '10px 12px',
           marginBottom: '16px',
-          fontSize: '12px'
+          fontSize: 'var(--fs-sm)'
         }}>
-          <div style={{ fontSize: '10px', color: 'var(--text-dim)', letterSpacing: '0.1em', marginBottom: '8px' }}>
+          <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-dim)', letterSpacing: '0.1em', marginBottom: '8px' }}>
             R:R CALCULATOR ({previewDirection.toUpperCase()} PREVIEW)
           </div>
           {orderMode === 'market' && (
@@ -288,7 +288,7 @@ export default function OrderPanel({
                       border: `1px solid ${active ? option.color : 'color-mix(in srgb, var(--muted) 20%, transparent)'}`,
                       background: active ? `color-mix(in srgb, ${option.color} 12%, transparent)` : 'transparent',
                       color: active ? option.color : 'var(--text-muted)',
-                      fontSize: '10px',
+                      fontSize: 'var(--fs-2xs)',
                       fontWeight: '700',
                       letterSpacing: '0.04em',
                       cursor: 'pointer'
@@ -305,19 +305,19 @@ export default function OrderPanel({
               and a media query cannot widen an inline grid. */}
           <div className="order-panel-rr-grid">
             <div>
-              <div style={{ color: 'var(--text-dim)', fontSize: '10px', marginBottom: '2px' }}>RISK</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-2xs)', marginBottom: '2px' }}>RISK</div>
               <div style={{ color: 'var(--red)', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>
                 {rrSummary.riskUSD != null ? `-${formatCurrency(rrSummary.riskUSD)}` : '-'}
               </div>
             </div>
             <div>
-              <div style={{ color: 'var(--text-dim)', fontSize: '10px', marginBottom: '2px' }}>REWARD</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-2xs)', marginBottom: '2px' }}>REWARD</div>
               <div style={{ color: 'var(--green)', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>
                 {rrSummary.rewardUSD != null ? `+${formatCurrency(rrSummary.rewardUSD)}` : '-'}
               </div>
             </div>
             <div>
-              <div style={{ color: 'var(--text-dim)', fontSize: '10px', marginBottom: '2px' }}>R:R RATIO</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-2xs)', marginBottom: '2px' }}>R:R RATIO</div>
               <div style={{ color: rrSummary.rr >= 2 ? 'var(--green)' : rrSummary.rr >= 1 ? 'var(--muted)' : 'var(--red)', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>
                 {rrSummary.rr != null ? `1:${rrSummary.rr}` : '-'}
               </div>
@@ -329,7 +329,7 @@ export default function OrderPanel({
       {orderMode === 'pending' && (
         <div style={{ marginBottom: '16px' }}>
           <div style={{ marginBottom: '14px' }}>
-            <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>ORDER TYPE</label>
+            <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>ORDER TYPE</label>
             {/* Columns live in .order-panel-type-grid (App.css) so the mobile
                 query can collapse them; an inline grid would outrank it. */}
             <div className="order-panel-type-grid">
@@ -352,8 +352,8 @@ export default function OrderPanel({
                     textAlign: 'left'
                   }}
                 >
-                  <div style={{ fontSize: '12px', fontWeight: '600', color: opt.color }}>{opt.label}</div>
-                  <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>{opt.desc}</div>
+                  <div style={{ fontSize: 'var(--fs-sm)', fontWeight: '600', color: opt.color }}>{opt.label}</div>
+                  <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', marginTop: '2px' }}>{opt.desc}</div>
                 </button>
               ))}
             </div>
@@ -364,7 +364,7 @@ export default function OrderPanel({
             borderRadius: '0',
             padding: '10px 12px',
             marginBottom: '14px',
-            fontSize: '11px',
+            fontSize: 'var(--fs-xs)',
             color: 'var(--text-muted)',
             lineHeight: '1.5'
           }}>
@@ -372,7 +372,7 @@ export default function OrderPanel({
           </div>
 
           <div style={{ marginBottom: '14px' }}>
-            <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>ORDER PRICE</label>
+            <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>ORDER PRICE</label>
             <input
               className="input-field"
               type="number"
@@ -385,7 +385,7 @@ export default function OrderPanel({
             />
           </div>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '12px', color: 'var(--text-muted)' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
             <input
               type="checkbox"
               checked={Boolean(orderForm.oco_enabled)}
@@ -402,7 +402,7 @@ export default function OrderPanel({
               padding: '12px',
               marginBottom: '14px'
             }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>OCO SIBLING ORDER</div>
+              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '8px' }}>OCO SIBLING ORDER</div>
               <select
                 className="select-field"
                 value={orderForm.oco_order_type || 'sell_stop'}
@@ -439,8 +439,8 @@ export default function OrderPanel({
             disabled={!selectedAccount || !priceData || !marketStatus.open || isSubmitting}
             style={{ flexDirection: 'column', padding: '16px 14px', fontWeight: 800, borderColor: 'var(--loss)', color: 'var(--loss)' }}
           >
-            <div style={{ fontSize: '10px', marginBottom: '4px', opacity: 0.7, letterSpacing: '0.1em' }}>SELL</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '18px' }}>{isSubmitting ? '...' : bid}</div>
+            <div style={{ fontSize: 'var(--fs-2xs)', marginBottom: '4px', opacity: 0.7, letterSpacing: '0.1em' }}>SELL</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xl)' }}>{isSubmitting ? '...' : bid}</div>
           </Button>
           <Button
             variant="secondary"
@@ -450,8 +450,8 @@ export default function OrderPanel({
             disabled={!selectedAccount || !priceData || !marketStatus.open || isSubmitting}
             style={{ flexDirection: 'column', padding: '16px 14px', fontWeight: 800, borderColor: 'var(--gain)', color: 'var(--gain)' }}
           >
-            <div style={{ fontSize: '10px', marginBottom: '4px', opacity: 0.7, letterSpacing: '0.1em' }}>BUY</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '18px' }}>{isSubmitting ? '...' : ask}</div>
+            <div style={{ fontSize: 'var(--fs-2xs)', marginBottom: '4px', opacity: 0.7, letterSpacing: '0.1em' }}>BUY</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xl)' }}>{isSubmitting ? '...' : ask}</div>
           </Button>
         </div>
       )}
@@ -474,22 +474,22 @@ export default function OrderPanel({
       )}
 
       {selectedAccount && (
-        <div className="order-panel-summary" style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+        <div className="order-panel-summary" style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
           <div className="order-panel-summary-row">
-            <span style={{ fontSize: '12px' }}>Balance</span>
+            <span style={{ fontSize: 'var(--fs-sm)' }}>Balance</span>
             <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: '15px', fontWeight: '700' }}>
               ${accountBalanceNum.toFixed(2)}
             </span>
           </div>
           <div className="order-panel-summary-row">
-            <span style={{ fontSize: '12px' }}>Floating Balance</span>
+            <span style={{ fontSize: 'var(--fs-sm)' }}>Floating Balance</span>
             <span style={{ color: floatingBalanceNum >= accountBalanceNum ? 'var(--green)' : 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: '15px', fontWeight: '700' }}>
               ${floatingBalanceNum.toFixed(2)}
             </span>
           </div>
           <div className="order-panel-summary-row">
-            <span style={{ fontSize: '11px' }}>Account</span>
-            <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
+            <span style={{ fontSize: 'var(--fs-xs)' }}>Account</span>
+            <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-xs)' }}>
               {selectedAccount.account_type.toUpperCase()} ${parseFloat(selectedAccount.account_size).toLocaleString()}
             </span>
           </div>

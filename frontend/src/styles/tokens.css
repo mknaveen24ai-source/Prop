@@ -95,6 +95,48 @@
   --space-9: 48px;
   --space-10: 64px;
 
+  /* ── Type scale ──────────────────────────────────────────────────────────
+     Added 2026-08-20. There was no font-size scale at all: tokens.css defined
+     spacing, radii, families and text COLOURS, but nothing for size. The result
+     was 30 distinct sizes hardcoded across the JSX, including 9.5px, 10.5px,
+     11.5px, 12.5px and 13.5px -- drift with nothing to migrate onto.
+
+     The steps are taken FROM the measured distribution rather than from a
+     textbook ratio, so the values already carrying the interface are exact
+     matches and adopting a token changes nothing on screen. 11/12/13px alone
+     account for 621 uses; a 1.25 modular scale would have moved every one of
+     them and turned a token migration into an unreviewable redesign.
+
+     The half-pixel sizes are deliberately absent. They round to a neighbour
+     during migration, which is the one place this scale is allowed to change
+     what is rendered, and those cases get looked at rather than scripted.
+
+     The top of the scale is spaced by what the display type actually uses --
+     28px (7 uses) and 40px (3) are real, while 26/32/34/36/38px are one-offs.
+     An evenly-spaced top end read better on paper and would have dragged every
+     hero numeral 4px, so the measurement won. */
+  --fs-3xs: 9px;    /* micro eyebrows, table superscripts */
+  --fs-2xs: 10px;   /* dense operator labels */
+  --fs-xs: 11px;    /* label default -- 218 uses */
+  --fs-sm: 12px;    /* secondary body -- 205 uses */
+  --fs-base: 13px;  /* body default -- 198 uses */
+  --fs-md: 14px;    /* comfortable body */
+  --fs-lg: 16px;    /* lead paragraph, small headings */
+  --fs-xl: 18px;    /* card headings */
+  --fs-2xl: 20px;   /* section headings */
+  --fs-3xl: 22px;   /* page headings */
+  --fs-4xl: 24px;   /* mastheads */
+  --fs-5xl: 28px;   /* display figures */
+  --fs-6xl: 40px;   /* hero numerals */
+  --fs-7xl: 48px;   /* the largest figure on any screen */
+
+  /* Line heights, so a size token does not need a hand-tuned partner every
+     time it is used. Tight for figures, relaxed for prose. */
+  --leading-tight: 1.15;
+  --leading-snug: 1.35;
+  --leading-normal: 1.55;
+  --leading-relaxed: 1.7;
+
   /* v3 "Noir Ledger": a real scale now that glass/glow carry more depth —
      still capped well short of a rounded app, but sm/lg/xl can differ. */
   --radius-sm: 3px;

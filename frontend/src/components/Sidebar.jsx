@@ -170,7 +170,7 @@ export default function Sidebar({
       badge = (
         <span className="badge badge-danger" style={{
           marginLeft: collapsed ? 0 : 'auto', flexShrink: 0,
-          padding: '2px 6px', fontSize: '10px', borderRadius: 'var(--radius-pill)',
+          padding: '2px 6px', fontSize: 'var(--fs-2xs)', borderRadius: 'var(--radius-pill)',
           position: collapsed ? 'absolute' : 'static',
           top: collapsed ? '2px' : undefined, right: collapsed ? '2px' : undefined,
         }}>
@@ -182,7 +182,7 @@ export default function Sidebar({
       badge = (
         <span className="badge badge-danger" style={{
           marginLeft: collapsed ? 0 : 'auto', flexShrink: 0,
-          padding: '2px 6px', fontSize: '10px', borderRadius: 'var(--radius-pill)',
+          padding: '2px 6px', fontSize: 'var(--fs-2xs)', borderRadius: 'var(--radius-pill)',
           position: collapsed ? 'absolute' : 'static',
           top: collapsed ? '2px' : undefined, right: collapsed ? '2px' : undefined,
         }}>
@@ -276,7 +276,7 @@ export default function Sidebar({
               alignItems: 'center',
               justifyContent: 'center',
               color: 'var(--paper)',
-              fontSize: '18px',
+              fontSize: 'var(--fs-xl)',
               boxShadow: '0 4px 12px var(--accent-glow)',
             }}
           >
@@ -294,7 +294,7 @@ export default function Sidebar({
                 <div style={{ fontSize: '15px', fontWeight: 800, letterSpacing: '0.02em', color: 'var(--text-primary)' }}>
                   PROP FIRM
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Trader Portal</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>Trader Portal</div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -320,7 +320,7 @@ export default function Sidebar({
                         display: 'flex', alignItems: 'center', gap: '6px', width: '100%',
                         border: 'none', background: 'transparent', cursor: 'pointer',
                         fontFamily: 'inherit',
-                        fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)',
+                        fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--text-muted)',
                         textTransform: 'uppercase', letterSpacing: '0.1em',
                         marginBottom: '8px', padding: '0 12px',
                       }}
@@ -408,7 +408,7 @@ export default function Sidebar({
               width: '32px', height: '32px', flexShrink: 0,
               borderRadius: '50%', background: 'var(--accent)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: 'var(--paper)', fontSize: '12px', fontWeight: 600,
+              color: 'var(--paper)', fontSize: 'var(--fs-sm)', fontWeight: 600,
             }}>
               {initials}
             </div>
@@ -421,10 +421,10 @@ export default function Sidebar({
                   transition={{ duration: 0.2 }}
                   style={{ flex: 1, overflow: 'hidden', minWidth: 0 }}
                 >
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <div style={{ fontSize: 'var(--fs-base)', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {displayName}
                   </div>
-                  <div style={{ fontSize: '11px', color: 'var(--success)' }}>• Active</div>
+                  <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--success)' }}>• Active</div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -499,7 +499,7 @@ export default function Sidebar({
                   <span style={{
                     position: 'absolute', top: '-4px', right: '-8px',
                     background: 'var(--accent)', color: 'var(--navy)',
-                    borderRadius: 'var(--radius-pill)', fontSize: '9px', fontWeight: '700',
+                    borderRadius: 'var(--radius-pill)', fontSize: 'var(--fs-3xs)', fontWeight: '700',
                     padding: '0 4px', lineHeight: '14px', minWidth: '14px',
                     textAlign: 'center'
                   }}>
@@ -507,7 +507,7 @@ export default function Sidebar({
                   </span>
                 )}
               </span>
-              <span style={{ fontSize: '10px', fontWeight: isActive ? '600' : '400', marginTop: '3px' }}>
+              <span style={{ fontSize: 'var(--fs-2xs)', fontWeight: isActive ? '600' : '400', marginTop: '3px' }}>
                 {item.label}
               </span>
             </button>
@@ -536,7 +536,7 @@ export default function Sidebar({
               }} />
             )}
           </span>
-          <span style={{ fontSize: '10px', fontWeight: showMoreSheet ? '600' : '400', marginTop: '3px' }}>
+          <span style={{ fontSize: 'var(--fs-2xs)', fontWeight: showMoreSheet ? '600' : '400', marginTop: '3px' }}>
             More
           </span>
         </button>
@@ -556,7 +556,7 @@ export default function Sidebar({
           <span style={{ display: 'inline-flex', lineHeight: 1 }}>
             {renderIcon('profile', { size: 18, color: activePage === 'profile' ? 'var(--accent)' : 'var(--text-muted)' })}
           </span>
-          <span style={{ fontSize: '10px', fontWeight: activePage === 'profile' ? '600' : '400', marginTop: '3px' }}>
+          <span style={{ fontSize: 'var(--fs-2xs)', fontWeight: activePage === 'profile' ? '600' : '400', marginTop: '3px' }}>
             Profile
           </span>
         </button>
@@ -596,7 +596,7 @@ export default function Sidebar({
                   </span>
                   <span className="sidebar-more-item__label">{item.label}</span>
                   {item.id === 'payouts' && pendingPayouts > 0 && (
-                    <span className="badge badge-danger" style={{ padding: '2px 6px', fontSize: '10px', borderRadius: 'var(--radius-pill)' }}>
+                    <span className="badge badge-danger" style={{ padding: '2px 6px', fontSize: 'var(--fs-2xs)', borderRadius: 'var(--radius-pill)' }}>
                       {pendingPayouts}
                     </span>
                   )}

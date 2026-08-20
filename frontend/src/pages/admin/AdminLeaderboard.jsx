@@ -255,7 +255,7 @@ export default function AdminLeaderboard() {
         render: (trader) => (
           <div>
             <div style={{ color: 'var(--admin-text)', fontWeight: 600 }}>{trader.full_name || 'Anonymous'}</div>
-            <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>{trader.email || 'No email'}</div>
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>{trader.email || 'No email'}</div>
           </div>
         )
       },
@@ -270,7 +270,7 @@ export default function AdminLeaderboard() {
         render: (trader) => (
           <div>
             <div className="admin-td-mono">{trader.account_uid || 'N/A'}</div>
-            <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>
               {formatMoney(trader.account_size)}
             </div>
           </div>
@@ -343,7 +343,7 @@ export default function AdminLeaderboard() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', gap: '16px', flexWrap: 'wrap' }}>
         <div>
           <h1 className="admin-h1">Leaderboard Management</h1>
-          <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+          <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
             Curate which funded traders appear on the public leaderboard and review the top visible performers.
           </p>
         </div>

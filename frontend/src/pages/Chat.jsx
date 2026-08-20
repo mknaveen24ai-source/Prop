@@ -315,7 +315,7 @@ function Chat() {
           <span style={{ fontFamily: 'var(--font-display)', fontSize: '15px' }}>Conversations</span>
           <button
             onClick={() => setShowNewChat((v) => !v)}
-            style={{ padding: '5px 10px', border: '1px solid var(--accent)', borderRadius: '4px', background: 'transparent', color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.08em', textTransform: 'uppercase', cursor: 'pointer' }}
+            style={{ padding: '5px 10px', border: '1px solid var(--accent)', borderRadius: '4px', background: 'transparent', color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.08em', textTransform: 'uppercase', cursor: 'pointer' }}
           >
             + New
           </button>
@@ -330,7 +330,7 @@ function Chat() {
               onChange={(e) => setNewSubject(e.target.value)}
               disabled={sending}
               autoFocus
-              style={{ padding: '9px 10px', border: '1px solid var(--rule)', borderRadius: '4px', background: 'var(--paper)', color: 'var(--ink)', fontSize: '13px' }}
+              style={{ padding: '9px 10px', border: '1px solid var(--rule)', borderRadius: '4px', background: 'var(--paper)', color: 'var(--ink)', fontSize: 'var(--fs-base)' }}
             />
             <button type="submit" disabled={sending || !newSubject.trim()} className="lx-btn lx-btn--sm lx-btn--primary">
               {sending ? 'Creating…' : 'Start Chat'}
@@ -340,9 +340,9 @@ function Chat() {
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {loading ? (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: '13px' }}>Loading…</div>
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>Loading…</div>
           ) : conversations.length === 0 ? (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: '13px' }}>No conversations yet.</div>
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>No conversations yet.</div>
           ) : (
             conversations.map((conv) => {
               const active = selectedConversation?.id === conv.id
@@ -358,14 +358,14 @@ function Chat() {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.subject}</span>
+                    <span style={{ fontSize: 'var(--fs-base)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.subject}</span>
                     {conv.unread_user_count > 0 && (
                       <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', color: 'var(--paper)', background: 'var(--accent)', borderRadius: '99px', padding: '1px 6px', flex: '0 0 auto' }}>{conv.unread_user_count}</span>
                     )}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                     <span className="lx-badge" style={{ color: getStatusToneColor(conv.status) }}>{conv.status}</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)' }}>{conv.last_message_at ? formatTime(conv.last_message_at) : ''}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', color: 'var(--muted)' }}>{conv.last_message_at ? formatTime(conv.last_message_at) : ''}</span>
                   </div>
                 </div>
               )
@@ -389,16 +389,16 @@ function Chat() {
               >
                 ←
               </button>
-              <div style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--accent)', flex: '0 0 auto' }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '50%', border: '1px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', color: 'var(--accent)', flex: '0 0 auto' }}>
                 {initialsOf(selectedConversation.assigned_to)}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '18px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedConversation.assigned_to || 'Support Desk'}</div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.13em', textTransform: 'uppercase', color: getStatusToneColor(selectedConversation.status), marginTop: '2px' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-xl)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedConversation.assigned_to || 'Support Desk'}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.13em', textTransform: 'uppercase', color: getStatusToneColor(selectedConversation.status), marginTop: '2px' }}>
                   ● {selectedConversation.status}
                 </div>
               </div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)', border: '1px solid var(--rule)', borderRadius: '99px', padding: '4px 10px', flex: '0 0 auto' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)', border: '1px solid var(--rule)', borderRadius: '99px', padding: '4px 10px', flex: '0 0 auto' }}>
                 Ticket #{selectedConversation.id}
               </div>
               {selectedConversation.status !== 'closed' && (
@@ -433,13 +433,13 @@ function Chat() {
                 )
               })}
               {supportTyping && (
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>Support is typing…</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', color: 'var(--muted)' }}>Support is typing…</div>
               )}
               <div ref={messagesEndRef} />
             </div>
 
             {selectedConversation.status === 'closed' ? (
-              <div style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', color: 'var(--muted)', borderTop: '1px solid var(--rule)' }}>
+              <div style={{ padding: '12px 16px', textAlign: 'center', fontSize: 'var(--fs-base)', color: 'var(--muted)', borderTop: '1px solid var(--rule)' }}>
                 This conversation is closed. Start a new chat if you need further assistance.
               </div>
             ) : (
@@ -456,7 +456,7 @@ function Chat() {
                 <button
                   type="submit"
                   disabled={sending || !newMessage.trim()}
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 18px', border: '1px solid var(--accent)', borderRadius: '4px', background: 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 18px', border: '1px solid var(--accent)', borderRadius: '4px', background: 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer' }}
                 >
                   {sending ? 'Sending…' : 'Send'}
                 </button>
@@ -466,11 +466,11 @@ function Chat() {
         ) : (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ textAlign: 'center', padding: '40px' }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '20px', marginBottom: '10px' }}>Welcome to Live Chat Support</div>
-              <p style={{ color: 'var(--muted)', fontSize: '13px', margin: '6px 0' }}>Start a conversation and the desk will pick it up here.</p>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-2xl)', marginBottom: '10px' }}>Welcome to Live Chat Support</div>
+              <p style={{ color: 'var(--muted)', fontSize: 'var(--fs-base)', margin: '6px 0' }}>Start a conversation and the desk will pick it up here.</p>
               <button
                 onClick={() => setShowNewChat(true)}
-                style={{ marginTop: '16px', padding: '11px 24px', border: '1px solid var(--accent)', borderRadius: '4px', background: 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer' }}
+                style={{ marginTop: '16px', padding: '11px 24px', border: '1px solid var(--accent)', borderRadius: '4px', background: 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer' }}
               >
                 Start a New Conversation
               </button>

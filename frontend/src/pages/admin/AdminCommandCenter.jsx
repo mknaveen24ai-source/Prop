@@ -658,7 +658,7 @@ export default function AdminCommandCenter() {
       render: (row) => (
         <div>
           <div style={{ color: 'var(--admin-text)', fontWeight: 600 }}>{row.full_name || 'Unnamed Trader'}</div>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>{row.email}</div>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>{row.email}</div>
         </div>
       )
     },
@@ -715,7 +715,7 @@ export default function AdminCommandCenter() {
       render: (row) => (
         <div>
           <div style={{ color: 'var(--admin-text)', fontWeight: 600 }}>{row.full_name || 'Unnamed Trader'}</div>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>{row.email}</div>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>{row.email}</div>
         </div>
       )
     },
@@ -735,7 +735,7 @@ export default function AdminCommandCenter() {
       render: (row) => (
         <div>
           <div style={{ color: 'var(--admin-text)' }}>{row.account_count || 0} total</div>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>{row.active_account_count || 0} active</div>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>{row.active_account_count || 0} active</div>
         </div>
       )
     },
@@ -770,7 +770,7 @@ export default function AdminCommandCenter() {
       render: (row) => (
         <div>
           <div className="admin-td-mono" style={{ color: 'var(--admin-text)', fontWeight: 700 }}>PAY-{String(row.id).padStart(5, '0')}</div>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>Account {row.account_uid || `#${row.account_id}`}</div>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>Account {row.account_uid || `#${row.account_id}`}</div>
         </div>
       )
     },
@@ -780,7 +780,7 @@ export default function AdminCommandCenter() {
       render: (row) => (
         <div>
           <div style={{ color: 'var(--admin-text)', fontWeight: 600 }}>{row.full_name || 'Unknown Trader'}</div>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>{row.email}</div>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>{row.email}</div>
         </div>
       )
     },
@@ -800,7 +800,7 @@ export default function AdminCommandCenter() {
       render: (row) => (
         <div>
           {row.is_flagged ? <AdminBadge status="warning" label="Flagged" /> : <AdminBadge status="success" label="Clean" />}
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px', marginTop: '6px' }}>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)', marginTop: '6px' }}>
             {row.open_disputes_count || 0} disputes, {row.critical_violations_count || 0} critical
           </div>
         </div>
@@ -891,7 +891,7 @@ export default function AdminCommandCenter() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
         <div>
           <h1 className="admin-h1">Command Center</h1>
-          <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+          <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
             Super-admin recovery, trader control, and money-risk queues in one workspace.
           </p>
         </div>
@@ -1101,11 +1101,11 @@ export default function AdminCommandCenter() {
         {actionContext && (
           <div style={{ display: 'grid', gap: '16px' }}>
             <div style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', padding: '14px' }}>
-              <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Target Summary</div>
+              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Target Summary</div>
               <div style={{ color: 'var(--admin-text)' }}>
                 {actionContext.scope === 'bulk' ? `${selectedActionRows.length} selected row(s)` : '1 selected row'}
               </div>
-              <div style={{ color: 'var(--admin-text-faint)', fontSize: '12px', marginTop: '8px', display: 'grid', gap: '4px' }}>
+              <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-sm)', marginTop: '8px', display: 'grid', gap: '4px' }}>
                 {selectedActionRows.slice(0, 4).map((row) => (
                   <div key={`${actionContext.action}-${row.id}`}>
                     {actionContext.tab === 'accounts'

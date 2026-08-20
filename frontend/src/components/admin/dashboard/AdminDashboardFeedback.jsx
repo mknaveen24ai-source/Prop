@@ -54,12 +54,12 @@ export function ErrorBanner({ message, onRetry }) {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <span style={{ fontSize: '20px' }}>!</span>
+        <span style={{ fontSize: 'var(--fs-2xl)' }}>!</span>
         <div>
           <div style={{ color: 'var(--admin-danger)', fontWeight: 600, marginBottom: '4px' }}>
             Dashboard data unavailable
           </div>
-          <div style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>{message}</div>
+          <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>{message}</div>
         </div>
       </div>
       <button className="admin-btn admin-btn-ghost" onClick={onRetry} style={{ flexShrink: 0 }}>

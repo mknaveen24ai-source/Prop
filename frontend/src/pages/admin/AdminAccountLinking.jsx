@@ -291,7 +291,7 @@ export default function AdminAccountLinking() {
       render: (row) => (
         <div>
           <div style={{ fontWeight: 600 }}>{row.member_count} accounts</div>
-          <div style={{ fontSize: '12px', color: 'var(--admin-text-muted)' }}>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)' }}>
             {(row.member_emails || []).slice(0, 2).join(', ')}
             {(row.member_emails || []).length > 2 ? ` +${row.member_emails.length - 2} more` : ''}
           </div>
@@ -308,7 +308,7 @@ export default function AdminAccountLinking() {
               key={type}
               className="admin-filter-chip"
               style={{
-                fontSize: '11px',
+                fontSize: 'var(--fs-xs)',
                 padding: '2px 8px',
                 cursor: 'default',
                 borderColor: STRONG_SIGNALS.has(type) ? 'var(--admin-danger, #e5484d)' : undefined,
@@ -394,7 +394,7 @@ export default function AdminAccountLinking() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
           <div>
             <h1 className="admin-h1">Account Linking</h1>
-            <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+            <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
               Suspected account sharing and challenge-passing services, scored from shared devices,
               networks, payout destinations, KYC documents and simultaneous order flow.
             </p>
@@ -561,13 +561,13 @@ export default function AdminAccountLinking() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               {graph && graph.nodes?.length > 0 && (
                 <div>
-                  <h3 style={{ fontSize: '13px', marginBottom: '8px' }}>Link graph</h3>
+                  <h3 style={{ fontSize: 'var(--fs-base)', marginBottom: '8px' }}>Link graph</h3>
                   <ClusterGraph nodes={graph.nodes} edges={graph.edges} />
                 </div>
               )}
 
               <div>
-                <h3 style={{ fontSize: '13px', marginBottom: '8px' }}>Linked traders</h3>
+                <h3 style={{ fontSize: 'var(--fs-base)', marginBottom: '8px' }}>Linked traders</h3>
                 <table className="admin-table" style={{ width: '100%' }}>
                   <thead>
                     <tr>
@@ -590,7 +590,7 @@ export default function AdminAccountLinking() {
               </div>
 
               <div>
-                <h3 style={{ fontSize: '13px', marginBottom: '8px' }}>Why these accounts were linked</h3>
+                <h3 style={{ fontSize: 'var(--fs-base)', marginBottom: '8px' }}>Why these accounts were linked</h3>
                 <table className="admin-table" style={{ width: '100%' }}>
                   <thead>
                     <tr><th>Signal</th><th>Detail</th><th>Traders</th><th>Weight</th></tr>
@@ -604,12 +604,12 @@ export default function AdminAccountLinking() {
                             label={SIGNAL_LABELS[item.evidence_type] || item.evidence_type}
                           />
                         </td>
-                        <td style={{ fontSize: '12px' }}>{item.evidence_label || item.evidence_value || '—'}</td>
+                        <td style={{ fontSize: 'var(--fs-sm)' }}>{item.evidence_label || item.evidence_value || '—'}</td>
                         <td>{item.distinct_users}</td>
                         <td>
                           {item.weight}
                           {item.detail?.entropy_factor !== undefined && item.detail.entropy_factor < 1 && (
-                            <span style={{ color: 'var(--admin-text-muted)', fontSize: '11px' }}>
+                            <span style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-xs)' }}>
                               {' '}(×{item.detail.entropy_factor} shared by {item.detail.distinct_users})
                             </span>
                           )}
@@ -618,7 +618,7 @@ export default function AdminAccountLinking() {
                     ))}
                   </tbody>
                 </table>
-                <p style={{ fontSize: '11px', color: 'var(--admin-text-muted)', marginTop: '8px' }}>
+                <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', marginTop: '8px' }}>
                   Weights are reduced the more users share a value — a device or network seen across many
                   accounts is usually shared infrastructure (office, VPN, browser anti-fingerprinting),
                   not a ring. Detection never locks or flags an account on its own.
@@ -626,7 +626,7 @@ export default function AdminAccountLinking() {
               </div>
 
               {detail.cluster?.resolution_note && (
-                <div style={{ fontSize: '12px', color: 'var(--admin-text-muted)' }}>
+                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)' }}>
                   <strong>Resolution:</strong> {detail.cluster.status} — {detail.cluster.resolution_note}
                   {detail.cluster.resolved_by ? ` (${detail.cluster.resolved_by})` : ''}
                 </div>

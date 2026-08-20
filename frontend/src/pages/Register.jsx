@@ -249,16 +249,16 @@ function Register({ onLogin }) {
       <span className="auth-eyebrow" style={{ display: 'block', marginBottom: '12px' }}>
         {step === STEP_OTP ? 'Phone Verification' : 'New Account'}
       </span>
-      <h1 style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: '8px' }}>
+      <h1 style={{ fontSize: 'var(--fs-4xl)', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: '8px' }}>
         {step === STEP_OTP ? 'Verify your phone' : `Create your ${tenant?.name || 'trading'} account.`}
       </h1>
-      <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+      <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-md)' }}>
         {step === STEP_OTP
           ? `Enter the 6-digit code sent to ${form.phone}`
           : tenant?.brand?.tagline || 'Join the premium prop firm today'}
       </p>
       {step === STEP_FORM && giftCode && giftPreview?.valid && (
-        <div style={{ marginTop: '16px', padding: '10px 16px', border: '1px solid var(--accent)', borderRadius: '6px', fontSize: '13px', color: 'var(--accent)' }}>
+        <div style={{ marginTop: '16px', padding: '10px 16px', border: '1px solid var(--accent)', borderRadius: '6px', fontSize: 'var(--fs-base)', color: 'var(--accent)' }}>
           🎁 You've been sent a free ${Number(giftPreview.account_size).toLocaleString()} challenge account — sign up to claim it.
         </div>
       )}
@@ -307,7 +307,7 @@ function Register({ onLogin }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <div style={{
                     width: '22px', height: '22px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '11px', fontWeight: 700, fontFamily: 'var(--font-mono)',
+                    fontSize: 'var(--fs-xs)', fontWeight: 700, fontFamily: 'var(--font-mono)',
                     background: done ? 'var(--accent)' : active ? 'var(--accent)' : 'var(--bg-hover)',
                     color: done || active ? 'var(--paper)' : 'var(--text-muted)',
                     border: `1.5px solid ${done || active ? 'var(--accent)' : 'var(--border)'}`,
@@ -315,7 +315,7 @@ function Register({ onLogin }) {
                   }}>
                     {done ? '✓' : i + 1}
                   </div>
-                  <span style={{ fontSize: '12px', fontWeight: active ? 600 : 400, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em', textTransform: 'uppercase', color: active ? 'var(--accent)' : 'var(--text-muted)' }}>{label}</span>
+                  <span style={{ fontSize: 'var(--fs-sm)', fontWeight: active ? 600 : 400, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em', textTransform: 'uppercase', color: active ? 'var(--accent)' : 'var(--text-muted)' }}>{label}</span>
                 </div>
               </React.Fragment>
             )
@@ -372,14 +372,14 @@ function Register({ onLogin }) {
                   ))}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>Password strength</span>
-                  <span style={{ fontSize: '11px', fontWeight: '600', color: strength.color }}>{strength.label}</span>
+                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)' }}>Password strength</span>
+                  <span style={{ fontSize: 'var(--fs-xs)', fontWeight: '600', color: strength.color }}>{strength.label}</span>
                 </div>
                 <div className="ui-cols ui-cols--keep-2" style={{ '--cols-gap': '3px' }}>
                   {strength.checks.map(c => (
                     <div key={c.label} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <span style={{ fontSize: '10px', color: c.pass ? strength.color : 'var(--text-dim)' }}>{c.pass ? '✓' : '○'}</span>
-                      <span style={{ fontSize: '11px', color: c.pass ? 'var(--text-muted)' : 'var(--text-dim)' }}>{c.label}</span>
+                      <span style={{ fontSize: 'var(--fs-2xs)', color: c.pass ? strength.color : 'var(--text-dim)' }}>{c.pass ? '✓' : '○'}</span>
+                      <span style={{ fontSize: 'var(--fs-xs)', color: c.pass ? 'var(--text-muted)' : 'var(--text-dim)' }}>{c.label}</span>
                     </div>
                   ))}
                 </div>
@@ -411,7 +411,7 @@ function Register({ onLogin }) {
               <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 PHONE / WHATSAPP
                 <span style={{
-                  fontSize: '10px', fontWeight: 600, padding: '2px 7px', borderRadius: 'var(--radius-pill)',
+                  fontSize: 'var(--fs-2xs)', fontWeight: 600, padding: '2px 7px', borderRadius: 'var(--radius-pill)',
                   background: 'color-mix(in srgb, var(--accent) 12%, transparent)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)'
                 }}>OTP REQUIRED</span>
               </label>
@@ -424,7 +424,7 @@ function Register({ onLogin }) {
                 placeholder="+91 9999999999 (with country code)"
                 required
               />
-              <p style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '5px', marginBottom: 0 }}>
+              <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginTop: '5px', marginBottom: 0 }}>
                 📱 We will send a verification code to this number. Your account will only be created after verification.
               </p>
             </div>
@@ -434,11 +434,11 @@ function Register({ onLogin }) {
               <input type="text" name="referred_by" className="input-field" value={form.referred_by} onChange={handleChange} placeholder="Enter referral code if you have one" />
               {form.referred_by.trim() && !checkingReferral && referralCheck && (
                 referralCheck.valid ? (
-                  <p style={{ fontSize: '11px', color: 'var(--gain)', marginTop: '5px', marginBottom: 0 }}>
+                  <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--gain)', marginTop: '5px', marginBottom: 0 }}>
                     ✓ Valid code — you'll get {referralCheck.discount_pct}% off your first challenge
                   </p>
                 ) : (
-                  <p style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '5px', marginBottom: 0 }}>
+                  <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginTop: '5px', marginBottom: 0 }}>
                     Code not recognized — you can still register without it
                   </p>
                 )
@@ -454,7 +454,7 @@ function Register({ onLogin }) {
             }}>
               <input type="checkbox" id="terms" checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)}
                 style={{ marginTop: '2px', accentColor: 'var(--accent)', cursor: 'pointer', flexShrink: 0 }} />
-              <label htmlFor="terms" style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.6', cursor: 'pointer' }}>
+              <label htmlFor="terms" style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', lineHeight: '1.6', cursor: 'pointer' }}>
                 I have read and agree to the{' '}
                 <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Terms of Service</a>,{' '}
                 <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Privacy Policy</a>, and{' '}
@@ -476,7 +476,7 @@ function Register({ onLogin }) {
               {loading ? 'Sending code…' : 'Send Verification Code →'}
             </button>
 
-            <p style={{ textAlign: 'center', marginTop: '24px', color: 'var(--text-muted)', fontSize: '14px' }}>
+            <p style={{ textAlign: 'center', marginTop: '24px', color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>
               Already have an account?{' '}
               <Link to="/login" style={{ color: 'var(--accent)' }}>Sign in here</Link>
             </p>
@@ -508,7 +508,7 @@ function Register({ onLogin }) {
                 style={{
                   background: 'none', border: 'none', cursor: otpCooldown > 0 ? 'default' : 'pointer',
                   color: otpCooldown > 0 ? 'var(--text-dim)' : 'var(--accent)',
-                  fontSize: '13px', padding: 0
+                  fontSize: 'var(--fs-base)', padding: 0
                 }}
               >
                 {otpCooldown > 0 ? `Resend in ${otpCooldown}s` : 'Resend code'}
@@ -516,7 +516,7 @@ function Register({ onLogin }) {
               <button
                 type="button"
                 onClick={() => { setStep(STEP_FORM); setError(''); setSuccess(''); setOtpCode('') }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '13px', padding: 0 }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 'var(--fs-base)', padding: 0 }}
               >
                 ← Change number
               </button>
@@ -532,7 +532,7 @@ function Register({ onLogin }) {
               {loading ? 'Verifying…' : 'Verify & Create Account'}
             </button>
 
-            <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '12px', color: 'var(--text-dim)', lineHeight: 1.6 }}>
+            <p style={{ textAlign: 'center', marginTop: '20px', fontSize: 'var(--fs-sm)', color: 'var(--text-dim)', lineHeight: 1.6 }}>
               The code is valid for <strong>5 minutes</strong>.<br/>
               Didn&apos;t receive it? Check that your number includes the country code (e.g. +91…).
             </p>

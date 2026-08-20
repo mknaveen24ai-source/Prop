@@ -66,10 +66,10 @@ export default function RiskWarningBanner({ floating = false }) {
     }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1 }}>
-        <span style={{ fontSize: '12px', fontWeight: 700, flexShrink: 0, marginTop: '2px', color: 'var(--muted)' }}>WARNING</span>
+        <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, flexShrink: 0, marginTop: '2px', color: 'var(--muted)' }}>WARNING</span>
         <p style={{
           color: 'var(--text-muted)',
-          fontSize: '12px',
+          fontSize: 'var(--fs-sm)',
           lineHeight: '1.6',
           margin: 0
         }}>
@@ -92,7 +92,7 @@ export default function RiskWarningBanner({ floating = false }) {
           color: 'var(--text-dim)',
           padding: '4px 12px',
           cursor: 'pointer',
-          fontSize: '12px',
+          fontSize: 'var(--fs-sm)',
           flexShrink: 0,
           fontFamily: 'var(--font-ui)'
         }}

@@ -22,7 +22,7 @@ function correlationCellStyle(value, isDiagonal) {
 
 function CorrelationMatrix({ userIds, matrix, labelFor }) {
   if (userIds.length === 0) {
-    return <p style={{ color: 'var(--admin-text-faint)', fontSize: '13px' }}>Not enough traders with overlapping trading days yet.</p>;
+    return <p style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-base)' }}>Not enough traders with overlapping trading days yet.</p>;
   }
   return (
     <Card style={{ overflowX: 'auto' }}>
@@ -31,7 +31,7 @@ function CorrelationMatrix({ userIds, matrix, labelFor }) {
           <tr>
             <th className="admin-th"></th>
             {userIds.map((id) => (
-              <th key={id} className="admin-th" style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{labelFor(id)}</th>
+              <th key={id} className="admin-th" style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)' }}>{labelFor(id)}</th>
             ))}
           </tr>
         </thead>
@@ -124,7 +124,7 @@ export default function TradeBehaviorTab() {
       <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '16px', marginTop: '24px', alignItems: 'stretch' }}>
         <Card>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--admin-text-muted)' }}>Avg R-Multiple</div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '28px', marginTop: '10px', color: avgRMultiple == null ? 'var(--admin-text-faint)' : avgRMultiple >= 0 ? 'var(--admin-success)' : 'var(--admin-danger)' }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: 'var(--fs-5xl)', marginTop: '10px', color: avgRMultiple == null ? 'var(--admin-text-faint)' : avgRMultiple >= 0 ? 'var(--admin-success)' : 'var(--admin-danger)' }}>
             {avgRMultiple == null ? '—' : `${avgRMultiple.toFixed(2)}R`}
           </div>
           <div style={{ fontSize: '11.5px', color: 'var(--admin-text-muted)', marginTop: '6px' }}>Platform-wide, last 5,000 closed trades. Only trades with a stop-loss count.</div>
@@ -146,7 +146,7 @@ export default function TradeBehaviorTab() {
       </Card>
 
       <h2 className="admin-h2">Trader Correlation Matrix</h2>
-      <p style={{ color: 'var(--admin-text-muted)', fontSize: '12px', marginBottom: '12px' }}>
+      <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)', marginBottom: '12px' }}>
         Cells at or above {COPY_TRADING_THRESHOLD.toFixed(2)} are flagged as a possible copy-trading signal. Requires at least 3 overlapping trading days between two traders.
       </p>
       <div style={{ marginBottom: '24px' }}>

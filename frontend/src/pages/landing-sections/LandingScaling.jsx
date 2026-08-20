@@ -55,7 +55,7 @@ export default function LandingScaling() {
                 <div style={{
                   display: 'inline-block', padding: '5px 14px',
                   background: 'transparent',
-                  fontSize: '11px',
+                  fontSize: 'var(--fs-xs)',
                   textTransform: 'uppercase', letterSpacing: '0.15em',
                   color: step.color, marginBottom: '16px',
                   border: `1px solid ${step.color}`,
@@ -63,7 +63,7 @@ export default function LandingScaling() {
                 }}>
                   {step.diff}
                 </div>
-                <h3 className="mp-h3" style={{ fontSize: '22px' }}>{step.title}</h3>
+                <h3 className="mp-h3" style={{ fontSize: 'var(--fs-3xl)' }}>{step.title}</h3>
                 <p className="mp-p-body">{step.text}</p>
 
                 {idx === 3 && (

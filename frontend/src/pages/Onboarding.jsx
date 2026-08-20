@@ -46,8 +46,8 @@ const STEPS = [
               border: '1px solid color-mix(in srgb, var(--muted) 15%, transparent)',
               padding: '8px 10px'
             }}>
-              <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginBottom: '2px' }}>{label}</div>
-            <div style={{ fontSize: '13px', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--font-mono)' }}>{val}</div>
+              <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-dim)', marginBottom: '2px' }}>{label}</div>
+            <div style={{ fontSize: 'var(--fs-base)', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--font-mono)' }}>{val}</div>
             </div>
           ))}
         </div>
@@ -163,7 +163,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
           style={{
             position: 'absolute', top: '16px', right: '16px',
             background: 'transparent', border: 'none',
-            color: 'var(--text-dim)', fontSize: '12px',
+            color: 'var(--text-dim)', fontSize: 'var(--fs-sm)',
             cursor: 'pointer', padding: '4px 8px'
           }}
         >
@@ -189,7 +189,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
         </div>
 
         {/* Icon */}
-        <div style={{ fontSize: '48px', marginBottom: '16px', lineHeight: 1 }}>
+        <div style={{ fontSize: 'var(--fs-7xl)', marginBottom: '16px', lineHeight: 1 }}>
           {current.icon}
         </div>
 
@@ -197,7 +197,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
         <h2 style={{
             fontFamily: 'var(--font-display)',
           color: 'var(--accent)',
-          fontSize: '20px',
+          fontSize: 'var(--fs-2xl)',
           marginBottom: '14px',
           fontWeight: '700'
         }}>
@@ -207,7 +207,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
         {/* Body */}
         <div style={{
           color: 'var(--text-muted)',
-          fontSize: '14px',
+          fontSize: 'var(--fs-md)',
           lineHeight: '1.7',
           marginBottom: '28px',
           minHeight: '80px'
@@ -225,7 +225,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
                 border: '1px solid var(--navy-border)',
                 color: 'var(--text-muted)',
                 padding: '10px 20px',
-                fontSize: '13px',
+                fontSize: 'var(--fs-base)',
                 cursor: 'pointer'
               }}
             >
@@ -241,7 +241,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
                 border: '1px solid var(--accent)',
                 color: 'var(--accent)',
                 padding: '10px 18px',
-                fontSize: '13px',
+                fontSize: 'var(--fs-base)',
                 cursor: 'pointer',
                 fontWeight: '600'
               }}
@@ -258,7 +258,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
               color: 'var(--navy)',
               border: 'none',
               padding: '11px 28px',
-              fontSize: '14px',
+              fontSize: 'var(--fs-md)',
               fontWeight: '700',
               cursor: 'pointer',
                 fontFamily: 'var(--font-ui)'
@@ -272,7 +272,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
         <div style={{
           textAlign: 'center',
           marginTop: '16px',
-          fontSize: '11px',
+          fontSize: 'var(--fs-xs)',
           color: 'var(--text-dim)'
         }}>
           {step + 1} of {STEPS.length}

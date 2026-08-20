@@ -148,11 +148,11 @@ function KycDocViewer({ userId, zoom, adminAxios }) {
       <div className="admin-kyc-viewer-stage">
         {loadingDoc ? (
           <div className="admin-kyc-viewer-empty" style={{ display: 'flex' }}>
-            <div style={{ fontSize: '14px' }}>Loading document...</div>
+            <div style={{ fontSize: 'var(--fs-md)' }}>Loading document...</div>
           </div>
         ) : docError ? (
           <div className="admin-kyc-viewer-empty" style={{ display: 'flex' }}>
-            <div style={{ fontSize: '14px' }}>{docError}</div>
+            <div style={{ fontSize: 'var(--fs-md)' }}>{docError}</div>
           </div>
         ) : isPdf ? (
           <object
@@ -651,7 +651,7 @@ export default function AdminKYC() {
         render: (row) => (
           <div>
             <div style={{ color: 'var(--admin-text)', fontWeight: 600 }}>{row.full_name || 'Unnamed Trader'}</div>
-            <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>{row.email}</div>
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>{row.email}</div>
           </div>
         )
       },
@@ -682,7 +682,7 @@ export default function AdminKYC() {
               status={getSlaBadgeStatus(row.kyc_sla_status)}
               label={row.kyc_sla_status ? row.kyc_sla_status.replace(/_/g, ' ') : 'No timer'}
             />
-            <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px', marginTop: '6px' }}>
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)', marginTop: '6px' }}>
               {row.kyc_wait_hours ? formatHours(row.kyc_wait_hours) : 'No wait data'}
             </div>
           </div>
@@ -694,7 +694,7 @@ export default function AdminKYC() {
         render: (row) => (
           <div>
             <AdminBadge status={getQualityBadgeStatus(row.quality_risk)} label={row.quality_risk || 'low'} />
-            <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px', marginTop: '6px' }}>
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)', marginTop: '6px' }}>
               Score {row.quality_score || 0}{row.missing_files ? ' - missing file' : ''}
             </div>
           </div>
@@ -706,7 +706,7 @@ export default function AdminKYC() {
         render: (row) => (
           <div>
             <div style={{ color: 'var(--admin-text)' }}>{row.classification || row.support_tier || '-'}</div>
-            <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>{row.risk_tier || 'normal risk'}</div>
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>{row.risk_tier || 'normal risk'}</div>
           </div>
         )
       },
@@ -750,7 +750,7 @@ export default function AdminKYC() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
         <div>
           <h1 className="admin-h1">KYC Queue</h1>
-          <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+          <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
             Review pending documents, SLA drift, and quality-risk signals from one operator queue.
           </p>
         </div>
@@ -850,7 +850,7 @@ export default function AdminKYC() {
               <div className="admin-kyc-review-header">
                 <div>
                   <h2 className="admin-h2" style={{ margin: 0 }}>{selectedUser.full_name || 'Unnamed Trader'}</h2>
-                  <div style={{ color: 'var(--admin-text-muted)', fontSize: '13px', marginTop: '4px' }}>
+                  <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)', marginTop: '4px' }}>
                     {selectedUser.email} - {selectedUser.kyc_document_country || selectedUser.country || 'Unknown Country'}
                   </div>
                 </div>
@@ -984,7 +984,7 @@ export default function AdminKYC() {
                     {check.pass == null ? '—' : check.pass ? '✓' : '✕'}
                   </span>
                   <span style={{ flex: 1, fontSize: '12.5px' }}>{check.label}</span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.1em', textTransform: 'uppercase', color: check.pass == null ? 'var(--admin-text-faint)' : check.pass ? 'var(--gain)' : 'var(--loss)' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: check.pass == null ? 'var(--admin-text-faint)' : check.pass ? 'var(--gain)' : 'var(--loss)' }}>
                     {check.pass == null ? 'Unknown' : check.pass ? 'Pass' : 'Fail'}
                   </span>
                 </div>

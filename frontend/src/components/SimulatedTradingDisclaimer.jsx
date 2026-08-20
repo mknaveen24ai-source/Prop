@@ -23,7 +23,7 @@ export default function SimulatedTradingDisclaimer() {
             background: 'color-mix(in srgb, var(--muted) 15%, transparent)',
             border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)',
             padding: '2px 8px',
-            fontSize: '10px',
+            fontSize: 'var(--fs-2xs)',
             color: 'var(--accent)',
             fontWeight: '600',
             letterSpacing: '0.08em',
@@ -33,7 +33,7 @@ export default function SimulatedTradingDisclaimer() {
           </span>
           <p style={{
             color: 'var(--text-muted)',
-            fontSize: '12px',
+            fontSize: 'var(--fs-sm)',
             margin: 0,
             lineHeight: '1.5'
           }}>
@@ -43,7 +43,7 @@ export default function SimulatedTradingDisclaimer() {
                 onClick={() => setExpanded(true)}
                 style={{
                   background: 'transparent', border: 'none', color: 'var(--accent)',
-                  fontSize: '12px', cursor: 'pointer', padding: '0 0 0 6px',
+                  fontSize: 'var(--fs-sm)', cursor: 'pointer', padding: '0 0 0 6px',
                   fontFamily: 'var(--font-ui)', textDecoration: 'underline'
                 }}
               >
@@ -58,7 +58,7 @@ export default function SimulatedTradingDisclaimer() {
             aria-label="Dismiss"
             style={{
               background: 'transparent', border: 'none', color: 'var(--text-dim)',
-              fontSize: '18px', cursor: 'pointer', padding: '0', lineHeight: 1,
+              fontSize: 'var(--fs-xl)', cursor: 'pointer', padding: '0', lineHeight: 1,
               flexShrink: 0
             }}
           >
@@ -74,7 +74,7 @@ export default function SimulatedTradingDisclaimer() {
           borderTop: '1px solid color-mix(in srgb, var(--muted) 10%, transparent)'
         }}>
           <p style={{
-            color: 'var(--text-muted)', fontSize: '12px', lineHeight: '1.8', margin: 0
+            color: 'var(--text-muted)', fontSize: 'var(--fs-sm)', lineHeight: '1.8', margin: 0
           }}>
             Your evaluation account is a simulated trading environment connected to live market prices.
             Trades are tracked for performance evaluation purposes only — no real orders are placed in

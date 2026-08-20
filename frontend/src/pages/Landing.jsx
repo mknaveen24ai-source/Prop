@@ -262,7 +262,7 @@ export default function Landing() {
       {/* Glass Navbar */}
       <nav className={`nav-transparent ${scrolled ? 'scrolled' : ''}`}>
         <div className="mp-nav-brand" style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-          <span style={{ fontFamily: 'var(--font-ui)', fontSize: '20px', fontWeight: 800, letterSpacing: '0.08em', color: 'var(--ink)' }}>
+          <span style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--fs-2xl)', fontWeight: 800, letterSpacing: '0.08em', color: 'var(--ink)' }}>
             {String(tenant?.logo_text || tenant?.brand?.short_name || tenant?.name || 'PROPFIRM').toUpperCase()}
           </span>
         </div>
@@ -273,7 +273,7 @@ export default function Landing() {
         <div className="mp-nav-links">
               {NAV_LINKS.map(link => (
                 <a key={link.label} href={link.href} style={{
-                  color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '14px',
+                  color: 'var(--text-secondary)', textDecoration: 'none', fontSize: 'var(--fs-md)',
                   fontFamily: 'var(--font-ui)', fontWeight: '500',
                   transition: 'color 0.2s',
                   position: 'relative',
@@ -294,7 +294,7 @@ export default function Landing() {
               <Link
                 to="/transparency"
                 style={{
-                  color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '14px',
+                  color: 'var(--text-secondary)', textDecoration: 'none', fontSize: 'var(--fs-md)',
                   fontFamily: 'var(--font-ui)', fontWeight: '500',
                   transition: 'color 0.2s',
                 }}

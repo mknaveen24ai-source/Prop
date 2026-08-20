@@ -206,7 +206,7 @@ export default function DashboardKYCPage({
       {kycStatus === 'rejected' && user?.kyc_rejection_reason && (
         <Card style={{ border: '1px solid var(--loss)' }}>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--loss)' }}>Reason from admin</div>
-          <div style={{ fontSize: '14px', marginTop: '8px' }}>{user.kyc_rejection_reason}</div>
+          <div style={{ fontSize: 'var(--fs-md)', marginTop: '8px' }}>{user.kyc_rejection_reason}</div>
         </Card>
       )}
 
@@ -228,7 +228,7 @@ export default function DashboardKYCPage({
       <div className="ui-split" style={{ alignItems: 'start', '--split': 'minmax(0,1.25fr) minmax(0,1fr)' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {detailLoading && !detail && !detailError && (
-            <div style={{ fontSize: '12px', color: 'var(--muted)' }}>Checking your document status…</div>
+            <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--muted)' }}>Checking your document status…</div>
           )}
           {docs.map((doc) => {
             const status = docStatus(doc.present)
@@ -262,7 +262,7 @@ export default function DashboardKYCPage({
             <button
               type="button"
               onClick={() => setShowFullForm(true)}
-              style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: '12px', textDecoration: 'underline', cursor: 'pointer', padding: 0, textAlign: 'left' }}
+              style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 'var(--fs-sm)', textDecoration: 'underline', cursor: 'pointer', padding: 0, textAlign: 'left' }}
             >
               Need to fix your country or document type too? Resubmit everything instead.
             </button>
@@ -288,7 +288,7 @@ export default function DashboardKYCPage({
           )}
 
           {kycStatus === 'pending' && (
-            <Card style={{ textAlign: 'center', padding: '20px', color: 'var(--muted)', fontSize: '13px' }}>
+            <Card style={{ textAlign: 'center', padding: '20px', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>
               Your documents are locked while admin reviews them. If declined, you'll be able to resubmit here.
             </Card>
           )}
@@ -306,7 +306,7 @@ export default function DashboardKYCPage({
 
           <Card style={{ border: '1px solid var(--accent)', background: 'var(--glass-2)' }}>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--accent)' }}>Why now</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '18px', marginTop: '7px' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-xl)', marginTop: '7px' }}>
               {kycStatus === 'approved' ? 'Your identity is verified' : 'Verification is required before your first payout'}
             </div>
             <div style={{ fontSize: '12.5px', color: 'var(--muted)', marginTop: '7px', lineHeight: 1.6 }}>

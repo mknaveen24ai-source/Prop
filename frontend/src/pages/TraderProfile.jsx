@@ -64,7 +64,7 @@ export function TraderProfileContent({ userId, onBack }) {
       <button
         onClick={goBack}
         style={{
-          background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: '13px',
+          background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 'var(--fs-base)',
           cursor: 'pointer', padding: 0, marginBottom: '20px', display: 'inline-flex', alignItems: 'center', gap: '6px'
         }}
       >
@@ -80,22 +80,22 @@ export function TraderProfileContent({ userId, onBack }) {
             background: 'color-mix(in srgb, var(--muted) 15%, transparent)',
             border: '2px solid var(--accent)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '28px', flexShrink: 0
+            fontSize: 'var(--fs-5xl)', flexShrink: 0
           }}>
             {trader.full_name?.charAt(0)?.toUpperCase() || '?'}
           </div>
 
           {/* Name + badges */}
           <div style={{ flex: 1 }}>
-    <h1 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', fontSize: '22px', marginBottom: '6px' }}>
+    <h1 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', fontSize: 'var(--fs-3xl)', marginBottom: '6px' }}>
               {trader.full_name}
             </h1>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ fontSize: '12px', color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                 {renderIcon('location', { size: 12 })} {trader.country || 'Unknown'}
               </span>
-              <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>·</span>
-              <span style={{ fontSize: '12px', color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-dim)' }}>·</span>
+              <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                 {renderIcon('calendar', { size: 12 })} Joined {joinDate}
               </span>
               {trader.is_funded && (
@@ -103,7 +103,7 @@ export function TraderProfileContent({ userId, onBack }) {
                   padding: '2px 10px', borderRadius: 'var(--radius-pill)',
                   background: 'color-mix(in srgb, var(--muted) 12%, transparent)',
                   border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)',
-                  fontSize: '11px', color: 'var(--cyan)', fontWeight: '600',
+                  fontSize: 'var(--fs-xs)', color: 'var(--cyan)', fontWeight: '600',
                   display: 'inline-flex', alignItems: 'center', gap: '4px'
                 }}>
                   {renderIcon('star', { size: 11 })} FUNDED TRADER
@@ -114,7 +114,7 @@ export function TraderProfileContent({ userId, onBack }) {
                   padding: '2px 10px', borderRadius: 'var(--radius-pill)',
                   background: 'color-mix(in srgb, var(--muted) 10%, transparent)',
                   border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)',
-                  fontSize: '11px', color: 'var(--accent)', fontWeight: '600',
+                  fontSize: 'var(--fs-xs)', color: 'var(--accent)', fontWeight: '600',
                   display: 'inline-flex', alignItems: 'center', gap: '4px'
                 }}>
                   {renderIcon('leaderboard', { size: 11 })} {trader.total_phases_passed} Phase{trader.total_phases_passed !== 1 ? 's' : ''} Passed
@@ -136,10 +136,10 @@ export function TraderProfileContent({ userId, onBack }) {
           { label: 'Challenges',      value: trader.total_accounts || 0,                                     color: 'var(--text-muted)' },
         ].map(s => (
           <div key={s.label} className="stat-card" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '20px', fontWeight: '700', color: s.color, fontFamily: 'var(--font-mono)', marginBottom: '4px' }}>
+            <div style={{ fontSize: 'var(--fs-2xl)', fontWeight: '700', color: s.color, fontFamily: 'var(--font-mono)', marginBottom: '4px' }}>
               {s.value}
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-dim)', letterSpacing: '0.06em' }}>{s.label}</div>
+            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', letterSpacing: '0.06em' }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -147,11 +147,11 @@ export function TraderProfileContent({ userId, onBack }) {
       {/* ── Trading Style ── */}
       {(stats.favourite_instrument || stats.avg_hold_mins) && (
         <Card style={{ marginBottom: '20px' }}>
-          <h3 style={{ color: 'var(--accent)', marginBottom: '16px', fontSize: '14px', letterSpacing: '0.08em' }}>TRADING STYLE</h3>
+          <h3 style={{ color: 'var(--accent)', marginBottom: '16px', fontSize: 'var(--fs-md)', letterSpacing: '0.08em' }}>TRADING STYLE</h3>
           <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
             {stats.favourite_instrument && (
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>FAVOURITE INSTRUMENT</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginBottom: '4px' }}>FAVOURITE INSTRUMENT</div>
             <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
                   {stats.favourite_instrument}
                 </div>
@@ -159,7 +159,7 @@ export function TraderProfileContent({ userId, onBack }) {
             )}
             {stats.avg_hold_mins && (
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>AVG HOLD TIME</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginBottom: '4px' }}>AVG HOLD TIME</div>
             <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>
                   {stats.avg_hold_mins < 60
                     ? `${Math.round(stats.avg_hold_mins)}m`
@@ -169,7 +169,7 @@ export function TraderProfileContent({ userId, onBack }) {
             )}
             {stats.profit_factor && (
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginBottom: '4px' }}>PROFIT FACTOR</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginBottom: '4px' }}>PROFIT FACTOR</div>
             <div style={{ fontSize: '15px', fontWeight: '700', color: parseFloat(stats.profit_factor) >= 1.5 ? 'var(--green)' : 'var(--text)', fontFamily: 'var(--font-mono)' }}>
                   {parseFloat(stats.profit_factor).toFixed(2)}
                 </div>
@@ -181,7 +181,7 @@ export function TraderProfileContent({ userId, onBack }) {
 
       {/* ── Privacy notice ── */}
       <div style={{ textAlign: 'center', padding: '20px 0' }}>
-        <p style={{ color: 'var(--text-dim)', fontSize: '12px' }}>
+        <p style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-sm)' }}>
           Only aggregated public statistics are shown. No personal contact information is displayed.
         </p>
       </div>
@@ -203,7 +203,7 @@ export default function TraderProfile() {
           <span className="nav-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>PROP FIRM</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button onClick={() => navigate('/leaderboard')} style={{ background: 'transparent', border: '1px solid var(--navy-border)', color: 'var(--text-muted)', padding: '7px 16px', cursor: 'pointer', fontSize: '13px' }}>
+          <button onClick={() => navigate('/leaderboard')} style={{ background: 'transparent', border: '1px solid var(--navy-border)', color: 'var(--text-muted)', padding: '7px 16px', cursor: 'pointer', fontSize: 'var(--fs-base)' }}>
             ← Leaderboard
           </button>
           <ThemeToggle />

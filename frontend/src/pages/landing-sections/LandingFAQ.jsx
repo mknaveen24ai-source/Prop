@@ -154,7 +154,7 @@ export default function LandingFAQ() {
                     ? `1px solid ${color}`
                     : '1px solid var(--rule)',
                   cursor: 'pointer',
-              fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '14px',
+              fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 'var(--fs-md)',
                   transition: 'border-color 0.2s ease, color 0.2s ease',
                 }}
               >

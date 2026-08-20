@@ -111,7 +111,7 @@ export default function LandingCalculator({ onStartAssessment }) {
           </p>
 
           {availabilitySource !== 'live' && (
-            <p className="mp-reveal mp-delay-250" style={{ margin: '14px auto 0', color: 'var(--muted)', maxWidth: '740px', fontSize: '13px' }}>
+            <p className="mp-reveal mp-delay-250" style={{ margin: '14px auto 0', color: 'var(--muted)', maxWidth: '740px', fontSize: 'var(--fs-base)' }}>
               {availabilitySource === 'config'
                 ? 'Tier availability on this page follows admin-configured quotas and refreshes automatically.'
                 : 'Live availability is temporarily unavailable. You can still register and claim the next open tier.'}
@@ -147,13 +147,13 @@ export default function LandingCalculator({ onStartAssessment }) {
                   }}
                 >
                   <div style={{
-                    fontFamily: 'var(--font-display)', fontSize: '18px', fontWeight: 800,
+                    fontFamily: 'var(--font-display)', fontSize: 'var(--fs-xl)', fontWeight: 800,
                     color: active ? 'var(--paper)' : 'var(--ink)',
                   }}>
                     {m.name}
                   </div>
                   <div style={{
-                    marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: '9px', fontWeight: 700,
+                    marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', fontWeight: 700,
                     textTransform: 'uppercase', letterSpacing: '0.08em',
                     color: active ? hook.color : 'var(--muted)',
                   }}>
@@ -174,11 +174,11 @@ export default function LandingCalculator({ onStartAssessment }) {
         {selectedModel && (
           <div style={{ textAlign: 'center', marginBottom: '28px' }}>
             <div className="mp-availability-pill mp-reveal mp-delay-300" style={{ display: 'inline-flex', gap: '24px', padding: '12px 28px', background: 'transparent', border: '1px solid var(--rule)' }}>
-              <span style={{ fontSize: '13px', color: 'var(--muted)' }}>
+              <span style={{ fontSize: 'var(--fs-base)', color: 'var(--muted)' }}>
                 Sizes Available: <span style={{ color: 'var(--ink)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{totalEnabled}</span>
               </span>
               <span style={{ width: '1px', background: 'var(--rule)' }} />
-              <span style={{ fontSize: '13px', color: 'var(--muted)' }}>
+              <span style={{ fontSize: 'var(--fs-base)', color: 'var(--muted)' }}>
                 Remaining Slots: <span style={{ color: hasUnlimitedAvailability || totalRemaining > 0 ? 'var(--gain)' : 'var(--warn)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{hasUnlimitedAvailability ? 'Unlimited' : totalRemaining}</span>
               </span>
             </div>
@@ -234,7 +234,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                     <div style={{
                       position: 'absolute', top: '-11px', left: '50%', transform: 'translateX(-50%)',
                       background: 'var(--warn)', color: 'var(--ink)', fontFamily: 'var(--font-mono)',
-                      fontSize: '9px', fontWeight: 800, letterSpacing: '0.1em', padding: '4px 12px',
+                      fontSize: 'var(--fs-3xs)', fontWeight: 800, letterSpacing: '0.1em', padding: '4px 12px',
                       textTransform: 'uppercase', whiteSpace: 'nowrap',
                     }}>
                       Recommended
@@ -243,10 +243,10 @@ export default function LandingCalculator({ onStartAssessment }) {
 
                   {/* Header row: ACCOUNT SIZE / PRICE */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                    <span style={{ fontSize: '10px', color: mutedColor, textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                    <span style={{ fontSize: 'var(--fs-2xs)', color: mutedColor, textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
                       Account Size
                     </span>
-                    <span style={{ fontSize: '10px', color: mutedColor, textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                    <span style={{ fontSize: 'var(--fs-2xs)', color: mutedColor, textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
                       Price
                     </span>
                   </div>
@@ -254,20 +254,20 @@ export default function LandingCalculator({ onStartAssessment }) {
                     <span style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(22px,2.4vw,28px)', fontWeight: 800, color: isSoldOut ? 'var(--muted)' : inkColor }}>
                       ${size >= 1000 ? `${size / 1000}K` : size}
                     </span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '20px', fontWeight: 800, color: isSoldOut ? 'var(--muted)' : inkColor }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xl)', fontWeight: 800, color: isSoldOut ? 'var(--muted)' : inkColor }}>
                       {price != null ? `$${price}` : '—'}
                     </span>
                   </div>
                   <div style={{ marginBottom: '14px' }}>
                     <span style={{
-                      display: 'inline-block', padding: '2px 8px', fontSize: '9px', fontWeight: 800, fontFamily: 'var(--font-mono)',
+                      display: 'inline-block', padding: '2px 8px', fontSize: 'var(--fs-3xs)', fontWeight: 800, fontFamily: 'var(--font-mono)',
                       textTransform: 'uppercase', letterSpacing: '0.08em',
                       border: `1px solid ${isSoldOut ? 'var(--loss)' : pct > 50 ? 'var(--gain)' : 'var(--warn)'}`,
                       color: isSoldOut ? 'var(--loss)' : pct > 50 ? 'var(--gain)' : 'var(--warn)',
                     }}>
                       {isSoldOut ? 'FULL' : isUnlimited ? 'OPEN' : pct > 50 ? 'OPEN' : 'LOW'}
                     </span>
-                    <span style={{ marginLeft: '8px', fontSize: '10px', color: mutedColor, fontFamily: 'var(--font-mono)' }}>
+                    <span style={{ marginLeft: '8px', fontSize: 'var(--fs-2xs)', color: mutedColor, fontFamily: 'var(--font-mono)' }}>
                       {sizeLabel(size)}
                     </span>
                   </div>
@@ -282,7 +282,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                       padding: '12px',
                       marginBottom: '18px',
                       fontFamily: 'var(--font-mono)',
-                      fontSize: '12px',
+                      fontSize: 'var(--fs-sm)',
                       fontWeight: 700,
                       textTransform: 'uppercase',
                       letterSpacing: '0.08em',
@@ -298,14 +298,14 @@ export default function LandingCalculator({ onStartAssessment }) {
                   {/* Itemized rules */}
                   <div style={{ borderTop: `1px solid ${ruleColor}`, paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
                     <div>
-                      <div style={{ fontSize: '11px', fontWeight: 700, color: inkColor, marginBottom: '4px' }}>
+                      <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: inkColor, marginBottom: '4px' }}>
                         Profit Target
                         <InfoDot title="The percentage gain required to pass this phase." />
                       </div>
                       {targets.map((t, i) => {
                         const phaseDays = Array.isArray(selectedModel.time_limits_days) ? selectedModel.time_limits_days[i] : null;
                         return (
-                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: mutedColor }}>
+                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-xs)', color: mutedColor }}>
                             <span>Phase {i + 1}</span>
                             <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: inkColor }}>
                               {t}%{phaseDays != null ? ` in ${phaseDays}d` : ''}
@@ -315,7 +315,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                       })}
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-xs)' }}>
                       <span style={{ color: inkColor, fontWeight: 700 }}>
                         Max Loss
                         <InfoDot title="Maximum drawdown allowed from your starting balance before the account is closed." />
@@ -323,7 +323,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                       <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: inkColor }}>{selectedModel.max_drawdown_pct}%</span>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-xs)' }}>
                       <span style={{ color: inkColor, fontWeight: 700 }}>
                         Daily Loss
                         <InfoDot title="Maximum drawdown allowed within a single day." />
@@ -331,7 +331,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                       <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: inkColor }}>{selectedModel.daily_drawdown_pct}%</span>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-xs)' }}>
                       <span style={{ color: inkColor, fontWeight: 700 }}>
                         Min Trading Days
                         <InfoDot title="Minimum number of days you must trade before completing this phase." />
@@ -339,7 +339,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                       <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: inkColor }}>{selectedModel.min_trading_days}</span>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-xs)' }}>
                       <span style={{ color: inkColor, fontWeight: 700 }}>
                         Split
                         <InfoDot title="Your share of profits once funded, paid on this cadence." />
@@ -363,7 +363,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                   )}
 
                   {isSoldOut && (
-                    <div style={{ marginTop: '14px', fontSize: '11px', color: 'var(--muted)' }}>
+                    <div style={{ marginTop: '14px', fontSize: 'var(--fs-xs)', color: 'var(--muted)' }}>
                       {price == null ? 'Not offered at this size' : 'All slots claimed — check back soon'}
                     </div>
                   )}

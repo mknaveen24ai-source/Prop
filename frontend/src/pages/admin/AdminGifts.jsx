@@ -57,7 +57,7 @@ export default function AdminGifts() {
     <>
       <div style={{ marginBottom: '24px' }}>
         <h1 className="admin-h1">Gift Vouchers</h1>
-        <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+        <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
           Challenge accounts purchased as gifts. Buyers create these at checkout — this view is for
           monitoring and support (revoking an unclaimed gift), not creation.
         </p>

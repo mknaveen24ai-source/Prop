@@ -220,10 +220,10 @@ export default function Checkout() {
       <div className="lx-card auth-glass-card" style={{ width: 'min(100%, 520px)', zIndex: 10, padding: '40px 32px' }}>
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>
           <div className="auth-logo-mark" style={{ margin: '0 auto 16px' }}>⚡</div>
-          <h1 style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: '8px' }}>
+          <h1 style={{ fontSize: 'var(--fs-4xl)', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: '8px' }}>
             Review Your Challenge
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-md)' }}>
             Confirm your plan, then continue to secure payment.
           </p>
         </div>
@@ -233,13 +233,13 @@ export default function Checkout() {
             {!showVoucherField ? (
               <button
                 onClick={() => setShowVoucherField(true)}
-                style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '13px', cursor: 'pointer', padding: 0 }}
+                style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 'var(--fs-base)', cursor: 'pointer', padding: 0 }}
               >
                 Have a prize voucher code?
               </button>
             ) : (
               <>
-                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: '10px' }}>
                   Redeem a competition prize voucher for a free challenge account — no payment required.
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
@@ -270,23 +270,23 @@ export default function Checkout() {
             {!showCouponField ? (
               <button
                 onClick={() => setShowCouponField(true)}
-                style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '13px', cursor: 'pointer', padding: 0 }}
+                style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 'var(--fs-base)', cursor: 'pointer', padding: 0 }}
               >
                 Have a coupon code?
               </button>
             ) : couponResult?.valid ? (
-              <div style={{ fontSize: '13px', color: 'var(--gain)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: 'var(--fs-base)', color: 'var(--gain)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>✓ Coupon {couponResult.code} applied</span>
                 <button
                   onClick={() => { setCouponResult(null); setCouponCode(''); setCouponError('') }}
-                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '12px', cursor: 'pointer', padding: 0 }}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 'var(--fs-sm)', cursor: 'pointer', padding: 0 }}
                 >
                   Remove
                 </button>
               </div>
             ) : (
               <>
-                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
+                <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', marginBottom: '10px' }}>
                   Enter a coupon code to get a discount on this challenge.
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
@@ -307,7 +307,7 @@ export default function Checkout() {
                     {validatingCoupon ? 'Checking…' : 'Apply'}
                   </button>
                 </div>
-                {couponError && <div className="error" style={{ marginTop: '10px', fontSize: '12px' }}>{couponError}</div>}
+                {couponError && <div className="error" style={{ marginTop: '10px', fontSize: 'var(--fs-sm)' }}>{couponError}</div>}
               </>
             )}
           </div>
@@ -315,7 +315,7 @@ export default function Checkout() {
 
         {authChecked && user && dataLoaded && pending && model && (
           <div style={{ border: '1px solid var(--rule)', padding: '16px 20px', marginBottom: '20px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={isGift}
@@ -341,7 +341,7 @@ export default function Checkout() {
                   rows={2}
                   style={{ width: '100%', resize: 'vertical' }}
                 />
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px' }}>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '8px' }}>
                   We'll email them a redemption code — no account required to receive it. You'll pay now, they claim it.
                 </div>
               </div>
@@ -359,7 +359,7 @@ export default function Checkout() {
 
         {dataLoaded && pending === null && (
           <div style={{ textAlign: 'center', padding: '20px 0' }}>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '20px' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-md)', marginBottom: '20px' }}>
               You haven't picked a challenge yet.
             </p>
             <Link to="/#mp-accounts" className="btn btn-primary" style={{ textDecoration: 'none' }}>
@@ -370,7 +370,7 @@ export default function Checkout() {
 
         {dataLoaded && pending && !model && (
           <div style={{ textAlign: 'center', padding: '20px 0' }}>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '20px' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-md)', marginBottom: '20px' }}>
               We couldn't load this challenge model. It may no longer be available.
             </p>
             <Link to="/#mp-accounts" className="btn btn-primary" style={{ textDecoration: 'none' }}>
@@ -383,10 +383,10 @@ export default function Checkout() {
           <>
             <div style={{ border: '1px solid var(--rule)', padding: '20px', marginBottom: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
-                <span style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                <span style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-2xl)', fontWeight: 800, color: 'var(--text-primary)' }}>
                   {model.name}
                 </span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: '22px', fontWeight: 800, color: 'var(--accent)' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xl)', fontWeight: 800, color: 'var(--accent)' }}>
                   {price != null ? (
                     finalPrice != null && finalPrice < price ? (
                       <>
@@ -397,21 +397,21 @@ export default function Checkout() {
                   ) : '—'}
                 </span>
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: discountEligibility?.eligible || couponResult?.valid ? '4px' : '16px' }}>
+              <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginBottom: discountEligibility?.eligible || couponResult?.valid ? '4px' : '16px' }}>
                 ${Number(pending.accountSize).toLocaleString('en-US')} account · {sizeLabel(pending.accountSize)}
               </div>
               {discountEligibility?.eligible && (
-                <div style={{ fontSize: '12px', color: 'var(--gain)', marginBottom: couponResult?.valid ? '4px' : '16px' }}>
+                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--gain)', marginBottom: couponResult?.valid ? '4px' : '16px' }}>
                   ✓ {discountEligibility.discount_pct}% referral discount applied (first challenge only)
                 </div>
               )}
               {couponResult?.valid && (
-                <div style={{ fontSize: '12px', color: 'var(--gain)', marginBottom: '16px' }}>
+                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--gain)', marginBottom: '16px' }}>
                   ✓ Coupon {couponResult.code} applied ({couponResult.discount_type === 'percent' ? `${couponResult.discount_value}% off` : `$${couponResult.discount_value} off`})
                 </div>
               )}
 
-              <div className="ui-cols" style={{ fontSize: '12px', '--cols-gap': '10px' }}>
+              <div className="ui-cols" style={{ fontSize: 'var(--fs-sm)', '--cols-gap': '10px' }}>
                 {targets.map((t, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-muted)' }}>Phase {i + 1} Target</span>
@@ -448,7 +448,7 @@ export default function Checkout() {
             )}
 
             {!authChecked && (
-              <div style={{ textAlign: 'center', padding: '12px 0', color: 'var(--text-muted)', fontSize: '13px' }}>
+              <div style={{ textAlign: 'center', padding: '12px 0', color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>
                 Checking your session…
               </div>
             )}
@@ -475,7 +475,7 @@ export default function Checkout() {
               </button>
             )}
 
-            <p style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '16px' }}>
+            <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', textAlign: 'center', marginTop: '16px' }}>
               You'll complete secure payment on our payment provider's page, then return here automatically.
             </p>
           </>

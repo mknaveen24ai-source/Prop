@@ -190,43 +190,43 @@ export default function DashboardTradeHistoryPage({ selectedAccount, accountHist
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: '14px', marginBottom: '20px' }}>
             <Card stat tone="var(--accent)">
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Win Rate</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', marginTop: '8px', color: 'var(--accent)' }}>{kpis.winRate.toFixed(1)}%</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-4xl)', marginTop: '8px', color: 'var(--accent)' }}>{kpis.winRate.toFixed(1)}%</div>
               <Sparkline data={kpis.spark} tone="var(--accent)" width={74} height={26} />
             </Card>
             <Card stat tone="var(--muted)">
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Total Trades</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', marginTop: '8px' }}>{kpis.total}</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-4xl)', marginTop: '8px' }}>{kpis.total}</div>
             </Card>
             <Card stat tone="var(--accent)">
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Avg R-Multiple</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', marginTop: '8px', color: 'var(--accent)' }}>{kpis.avgR != null ? `${kpis.avgR.toFixed(2)}R` : '—'}</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-4xl)', marginTop: '8px', color: 'var(--accent)' }}>{kpis.avgR != null ? `${kpis.avgR.toFixed(2)}R` : '—'}</div>
             </Card>
             <Card stat tone={kpis.totalPnl >= 0 ? 'var(--gain)' : 'var(--loss)'}>
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Total P&amp;L</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', marginTop: '8px', color: kpis.totalPnl >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{formatSigned(kpis.totalPnl)}</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-4xl)', marginTop: '8px', color: kpis.totalPnl >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{formatSigned(kpis.totalPnl)}</div>
               <Sparkline data={kpis.spark} tone={kpis.totalPnl >= 0 ? 'var(--gain)' : 'var(--loss)'} width={74} height={26} />
             </Card>
             <Card stat tone="var(--accent)">
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Profit Factor</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', marginTop: '8px', color: 'var(--accent)' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-4xl)', marginTop: '8px', color: 'var(--accent)' }}>
                 {kpis.profitFactor == null ? '—' : kpis.profitFactor === Infinity ? '∞' : kpis.profitFactor.toFixed(2)}
               </div>
             </Card>
             <Card stat tone="var(--gain)">
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Best Trade</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', marginTop: '8px', color: 'var(--gain)' }}>{kpis.bestTrade != null ? formatSigned(kpis.bestTrade) : '—'}</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-4xl)', marginTop: '8px', color: 'var(--gain)' }}>{kpis.bestTrade != null ? formatSigned(kpis.bestTrade) : '—'}</div>
             </Card>
             <Card stat tone="var(--loss)">
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Worst Trade</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', marginTop: '8px', color: 'var(--loss)' }}>{kpis.worstTrade != null ? formatSigned(kpis.worstTrade) : '—'}</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-4xl)', marginTop: '8px', color: 'var(--loss)' }}>{kpis.worstTrade != null ? formatSigned(kpis.worstTrade) : '—'}</div>
             </Card>
             <Card stat tone="var(--gain)">
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Avg Win</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', marginTop: '8px', color: 'var(--gain)' }}>{kpis.avgWin != null ? formatSigned(kpis.avgWin) : '—'}</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-4xl)', marginTop: '8px', color: 'var(--gain)' }}>{kpis.avgWin != null ? formatSigned(kpis.avgWin) : '—'}</div>
             </Card>
             <Card stat tone="var(--loss)">
               <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Avg Loss</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', marginTop: '8px', color: 'var(--loss)' }}>{kpis.avgLoss != null ? formatSigned(kpis.avgLoss) : '—'}</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-4xl)', marginTop: '8px', color: 'var(--loss)' }}>{kpis.avgLoss != null ? formatSigned(kpis.avgLoss) : '—'}</div>
             </Card>
           </div>
 
@@ -234,7 +234,7 @@ export default function DashboardTradeHistoryPage({ selectedAccount, accountHist
             {kpis.cumulative.length > 1 ? (
               <EquityCurveChart data={kpis.cumulative} height={200} tone={kpis.totalPnl >= 0 ? 'var(--gain)' : 'var(--loss)'} />
             ) : (
-              <div style={{ textAlign: 'center', padding: '48px', color: 'var(--muted)', fontSize: '13px' }}>Not enough closed trades yet for a curve.</div>
+              <div style={{ textAlign: 'center', padding: '48px', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>Not enough closed trades yet for a curve.</div>
             )}
           </Card>
 
@@ -274,7 +274,7 @@ export default function DashboardTradeHistoryPage({ selectedAccount, accountHist
 
       {accountHistory.length > 0 && (
         <div style={{ marginTop: '32px' }}>
-          <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '12px' }}>
+          <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '12px' }}>
             Past Challenge Accounts
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -283,11 +283,11 @@ export default function DashboardTradeHistoryPage({ selectedAccount, accountHist
               const statusColor = getStatusColor(acc.status)
               return (
                 <Card key={acc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                  <div style={{ fontSize: '13px' }}>
+                  <div style={{ fontSize: 'var(--fs-base)' }}>
                     {String(acc.account_type).toUpperCase()} — ${parseFloat(acc.account_size).toLocaleString('en-US')}
-                    <span style={{ color: statusColor, marginLeft: '10px', fontSize: '11px', fontFamily: 'var(--font-mono)' }}>{String(acc.status).toUpperCase()}</span>
+                    <span style={{ color: statusColor, marginLeft: '10px', fontSize: 'var(--fs-xs)', fontFamily: 'var(--font-mono)' }}>{String(acc.status).toUpperCase()}</span>
                   </div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '13px', color: pnl >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{formatSigned(pnl)}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-base)', color: pnl >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{formatSigned(pnl)}</div>
                 </Card>
               )
             })}

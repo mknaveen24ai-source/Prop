@@ -296,7 +296,7 @@ export default function AdminDisputes() {
         render: (dispute) => (
           <div>
             <div style={{ color: 'var(--admin-text)' }}>{dispute.user_email || dispute.user_name || `User #${dispute.user_id}`}</div>
-            {dispute.account_id && <div style={{ fontSize: '11px', color: 'var(--admin-text-faint)' }}>Acc #{dispute.account_id}</div>}
+            {dispute.account_id && <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-faint)' }}>Acc #{dispute.account_id}</div>}
           </div>
         )
       },
@@ -323,7 +323,7 @@ export default function AdminDisputes() {
         render: (dispute) => (
           <div>
             <AdminBadge status={formatSlaTone(dispute.sla_status)} label={dispute.sla_status || 'within_sla'} />
-            <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px', marginTop: '6px' }}>
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)', marginTop: '6px' }}>
               {dispute.age_hours ? `${dispute.age_hours.toFixed(1)}h` : 'No age data'}
             </div>
           </div>
@@ -361,7 +361,7 @@ export default function AdminDisputes() {
     <>
       <div style={{ marginBottom: '24px' }}>
         <h1 className="admin-h1">Dispute Management</h1>
-        <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+        <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
           Handle trader complaints, rule-violation contests, and case-review queues from a single workflow board.
         </p>
       </div>
@@ -452,16 +452,16 @@ export default function AdminDisputes() {
           <div style={{ display: 'grid', gap: '20px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Trader</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Trader</div>
                 <div style={{ color: 'var(--admin-text)', fontWeight: 500, marginTop: '4px' }}>{selected.user_email || selected.user_name || 'Unknown trader'}</div>
               </div>
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Account</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Account</div>
                 <div className="admin-td-mono" style={{ marginTop: '4px' }}>#{selected.account_id || 'N/A'}</div>
               </div>
               <div style={{ gridColumn: 'span 2' }}>
-                <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Subject</div>
-                <div style={{ color: 'var(--admin-text)', fontWeight: 600, fontSize: '16px', marginTop: '4px' }}>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Subject</div>
+                <div style={{ color: 'var(--admin-text)', fontWeight: 600, fontSize: 'var(--fs-lg)', marginTop: '4px' }}>
                   {selected.subject || selected.title || '-'}
                 </div>
               </div>
@@ -475,7 +475,7 @@ export default function AdminDisputes() {
                   border: '1px solid var(--admin-border)',
                   padding: '16px',
                   color: 'var(--admin-text)',
-                  fontSize: '13px',
+                  fontSize: 'var(--fs-base)',
                   lineHeight: '1.6',
                   whiteSpace: 'pre-wrap'
                 }}>

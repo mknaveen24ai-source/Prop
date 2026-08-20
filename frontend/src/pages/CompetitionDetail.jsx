@@ -253,12 +253,12 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
               </PieChart>
             </div>
             {hoveredPrize != null && prizePool[hoveredPrize] && (
-              <div style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--ink)', marginTop: '-8px', marginBottom: '8px' }}>
+              <div style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', color: 'var(--ink)', marginTop: '-8px', marginBottom: '8px' }}>
                 #{prizePool[hoveredPrize].rank} · {prizePool[hoveredPrize].label}
               </div>
             )}
             {prizeTotal != null && hoveredPrize == null && (
-              <div style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: '13px', color: 'var(--muted)', marginTop: '-8px', marginBottom: '8px' }}>
+              <div style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-base)', color: 'var(--muted)', marginTop: '-8px', marginBottom: '8px' }}>
                 ${prizeTotal.toLocaleString('en-US')} total
               </div>
             )}
@@ -275,23 +275,23 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
 
       {showTerms && (
         <Card ruled title="Rules & Terms">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px,1fr))', gap: '14px', fontSize: '13px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px,1fr))', gap: '14px', fontSize: 'var(--fs-base)' }}>
             <div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Starting Balance</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Starting Balance</div>
               <div style={{ marginTop: '4px' }}>${competition.starting_balance.toLocaleString('en-US')}</div>
             </div>
             <div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Ranking Metric</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Ranking Metric</div>
               <div style={{ marginTop: '4px' }}>{competition.ranking_metric === 'profit_usd' ? 'Realized P&L ($)' : 'Return (%)'}</div>
             </div>
             {competition.daily_drawdown_pct != null && (
               <div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Daily Drawdown Limit</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Daily Drawdown Limit</div>
                 <div style={{ marginTop: '4px' }}>{competition.daily_drawdown_pct}%</div>
               </div>
             )}
             <div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Window</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Window</div>
               <div style={{ marginTop: '4px' }}>{formatDate(competition.start_at)} → {formatDate(competition.end_at)}</div>
             </div>
           </div>
@@ -308,7 +308,7 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
           <div style={{ fontSize: '15px', color: 'var(--accent)', marginBottom: '6px' }}>
             You won a free ${Number(myVoucher.account_size).toLocaleString('en-US')} challenge account
           </div>
-          <div style={{ fontSize: '13px', color: 'var(--muted)', marginBottom: '12px' }}>
+          <div style={{ fontSize: 'var(--fs-base)', color: 'var(--muted)', marginBottom: '12px' }}>
             Redeem your prize before it expires{myVoucher.expires_at ? ` on ${formatDate(myVoucher.expires_at)}` : ''}.
           </div>
           <button className="lx-btn lx-btn--md lx-btn--primary" onClick={() => navigate(`/checkout?voucher=${myVoucher.code}`)}>
@@ -323,10 +323,10 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
           {podium.map((p, idx) => (
             <Card key={p.entry_id} interactive onClick={() => (onSelectTrader ? onSelectTrader(p.user_id) : navigate(`/trader/${p.user_id}`))}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '40px', lineHeight: 1, color: PODIUM_TONES[idx], minWidth: '44px' }}>{p.rank}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-6xl)', lineHeight: 1, color: PODIUM_TONES[idx], minWidth: '44px' }}>{p.rank}</div>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontSize: '15px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.full_name}</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: '3px' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: '3px' }}>
                     {p.country || 'Unknown'} · {p.days_traded != null ? `${p.days_traded}d traded` : '—'}
                   </div>
                 </div>
@@ -334,7 +334,7 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
               <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '12px', marginTop: '16px' }}>
                 <div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Return</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '24px', color: p.profit_pct >= 0 ? 'var(--gain)' : 'var(--loss)', marginTop: '3px' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-4xl)', color: p.profit_pct >= 0 ? 'var(--gain)' : 'var(--loss)', marginTop: '3px' }}>
                     {p.profit_pct >= 0 ? '+' : ''}{p.profit_pct.toFixed(2)}%
                   </div>
                 </div>
@@ -350,7 +350,7 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
       {/* Standings */}
       <Card ruled flush title="Standings" actions={
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--muted)' }}>Updated {lastUpdated ? formatTime(lastUpdated) : '—'}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--muted)' }}>Updated {lastUpdated ? formatTime(lastUpdated) : '—'}</span>
           {leaders.length > 0 && (
             <button
               onClick={() => exportRowsToCSV(leaders, STANDINGS_EXPORT_COLUMNS, `${slug}_standings_${new Date().toISOString().slice(0, 10)}.csv`)}

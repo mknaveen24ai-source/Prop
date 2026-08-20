@@ -39,7 +39,7 @@ export default function LandingFooter({ onFooterCta }) {
                 <path d="M5 12H19M19 12L12 5M19 12L12 19" />
               </svg>
             </Link>
-        <p style={{ marginTop: '24px', fontSize: '12px', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>Accounts released monthly · Limited availability</p>
+        <p style={{ marginTop: '24px', fontSize: 'var(--fs-sm)', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>Accounts released monthly · Limited availability</p>
           </div>
         </div>
 
@@ -48,11 +48,11 @@ export default function LandingFooter({ onFooterCta }) {
 
           {/* Brand */}
           <div className="mp-footer-brand" style={{ gridColumn: 'span 2' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: '24px', fontWeight: 800, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-4xl)', fontWeight: 800, marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span style={{ color: 'var(--ink)' }}>PROPFIRM </span>
               <span style={{ color: 'var(--muted)' }}>V2</span>
             </div>
-            <p className="mp-p-body" style={{ color: 'var(--muted)', maxWidth: '300px', fontSize: '14px' }}>
+            <p className="mp-p-body" style={{ color: 'var(--muted)', maxWidth: '300px', fontSize: 'var(--fs-md)' }}>
               {landingCopy.footerBrand}
             </p>
             <div style={{ marginTop: '30px', display: 'flex', gap: '12px' }}>
@@ -66,7 +66,7 @@ export default function LandingFooter({ onFooterCta }) {
                   width: '42px', height: '42px',
                   background: 'transparent',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '16px', color: 'var(--muted)', cursor: 'pointer',
+                  fontSize: 'var(--fs-lg)', color: 'var(--muted)', cursor: 'pointer',
                   border: '1px solid var(--rule)',
                   transition: 'border-color 0.2s ease, color 0.2s ease',
                 }}
@@ -97,12 +97,12 @@ export default function LandingFooter({ onFooterCta }) {
             },
           ].map(col => (
             <div key={col.title}>
-                <h4 style={{ fontFamily: 'var(--font-display)', fontSize: '14px', color: 'var(--muted)', marginBottom: '24px', textTransform: 'uppercase', letterSpacing: '0.15em' }}>{col.title}</h4>
+                <h4 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-md)', color: 'var(--muted)', marginBottom: '24px', textTransform: 'uppercase', letterSpacing: '0.15em' }}>{col.title}</h4>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {col.links.map(link => (
                   <li key={link}>
                     <a href={linkHref(link)} style={{
-                      color: 'var(--muted)', textDecoration: 'none', fontSize: '14px',
+                      color: 'var(--muted)', textDecoration: 'none', fontSize: 'var(--fs-md)',
                       transition: 'color 0.2s',
                       display: 'inline-block',
                     }}
@@ -120,7 +120,7 @@ export default function LandingFooter({ onFooterCta }) {
               dead links. Replaced with the two policies that actually exist and
               that consumer law requires us to publish. */}
           <div>
-            <h4 style={{ fontFamily: 'var(--font-display)', fontSize: '14px', color: 'var(--muted)', marginBottom: '24px', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Legal</h4>
+            <h4 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-md)', color: 'var(--muted)', marginBottom: '24px', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Legal</h4>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {[
                 { to: '/terms', label: 'Terms of Service' },
@@ -131,7 +131,7 @@ export default function LandingFooter({ onFooterCta }) {
                 <li key={to}>
                   <Link
                     to={to}
-                    style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: '14px', transition: 'color 0.2s' }}
+                    style={{ color: 'var(--muted)', textDecoration: 'none', fontSize: 'var(--fs-md)', transition: 'color 0.2s' }}
                     onMouseOver={e => { e.currentTarget.style.color = 'var(--ink)' }}
                     onMouseOut={e => { e.currentTarget.style.color = 'var(--muted)' }}
                     onFocus={e => { e.currentTarget.style.color = 'var(--ink)' }}
@@ -147,17 +147,17 @@ export default function LandingFooter({ onFooterCta }) {
 
         {/* Bottom Bar */}
         <div className="mp-footer-bottom" style={{ borderTop: '1px solid var(--rule)', paddingTop: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <p style={{ fontSize: '11px', color: 'var(--muted)', lineHeight: 1.8, textAlign: 'justify' }}>
+          <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--muted)', lineHeight: 1.8, textAlign: 'justify' }}>
             <strong style={{ color: 'var(--ink)' }}>Risk Warning:</strong> Trading Foreign Exchange (Forex) and Commodities carries a high level of risk and is not suitable for all investors. You may sustain a loss of some or all of your capital. Past performance is not indicative of future results.
             <br/><br/>
             <strong style={{ color: 'var(--ink)' }}>Simulated Trading Disclaimer:</strong> All accounts provided during the evaluation phases (1-step, 2-step, or 3-step, depending on the model chosen) are simulated demo accounts using live market quotes. Upon passing every phase, funded accounts are backed by the firm's real capital and trades may be executed on live markets. PropFirm V2 is not a broker, does not accept client deposits for trading, and does not provide financial advice. Challenge accounts are paid and limited in availability.
           </p>
           <div className="mp-footer-bottom-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--rule)', paddingTop: '24px', flexWrap: 'wrap', gap: '16px' }}>
-            <span style={{ fontSize: '12px', color: 'var(--muted)' }}>© {new Date().getFullYear()} PropFirm V2. All rights reserved.</span>
+            <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--muted)' }}>© {new Date().getFullYear()} PropFirm V2. All rights reserved.</span>
             <div className="mp-footer-chip-row" style={{ display: 'flex', gap: '10px' }}>
               {['WEB PLATFORM', 'FOREX', 'GOLD', 'SILVER'].map(p => (
                 <div key={p} style={{
-                  fontSize: '10px', color: 'var(--muted)',
+                  fontSize: 'var(--fs-2xs)', color: 'var(--muted)',
                   border: '1px solid var(--rule)', padding: '5px 10px',
                 fontFamily: 'var(--font-mono)',
                   letterSpacing: '0.05em',

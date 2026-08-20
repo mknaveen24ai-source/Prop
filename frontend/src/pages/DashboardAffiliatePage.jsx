@@ -100,7 +100,7 @@ function AffiliateAnalysisTab({ summary }) {
               <XAxis dataKey="month" {...chartThemeProps.xAxis} />
               <YAxis {...chartThemeProps.yAxis} allowDecimals={false} />
               <Tooltip {...chartThemeProps.tooltip} />
-              <Legend wrapperStyle={{ fontSize: '12px' }} />
+              <Legend wrapperStyle={{ fontSize: 'var(--fs-sm)' }} />
               <Bar dataKey="total" fill="var(--accent)" name="Total Referrals" radius={[4, 4, 0, 0]} />
               <Bar dataKey="paying" fill="var(--green)" name="Paying Referrals" radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -114,7 +114,7 @@ function AffiliateAnalysisTab({ summary }) {
               <XAxis dataKey="month" {...chartThemeProps.xAxis} />
               <YAxis {...chartThemeProps.yAxis} tickFormatter={(v) => `$${v}`} />
               <Tooltip {...chartThemeProps.tooltip} formatter={(value) => [`$${Number(value).toLocaleString()}`, undefined]} />
-              <Legend wrapperStyle={{ fontSize: '12px' }} />
+              <Legend wrapperStyle={{ fontSize: 'var(--fs-sm)' }} />
               <Bar dataKey="paid" stackId="commission" fill="var(--green)" name="Paid" />
               <Bar dataKey="pending" stackId="commission" fill="var(--muted)" name="Pending" radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -172,7 +172,7 @@ function ReferralSeasonTab() {
   if (!season) {
     return (
       <Card style={{ maxWidth: '700px' }}>
-        <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0 }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', margin: 0 }}>
           No referral season is running right now — check back soon. Seasons rank affiliates by new paying
           referrals over a set period, with free challenge accounts for the top finishers.
         </p>
@@ -186,21 +186,21 @@ function ReferralSeasonTab() {
     <>
       <Card style={{ marginBottom: '20px', maxWidth: '700px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '8px', marginBottom: '6px' }}>
-          <span style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-secondary)' }}>{season.title}</span>
+          <span style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, color: 'var(--text-secondary)' }}>{season.title}</span>
           <StatusBadge status={season.status} />
         </div>
         {season.description && (
-          <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '10px' }}>{season.description}</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: '10px' }}>{season.description}</p>
         )}
-        <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
+        <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', margin: 0 }}>
           {new Date(season.start_at).toLocaleDateString()} – {new Date(season.end_at).toLocaleDateString()}
         </p>
         {season.prize_pool?.length > 0 && (
           <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--rule-soft, var(--navy-border))' }}>
-            <div style={{ fontSize: '11px', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '8px' }}>Prizes</div>
+            <div style={{ fontSize: 'var(--fs-xs)', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '8px' }}>Prizes</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {season.prize_pool.map((p, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-base)' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Rank #{p.rank}</span>
                   <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{p.label}</span>
                 </div>
@@ -210,8 +210,8 @@ function ReferralSeasonTab() {
         )}
         {myEntry && (
           <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--rule-soft, var(--navy-border))', display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Your standing</span>
-            <span style={{ fontSize: '13px', fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>
+            <span style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)' }}>Your standing</span>
+            <span style={{ fontSize: 'var(--fs-base)', fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>
               {myRank ? `#${myRank}` : 'Unranked'} · {myEntry.new_paying_referrals} new paying referral{myEntry.new_paying_referrals === 1 ? '' : 's'}
             </span>
           </div>
@@ -345,7 +345,7 @@ export default function DashboardAffiliatePage() {
   if (loading) {
     return (
       <div>
-        <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: '24px', fontSize: '22px' }}>
+        <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: '24px', fontSize: 'var(--fs-3xl)' }}>
           Affiliate Program
         </h2>
         <div style={{ textAlign: 'center', padding: '80px', color: 'var(--text-muted)' }}>Loading...</div>
@@ -356,7 +356,7 @@ export default function DashboardAffiliatePage() {
   if (error && !summary) {
     return (
       <div>
-        <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: '24px', fontSize: '22px' }}>
+        <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: '24px', fontSize: 'var(--fs-3xl)' }}>
           Affiliate Program
         </h2>
         <Card style={{ padding: '24px', color: 'var(--red)' }}>{error}</Card>
@@ -411,7 +411,7 @@ export default function DashboardAffiliatePage() {
 
   return (
     <div>
-      <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: '24px', fontSize: '22px' }}>
+      <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: '24px', fontSize: 'var(--fs-3xl)' }}>
         Affiliate Program
       </h2>
 
@@ -431,14 +431,14 @@ export default function DashboardAffiliatePage() {
       {activeTab === 'overview' && (
         <>
           <Card title="Your Referral Link" style={{ marginBottom: '20px', maxWidth: '700px' }}>
-            <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '12px' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: '12px' }}>
               Share this link. Anyone who signs up gets a discount on their first challenge, and you earn
               commission on every challenge they ever purchase — for life.
             </p>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
               <code ref={referralLinkRef} style={{
                 flex: '1 1 300px', padding: '10px 14px', background: 'var(--bg-surface)',
-                border: '1px solid var(--border)', borderRadius: '6px', fontSize: '13px',
+                border: '1px solid var(--border)', borderRadius: '6px', fontSize: 'var(--fs-base)',
                 color: 'var(--text-secondary)', overflowX: 'auto', whiteSpace: 'nowrap'
               }}>
                 {summary?.referral_link || '—'}
@@ -451,11 +451,11 @@ export default function DashboardAffiliatePage() {
               </button>
             </div>
             {copyFailed && (
-              <p style={{ marginTop: '8px', fontSize: '12px', color: 'var(--warn)' }} role="alert">
+              <p style={{ marginTop: '8px', fontSize: 'var(--fs-sm)', color: 'var(--warn)' }} role="alert">
                 Couldn't copy automatically — the link is selected above, press Ctrl/Cmd+C to copy it.
               </p>
             )}
-            <p style={{ marginTop: '10px', fontSize: '12px', color: 'var(--text-muted)' }}>
+            <p style={{ marginTop: '10px', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
               Referral code: <strong style={{ color: 'var(--text-secondary)' }}>{summary?.affiliate_code || '—'}</strong>
             </p>
           </Card>
@@ -469,11 +469,11 @@ export default function DashboardAffiliatePage() {
 
           <Card title="Commission Tier" style={{ maxWidth: '700px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
-              <span style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+              <span style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, color: 'var(--text-secondary)' }}>
                 {currentTier ? `${currentTier.label || 'Tier ' + currentTier.tier_rank} — ${currentTier.commission_pct}%` : '—'}
               </span>
               {nextTier && (
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
                   {nextTier.min_referrals - payingReferrals} more paying referral{nextTier.min_referrals - payingReferrals === 1 ? '' : 's'} to reach {nextTier.label || `Tier ${nextTier.tier_rank}`} ({nextTier.commission_pct}%)
                 </span>
               )}
@@ -485,12 +485,12 @@ export default function DashboardAffiliatePage() {
               />
             )}
             {!nextTier && currentTier && (
-              <p style={{ fontSize: '12px', color: 'var(--green)', margin: 0 }}>You've reached the highest tier.</p>
+              <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--green)', margin: 0 }}>You've reached the highest tier.</p>
             )}
 
             {allTiers.length > 0 && (
               <div style={{ marginTop: '18px', paddingTop: '14px', borderTop: '1px solid var(--rule-soft, var(--navy-border))' }}>
-                <div style={{ fontSize: '11px', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '10px' }}>Full Tier Ladder</div>
+                <div style={{ fontSize: 'var(--fs-xs)', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '10px' }}>Full Tier Ladder</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {allTiers.map((t) => {
                     const isCurrent = currentTier && t.tier_rank === currentTier.tier_rank
@@ -504,10 +504,10 @@ export default function DashboardAffiliatePage() {
                           border: isCurrent ? '1px solid var(--accent)' : '1px solid transparent',
                         }}
                       >
-                        <span style={{ fontSize: '13px', fontWeight: isCurrent ? 700 : 400, color: isCurrent ? 'var(--accent)' : 'var(--text-secondary)' }}>
+                        <span style={{ fontSize: 'var(--fs-base)', fontWeight: isCurrent ? 700 : 400, color: isCurrent ? 'var(--accent)' : 'var(--text-secondary)' }}>
                           {t.label || `Tier ${t.tier_rank}`}{isCurrent ? ' (current)' : ''}
                         </span>
-                        <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                        <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
                           {t.min_referrals}+ referrals · {t.commission_pct}%
                         </span>
                       </div>
@@ -577,12 +577,12 @@ export default function DashboardAffiliatePage() {
       {activeTab === 'payouts' && (
         <>
           <Card title="Request Payout" style={{ marginBottom: '20px', maxWidth: '700px' }}>
-            <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '16px' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: '16px' }}>
               Available balance: {formatCurrency(summary?.available_balance || 0)}. Enter the amount you'd like to withdraw.
             </p>
             {payoutMessage && (
               <div style={{
-                padding: '10px 14px', borderRadius: '6px', marginBottom: '16px', fontSize: '13px',
+                padding: '10px 14px', borderRadius: '6px', marginBottom: '16px', fontSize: 'var(--fs-base)',
                 background: payoutMessage.type === 'success' ? 'color-mix(in srgb, var(--green) 12%, transparent)' : 'color-mix(in srgb, var(--red) 12%, transparent)',
                 color: payoutMessage.type === 'success' ? 'var(--green)' : 'var(--red)'
               }}>
@@ -609,7 +609,7 @@ export default function DashboardAffiliatePage() {
                       key={pct}
                       type="button"
                       className="btn btn-secondary"
-                      style={{ flex: 1, padding: '6px', fontSize: '11px' }}
+                      style={{ flex: 1, padding: '6px', fontSize: 'var(--fs-xs)' }}
                       onClick={() => setPayoutForm({ ...payoutForm, amount_requested: String(Math.floor((summary?.available_balance || 0) * pct * 100) / 100) })}
                     >
                       {pct === 1 ? 'Max' : `${pct * 100}%`}

@@ -72,7 +72,7 @@ export default function AdminNotificationDrawer({ open, onClose, alerts, onNavig
       />
       <aside className={`admin-notif-drawer${open ? ' is-open' : ''}`} aria-hidden={!open}>
         <div className="admin-notif-drawer-header">
-          <strong style={{ fontSize: '14px' }}>Alerts</strong>
+          <strong style={{ fontSize: 'var(--fs-md)' }}>Alerts</strong>
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             {unreadCount > 0 && (
               <button type="button" className="admin-notif-drawer-mark-all" onClick={markAllRead}>

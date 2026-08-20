@@ -22,8 +22,8 @@ function formatDateTime(value) {
 function RuleRow({ label, value, accent = false }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '12px 0', borderBottom: '1px solid var(--navy-border)' }}>
-      <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{label}</span>
-      <span style={{ color: accent ? 'var(--accent)' : 'var(--text)', fontSize: '13px', fontFamily: 'var(--font-mono)', textAlign: 'right' }}>{value}</span>
+      <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>{label}</span>
+      <span style={{ color: accent ? 'var(--accent)' : 'var(--text)', fontSize: 'var(--fs-base)', fontFamily: 'var(--font-mono)', textAlign: 'right' }}>{value}</span>
     </div>
   )
 }
@@ -194,10 +194,10 @@ function PhaseTable({ model, currentStepNumber, isFundedAccount, isCurrentModel 
   return (
     <Card style={{ marginBottom: '16px', border: isCurrentModel ? '1px solid var(--accent)' : undefined }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '4px', flexWrap: 'wrap' }}>
-        <h3 style={{ color: 'var(--accent)', fontSize: '16px', margin: 0 }}>{model.name || 'Phase Table'}</h3>
-        {isCurrentModel && <span className="badge badge-success" style={{ fontSize: '10px' }}>Your model</span>}
+        <h3 style={{ color: 'var(--accent)', fontSize: 'var(--fs-lg)', margin: 0 }}>{model.name || 'Phase Table'}</h3>
+        {isCurrentModel && <span className="badge badge-success" style={{ fontSize: 'var(--fs-2xs)' }}>Your model</span>}
       </div>
-      {model.description && <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginBottom: '14px' }}>{model.description}</p>}
+      {model.description && <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)', marginBottom: '14px' }}>{model.description}</p>}
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: `${180 + columns.length * 140}px` }}>
           <thead>
@@ -207,7 +207,7 @@ function PhaseTable({ model, currentStepNumber, isFundedAccount, isCurrentModel 
                 <th
                   key={c.key}
                   style={{
-                    textAlign: 'right', padding: '8px 12px', fontSize: '12px',
+                    textAlign: 'right', padding: '8px 12px', fontSize: 'var(--fs-sm)',
                     color: c.isCurrent ? 'var(--accent)' : 'var(--text)',
                     borderBottom: `2px solid ${c.isCurrent ? 'var(--accent)' : 'var(--navy-border)'}`,
                   }}
@@ -220,12 +220,12 @@ function PhaseTable({ model, currentStepNumber, isFundedAccount, isCurrentModel 
           <tbody>
             {rows.map((row) => (
               <tr key={row.label}>
-                <td style={{ padding: '10px 12px', fontSize: '12px', color: 'var(--text-muted)', borderBottom: '1px solid var(--navy-border)' }}>{row.label}</td>
+                <td style={{ padding: '10px 12px', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', borderBottom: '1px solid var(--navy-border)' }}>{row.label}</td>
                 {columns.map((c) => (
                   <td
                     key={c.key}
                     style={{
-                      textAlign: 'right', padding: '10px 12px', fontSize: '13px', fontFamily: 'var(--font-mono)',
+                      textAlign: 'right', padding: '10px 12px', fontSize: 'var(--fs-base)', fontFamily: 'var(--font-mono)',
                       color: c.isCurrent ? 'var(--accent)' : 'var(--text)',
                       borderBottom: '1px solid var(--navy-border)',
                     }}
@@ -304,7 +304,7 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
         <div style={{ flex: 1, minWidth: '280px' }}>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--accent)' }}>{kicker}</div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '38px', fontWeight: 400, margin: '10px 0 0' }}>The Rulebook, in full</h2>
-          <p style={{ fontSize: '14px', lineHeight: 1.7, color: 'var(--muted)', maxWidth: '64ch', margin: '10px 0 0' }}>
+          <p style={{ fontSize: 'var(--fs-md)', lineHeight: 1.7, color: 'var(--muted)', maxWidth: '64ch', margin: '10px 0 0' }}>
             Everything that can end this account is printed on this page. Nothing is held in a separate schedule, and nothing changes while a challenge is running.
           </p>
         </div>
@@ -333,7 +333,7 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
               <Card key={r.label} stat tone={r.tone}>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>{r.label}</div>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'clamp(19px,1.7vw,24px)', whiteSpace: 'nowrap', marginTop: '8px', color: r.tone }}>{r.value}</div>
-                <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '5px', lineHeight: 1.5 }}>{r.note}</div>
+                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--muted)', marginTop: '5px', lineHeight: 1.5 }}>{r.note}</div>
               </Card>
             ))}
           </div>
@@ -375,7 +375,7 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
           )}
 
           <Card>
-            <h3 style={{ color: 'var(--accent)', marginBottom: '14px', fontSize: '16px' }}>Live Status</h3>
+            <h3 style={{ color: 'var(--accent)', marginBottom: '14px', fontSize: 'var(--fs-lg)' }}>Live Status</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 32px' }}>
               <div>
                 <RuleRow label="Status" value={String(selectedAccount.status || '—').toUpperCase()} />

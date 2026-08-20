@@ -16,7 +16,7 @@ export default function AdminChart({
         // collapses to a 0×0 box (relying on `overflow: visible` for SVG
         // charts to paint past it), which makes ordinary text wrap to one
         // word per line instead of centering.
-        <div style={{ width: '100%', height, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+        <div style={{ width: '100%', height, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>
           {empty}
         </div>
       ) : (
@@ -49,8 +49,8 @@ export const chartThemeProps = {
       color: 'var(--admin-text)',
       boxShadow: 'var(--elev)'
     },
-    itemStyle: { color: 'var(--admin-text)', fontSize: '13px' },
-    labelStyle: { color: 'var(--admin-text-muted)', marginBottom: '8px', fontSize: '12px', fontWeight: 600 }
+    itemStyle: { color: 'var(--admin-text)', fontSize: 'var(--fs-base)' },
+    labelStyle: { color: 'var(--admin-text-muted)', marginBottom: '8px', fontSize: 'var(--fs-sm)', fontWeight: 600 }
   }
 };
 

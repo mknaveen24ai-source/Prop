@@ -261,8 +261,8 @@ export default function AdminPayouts() {
       render: (p) => (
         <div>
           <div style={{ color: 'var(--admin-text)' }}>{p.full_name || p.email || 'Unknown User'}</div>
-          {p.full_name && <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>{p.email}</div>}
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>Acc #{p.account_id}</div>
+          {p.full_name && <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>{p.email}</div>}
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>Acc #{p.account_id}</div>
         </div>
       )
     },
@@ -275,7 +275,7 @@ export default function AdminPayouts() {
       render: (p) => (
         <div className="admin-tag-row">
           {(p.tags || []).slice(0, 3).map((tag) => <span key={tag} className="admin-tag-pill static">{tag}</span>)}
-          {(p.tags || []).length > 3 && <span style={{ color: 'var(--admin-text-muted)', fontSize: '12px' }}>+{p.tags.length - 3}</span>}
+          {(p.tags || []).length > 3 && <span style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)' }}>+{p.tags.length - 3}</span>}
         </div>
       )
     },
@@ -325,7 +325,7 @@ export default function AdminPayouts() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
           <div>
             <h1 className="admin-h1">Payout Operations</h1>
-            <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>Review finance queues with saved views, classifications, tags, and risk context.</p>
+            <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>Review finance queues with saved views, classifications, tags, and risk context.</p>
           </div>
         </div>
 

@@ -59,11 +59,11 @@ function CreateCompetitionForm({ onCreate, creating }) {
         <h3 style={{ margin: '0 0 4px' }}>Create Competition</h3>
       </div>
       <label>
-        <div style={{ fontSize: '12px', opacity: 0.7, marginBottom: '4px' }}>Title</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Title</div>
         <input style={inputStyle} value={form.title} onChange={(e) => update('title', e.target.value)} required />
       </label>
       <label>
-        <div style={{ fontSize: '12px', opacity: 0.7, marginBottom: '4px' }}>Type</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Type</div>
         <select style={inputStyle} value={form.type} onChange={(e) => update('type', e.target.value)}>
           <option value="weekly">Weekly</option>
           <option value="monthly">Monthly</option>
@@ -71,34 +71,34 @@ function CreateCompetitionForm({ onCreate, creating }) {
         </select>
       </label>
       <label>
-        <div style={{ fontSize: '12px', opacity: 0.7, marginBottom: '4px' }}>Start</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Start</div>
         <input type="datetime-local" style={inputStyle} value={form.start_at} onChange={(e) => update('start_at', e.target.value)} required />
       </label>
       <label>
-        <div style={{ fontSize: '12px', opacity: 0.7, marginBottom: '4px' }}>End</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>End</div>
         <input type="datetime-local" style={inputStyle} value={form.end_at} onChange={(e) => update('end_at', e.target.value)} required />
       </label>
       <label>
-        <div style={{ fontSize: '12px', opacity: 0.7, marginBottom: '4px' }}>Starting Balance ($)</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Starting Balance ($)</div>
         <input type="number" style={inputStyle} value={form.starting_balance} onChange={(e) => update('starting_balance', e.target.value)} />
       </label>
       <label>
-        <div style={{ fontSize: '12px', opacity: 0.7, marginBottom: '4px' }}>Max Participants (blank = unlimited)</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Max Participants (blank = unlimited)</div>
         <input type="number" style={inputStyle} value={form.max_participants} onChange={(e) => update('max_participants', e.target.value)} />
       </label>
       <label>
-        <div style={{ fontSize: '12px', opacity: 0.7, marginBottom: '4px' }}>Ranking Metric</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Ranking Metric</div>
         <select style={inputStyle} value={form.ranking_metric} onChange={(e) => update('ranking_metric', e.target.value)}>
           <option value="profit_pct">Profit %</option>
           <option value="profit_usd">Profit $</option>
         </select>
       </label>
       <label>
-        <div style={{ fontSize: '12px', opacity: 0.7, marginBottom: '4px' }}>Max Drawdown %</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Max Drawdown %</div>
         <input type="number" style={inputStyle} value={form.max_drawdown_pct} onChange={(e) => update('max_drawdown_pct', e.target.value)} />
       </label>
       <label>
-        <div style={{ fontSize: '12px', opacity: 0.7, marginBottom: '4px' }}>Daily Drawdown % (optional)</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Daily Drawdown % (optional)</div>
         <input type="number" style={inputStyle} value={form.daily_drawdown_pct} onChange={(e) => update('daily_drawdown_pct', e.target.value)} />
       </label>
       <div style={{ gridColumn: '1 / -1' }}>
@@ -188,7 +188,7 @@ export default function AdminCompetitions() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h1 className="admin-h1">Competitions</h1>
-          <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+          <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
             Create and manage weekly/monthly contests. Entries are free in v1; final rankings are shown once a contest completes for manual prize payout.
           </p>
         </div>

@@ -90,13 +90,13 @@ export default function CommandPalette({ results, placeholder = 'Jump to a pageâ
             onKeyDown={(e) => { if (e.key === 'Enter' && filtered[0]) go(filtered[0]) }}
             style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: '15px', color: 'var(--ink)' }}
           />
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', color: 'var(--muted)', border: '1px solid var(--rule)', borderRadius: '3px', padding: '2px 6px' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', color: 'var(--muted)', border: '1px solid var(--rule)', borderRadius: '3px', padding: '2px 6px' }}>
             ESC
           </span>
         </div>
         <div style={{ maxHeight: '52vh', overflowY: 'auto', padding: '8px' }}>
           {filtered.length === 0 && (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: '13px' }}>
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>
               No matches
             </div>
           )}

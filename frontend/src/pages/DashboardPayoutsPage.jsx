@@ -128,7 +128,7 @@ export default function DashboardPayoutsPage({
       <div className="ui-split" style={{ alignItems: 'start', '--split': 'minmax(0,1fr) minmax(0,1.5fr)' }}>
         {/* Request a payout */}
         <form onSubmit={requestPayout} style={{ background: 'var(--glass-2)', backdropFilter: 'blur(18px)', border: '1px solid var(--accent)', borderRadius: '4px', boxShadow: 'var(--elev)', padding: '18px 20px' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: '20px', borderBottom: '3px double var(--rule)', paddingBottom: '12px', marginBottom: '16px' }}>Request a payout</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-2xl)', borderBottom: '3px double var(--rule)', paddingBottom: '12px', marginBottom: '16px' }}>Request a payout</div>
 
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '6px' }}>
             Amount available — {formatCurrency(availableProfit)}
@@ -149,7 +149,7 @@ export default function DashboardPayoutsPage({
                 key={pct}
                 type="button"
                 onClick={() => setPayoutForm({ ...payoutForm, amount_requested: String(presetAmount(pct)) })}
-                style={{ flex: 1, padding: '8px', border: '1px solid var(--rule)', borderRadius: '4px', background: 'transparent', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '.08em', textTransform: 'uppercase', cursor: 'pointer' }}
+                style={{ flex: 1, padding: '8px', border: '1px solid var(--rule)', borderRadius: '4px', background: 'transparent', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.08em', textTransform: 'uppercase', cursor: 'pointer' }}
               >
                 {pct === 1 ? 'Max' : `${pct * 100}%`}
               </button>
@@ -172,7 +172,7 @@ export default function DashboardPayoutsPage({
               >
                 <span style={{ width: '8px', height: '8px', background: m.tone, flex: '0 0 auto' }} />
                 <span style={{ flex: 1 }}>
-                  <span style={{ display: 'block', fontSize: '13px', color: 'var(--ink)' }}>{m.label}</span>
+                  <span style={{ display: 'block', fontSize: 'var(--fs-base)', color: 'var(--ink)' }}>{m.label}</span>
                   <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)', marginTop: '2px' }}>{m.meta}</span>
                 </span>
               </button>
@@ -197,7 +197,7 @@ export default function DashboardPayoutsPage({
                   >
                     <span style={{ width: '8px', height: '8px', background: n.tone, flex: '0 0 auto' }} />
                     <span style={{ flex: 1 }}>
-                      <span style={{ display: 'block', fontSize: '13px', color: 'var(--ink)' }}>{n.label}</span>
+                      <span style={{ display: 'block', fontSize: 'var(--fs-base)', color: 'var(--ink)' }}>{n.label}</span>
                       <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)', marginTop: '2px' }}>{n.meta}</span>
                     </span>
                   </button>
@@ -216,7 +216,7 @@ export default function DashboardPayoutsPage({
               required
               style={{ width: '100%', marginTop: '6px', resize: 'vertical' }}
             />
-            <p style={{ marginTop: '8px', fontSize: '11px', color: 'var(--warn)' }}>
+            <p style={{ marginTop: '8px', fontSize: 'var(--fs-xs)', color: 'var(--warn)' }}>
               Double-check before submitting — crypto payouts are final. Funds sent to an incorrect address or wrong network cannot be recovered.
             </p>
           </div>
@@ -275,7 +275,7 @@ export default function DashboardPayoutsPage({
             {accrualData.length > 1 ? (
               <EquityCurveChart data={accrualData} height={200} tone="var(--gain)" />
             ) : (
-              <div style={{ textAlign: 'center', padding: '48px', color: 'var(--muted)', fontSize: '13px' }}>Not enough trading history yet for this range.</div>
+              <div style={{ textAlign: 'center', padding: '48px', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>Not enough trading history yet for this range.</div>
             )}
           </Card>
 
@@ -310,7 +310,7 @@ export default function DashboardPayoutsPage({
                   <tbody>
                     {pagedPayouts.map((p) => (
                       <tr key={p.id}>
-                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{p.account_uid || p.account_id || '—'}</td>
+                        <td style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)' }}>{p.account_uid || p.account_id || '—'}</td>
                         <td style={{ fontFamily: 'var(--font-mono)' }}>{formatCurrency(p.amount_requested)}</td>
                         <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--gain)' }}>{formatCurrency(p.amount_payable)}</td>
                         <td>{p.payment_method}</td>

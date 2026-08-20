@@ -238,7 +238,7 @@ export default function AdminEmailJobs() {
       render: (job) => (
         <div>
           <div>MAIL-{String(job.id).padStart(6, '0')}</div>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>{job.delivery_type === 'automation' ? 'Automation' : 'Transactional'}</div>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>{job.delivery_type === 'automation' ? 'Automation' : 'Transactional'}</div>
         </div>
       )
     },
@@ -249,7 +249,7 @@ export default function AdminEmailJobs() {
       render: (job) => (
         <div>
           <div style={{ color: 'var(--admin-text)' }}>{job.full_name_hint || job.to_email}</div>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>{job.to_email}</div>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>{job.to_email}</div>
         </div>
       )
     },
@@ -260,7 +260,7 @@ export default function AdminEmailJobs() {
       render: (job) => (
         <div>
           <div style={{ color: 'var(--admin-text)' }}>{formatTemplateLabel(job.template_key)}</div>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>{job.template_key}</div>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>{job.template_key}</div>
         </div>
       )
     },
@@ -271,7 +271,7 @@ export default function AdminEmailJobs() {
       render: (job) => (
         <div>
           <AdminBadge status={normalizeStatusTone(job.status)} label={job.status} />
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px', marginTop: '6px' }}>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)', marginTop: '6px' }}>
             {job.attempt_count} attempt{job.attempt_count === 1 ? '' : 's'}
           </div>
         </div>
@@ -284,7 +284,7 @@ export default function AdminEmailJobs() {
       render: (job) => (
         <div>
           <div>{formatDateTime(job.scheduled_for)}</div>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>Created {formatDateTime(job.created_at)}</div>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>Created {formatDateTime(job.created_at)}</div>
         </div>
       )
     },
@@ -295,7 +295,7 @@ export default function AdminEmailJobs() {
       render: (job) => (
         <div>
           <div>Last try: {formatDateTime(job.last_attempt_at)}</div>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>Sent: {formatDateTime(job.sent_at)}</div>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>Sent: {formatDateTime(job.sent_at)}</div>
         </div>
       )
     },
@@ -304,10 +304,10 @@ export default function AdminEmailJobs() {
       key: 'error',
       render: (job) => (
         <div>
-          <div style={{ color: 'var(--admin-text)', fontSize: '12px' }}>
+          <div style={{ color: 'var(--admin-text)', fontSize: 'var(--fs-sm)' }}>
             {job.last_error ? String(job.last_error).slice(0, 90) : 'No error recorded'}
           </div>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px', marginTop: '4px' }}>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)', marginTop: '4px' }}>
             {job.preview_url ? 'Preview captured' : job.provider_message_id ? 'Provider receipt stored' : 'No preview path'}
           </div>
         </div>
@@ -349,7 +349,7 @@ export default function AdminEmailJobs() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
           <div>
             <h1 className="admin-h1">Email Job Monitor</h1>
-            <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+            <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
               Watch transactional and automation emails, inspect failures, and re-queue dead jobs without leaving the admin console.
             </p>
           </div>
@@ -433,7 +433,7 @@ export default function AdminEmailJobs() {
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-start', marginBottom: '18px' }}>
                 <div>
                   <h2 className="admin-h2" style={{ marginBottom: '6px' }}>Email Job MAIL-{String(drawerRow.id).padStart(6, '0')}</h2>
-                  <div style={{ color: 'var(--admin-text-muted)', fontSize: '12px' }}>{drawerRow.to_email}</div>
+                  <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)' }}>{drawerRow.to_email}</div>
                 </div>
                 <button className="admin-modal-close" onClick={() => setDrawerRow(null)}>×</button>
               </div>
@@ -479,7 +479,7 @@ export default function AdminEmailJobs() {
 
               <Card style={{ margin: '16px 0 0', background: 'var(--admin-bg)' }}>
                 <h3 className="admin-h3">Payload</h3>
-                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--admin-text-muted)', fontSize: '12px' }}>
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)' }}>
                   {JSON.stringify(drawerRow.payload_json || {}, null, 2)}
                 </pre>
               </Card>

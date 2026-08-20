@@ -38,7 +38,7 @@ class ErrorBoundary extends React.Component {
           <p style={{ color: 'var(--text-primary)', fontWeight: 700, marginBottom: '6px' }}>
             {this.props.label ? `${this.props.label} failed to load` : 'This section failed to load'}
           </p>
-          <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '18px' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: '18px' }}>
             An unexpected error occurred here — the rest of the app is unaffected.
           </p>
           <button
@@ -48,7 +48,7 @@ class ErrorBoundary extends React.Component {
             Try Again
           </button>
           {import.meta.env.DEV && this.state.error && (
-            <pre style={{ marginTop: '18px', textAlign: 'left', fontSize: '11px', color: 'var(--danger)', overflowX: 'auto', maxWidth: '100%' }}>
+            <pre style={{ marginTop: '18px', textAlign: 'left', fontSize: 'var(--fs-xs)', color: 'var(--danger)', overflowX: 'auto', maxWidth: '100%' }}>
               {this.state.error.toString()}
               {'\n'}
               {this.state.errorInfo?.componentStack}
@@ -89,7 +89,7 @@ class ErrorBoundary extends React.Component {
           </div>
           {import.meta.env.DEV && this.state.error && (
             <div style={{ marginTop: '40px', padding: '20px', background: 'var(--paper-2, #1f1f1f)', border: '1px solid var(--loss, #f87171)', width: '80%', maxWidth: '800px', overflowX: 'auto' }}>
-              <pre style={{ color: 'var(--loss, #f87171)', fontSize: '12px', margin: 0 }}>
+              <pre style={{ color: 'var(--loss, #f87171)', fontSize: 'var(--fs-sm)', margin: 0 }}>
                 {this.state.error.toString()}
                 <br/>
                 {this.state.errorInfo?.componentStack}

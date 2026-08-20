@@ -68,7 +68,7 @@ export default function ModelOptimizationTab() {
             <YAxis yAxisId="left" {...chartThemeProps.yAxis} />
             <YAxis yAxisId="right" orientation="right" {...chartThemeProps.yAxis} />
             <Tooltip {...chartThemeProps.tooltip} />
-            <Legend wrapperStyle={{ fontSize: '12px' }} />
+            <Legend wrapperStyle={{ fontSize: 'var(--fs-sm)' }} />
             <Bar yAxisId="left" dataKey="difficulty" fill="var(--admin-text-faint)" name="Difficulty (derived)" barSize={28} />
             <Bar yAxisId="right" dataKey="revenue" fill="var(--admin-accent)" name="Revenue ($)" barSize={28} />
           </BarChart>
@@ -98,11 +98,11 @@ export default function ModelOptimizationTab() {
       <h2 className="admin-h2" style={{ marginTop: '24px' }}>Failure Pattern Analysis</h2>
       <Card style={{ marginBottom: '24px' }}>
         {failurePatterns.length === 0 ? (
-          <p style={{ color: 'var(--admin-text-faint)', fontSize: '13px' }}>No failed accounts yet.</p>
+          <p style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-base)' }}>No failed accounts yet.</p>
         ) : (
           <ol style={{ margin: 0, paddingLeft: '20px' }}>
             {failurePatterns.map((f) => (
-              <li key={f.reason} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--rule)', fontSize: '13px' }}>
+              <li key={f.reason} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--rule)', fontSize: 'var(--fs-base)' }}>
                 <span>{f.reason}</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--admin-text-muted)' }}>{f.count}</span>
               </li>

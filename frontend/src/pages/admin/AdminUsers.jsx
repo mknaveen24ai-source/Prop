@@ -320,12 +320,12 @@ export default function AdminUsers() {
       width: '260px',
       render: (u) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="admin-avatar" style={{ width: '36px', height: '36px', fontSize: '13px', background: u.is_banned ? 'var(--admin-danger)' : undefined }}>
+          <div className="admin-avatar" style={{ width: '36px', height: '36px', fontSize: 'var(--fs-base)', background: u.is_banned ? 'var(--admin-danger)' : undefined }}>
             {(u.full_name || u.email || 'A').charAt(0).toUpperCase()}
           </div>
           <div>
-            <div style={{ color: 'var(--admin-text)', fontWeight: 500, fontSize: '13px' }}>{u.full_name || 'Unnamed Trader'}</div>
-            <div style={{ color: 'var(--admin-text-faint)', fontSize: '12px' }}>{u.email}</div>
+            <div style={{ color: 'var(--admin-text)', fontWeight: 500, fontSize: 'var(--fs-base)' }}>{u.full_name || 'Unnamed Trader'}</div>
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-sm)' }}>{u.email}</div>
           </div>
         </div>
       )
@@ -340,7 +340,7 @@ export default function AdminUsers() {
       render: (u) => (
         <div>
           <div style={{ color: 'var(--admin-text)' }}>{u.account_count || 0} total</div>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>{u.active_account_count || 0} active</div>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>{u.active_account_count || 0} active</div>
         </div>
       )
     },
@@ -352,7 +352,7 @@ export default function AdminUsers() {
       render: (u) => (
         <div className="admin-tag-row">
           {(u.tags || []).slice(0, 3).map((tag) => <span key={tag} className="admin-tag-pill static">{tag}</span>)}
-          {(u.tags || []).length > 3 && <span style={{ color: 'var(--admin-text-muted)', fontSize: '12px' }}>+{u.tags.length - 3}</span>}
+          {(u.tags || []).length > 3 && <span style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)' }}>+{u.tags.length - 3}</span>}
         </div>
       )
     },
@@ -392,7 +392,7 @@ export default function AdminUsers() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
           <div>
             <h1 className="admin-h1">Trader Operations</h1>
-            <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>Classify, segment, and act on traders with reusable filters and saved views.</p>
+            <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>Classify, segment, and act on traders with reusable filters and saved views.</p>
           </div>
         </div>
 

@@ -44,7 +44,7 @@ export default function PrizePoolEditor({ prizes, onChange, stepModels = [], acc
 
   return (
     <div>
-      <div style={{ fontSize: '12px', opacity: 0.7, marginBottom: '8px' }}>Prizes (shown to traders on the competition page)</div>
+      <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '8px' }}>Prizes (shown to traders on the competition page)</div>
       {prizes.map((p, idx) => (
         <div key={idx} style={{ border: '1px solid var(--admin-border)', borderRadius: '8px', padding: '10px', marginBottom: '10px' }}>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: p.voucher ? '10px' : 0 }}>
@@ -65,7 +65,7 @@ export default function PrizePoolEditor({ prizes, onChange, stepModels = [], acc
             <button type="button" className="admin-btn admin-btn-sm" onClick={() => removeRow(idx)}>Remove</button>
           </div>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', opacity: 0.85 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--fs-sm)', opacity: 0.85 }}>
             <input type="checkbox" checked={!!p.voucher} onChange={(e) => toggleVoucher(idx, e.target.checked)} />
             Grant a free challenge account voucher to this rank
           </label>

@@ -404,7 +404,7 @@ export default function AdminChat() {
     <>
       <div style={{ marginBottom: '24px' }}>
         <h1 className="admin-h1">Support Inbox</h1>
-        <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+        <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
           Manage trader conversations with saved views, attention filters, and quick bulk status actions.
         </p>
       </div>
@@ -481,7 +481,7 @@ export default function AdminChat() {
           flexDirection: 'column'
         }}>
           <div style={{ padding: '16px', borderBottom: '1px solid var(--admin-border)' }}>
-            <div style={{ color: 'var(--admin-text-muted)', fontSize: '12px' }}>
+            <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)' }}>
               {filteredConversations.length} conversation{filteredConversations.length === 1 ? '' : 's'} in this view
             </div>
           </div>
@@ -528,7 +528,7 @@ export default function AdminChat() {
                             <div style={{
                               color: 'var(--admin-text)',
                               fontWeight: 600,
-                              fontSize: '13px',
+                              fontSize: 'var(--fs-base)',
                               whiteSpace: 'nowrap',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis'
@@ -536,7 +536,7 @@ export default function AdminChat() {
                               {conversation.user_email || conversation.user_name || `User #${conversation.user_id}`}
                             </div>
                             {visibleColumnKeys.includes('subject') && (
-                              <div style={{ color: 'var(--admin-text-muted)', fontSize: '12px', marginTop: '4px' }}>
+                              <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)', marginTop: '4px' }}>
                                 {conversation.subject || 'No subject'}
                               </div>
                             )}
@@ -547,7 +547,7 @@ export default function AdminChat() {
                           <span style={{
                             background: 'var(--admin-danger)',
                             color: 'var(--paper)',
-                            fontSize: '10px',
+                            fontSize: 'var(--fs-2xs)',
                             fontWeight: 700,
                             borderRadius: 'var(--radius-pill)',
                             padding: '1px 6px',
@@ -561,7 +561,7 @@ export default function AdminChat() {
                       {conversation.last_message && visibleColumnKeys.includes('lastMessage') && (
                         <div style={{
                           color: 'var(--admin-text-faint)',
-                          fontSize: '11px',
+                          fontSize: 'var(--fs-xs)',
                           marginTop: '6px',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
@@ -575,7 +575,7 @@ export default function AdminChat() {
                         {visibleColumnKeys.includes('status') && (
                           <span style={{
                             color: statusColor(conversation.status),
-                            fontSize: '11px',
+                            fontSize: 'var(--fs-xs)',
                             textTransform: 'uppercase',
                             fontWeight: 700
                           }}>
@@ -583,7 +583,7 @@ export default function AdminChat() {
                           </span>
                         )}
                         {visibleColumnKeys.includes('updated') && (
-                          <span style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>
+                          <span style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>
                             {formatDate(conversation.last_message_at || conversation.created_at)}
                           </span>
                         )}
@@ -618,14 +618,14 @@ export default function AdminChat() {
                   <div style={{ color: 'var(--admin-text)', fontWeight: 600 }}>
                     {selectedConversation.user_email || selectedConversation.user_name || 'Unknown user'}
                   </div>
-                  <div style={{ color: 'var(--admin-text-muted)', fontSize: '12px', marginTop: '4px' }}>
+                  <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)', marginTop: '4px' }}>
                     {selectedConversation.subject || 'No subject'}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
-                    <span style={{ color: statusColor(selectedConversation.status), fontSize: '11px', textTransform: 'uppercase', fontWeight: 700 }}>
+                    <span style={{ color: statusColor(selectedConversation.status), fontSize: 'var(--fs-xs)', textTransform: 'uppercase', fontWeight: 700 }}>
                       {selectedConversation.status}
                     </span>
-                    <span style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>
+                    <span style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>
                       {selectedConversation.assigned_to ? `Assigned to ${selectedConversation.assigned_to}` : 'Unassigned'}
                     </span>
                   </div>
@@ -680,7 +680,7 @@ export default function AdminChat() {
                         style={{
                           width: '32px',
                           height: '32px',
-                          fontSize: '12px',
+                          fontSize: 'var(--fs-sm)',
                           flexShrink: 0,
                           background: isAdmin ? 'var(--admin-accent)' : undefined
                         }}
@@ -693,7 +693,7 @@ export default function AdminChat() {
                           borderRadius: isAdmin ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
                           background: isAdmin ? 'var(--admin-accent)' : 'var(--admin-surface)',
                           color: isAdmin ? 'var(--paper)' : 'var(--admin-text)',
-                          fontSize: '13px',
+                          fontSize: 'var(--fs-base)',
                           lineHeight: '1.5',
                           border: isAdmin ? 'none' : '1px solid var(--admin-border)',
                           whiteSpace: 'pre-wrap'
@@ -701,7 +701,7 @@ export default function AdminChat() {
                           {message.message}
                         </div>
                         <div style={{
-                          fontSize: '11px',
+                          fontSize: 'var(--fs-xs)',
                           color: 'var(--admin-text-faint)',
                           marginTop: '4px',
                           textAlign: isAdmin ? 'right' : 'left'
@@ -716,7 +716,7 @@ export default function AdminChat() {
               </div>
 
               {traderTyping && (
-                <div style={{ padding: '4px 24px', fontSize: '12px', color: 'var(--admin-text-faint)', fontStyle: 'italic' }}>
+                <div style={{ padding: '4px 24px', fontSize: 'var(--fs-sm)', color: 'var(--admin-text-faint)', fontStyle: 'italic' }}>
                   Trader is typing…
                 </div>
               )}
@@ -762,7 +762,7 @@ export default function AdminChat() {
               justifyContent: 'center',
               color: 'var(--admin-text-faint)'
             }}>
-              <div style={{ fontSize: '16px' }}>Select a support conversation to view messages.</div>
+              <div style={{ fontSize: 'var(--fs-lg)' }}>Select a support conversation to view messages.</div>
             </div>
           )}
         </div>

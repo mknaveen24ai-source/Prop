@@ -80,7 +80,7 @@ export default function RealTimeMonitoringTab() {
             <XAxis dataKey="instrument" {...chartThemeProps.xAxis} />
             <YAxis {...chartThemeProps.yAxis} />
             <Tooltip {...chartThemeProps.tooltip} />
-            <Legend wrapperStyle={{ fontSize: '12px' }} />
+            <Legend wrapperStyle={{ fontSize: 'var(--fs-sm)' }} />
             <Bar dataKey="buyLots" stackId="lots" fill="var(--admin-success)" name="Buy Lots">
               {exposure.map((_, index) => (
                 <Cell key={`buy-${index}`} fillOpacity={dimUnlessActive(exposureActiveIndex, index)} />
@@ -109,16 +109,16 @@ export default function RealTimeMonitoringTab() {
             <div style={{ width: `${buyPct}%`, background: 'var(--admin-success)' }} />
             <div style={{ width: `${100 - buyPct}%`, background: 'var(--admin-danger)' }} />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)' }}>
             <span style={{ color: 'var(--admin-success)' }}>BUY {buyPct}%</span>
             <span style={{ color: 'var(--admin-danger)' }}>SELL {100 - buyPct}%</span>
           </div>
 
           <h3 className="admin-h2" style={{ margin: '24px 0 12px' }}>Risk Concentration Alerts</h3>
           {riskAlerts.length === 0 ? (
-            <p style={{ color: 'var(--admin-text-faint)', fontSize: '13px' }}>No instrument exceeds the 30% concentration threshold.</p>
+            <p style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-base)' }}>No instrument exceeds the 30% concentration threshold.</p>
           ) : (
-            <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '13px' }}>
+            <ul style={{ margin: 0, paddingLeft: '18px', fontSize: 'var(--fs-base)' }}>
               {riskAlerts.map((a) => (
                 <li key={a.instrument} style={{ color: 'var(--admin-text)' }}>
                   <span style={{ fontFamily: 'var(--font-mono)' }}>{a.instrument}</span> holds {a.share}% of total firm exposure

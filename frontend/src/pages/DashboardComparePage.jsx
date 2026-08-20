@@ -92,7 +92,7 @@ export default function DashboardComparePage({ accounts = [] }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
       {failedIds.length > 0 && (
-        <div style={{ padding: '12px 16px', border: '1px solid var(--warn)', borderRadius: 'var(--radius-sm)', color: 'var(--warn)', fontSize: '13px' }} role="alert">
+        <div style={{ padding: '12px 16px', border: '1px solid var(--warn)', borderRadius: 'var(--radius-sm)', color: 'var(--warn)', fontSize: 'var(--fs-base)' }} role="alert">
           Couldn't load stats for {failedIds.length} account{failedIds.length === 1 ? '' : 's'} — the numbers below may be incomplete.
         </div>
       )}
@@ -113,20 +113,20 @@ export default function DashboardComparePage({ accounts = [] }) {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
                   <div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)' }}>P&amp;L</div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '14px', marginTop: '3px', color: stats.equity_profit_pct >= 0 ? 'var(--gain)' : 'var(--loss)' }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)' }}>P&amp;L</div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-md)', marginTop: '3px', color: stats.equity_profit_pct >= 0 ? 'var(--gain)' : 'var(--loss)' }}>
                       {stats.equity_profit_pct >= 0 ? '+' : ''}{stats.equity_profit_pct?.toFixed(2)}%
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)' }}>Today</div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '14px', marginTop: '3px', color: stats.today_pnl >= 0 ? 'var(--gain)' : 'var(--loss)' }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)' }}>Today</div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-md)', marginTop: '3px', color: stats.today_pnl >= 0 ? 'var(--gain)' : 'var(--loss)' }}>
                       {stats.today_pnl >= 0 ? '+' : ''}{formatCurrency(stats.today_pnl || 0)}
                     </div>
                   </div>
                 </div>
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '4px' }}>
                     <span>Drawdown used</span>
                     <span>{(stats.total_drawdown_used_pct || 0).toFixed(0)}%</span>
                   </div>

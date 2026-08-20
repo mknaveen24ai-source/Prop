@@ -133,13 +133,13 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
       }}>
         <span
           onClick={() => navigate('/')}
-          style={{ fontFamily: 'var(--font-ui)', fontSize: '22px', fontWeight: '700', color: 'var(--accent)', letterSpacing: '0.12em', cursor: 'pointer' }}
+          style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--fs-3xl)', fontWeight: '700', color: 'var(--accent)', letterSpacing: '0.12em', cursor: 'pointer' }}
         >
           PROP FIRM
         </span>
         <button onClick={() => navigate(-1)} className="btn" style={{
           background: 'transparent', border: '1px solid var(--navy-border)',
-          color: 'var(--text-muted)', padding: '8px 20px', fontSize: '13px'
+          color: 'var(--text-muted)', padding: '8px 20px', fontSize: 'var(--fs-base)'
         }}>
           ← Back
         </button>
@@ -154,18 +154,18 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
         <div style={{
           display: 'inline-block', background: 'color-mix(in srgb, var(--muted) 10%, transparent)',
           border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)', borderRadius: 'var(--radius-pill)',
-          padding: '5px 14px', fontSize: '11px', color: 'var(--accent)',
+          padding: '5px 14px', fontSize: 'var(--fs-xs)', color: 'var(--accent)',
           letterSpacing: '0.1em', marginBottom: '20px'
         }}>
           LEGAL DOCUMENT
         </div>
         <h1 style={{
-          fontFamily: 'var(--font-display)', fontSize: '40px', fontWeight: '700',
+          fontFamily: 'var(--font-display)', fontSize: 'var(--fs-6xl)', fontWeight: '700',
           marginBottom: '12px', color: 'var(--text)'
         }}>
           Terms of Service
         </h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>
           Last updated: {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
         </p>
       </div>
@@ -177,7 +177,7 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
           background: 'color-mix(in srgb, var(--muted) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--muted) 20%, transparent)',
             padding: '24px 28px', marginBottom: '40px'
         }}>
-          <p style={{ color: 'var(--text)', lineHeight: '1.8', fontSize: '14px', margin: 0 }}>
+          <p style={{ color: 'var(--text)', lineHeight: '1.8', fontSize: 'var(--fs-md)', margin: 0 }}>
             Please read these Terms of Service carefully before using our platform. By registering an account or using any part of this service, you agree to be bound by these Terms. If you do not agree, do not use this platform.
           </p>
         </div>
@@ -201,11 +201,11 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
                 border: 'none', cursor: 'pointer', color: 'var(--text)', textAlign: 'left'
               }}
             >
-              <span style={{ fontFamily: 'var(--font-ui)', fontSize: '14px', fontWeight: '600', letterSpacing: '0.05em' }}>
+              <span style={{ fontFamily: 'var(--font-ui)', fontSize: 'var(--fs-md)', fontWeight: '600', letterSpacing: '0.05em' }}>
                 {section.title}
               </span>
               <span style={{
-                color: 'var(--accent)', fontSize: '18px', transition: 'transform 0.2s ease',
+                color: 'var(--accent)', fontSize: 'var(--fs-xl)', transition: 'transform 0.2s ease',
                 transform: activeSection === section.id ? 'rotate(45deg)' : 'rotate(0deg)',
                 display: 'inline-block'
               }}>+</span>
@@ -214,7 +214,7 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
             {activeSection === section.id && (
               <div style={{ padding: '0 24px 24px', borderTop: '1px solid var(--navy-border)' }}>
                 <p style={{
-                  color: 'var(--text-muted)', lineHeight: '1.9', fontSize: '14px',
+                  color: 'var(--text-muted)', lineHeight: '1.9', fontSize: 'var(--fs-md)',
                   marginTop: '20px', whiteSpace: 'pre-line', margin: '20px 0 0'
                 }}>
                   {section.content}
@@ -229,7 +229,7 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
           marginTop: '40px', padding: '24px', background: 'var(--navy-mid)',
           border: '1px solid var(--navy-border)',   textAlign: 'center'
         }}>
-          <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0, lineHeight: '1.7' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', margin: 0, lineHeight: '1.7' }}>
             By using this platform you confirm you have read, understood, and agreed to these Terms of Service.<br />
             For questions, contact us at <span style={{ color: 'var(--accent)' }}>support@propfirm.com</span>
           </p>

@@ -149,7 +149,7 @@ export default function AdminEntityDrawer({
         <div className="admin-entity-drawer-header">
           <div>
             <h2 className="admin-h2" style={{ margin: 0 }}>{title}</h2>
-            <div style={{ color: 'var(--admin-text-muted)', fontSize: '12px', marginTop: '4px' }}>
+            <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)', marginTop: '4px' }}>
               {entityType} #{row.id}
             </div>
           </div>

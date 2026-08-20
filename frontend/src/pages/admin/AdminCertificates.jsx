@@ -126,7 +126,7 @@ export default function AdminCertificates() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <h1 className="admin-h1">Certificates</h1>
-          <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px', marginBottom: '20px' }}>
+          <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)', marginBottom: '20px' }}>
             Issued automatically when a promotion is approved or a payout is paid. Search by trader name, email or certificate ID.
           </p>
         </div>

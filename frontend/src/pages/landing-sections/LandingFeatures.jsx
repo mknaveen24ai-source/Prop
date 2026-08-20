@@ -123,8 +123,8 @@ export default function LandingFeatures() {
               }}>
                 {item.icon}
               </div>
-              <h3 className="mp-h3" style={{ fontSize: '24px', marginBottom: '16px', color: 'var(--ink)' }}>{item.title}</h3>
-              <p className="mp-p-body" style={{ flexGrow: 1, fontSize: '16px', color: 'var(--muted)' }}>{item.desc}</p>
+              <h3 className="mp-h3" style={{ fontSize: 'var(--fs-4xl)', marginBottom: '16px', color: 'var(--ink)' }}>{item.title}</h3>
+              <p className="mp-p-body" style={{ flexGrow: 1, fontSize: 'var(--fs-lg)', color: 'var(--muted)' }}>{item.desc}</p>
             </div>
           ))}
         </div>

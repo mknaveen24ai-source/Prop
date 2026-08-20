@@ -442,7 +442,7 @@ export default function TradingPanel({
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-      <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: 0, fontSize: '22px' }}>
+      <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: 0, fontSize: 'var(--fs-3xl)' }}>
           Trading Terminal
         </h2>
         {/* Price Feed Status Indicator */}
@@ -453,7 +453,7 @@ export default function TradingPanel({
           padding: '8px 14px',
           background: priceFeedBackground,
           border: `1px solid ${priceFeedBorder}`,
-          fontSize: '12px'
+          fontSize: 'var(--fs-sm)'
         }}>
           <span style={{
             width: '8px',
@@ -466,7 +466,7 @@ export default function TradingPanel({
             {`● ${priceFeedLabel}`}
           </span>
           {!priceFeedLive && priceStatus.message && (
-            <span style={{ color: 'var(--text-muted)', marginLeft: '4px', fontSize: '11px' }}>
+            <span style={{ color: 'var(--text-muted)', marginLeft: '4px', fontSize: 'var(--fs-xs)' }}>
               {priceStatus.message}
             </span>
           )}
@@ -486,11 +486,11 @@ export default function TradingPanel({
                 color:      selectedAccount?.id === acc.id ? 'var(--navy)' : 'var(--text)',
                 border: '1px solid var(--accent)',
                 borderRadius: '0',
-                fontSize: '12px',
+                fontSize: 'var(--fs-sm)',
                 padding: '8px 14px'
               }}>
               {acc.account_type === 'competition' && acc.competition_title ? acc.competition_title.toUpperCase() : acc.account_type.toUpperCase()} ${parseFloat(acc.account_size).toLocaleString()}
-              <span style={{ marginLeft: '6px', fontSize: '10px', color: selectedAccount?.id === acc.id ? 'var(--navy)' : getStatusColor(acc.status) }}>
+              <span style={{ marginLeft: '6px', fontSize: 'var(--fs-2xs)', color: selectedAccount?.id === acc.id ? 'var(--navy)' : getStatusColor(acc.status) }}>
                 ● {acc.status.toUpperCase()}
               </span>
             </button>
@@ -512,7 +512,7 @@ export default function TradingPanel({
             onClick={() => setTickerCategory(tab.key)}
             style={{
               padding: '3px 9px',
-              fontSize: '10px',
+              fontSize: 'var(--fs-2xs)',
               fontWeight: 700,
               borderRadius: 'var(--radius-pill)',
               cursor: 'pointer',
@@ -597,11 +597,11 @@ export default function TradingPanel({
                   style: { fill: isPinned ? 'currentColor' : 'none' }
                 })}
               </button>
-              <div style={{ fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.08em', marginBottom: '4px' }}>{instrument}</div>
+              <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', letterSpacing: '0.08em', marginBottom: '4px' }}>{instrument}</div>
               <div style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
                 {bidText}
               </div>
-              <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '2px' }}>
+              <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-dim)', marginTop: '2px' }}>
                 {askText}
               </div>
             </div>
@@ -636,7 +636,7 @@ export default function TradingPanel({
 
       {/* Loading state */}
       {accountLoading && (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: 'var(--fs-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
           {renderIcon('timer', { size: 16, color: 'var(--text-secondary)' })}
           <span>Loading account data...</span>
         </div>
@@ -712,7 +712,7 @@ export default function TradingPanel({
                       }}
                     >
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '13px', color: 'var(--ink)' }}>{instrument}</div>
+                        <div style={{ fontSize: 'var(--fs-base)', color: 'var(--ink)' }}>{instrument}</div>
                         <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11.5px', color: 'var(--muted)', marginTop: '2px' }}>
                           {data ? formatPrice(data.bid, instrument) : '—'}
                         </div>

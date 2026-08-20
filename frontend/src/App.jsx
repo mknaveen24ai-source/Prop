@@ -233,7 +233,7 @@ function AppRoutes() {
             background: 'var(--paper-2)',
             color: 'var(--ink)',
             border: '1px solid var(--rule)',
-            fontSize: '13px',
+            fontSize: 'var(--fs-base)',
             fontFamily: 'var(--font-ui, system-ui, sans-serif)',
             padding: '12px 16px',
             maxWidth: '360px',

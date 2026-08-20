@@ -133,8 +133,8 @@ export default function TraderPerformanceTab() {
                 ['Avg Win / Avg Loss', `+$${selected.avgWin} / $${selected.avgLoss}`],
               ].map(([label, value]) => (
                 <div key={label}>
-                  <div style={{ fontSize: '11px', color: 'var(--admin-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '18px', color: 'var(--admin-text)', marginTop: '4px' }}>{value}</div>
+                  <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xl)', color: 'var(--admin-text)', marginTop: '4px' }}>{value}</div>
                 </div>
               ))}
             </div>

@@ -152,7 +152,7 @@ export function AdminLoginScreen({ onLoginSuccess }) {
         </div>
 
         {errorMsg && (
-          <div style={{ background: 'color-mix(in srgb, var(--admin-danger) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--admin-danger) 20%, transparent)', color: 'var(--admin-danger)', padding: '10px', marginBottom: '16px', fontSize: '13px', textAlign: 'center' }}>
+          <div style={{ background: 'color-mix(in srgb, var(--admin-danger) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--admin-danger) 20%, transparent)', color: 'var(--admin-danger)', padding: '10px', marginBottom: '16px', fontSize: 'var(--fs-base)', textAlign: 'center' }}>
             {errorMsg}
           </div>
         )}
@@ -168,7 +168,7 @@ export function AdminLoginScreen({ onLoginSuccess }) {
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="admin@yourfirm.com"
               />
-              <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--admin-text-muted)' }}>
+              <div style={{ marginTop: '8px', fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)' }}>
                 Required for DB-backed platform admins. Leave blank only for one-time legacy bootstrap access before the first platform admin exists.
               </div>
             </div>

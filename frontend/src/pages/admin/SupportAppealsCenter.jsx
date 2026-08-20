@@ -31,7 +31,7 @@ function SectionHeader({ eyebrow, title, subtitle }) {
         {title}
       </h1>
       {subtitle && (
-        <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px', maxWidth: '640px' }}>{subtitle}</p>
+        <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)', maxWidth: '640px' }}>{subtitle}</p>
       )}
     </div>
   )
@@ -178,13 +178,13 @@ function SupportTicketsSection() {
               <label className="admin-label">Message Thread</label>
               <div style={{ border: '1px solid var(--rule)', padding: '12px' }}>
                 <div style={{ marginBottom: thread.length ? '12px' : 0 }}>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--admin-text-faint)' }}>{selected.name || selected.email || 'Trader'} • {new Date(selected.created_at).toLocaleString()}</div>
-                  <div style={{ fontSize: '14px', color: 'var(--admin-text)' }}>{selected.message}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', color: 'var(--admin-text-faint)' }}>{selected.name || selected.email || 'Trader'} • {new Date(selected.created_at).toLocaleString()}</div>
+                  <div style={{ fontSize: 'var(--fs-md)', color: 'var(--admin-text)' }}>{selected.message}</div>
                 </div>
                 {thread.map((msg, i) => (
                   <div key={msg.id || i} style={{ marginBottom: i === thread.length - 1 ? 0 : '12px' }}>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--admin-text-faint)' }}>{msg.sender_name} • {new Date(msg.created_at).toLocaleString()}</div>
-                    <div style={{ fontSize: '14px', color: 'var(--admin-text)' }}>{msg.message}</div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', color: 'var(--admin-text-faint)' }}>{msg.sender_name} • {new Date(msg.created_at).toLocaleString()}</div>
+                    <div style={{ fontSize: 'var(--fs-md)', color: 'var(--admin-text)' }}>{msg.message}</div>
                   </div>
                 ))}
               </div>
@@ -291,7 +291,7 @@ function BreachAppealsSection() {
   }
 
   const columns = [
-    { header: 'Trader (User ID)', render: (row) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>{row.user_id}</span> },
+    { header: 'Trader (User ID)', render: (row) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)' }}>{row.user_id}</span> },
     { header: 'Breach Type', key: 'violation_type' },
     { header: 'Detected', render: (row) => new Date(row.first_detected_at).toLocaleString() },
     { header: 'Account Status', render: (row) => { const b = accountStatusBadge(row.account_status); return <AdminBadge bracket status={b.status} label={b.label} /> } },
@@ -323,7 +323,7 @@ function BreachAppealsSection() {
           <div>
             <div className="admin-form-group">
               <label className="admin-label">Violation Message</label>
-              <p style={{ fontSize: '14px', color: 'var(--admin-text)' }}>{selected.message}</p>
+              <p style={{ fontSize: 'var(--fs-md)', color: 'var(--admin-text)' }}>{selected.message}</p>
             </div>
 
             <div className="admin-form-group">
@@ -346,9 +346,9 @@ function BreachAppealsSection() {
             <div className="admin-form-group">
               <label className="admin-label">Appeal History (this trader)</label>
               {historyFor(selected.user_id).length === 0 ? (
-                <p style={{ color: 'var(--admin-text-faint)', fontSize: '13px' }}>No prior appeals.</p>
+                <p style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-base)' }}>No prior appeals.</p>
               ) : (
-                <ul style={{ margin: 0, paddingLeft: '18px', fontSize: '13px', color: 'var(--admin-text-muted)' }}>
+                <ul style={{ margin: 0, paddingLeft: '18px', fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)' }}>
                   {historyFor(selected.user_id).map((h, i) => (
                     <li key={i}>{h.date} — {h.outcome} ({h.reviewer})</li>
                   ))}
@@ -430,7 +430,7 @@ function NotificationCenterSection() {
     { header: 'Audience', key: 'audience' },
     { header: 'Channel', key: 'channel' },
     { header: 'Type', key: 'type' },
-    { header: 'Message', render: (row) => <span style={{ fontSize: '12px', color: 'var(--admin-text-muted)' }}>{row.title ? `${row.title} — ` : ''}{row.message}</span> },
+    { header: 'Message', render: (row) => <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)' }}>{row.title ? `${row.title} — ` : ''}{row.message}</span> },
     { header: 'Status', render: (row) => <AdminBadge bracket status={NOTIFICATION_STATUS_BADGE[row.status] || 'neutral'} label={row.status} /> },
   ]
 
@@ -564,7 +564,7 @@ function ComplianceLogSection() {
 
   const columns = [
     { header: 'Timestamp', render: (row) => new Date(row.created_at).toLocaleString(), isMono: true },
-    { header: 'Entity', render: (row) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>{row.entity_type}:{row.entity_id}</span> },
+    { header: 'Entity', render: (row) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)' }}>{row.entity_type}:{row.entity_id}</span> },
     { header: 'Action Type', key: 'event_type' },
     { header: 'Actor', key: 'actor' },
   ]
@@ -632,7 +632,7 @@ function TosTrackingSection() {
 
   return (
     <>
-      <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px', marginBottom: '16px' }}>
+      <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)', marginBottom: '16px' }}>
         Current agreement version: <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--admin-text)' }}>{currentVersion}</span>
       </p>
       <Card flush>
@@ -712,7 +712,7 @@ export default function SupportAppealsCenter() {
             </div>
           </div>
           <div className="admin-topbar-right">
-            <span style={{ fontSize: '12px', color: 'var(--admin-text-muted)' }}>{session?.full_name || session?.email}</span>
+            <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)' }}>{session?.full_name || session?.email}</span>
           </div>
         </header>
 

@@ -228,7 +228,7 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
                   if (onPrimaryCta) onPrimaryCta();
                   scrollToCalculator();
                 }}
-                style={{ padding: '22px 54px', fontSize: '18px' }}
+                style={{ padding: '22px 54px', fontSize: 'var(--fs-xl)' }}
               >
                 {landingCopy.heroPrimaryCta}
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -246,7 +246,7 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
             {/* Trust Stats */}
             <div className="mp-reveal mp-delay-400 mp-active mp-stat-counter">
               <div className="mp-stat-item">
-                  <span style={{ color: 'var(--warn)', fontFamily: 'var(--font-mono)', fontSize: '14px', fontWeight: 700 }}>{landingCopy.heroStatsLead}</span>
+                  <span style={{ color: 'var(--warn)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-md)', fontWeight: 700 }}>{landingCopy.heroStatsLead}</span>
                 <span className="mp-stat-number">&nbsp;{landingCopy.heroStatsLeadSuffix}</span>
               </div>
               <div className="mp-stat-divider" />
@@ -292,7 +292,7 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
                 }}>
                   <TerminalIllustration />
                 </div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '0.1em', color: 'var(--muted)', marginTop: '10px', textAlign: 'center' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '0.1em', color: 'var(--muted)', marginTop: '10px', textAlign: 'center' }}>
                   Fig. 1 — funded and trading live
                 </div>
               </div>
@@ -306,7 +306,7 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
           on top of "Payout Cycles". Hidden below `md` via .mp-scroll-cue: it is
           decorative, and scrolling needs no prompting on a touch screen. */}
       <div className="mp-scroll-cue" style={{ position: 'absolute', bottom: '40px', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', opacity: 0.4, animation: 'mp-scroll-bounce 2s ease-in-out infinite' }}>
-              <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.2em', fontFamily: 'var(--font-mono)' }}>Scroll to explore</span>
+              <span style={{ fontSize: 'var(--fs-2xs)', textTransform: 'uppercase', letterSpacing: '0.2em', fontFamily: 'var(--font-mono)' }}>Scroll to explore</span>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="6 9 12 15 18 9" />
         </svg>

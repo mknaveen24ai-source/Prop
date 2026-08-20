@@ -50,7 +50,7 @@ export default function LegalPage({ eyebrow = 'LEGAL DOCUMENT', title, intro, se
         </button>
         <button onClick={() => navigate(-1)} className="btn" style={{
           background: 'transparent', border: '1px solid var(--navy-border)',
-          color: 'var(--text-muted)', padding: '8px 20px', fontSize: '13px'
+          color: 'var(--text-muted)', padding: '8px 20px', fontSize: 'var(--fs-base)'
         }}>
           ← Back
         </button>
@@ -65,7 +65,7 @@ export default function LegalPage({ eyebrow = 'LEGAL DOCUMENT', title, intro, se
         <div style={{
           display: 'inline-block', background: 'color-mix(in srgb, var(--muted) 10%, transparent)',
           border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)', borderRadius: 'var(--radius-pill)',
-          padding: '5px 14px', fontSize: '11px', color: 'var(--cyan)',
+          padding: '5px 14px', fontSize: 'var(--fs-xs)', color: 'var(--cyan)',
           letterSpacing: '0.1em', marginBottom: '20px'
         }}>
           {eyebrow}
@@ -76,7 +76,7 @@ export default function LegalPage({ eyebrow = 'LEGAL DOCUMENT', title, intro, se
         }}>
           {title}
         </h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>
           Last updated: {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
         </p>
       </div>
@@ -88,7 +88,7 @@ export default function LegalPage({ eyebrow = 'LEGAL DOCUMENT', title, intro, se
             border: '1px solid color-mix(in srgb, var(--muted) 15%, transparent)',
             padding: '24px 28px', marginBottom: '40px'
           }}>
-            <p style={{ color: 'var(--text)', lineHeight: '1.8', fontSize: '14px', margin: 0, whiteSpace: 'pre-line' }}>
+            <p style={{ color: 'var(--text)', lineHeight: '1.8', fontSize: 'var(--fs-md)', margin: 0, whiteSpace: 'pre-line' }}>
               {intro}
             </p>
           </div>
@@ -120,12 +120,12 @@ export default function LegalPage({ eyebrow = 'LEGAL DOCUMENT', title, intro, se
                     width: '100%', display: 'flex', justifyContent: 'space-between',
                     alignItems: 'center', gap: '16px', padding: '20px 24px', background: 'transparent',
                     border: 'none', cursor: 'pointer', color: 'var(--text)', textAlign: 'left',
-                    fontFamily: 'var(--font-ui)', fontSize: '14px', fontWeight: '600', letterSpacing: '0.05em'
+                    fontFamily: 'var(--font-ui)', fontSize: 'var(--fs-md)', fontWeight: '600', letterSpacing: '0.05em'
                   }}
                 >
                   <span>{section.title}</span>
                   <span aria-hidden="true" style={{
-                    color: 'var(--cyan)', fontSize: '18px', transition: 'transform 0.2s ease',
+                    color: 'var(--cyan)', fontSize: 'var(--fs-xl)', transition: 'transform 0.2s ease',
                     transform: isOpen ? 'rotate(45deg)' : 'rotate(0deg)',
                     display: 'inline-block', flexShrink: 0
                   }}>+</span>
@@ -141,7 +141,7 @@ export default function LegalPage({ eyebrow = 'LEGAL DOCUMENT', title, intro, se
                 style={{ padding: '0 24px 24px', borderTop: '1px solid var(--navy-border)' }}
               >
                 <p style={{
-                  color: 'var(--text-muted)', lineHeight: '1.9', fontSize: '14px',
+                  color: 'var(--text-muted)', lineHeight: '1.9', fontSize: 'var(--fs-md)',
                   whiteSpace: 'pre-line', margin: '20px 0 0'
                 }}>
                   {section.content}
@@ -156,7 +156,7 @@ export default function LegalPage({ eyebrow = 'LEGAL DOCUMENT', title, intro, se
             marginTop: '40px', padding: '24px', background: 'var(--navy-mid)',
             border: '1px solid var(--navy-border)', textAlign: 'center'
           }}>
-            <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0, lineHeight: '1.7' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', margin: 0, lineHeight: '1.7' }}>
               {contactLabel || 'Questions about this policy? Contact us at'}<br />
               <a href={`mailto:${contactEmail}`} style={{ color: 'var(--cyan)' }}>{contactEmail}</a>
             </p>

@@ -158,7 +158,7 @@ export default function ComplianceAuditTab({ dateRange }) {
           { header: 'Resolution', value: (r) => r.resolution },
         ]}
         columns={[
-          { header: 'User ID', render: (row) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>{row.userId}</span> },
+          { header: 'User ID', render: (row) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)' }}>{row.userId}</span> },
           { header: 'Violation Type', key: 'type' },
           { header: 'Timestamp', render: (row) => new Date(row.timestamp).toLocaleString(), isMono: true },
           { header: 'Resolution', render: (row) => <AdminBadge bracket status={row.resolution === 'resolved' ? 'approved' : row.resolution === 'Pending' ? 'warning' : 'neutral'} label={row.resolution} /> },
@@ -179,7 +179,7 @@ export default function ComplianceAuditTab({ dateRange }) {
           { header: 'Method', value: (r) => r.method },
         ]}
         columns={[
-          { header: 'User ID', render: (row) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>{row.userId}</span> },
+          { header: 'User ID', render: (row) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)' }}>{row.userId}</span> },
           { header: 'Amount', render: (row) => `$${row.amount.toLocaleString()}` },
           { header: 'Payout Date', render: (row) => row.payoutDate ? new Date(row.payoutDate).toLocaleDateString() : '—', isMono: true },
           { header: 'Status', render: (row) => <AdminBadge bracket status={row.status === 'paid' ? 'approved' : 'danger'} label={row.status} /> },
@@ -221,7 +221,7 @@ export default function ComplianceAuditTab({ dateRange }) {
           { header: 'Resolution', value: (r) => r.resolution },
         ]}
         columns={[
-          { header: 'User ID', render: (row) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px' }}>{row.userId}</span> },
+          { header: 'User ID', render: (row) => <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)' }}>{row.userId}</span> },
           { header: 'Flag Type', key: 'flagType' },
           { header: 'Detected At', render: (row) => new Date(row.detectedAt).toLocaleString(), isMono: true },
           { header: 'Resolved At', render: (row) => row.resolvedAt ? new Date(row.resolvedAt).toLocaleString() : '—', isMono: true },

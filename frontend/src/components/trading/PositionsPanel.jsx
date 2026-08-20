@@ -150,9 +150,9 @@ export default function PositionsPanel({
                       <td colSpan="9" style={{ padding: '0' }}>
                         <div style={{ background: 'var(--navy-card)', border: '1px dashed var(--accent)', padding: '12px 16px', margin: '4px 0 8px 0', display: 'grid', gap: '10px' }}>
                           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '12px', color: 'var(--text)' }}>Close Fraction (Current: {parseFloat(trade.lot_size).toFixed(2)}):</span>
-                            <input type="number" step="0.01" max={Math.max(parseFloat(trade.lot_size) - 0.01, 0.01).toFixed(2)} value={partialForm.val || ''} onChange={e => setPartialForm({ ...partialForm, val: e.target.value })} style={{ width: '80px', padding: '4px 8px', fontSize: '12px' }} />
-                            <button onClick={() => handlePartialClose(trade.id, trade.lot_size, partialForm.val)} disabled={closingTradeSet.has(trade.id)} className="btn btn-accent" style={{ padding: '4px 12px', fontSize: '11px', opacity: closingTradeSet.has(trade.id) ? 0.6 : 1, cursor: closingTradeSet.has(trade.id) ? 'not-allowed' : 'pointer' }}>{closingTradeSet.has(trade.id) ? 'Closing...' : 'Confirm Partial Close'}</button>
+                            <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text)' }}>Close Fraction (Current: {parseFloat(trade.lot_size).toFixed(2)}):</span>
+                            <input type="number" step="0.01" max={Math.max(parseFloat(trade.lot_size) - 0.01, 0.01).toFixed(2)} value={partialForm.val || ''} onChange={e => setPartialForm({ ...partialForm, val: e.target.value })} style={{ width: '80px', padding: '4px 8px', fontSize: 'var(--fs-sm)' }} />
+                            <button onClick={() => handlePartialClose(trade.id, trade.lot_size, partialForm.val)} disabled={closingTradeSet.has(trade.id)} className="btn btn-accent" style={{ padding: '4px 12px', fontSize: 'var(--fs-xs)', opacity: closingTradeSet.has(trade.id) ? 0.6 : 1, cursor: closingTradeSet.has(trade.id) ? 'not-allowed' : 'pointer' }}>{closingTradeSet.has(trade.id) ? 'Closing...' : 'Confirm Partial Close'}</button>
                             <Button variant="secondary" size="sm" onClick={() => setPartialForm(null)}>Cancel</Button>
                           </div>
                           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -174,7 +174,7 @@ export default function PositionsPanel({
                                     background: invalid || closingTradeSet.has(trade.id) ? 'var(--glass)' : 'rgba(var(--brand-primary-rgb),0.08)',
                                     color: invalid || closingTradeSet.has(trade.id) ? 'var(--text-dim)' : 'var(--accent)',
                                     cursor: invalid || closingTradeSet.has(trade.id) ? 'not-allowed' : 'pointer',
-                                    fontSize: '11px',
+                                    fontSize: 'var(--fs-xs)',
                                     fontWeight: '700'
                                   }}
                                 >
@@ -192,23 +192,23 @@ export default function PositionsPanel({
                     <tr>
                       <td colSpan="9" style={{ padding: '0' }}>
                         <div style={{ background: 'var(--navy-card)', border: '1px solid var(--accent)', padding: '16px', margin: '4px 0 8px 0' }}>
-                          <div style={{ fontSize: '12px', color: 'var(--accent)', marginBottom: '12px', fontWeight: '600' }}>
+                          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--accent)', marginBottom: '12px', fontWeight: '600' }}>
                             Modify {trade.instrument} {trade.order_type.replace(/_/g, ' ').toUpperCase()} - Target: {trade.pending_price ? parseFloat(trade.pending_price).toFixed(dec) : '-'}
                           </div>
                           <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
                             <div>
-                              <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Pending Price</label>
+                              <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Pending Price</label>
                               <input
                                 type="number"
                                 value={modifyForm.pending_price || ''}
                                 onChange={e => setModifyForm(f => ({ ...f, pending_price: e.target.value }))}
                                 placeholder="Pending entry"
                                 step={getInputStepString(trade.instrument)}
-                                style={{ width: '140px', fontSize: '13px', padding: '7px 10px' }}
+                                style={{ width: '140px', fontSize: 'var(--fs-base)', padding: '7px 10px' }}
                               />
                             </div>
                             <div>
-                              <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                              <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
                                 Stop Loss <span style={{ color: 'var(--text-dim)' }}>(blank removes)</span>
                               </label>
                               <input
@@ -217,11 +217,11 @@ export default function PositionsPanel({
                                 onChange={e => setModifyForm(f => ({ ...f, stop_loss: e.target.value }))}
                                 placeholder={`e.g. ${trade.pending_price ? (parseFloat(trade.pending_price) * (trade.direction === 'buy' ? 0.999 : 1.001)).toFixed(dec) : '-'}`}
                                 step={getInputStepString(trade.instrument)}
-                                style={{ width: '140px', fontSize: '13px', padding: '7px 10px' }}
+                                style={{ width: '140px', fontSize: 'var(--fs-base)', padding: '7px 10px' }}
                               />
                             </div>
                             <div>
-                              <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                              <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
                                 Take Profit <span style={{ color: 'var(--text-dim)' }}>(blank removes)</span>
                               </label>
                               <input
@@ -230,19 +230,19 @@ export default function PositionsPanel({
                                 onChange={e => setModifyForm(f => ({ ...f, take_profit: e.target.value }))}
                                 placeholder={`e.g. ${trade.pending_price ? (parseFloat(trade.pending_price) * (trade.direction === 'buy' ? 1.001 : 0.999)).toFixed(dec) : '-'}`}
                                 step={getInputStepString(trade.instrument)}
-                                style={{ width: '140px', fontSize: '13px', padding: '7px 10px' }}
+                                style={{ width: '140px', fontSize: 'var(--fs-base)', padding: '7px 10px' }}
                               />
                             </div>
-                            <button className="btn btn-accent" onClick={() => submitModify(trade)} style={{ padding: '7px 20px', fontSize: '12px' }}>
+                            <button className="btn btn-accent" onClick={() => submitModify(trade)} style={{ padding: '7px 20px', fontSize: 'var(--fs-sm)' }}>
                               Save
                             </button>
                             <Button variant="secondary" size="sm" onClick={cancelModify}>Cancel</Button>
                           </div>
                           {modifyError && (
-                            <div style={{ color: 'var(--red)', fontSize: '12px', marginTop: '8px' }}>{modifyError}</div>
+                            <div style={{ color: 'var(--red)', fontSize: 'var(--fs-sm)', marginTop: '8px' }}>{modifyError}</div>
                           )}
                           {modifySuccess && (
-                            <div style={{ color: 'var(--green)', fontSize: '12px', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ color: 'var(--green)', fontSize: 'var(--fs-sm)', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                               {renderIcon('approve', { size: 12, color: 'var(--accent-green)' })}
                               <span>{modifySuccess}</span>
                             </div>
@@ -263,13 +263,13 @@ export default function PositionsPanel({
                           padding: '16px',
                           margin: '4px 0 8px 0'
                         }}>
-                          <div style={{ fontSize: '12px', color: 'var(--accent)', marginBottom: '12px', fontWeight: '600' }}>
+                          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--accent)', marginBottom: '12px', fontWeight: '600' }}>
                             ✏️ Modify {trade.instrument} {trade.direction.toUpperCase()} — Current Price:{' '}
                             {trade.current_price ? parseFloat(trade.current_price).toFixed(dec) : '—'}
                           </div>
                           <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
                             <div>
-                              <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                              <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
                                 Stop Loss <span style={{ color: 'var(--text-dim)' }}>(leave blank to remove)</span>
                               </label>
                               <input
@@ -278,11 +278,11 @@ export default function PositionsPanel({
                                 onChange={e => setModifyForm(f => ({ ...f, stop_loss: e.target.value }))}
                                 placeholder={`e.g. ${trade.current_price ? (parseFloat(trade.current_price) * (trade.direction === 'buy' ? 0.999 : 1.001)).toFixed(dec) : '—'}`}
                                 step={getInputStepString(trade.instrument)}
-                                style={{ width: '140px', fontSize: '13px', padding: '7px 10px' }}
+                                style={{ width: '140px', fontSize: 'var(--fs-base)', padding: '7px 10px' }}
                               />
                             </div>
                             <div>
-                              <label style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                              <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
                                 Take Profit <span style={{ color: 'var(--text-dim)' }}>(leave blank to remove)</span>
                               </label>
                               <input
@@ -291,14 +291,14 @@ export default function PositionsPanel({
                                 onChange={e => setModifyForm(f => ({ ...f, take_profit: e.target.value }))}
                                 placeholder={`e.g. ${trade.current_price ? (parseFloat(trade.current_price) * (trade.direction === 'buy' ? 1.001 : 0.999)).toFixed(dec) : '—'}`}
                                 step={getInputStepString(trade.instrument)}
-                                style={{ width: '140px', fontSize: '13px', padding: '7px 10px' }}
+                                style={{ width: '140px', fontSize: 'var(--fs-base)', padding: '7px 10px' }}
                               />
                             </div>
                             <div style={{ display: 'flex', gap: '8px' }}>
                               <button
                                 className="btn btn-accent"
                                 onClick={() => submitModify(trade)}
-                                style={{ padding: '7px 20px', fontSize: '12px' }}>
+                                style={{ padding: '7px 20px', fontSize: 'var(--fs-sm)' }}>
                                 Save
                               </button>
                               <Button
@@ -312,10 +312,10 @@ export default function PositionsPanel({
                             </div>
                           </div>
                           {modifyError && (
-                            <div style={{ color: 'var(--red)', fontSize: '12px', marginTop: '8px' }}>{modifyError}</div>
+                            <div style={{ color: 'var(--red)', fontSize: 'var(--fs-sm)', marginTop: '8px' }}>{modifyError}</div>
                           )}
                           {modifySuccess && (
-                            <div style={{ color: 'var(--green)', fontSize: '12px', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ color: 'var(--green)', fontSize: 'var(--fs-sm)', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                               {renderIcon('approve', { size: 12, color: 'var(--accent-green)' })}
                               <span>{modifySuccess}</span>
                             </div>

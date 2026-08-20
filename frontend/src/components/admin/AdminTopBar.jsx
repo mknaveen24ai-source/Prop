@@ -96,10 +96,10 @@ export default function AdminTopBar({ adminAxios, onMobileMenuClick, onLogout, s
           border: '1px solid var(--admin-border)',
           background: 'var(--glass)'
         }}>
-          <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
             {roleLabel}
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--admin-text)' }}>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--admin-text)' }}>
             {scopeLabel} • {authSourceLabel}
           </div>
         </div>
@@ -123,7 +123,7 @@ export default function AdminTopBar({ adminAxios, onMobileMenuClick, onLogout, s
                   position: 'absolute', top: '2px', right: '2px',
                   minWidth: '14px', height: '14px', padding: '0 3px',
                   borderRadius: '999px', background: 'var(--admin-danger)',
-                  color: 'var(--paper)', fontSize: '9px', lineHeight: '14px',
+                  color: 'var(--paper)', fontSize: 'var(--fs-3xs)', lineHeight: '14px',
                   textAlign: 'center', fontFamily: 'var(--font-mono)',
                 }}
               >
@@ -151,9 +151,9 @@ export default function AdminTopBar({ adminAxios, onMobileMenuClick, onLogout, s
           {showProfile && (
             <div className="admin-dropdown" style={{ width: '220px' }}>
               <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--admin-border)', marginBottom: '4px' }}>
-                <strong style={{ fontSize: '13px', display: 'block' }}>{session?.full_name || roleLabel}</strong>
-                <span style={{ fontSize: '11px', color: 'var(--admin-text-muted)' }}>{session?.email || roleLabel}</span>
-                <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--admin-text-faint)' }}>
+                <strong style={{ fontSize: 'var(--fs-base)', display: 'block' }}>{session?.full_name || roleLabel}</strong>
+                <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)' }}>{session?.email || roleLabel}</span>
+                <div style={{ marginTop: '6px', fontSize: 'var(--fs-xs)', color: 'var(--admin-text-faint)' }}>
                   {roleLabel} • {scopeLabel} • {authSourceLabel}
                 </div>
               </div>

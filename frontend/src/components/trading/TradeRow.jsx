@@ -33,7 +33,7 @@ export default React.memo(function TradeRow({
         {trade.instrument}
         {isPending && (
           <span style={{
-            marginLeft: '6px', fontSize: '9px', padding: '2px 5px',
+            marginLeft: '6px', fontSize: 'var(--fs-3xs)', padding: '2px 5px',
             background: 'color-mix(in srgb, var(--muted) 15%, transparent)', border: '1px solid var(--accent)',
             color: 'var(--accent)', verticalAlign: 'middle'
           }}>

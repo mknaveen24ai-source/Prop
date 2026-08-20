@@ -6,8 +6,8 @@ import Card from '../../components/ui/Card'
 function StatCard({ label, value }) {
   return (
     <Card stat>
-      <div style={{ fontSize: '11px', opacity: 0.7, marginBottom: '6px' }}>{label}</div>
-      <div style={{ fontSize: '20px', fontWeight: 700 }}>{value}</div>
+      <div style={{ fontSize: 'var(--fs-xs)', opacity: 0.7, marginBottom: '6px' }}>{label}</div>
+      <div style={{ fontSize: 'var(--fs-2xl)', fontWeight: 700 }}>{value}</div>
     </Card>
   )
 }
@@ -55,7 +55,7 @@ export default function AdminCompetitionAnalytics() {
       </button>
 
       <h2 style={{ margin: '0 0 4px' }}>Trade Analytics</h2>
-      <p style={{ margin: '0 0 20px', opacity: 0.7, fontSize: '13px' }}>
+      <p style={{ margin: '0 0 20px', opacity: 0.7, fontSize: 'var(--fs-base)' }}>
         Participant trading performance for this competition's window only.
       </p>
 
@@ -69,7 +69,7 @@ export default function AdminCompetitionAnalytics() {
 
       <Card style={{ padding: '20px', overflowX: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-          <span style={{ fontSize: '12px', opacity: 0.7 }}>Sort by:</span>
+          <span style={{ fontSize: 'var(--fs-sm)', opacity: 0.7 }}>Sort by:</span>
           {SORT_OPTIONS.map((opt) => (
             <button
               key={opt.key}
@@ -82,7 +82,7 @@ export default function AdminCompetitionAnalytics() {
           ))}
         </div>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-base)' }}>
           <thead>
             <tr style={{ textAlign: 'left', opacity: 0.7 }}>
               <th style={{ padding: '8px 10px' }}>Trader</th>
@@ -99,7 +99,7 @@ export default function AdminCompetitionAnalytics() {
           <tbody>
             {sortedEntries.map((e) => (
               <tr key={e.entry_id} style={{ borderTop: '1px solid var(--admin-border)' }}>
-                <td style={{ padding: '8px 10px' }}>{e.full_name}<div style={{ fontSize: '11px', opacity: 0.6 }}>{e.email}</div></td>
+                <td style={{ padding: '8px 10px' }}>{e.full_name}<div style={{ fontSize: 'var(--fs-xs)', opacity: 0.6 }}>{e.email}</div></td>
                 <td style={{ padding: '8px 10px' }}>{e.total_trades} <span style={{ opacity: 0.6 }}>({e.winning_trades}W/{e.losing_trades}L)</span></td>
                 <td style={{ padding: '8px 10px' }}>{e.win_rate}%</td>
                 <td style={{ padding: '8px 10px' }}>{e.profit_factor}</td>

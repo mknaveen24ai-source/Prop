@@ -238,7 +238,7 @@ export default function AdminTrades() {
         render: (trade) => (
           <div>
             <div style={{ color: 'var(--admin-text)' }}>Acc #{trade.account_id}</div>
-            <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>Trader #{trade.user_id}</div>
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>Trader #{trade.user_id}</div>
           </div>
         )
       },
@@ -334,7 +334,7 @@ export default function AdminTrades() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', gap: '16px', flexWrap: 'wrap' }}>
         <div>
           <h1 className="admin-h1">All Executions</h1>
-          <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+          <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
             Monitor live market exposure, pending flow, and execution history from one global trade queue.
           </p>
         </div>
@@ -412,27 +412,27 @@ export default function AdminTrades() {
           <div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Instrument</div>
-                <div style={{ fontSize: '18px', fontWeight: 600, color: 'var(--admin-text)' }}>{selectedTrade.symbol}</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Instrument</div>
+                <div style={{ fontSize: 'var(--fs-xl)', fontWeight: 600, color: 'var(--admin-text)' }}>{selectedTrade.symbol}</div>
               </div>
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Direction And Size</div>
-                <div style={{ fontSize: '18px', fontWeight: 600, color: selectedTrade.type === 'BUY' ? 'var(--admin-info)' : 'var(--admin-danger)' }}>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Direction And Size</div>
+                <div style={{ fontSize: 'var(--fs-xl)', fontWeight: 600, color: selectedTrade.type === 'BUY' ? 'var(--admin-info)' : 'var(--admin-danger)' }}>
                   {selectedTrade.type} <span style={{ color: 'var(--admin-text)' }}>{selectedTrade.lots} Lot</span>
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--admin-danger)' }}>Stop Loss</div>
-                <div style={{ fontSize: '16px', fontFamily: 'var(--admin-font-mono)' }}>{formatPrice(selectedTrade.sl)}</div>
+                <div style={{ fontSize: 'var(--fs-xs)', textTransform: 'uppercase', color: 'var(--admin-danger)' }}>Stop Loss</div>
+                <div style={{ fontSize: 'var(--fs-lg)', fontFamily: 'var(--admin-font-mono)' }}>{formatPrice(selectedTrade.sl)}</div>
               </div>
               <div>
-                <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--admin-success)' }}>Take Profit</div>
-                <div style={{ fontSize: '16px', fontFamily: 'var(--admin-font-mono)' }}>{formatPrice(selectedTrade.tp)}</div>
+                <div style={{ fontSize: 'var(--fs-xs)', textTransform: 'uppercase', color: 'var(--admin-success)' }}>Take Profit</div>
+                <div style={{ fontSize: 'var(--fs-lg)', fontFamily: 'var(--admin-font-mono)' }}>{formatPrice(selectedTrade.tp)}</div>
               </div>
             </div>
 
             <div style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', padding: '16px', marginBottom: '24px', textAlign: 'center' }}>
-              <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Net Floating P&L</div>
+              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Net Floating P&L</div>
               <div style={{ fontSize: '32px', fontFamily: 'var(--admin-font-mono)', fontWeight: 700, color: (parseFloat(selectedTrade.pnl) || 0) >= 0 ? 'var(--admin-success)' : 'var(--admin-danger)' }}>
                 {(parseFloat(selectedTrade.pnl) || 0) >= 0 ? '+' : ''}${(parseFloat(selectedTrade.pnl) || 0).toFixed(2)}
               </div>
@@ -440,7 +440,7 @@ export default function AdminTrades() {
 
             {selectedTrade.status === 'open' && (
               <div style={{ background: 'color-mix(in srgb, var(--admin-danger) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--admin-danger) 20%, transparent)', padding: '16px' }}>
-                <p style={{ fontSize: '13px', color: 'var(--admin-text-muted)', marginBottom: '16px' }}>
+                <p style={{ fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)', marginBottom: '16px' }}>
                   As an administrator, you may forcibly close this active market execution. This action will realize the current floating P&L and cannot be reversed.
                 </p>
                 <button className="admin-btn admin-btn-danger" style={{ width: '100%' }} onClick={executeForceClose}>

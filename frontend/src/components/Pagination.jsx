@@ -55,7 +55,7 @@ export default function Pagination({ page, totalPages, onPageChange, pageSize, t
         ? 'var(--text-muted)'
         : 'var(--text-secondary)',
     cursor: isDisabled ? 'not-allowed' : 'pointer',
-    fontSize: '13px',
+    fontSize: 'var(--fs-base)',
     fontWeight: isActive ? 700 : 500,
     opacity: isDisabled ? 0.5 : 1,
     transition: 'background 0.15s, border-color 0.15s, color 0.15s',
@@ -75,7 +75,7 @@ export default function Pagination({ page, totalPages, onPageChange, pageSize, t
       padding: '12px 0',
       flexWrap: 'wrap',
     }}>
-      <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>
+      <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', fontWeight: 500 }}>
         {totalShown}
       </span>
 
@@ -95,7 +95,7 @@ export default function Pagination({ page, totalPages, onPageChange, pageSize, t
         {/* Page numbers */}
         {getPages().map((p, i) =>
           p === '...' ? (
-            <span key={`ellipsis-${i}`} style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '0 4px' }}>
+            <span key={`ellipsis-${i}`} style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', padding: '0 4px' }}>
               …
             </span>
           ) : (

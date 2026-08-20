@@ -29,7 +29,7 @@ function EmptyChartState({ height, message }) {
         justifyContent: 'center',
         height,
         color: 'var(--admin-text-muted)',
-        fontSize: '13px',
+        fontSize: 'var(--fs-base)',
       }}
     >
       {message}
@@ -69,7 +69,7 @@ export function AdminDashboardAlerts({ loading, error, alerts, navigate }) {
           </div>
           <button
             onClick={() => navigate(ALERT_ROUTES[a.go] ? ALERT_ROUTES[a.go] : `/admin/${a.go}`)}
-            style={{ alignSelf: 'center', padding: '6px 11px', border: `1px solid var(--${a.tone})`, borderRadius: '4px', background: 'transparent', color: `var(--${a.tone})`, fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.1em', textTransform: 'uppercase', whiteSpace: 'nowrap', cursor: 'pointer' }}
+            style={{ alignSelf: 'center', padding: '6px 11px', border: `1px solid var(--${a.tone})`, borderRadius: '4px', background: 'transparent', color: `var(--${a.tone})`, fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.1em', textTransform: 'uppercase', whiteSpace: 'nowrap', cursor: 'pointer' }}
           >
             {a.cta}
           </button>
@@ -166,7 +166,7 @@ export function AdminDashboardCharts({
           <AdminChart title={`Account Status · ${accountStatusData.reduce((sum, e) => sum + e.value, 0).toLocaleString()} accounts`}>
             <PieChart>
               <Tooltip {...chartThemeProps.tooltip} />
-              <Legend wrapperStyle={{ fontSize: '12px' }} />
+              <Legend wrapperStyle={{ fontSize: 'var(--fs-sm)' }} />
               <Pie
                 data={accountStatusData}
                 cx="50%"
@@ -255,13 +255,13 @@ export function AdminDashboardAttention({ loading, error, overview, funnelData, 
       <Card
         title="Needs Attention"
         actions={attentionTotal > 0 && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--loss)', border: '1px solid var(--loss)', borderRadius: '99px', padding: '3px 9px' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--loss)', border: '1px solid var(--loss)', borderRadius: '99px', padding: '3px 9px' }}>
             {attentionTotal} open
           </span>
         )}
       >
         {attentionQueue.length === 0 ? (
-          <div style={{ padding: '24px 4px', textAlign: 'center', color: 'var(--muted)', fontSize: '13px' }}>Nothing needs attention right now.</div>
+          <div style={{ padding: '24px 4px', textAlign: 'center', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>Nothing needs attention right now.</div>
         ) : (
           attentionQueue.map((q) => (
             <button
@@ -271,10 +271,10 @@ export function AdminDashboardAttention({ loading, error, overview, funnelData, 
             >
               <span style={{ display: 'inline-flex', color: 'var(--warn)' }}>{renderIcon(ATTENTION_ICONS[q.key] || 'flag', { size: 16, color: 'var(--warn)' })}</span>
               <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: '13px' }}>{q.label}</span>
-                <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: '3px' }}>{q.meta}</span>
+                <span style={{ display: 'block', fontSize: 'var(--fs-base)' }}>{q.label}</span>
+                <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: '3px' }}>{q.meta}</span>
               </span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '16px', color: 'var(--warn)' }}>{q.n}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-lg)', color: 'var(--warn)' }}>{q.n}</span>
             </button>
           ))
         )}
@@ -295,7 +295,7 @@ const EXPOSURE_COLUMNS = [
         style={{
           padding: '2px 8px',
           borderRadius: 'var(--radius-pill)',
-          fontSize: '11px',
+          fontSize: 'var(--fs-xs)',
           fontWeight: 700,
           background: row.net_direction === 'BUY'
             ? 'color-mix(in srgb, var(--admin-success) 12%, transparent)'
@@ -331,7 +331,7 @@ export function AdminDashboardExposureTable({ loading, error, exposure, totalAct
   return (
     <Card
       ruled flush title="Aggregate Exposure"
-      actions={<span style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--muted)' }}>Net across {totalActiveAccounts.toLocaleString()} accounts · refreshes 30s</span>}
+      actions={<span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--muted)' }}>Net across {totalActiveAccounts.toLocaleString()} accounts · refreshes 30s</span>}
     >
       <AdminDataTable columns={EXPOSURE_COLUMNS} data={exposure} emptyMessage="No open trades" />
     </Card>

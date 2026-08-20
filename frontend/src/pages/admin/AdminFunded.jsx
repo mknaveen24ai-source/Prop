@@ -302,7 +302,7 @@ export default function AdminFunded() {
         render: (account) => (
           <div>
             <div className="admin-td-mono">{account.account_uid || `#${String(account.id).padStart(5, '0')}`}</div>
-            <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>#{account.id}</div>
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>#{account.id}</div>
           </div>
         )
       },
@@ -313,7 +313,7 @@ export default function AdminFunded() {
         render: (account) => (
           <div>
             <div style={{ color: 'var(--admin-text)' }}>{account.full_name || 'Unnamed Trader'}</div>
-            <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>{account.user_email || account.email}</div>
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>{account.user_email || account.email}</div>
           </div>
         )
       },
@@ -357,7 +357,7 @@ export default function AdminFunded() {
         render: (account) => (
           <div>
             {account.risk_tier ? <AdminBadge status={account.risk_tier === 'critical' ? 'danger' : account.risk_tier === 'high' ? 'warning' : 'info'} label={account.risk_tier} /> : <span style={{ color: 'var(--admin-text-faint)' }}>-</span>}
-            <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px', marginTop: '6px' }}>
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)', marginTop: '6px' }}>
               {account.review_flagged ? 'Review flagged' : account.classification || 'No classification'}
             </div>
           </div>
@@ -401,7 +401,7 @@ export default function AdminFunded() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', gap: '16px', flexWrap: 'wrap' }}>
         <div>
           <h1 className="admin-h1">Funded Accounts</h1>
-          <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+          <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
             Manage funded balances, review flags, and post-evaluation risk actions from one operator queue.
           </p>
         </div>
@@ -522,8 +522,8 @@ export default function AdminFunded() {
                 { label: 'Paid Out', value: formatMoney(selectedAcc.total_payouts) }
               ].map((card) => (
                 <div key={card.label} style={{ background: 'var(--admin-bg)', padding: '16px', border: '1px solid var(--admin-border)' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>{card.label}</div>
-                  <div style={{ marginTop: '6px', fontSize: '22px', fontFamily: 'var(--admin-font-mono)', fontWeight: 700 }}>
+                  <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>{card.label}</div>
+                  <div style={{ marginTop: '6px', fontSize: 'var(--fs-3xl)', fontFamily: 'var(--admin-font-mono)', fontWeight: 700 }}>
                     {card.value}
                   </div>
                 </div>
@@ -556,7 +556,7 @@ export default function AdminFunded() {
 
             <Card style={{ margin: 0 }}>
               <h3 className="admin-h3">Balance Adjustment</h3>
-              <p style={{ color: 'var(--admin-text-muted)', fontSize: '12px', marginBottom: '16px' }}>
+              <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)', marginBottom: '16px' }}>
                 Use a positive amount to credit or a negative amount to debit the funded balance.
               </p>
               <div style={{ display: 'grid', gap: '12px' }}>

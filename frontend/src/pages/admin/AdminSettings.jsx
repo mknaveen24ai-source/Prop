@@ -241,13 +241,13 @@ export default function AdminSettings() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
         <div>
           <h1 className="admin-h1">Platform Settings</h1>
-          <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+          <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
             Changes are audited and take effect immediately (30s cache on trading rules).
           </p>
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           {dirty && (
-            <span style={{ fontSize: '12px', color: 'var(--admin-warning)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--admin-warning)', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--admin-warning)', display: 'inline-block' }} />
               Unsaved changes
             </span>
@@ -344,7 +344,7 @@ export default function AdminSettings() {
                 <div key={field.key} style={{ display: 'flex', alignItems: 'center', gap: '18px', padding: '14px 0', borderBottom: '1px solid var(--admin-border)' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '13.5px' }}>{field.label}</div>
-                    {field.hint && <div style={{ fontSize: '12px', color: 'var(--admin-text-muted)', marginTop: '3px', lineHeight: 1.5 }}>{field.hint}</div>}
+                    {field.hint && <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)', marginTop: '3px', lineHeight: 1.5 }}>{field.hint}</div>}
                   </div>
                   <SettingToggle checked={values[field.key] === 'true'} onChange={(next) => handleChange(field.key, next)} />
                 </div>

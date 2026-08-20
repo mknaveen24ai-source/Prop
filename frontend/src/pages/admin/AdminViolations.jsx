@@ -407,7 +407,7 @@ export default function AdminViolations() {
         render: (violation) => (
           <div>
             <div style={{ color: 'var(--admin-text)', fontWeight: 600 }}>{formatLabel(violation.violation_type)}</div>
-            <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>#{violation.id}</div>
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>#{violation.id}</div>
           </div>
         )
       },
@@ -422,7 +422,7 @@ export default function AdminViolations() {
         render: (violation) => (
           <div>
             <div className="admin-td-mono" style={{ color: 'var(--admin-text)' }}>{violation.account_id || '-'}</div>
-            <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>{violation.user_id || '-'}</div>
+            <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>{violation.user_id || '-'}</div>
           </div>
         )
       },
@@ -496,10 +496,10 @@ export default function AdminViolations() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
         <div>
           <h1 className="admin-h1">Automation Violations</h1>
-          <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+          <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
             Live rule-breach feed for drawdown failures, opposing trades, and automated risk flags.
           </p>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '12px', marginTop: '6px' }}>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-sm)', marginTop: '6px' }}>
             Auto-refresh every 15s{lastUpdatedAt ? ` - Last updated ${lastUpdatedAt.toLocaleTimeString()}` : ''}
           </div>
         </div>
@@ -656,31 +656,31 @@ export default function AdminViolations() {
           <div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px', marginBottom: '24px' }}>
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Type</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Type</div>
                 <div style={{ marginTop: '4px', color: 'var(--admin-text)', fontWeight: 600 }}>{formatLabel(selectedViolation.violation_type)}</div>
               </div>
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Severity</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Severity</div>
                 <div style={{ marginTop: '4px' }}>
                   <AdminBadge status={getSeverityTone(selectedViolation.severity)} label={formatLabel(selectedViolation.severity)} />
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Account ID</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Account ID</div>
                 <div className="admin-td-mono" style={{ marginTop: '4px' }}>{selectedViolation.account_id || '-'}</div>
               </div>
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>User ID</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>User ID</div>
                 <div className="admin-td-mono" style={{ marginTop: '4px' }}>{selectedViolation.user_id || '-'}</div>
               </div>
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Status</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Status</div>
                 <div style={{ marginTop: '4px' }}>
                   <AdminBadge status={selectedViolation.status === 'resolved' ? 'success' : 'danger'} label={formatLabel(selectedViolation.status)} />
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Hit Count</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Hit Count</div>
                 <div className="admin-td-mono" style={{ marginTop: '4px' }}>{selectedViolation.hit_count || 1}</div>
               </div>
             </div>
@@ -700,19 +700,19 @@ export default function AdminViolations() {
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px', marginBottom: '24px' }}>
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>First Detected</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>First Detected</div>
                 <div style={{ marginTop: '4px', color: 'var(--admin-text)' }}>{formatTimestamp(selectedViolation.first_detected_at)}</div>
               </div>
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Last Detected</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Last Detected</div>
                 <div style={{ marginTop: '4px', color: 'var(--admin-text)' }}>{formatTimestamp(selectedViolation.last_detected_at)}</div>
               </div>
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Instrument</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Instrument</div>
                 <div className="admin-td-mono" style={{ marginTop: '4px' }}>{selectedViolation.instrument || '-'}</div>
               </div>
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Source</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Source</div>
                 <div style={{ marginTop: '4px', color: 'var(--admin-text)' }}>{formatLabel(selectedViolation.source)}</div>
               </div>
             </div>
@@ -724,7 +724,7 @@ export default function AdminViolations() {
                 border: '1px solid var(--admin-border)',
                 padding: '14px',
                 color: 'var(--admin-text)',
-                fontSize: '12px',
+                fontSize: 'var(--fs-sm)',
                 fontFamily: 'var(--admin-font-mono)',
                 whiteSpace: 'pre-wrap',
                 overflowX: 'auto'
@@ -747,7 +747,7 @@ export default function AdminViolations() {
                     {actionLoading === 'force_close_open_trades' ? 'Closing...' : 'Force Close Open Trades'}
                   </button>
                 </div>
-                <p style={{ color: 'var(--admin-text-faint)', fontSize: '12px', marginTop: '10px' }}>
+                <p style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-sm)', marginTop: '10px' }}>
                   These actions use the current admin enforcement and account override APIs.
                 </p>
               </div>

@@ -172,7 +172,7 @@ export default function AdminSystemHealth() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
         <div>
           <h2 style={{ margin: 0 }}>System Health</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--admin-text-faint)', fontSize: '13px' }}>
+          <p style={{ margin: '4px 0 0', color: 'var(--admin-text-faint)', fontSize: 'var(--fs-base)' }}>
             Refreshes every {POLL_MS / 1000}s
             {lastUpdated ? ` · last updated ${lastUpdated.toLocaleTimeString()}` : ''}
           </p>
@@ -187,7 +187,7 @@ export default function AdminSystemHealth() {
       {error ? (
         <Card style={{ padding: '16px', marginBottom: '16px', borderColor: 'var(--admin-danger, #b3261e)' }}>
           <strong>{error}</strong>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '13px', marginTop: '4px' }}>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-base)', marginTop: '4px' }}>
             Showing the last successful reading, if any.
           </div>
         </Card>
@@ -200,7 +200,7 @@ export default function AdminSystemHealth() {
           <strong>Attention needed</strong>
           <ul style={{ margin: '8px 0 0', paddingLeft: '20px' }}>
             {degraded.map(([key, data]) => (
-              <li key={key} style={{ fontSize: '13px' }}>
+              <li key={key} style={{ fontSize: 'var(--fs-base)' }}>
                 {SECTION_LABELS[key] || key}: {data.status}
                 {data.error ? ` — ${data.error}` : ''}
                 {data.note ? ` — ${data.note}` : ''}
@@ -236,7 +236,7 @@ export default function AdminSystemHealth() {
                 <AdminBadge tone={statusTone(data.status)}>{data.status}</AdminBadge>
               </div>
 
-              <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse' }}>
+              <table style={{ width: '100%', fontSize: 'var(--fs-base)', borderCollapse: 'collapse' }}>
                 <tbody>
                   {sectionRows(key, data).map(([label, value]) => (
                     <tr key={label}>

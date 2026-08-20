@@ -51,10 +51,10 @@ export function CompetitionsListContent({ onSelectSlug }) {
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
           {renderIcon('leaderboard', { size: 48, color: 'var(--accent)' })}
         </div>
-        <h1 style={{ fontFamily: 'var(--font-display)', color: 'var(--ink)', fontSize: '28px', marginBottom: '8px' }}>
+        <h1 style={{ fontFamily: 'var(--font-display)', color: 'var(--ink)', fontSize: 'var(--fs-5xl)', marginBottom: '8px' }}>
           Trading Competitions
         </h1>
-        <p style={{ color: 'var(--muted)', fontSize: '14px' }}>
+        <p style={{ color: 'var(--muted)', fontSize: 'var(--fs-md)' }}>
           Join a weekly or monthly contest, trade a dedicated account, and climb the leaderboard
         </p>
       </div>
@@ -89,19 +89,19 @@ export function CompetitionsListContent({ onSelectSlug }) {
             >
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '16px', color: 'var(--ink)' }}>{c.title}</span>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-lg)', color: 'var(--ink)' }}>{c.title}</span>
                   {statusBadge(c.status)}
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--muted)' }}>
+                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--muted)' }}>
                   {formatDate(c.start_at)} → {formatDate(c.end_at)} · ${c.starting_balance.toLocaleString('en-US')} account
                   {c.entry_fee > 0 ? ` · $${c.entry_fee} entry` : ' · Free entry'}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '18px', fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>
+                <div style={{ fontSize: 'var(--fs-xl)', fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>
                   {c.participant_count ?? 0}{c.max_participants ? ` / ${c.max_participants}` : ''}
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--muted)' }}>participants</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--muted)' }}>participants</div>
               </div>
             </Card>
           ))}

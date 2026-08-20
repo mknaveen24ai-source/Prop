@@ -57,7 +57,7 @@ function AffiliateAnalysisTab({ adminAxios, toast }) {
               <Bar dataKey="paid" fill="var(--admin-success)" radius={[4, 4, 0, 0]} name="Commission Paid" />
             </BarChart>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '260px', color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '260px', color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
               No paid affiliate payouts in the last 6 months
             </div>
           )}
@@ -77,7 +77,7 @@ function AffiliateAnalysisTab({ adminAxios, toast }) {
               </Bar>
             </BarChart>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '260px', color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '260px', color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
               No affiliates have reached a commission tier yet
             </div>
           )}
@@ -103,7 +103,7 @@ function AffiliateAnalysisTab({ adminAxios, toast }) {
                 <tr key={row.userId}>
                   <td className="admin-td">
                     <div>{row.fullName || 'Unknown'}</div>
-                    <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>{row.email}</div>
+                    <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>{row.email}</div>
                   </td>
                   <td className="admin-td admin-td-mono">{row.affiliateCode}</td>
                   <td className="admin-td">{row.totalReferrals}</td>
@@ -163,7 +163,7 @@ export default function AdminAffiliates() {
   return (
     <div style={{ padding: '24px' }}>
       <h1 className="admin-h1">Affiliates</h1>
-      <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px', marginBottom: '20px' }}>
+      <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)', marginBottom: '20px' }}>
         Traders who have referred at least one signup. Commission is a lifetime revenue share, not a one-time bonus.
       </p>
 
@@ -176,7 +176,7 @@ export default function AdminAffiliates() {
               padding: '7px 16px', border: 'none', borderRadius: '3px', cursor: 'pointer',
               background: activeTab === tab.id ? 'var(--admin-accent)' : 'transparent',
               color: activeTab === tab.id ? 'var(--paper)' : 'var(--admin-text-muted)',
-              fontFamily: 'var(--font-mono)', fontSize: '11px', letterSpacing: '.08em', textTransform: 'uppercase'
+              fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.08em', textTransform: 'uppercase'
             }}
           >
             {tab.label}
@@ -226,7 +226,7 @@ export default function AdminAffiliates() {
                     <tr key={row.user_id} onClick={() => navigate(`/admin/affiliates/${row.user_id}`)} style={{ cursor: 'pointer' }}>
                       <td className="admin-td">
                         <div>{row.full_name || 'Unknown'}</div>
-                        <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>{row.email}</div>
+                        <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>{row.email}</div>
                       </td>
                       <td className="admin-td admin-td-mono">{row.affiliate_code}</td>
                       <td className="admin-td">{row.total_referrals}</td>
@@ -243,7 +243,7 @@ export default function AdminAffiliates() {
           {totalPages > 1 && (
             <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'center' }}>
               <button className="admin-btn admin-btn-sm" disabled={data.page <= 1} onClick={() => fetchAffiliates(data.page - 1)}>Previous</button>
-              <span style={{ padding: '6px 12px', fontSize: '13px', color: 'var(--admin-text-muted)' }}>Page {data.page} of {totalPages}</span>
+              <span style={{ padding: '6px 12px', fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)' }}>Page {data.page} of {totalPages}</span>
               <button className="admin-btn admin-btn-sm" disabled={data.page >= totalPages} onClick={() => fetchAffiliates(data.page + 1)}>Next</button>
             </div>
           )}

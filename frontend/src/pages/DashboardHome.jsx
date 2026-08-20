@@ -136,7 +136,7 @@ function KpiCard({ icon, label, value, delta, sub, tone, sparkData }) {
         {value}
       </div>
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '10px', marginTop: '6px' }}>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: tone }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', color: tone }}>
           {delta}<span style={{ color: 'var(--muted)' }}> {sub}</span>
         </div>
         <Suspense fallback={<div style={{ width: 74, height: 26 }} />}>
@@ -162,7 +162,7 @@ function ConsistencyDonut({ score }) {
         strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset}
         transform={`rotate(-90 ${size / 2} ${size / 2})`} style={{ transition: 'stroke-dashoffset .6s ease' }}
       />
-      <text x="50%" y="47%" textAnchor="middle" dominantBaseline="central" style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '22px', fill: 'var(--gain)' }}>
+      <text x="50%" y="47%" textAnchor="middle" dominantBaseline="central" style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 'var(--fs-3xl)', fill: 'var(--gain)' }}>
         {score != null ? Math.round(score) : '—'}
       </text>
       <text x="50%" y="66%" textAnchor="middle" dominantBaseline="central" style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '.1em', textTransform: 'uppercase', fill: 'var(--muted)' }}>
@@ -233,20 +233,20 @@ function ConsistencyRiskBlock({ consistency, dailyDrawdown, totalDrawdownUsedPct
             </div>
           </div>
         ) : (
-          <div style={{ color: 'var(--muted)', fontSize: '13px', padding: '8px 0' }}>Not enough closed-trade history yet.</div>
+          <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-base)', padding: '8px 0' }}>Not enough closed-trade history yet.</div>
         )}
       </Card>
 
       <Card>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--rule-soft)', paddingBottom: '10px', marginBottom: '6px' }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px' }}>Risk Budget</div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10px', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)' }}>Live</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)' }}>Live</div>
         </div>
         {risks.map((r) => (
           <div key={r.label} style={{ padding: '12px 0', borderBottom: '1px solid var(--rule-soft)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'baseline' }}>
-              <span style={{ fontSize: '13px' }}>{r.label}</span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: r.tone }}>{r.usedLabel}</span>
+              <span style={{ fontSize: 'var(--fs-base)' }}>{r.label}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', color: r.tone }}>{r.usedLabel}</span>
             </div>
             <div style={{ height: '7px', marginTop: '9px', border: '1px solid var(--rule)', borderRadius: '99px', background: 'var(--paper)', overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${Math.min(100, Math.max(0, r.pct))}%`, background: r.tone, boxShadow: `0 0 12px ${r.tone}`, transition: 'width .5s cubic-bezier(.16,1,.3,1)' }} />
@@ -267,8 +267,8 @@ function OpenPositionsTable({ positions }) {
   return (
     <Card ruled title="Open Positions" actions={(
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--muted)' }}>Floating</span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '14px', color: floatingTotal >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{formatSigned(floatingTotal)}</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', color: 'var(--muted)' }}>Floating</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-md)', color: floatingTotal >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{formatSigned(floatingTotal)}</span>
       </div>
     )} flush>
       <div className="lx-table-wrap">
@@ -332,7 +332,7 @@ function SessionHeat({ matrix, hours }) {
       </div>
       {matrix.map((row) => (
         <div key={row.day_label} className="heatmap-grid" style={{ marginBottom: '2px', alignItems: 'center' }}>
-          <div style={{ fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>{row.day_label.slice(0, 3).toUpperCase()}</div>
+          <div style={{ fontSize: 'var(--fs-3xs)', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>{row.day_label.slice(0, 3).toUpperCase()}</div>
           {(row.slots || []).map((slot) => (
             <div
               key={slot.hour}
@@ -382,14 +382,14 @@ function PayoutCycleBanner({ payoutCycle, onRequestPayout }) {
       <div style={{ flex: 1, minWidth: '220px' }}>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--accent)' }}>Next payout window</div>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '21px', marginTop: '4px' }}>Eligible for a profit share payout</div>
-        <div style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '4px' }}>
+        <div style={{ fontSize: 'var(--fs-base)', color: 'var(--muted)', marginTop: '4px' }}>
           Cycle closes {new Date(payoutCycle.next_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} · estimated share {formatMoney(payoutCycle.estimated_share)}
         </div>
       </div>
       {boxes.map((b) => (
         <div key={b.l} style={{ minWidth: '70px', textAlign: 'center', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper)', padding: '10px 12px' }}>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '22px', color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>{b.v}</div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: '4px' }}>{b.l}</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xl)', color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>{b.v}</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: '4px' }}>{b.l}</div>
         </div>
       ))}
       <button
@@ -416,17 +416,17 @@ function ScalingProgressCard({ scaling }) {
     <Card>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--rule-soft)', paddingBottom: '10px', marginBottom: '14px' }}>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px' }}>Scaling Plan</div>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--accent)' }}>{scaling.multiplier.toFixed(2)}x lot size</div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', color: 'var(--accent)' }}>{scaling.multiplier.toFixed(2)}x lot size</div>
       </div>
 
       <div style={{ display: 'flex', gap: '18px', marginBottom: '14px', flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Milestones Claimed</div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '18px', marginTop: '3px' }}>{scaling.milestones_claimed}</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Milestones Claimed</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xl)', marginTop: '3px' }}>{scaling.milestones_claimed}</div>
         </div>
         <div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Capital Added</div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '18px', marginTop: '3px', color: 'var(--gain)' }}>{formatMoney(scaling.total_increased)}</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Capital Added</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xl)', marginTop: '3px', color: 'var(--gain)' }}>{formatMoney(scaling.total_increased)}</div>
         </div>
       </div>
 
@@ -436,7 +436,7 @@ function ScalingProgressCard({ scaling }) {
         </div>
       ) : (
         <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: '9px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '4px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '4px' }}>
             <span>Progress to milestone {nextMilestone}</span>
             <span>{scaling.progress_pct.toFixed(0)}%</span>
           </div>
@@ -723,7 +723,7 @@ export default function DashboardHome({
             <EquityCurveChart data={equityCurve} height={250} />
           </Suspense>
         ) : (
-          <div style={{ height: 250, display: 'flex', alignItems: 'center', justifyContent: 'center', color: analyticsError ? 'var(--warn)' : 'var(--muted)', fontSize: '13px' }}>
+          <div style={{ height: 250, display: 'flex', alignItems: 'center', justifyContent: 'center', color: analyticsError ? 'var(--warn)' : 'var(--muted)', fontSize: 'var(--fs-base)' }}>
             {analyticsError ? "Couldn't load performance data — try refreshing the page." : 'Not enough data for this range yet'}
           </div>
         )}
@@ -738,7 +738,7 @@ export default function DashboardHome({
             ].map((l) => (
               <div key={l.label}>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--muted)' }}>{l.label}</div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '14px', color: l.tone, marginTop: '3px' }}>{l.value}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-md)', color: l.tone, marginTop: '3px' }}>{l.value}</div>
               </div>
             ))}
           </div>

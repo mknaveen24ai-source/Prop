@@ -83,7 +83,7 @@ export default function AdminAffiliateDetail() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
         <div>
           <h2 style={{ margin: '0 0 4px' }}>{user.full_name}</h2>
-          <div style={{ fontSize: '12px', opacity: 0.7 }}>{user.email} · Code {user.affiliate_code} · Joined {new Date(user.created_at).toLocaleDateString()}</div>
+          <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7 }}>{user.email} · Code {user.affiliate_code} · Joined {new Date(user.created_at).toLocaleDateString()}</div>
         </div>
         <AdjustBalanceForm onSubmit={handleAdjustBalance} />
       </div>

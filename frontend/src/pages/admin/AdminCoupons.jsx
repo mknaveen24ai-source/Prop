@@ -138,7 +138,7 @@ export default function AdminCoupons() {
     <>
       <div style={{ marginBottom: '24px' }}>
         <h1 className="admin-h1">Coupons</h1>
-        <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+        <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
           Codes traders can enter at checkout for a percent or fixed-dollar discount. Each code can only be
           redeemed once per trader, and stacks on top of any active referral discount.
         </p>

@@ -55,14 +55,14 @@ export default function LandingAffiliate() {
               <div className="mp-timeline-content mp-glass-card" style={{ padding: '30px' }}>
                 <div style={{
                   display: 'inline-block', padding: '5px 14px',
-                  background: 'transparent', fontSize: '11px',
+                  background: 'transparent', fontSize: 'var(--fs-xs)',
                   textTransform: 'uppercase', letterSpacing: '0.15em',
                   color: 'var(--gain)', marginBottom: '16px',
                   border: '1px solid var(--gain)', fontFamily: 'var(--font-mono)',
                 }}>
                   {step.diff}
                 </div>
-                <h3 className="mp-h3" style={{ fontSize: '22px' }}>{step.title}</h3>
+                <h3 className="mp-h3" style={{ fontSize: 'var(--fs-3xl)' }}>{step.title}</h3>
                 <p className="mp-p-body">{step.text}</p>
               </div>
             </div>

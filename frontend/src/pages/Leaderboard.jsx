@@ -33,10 +33,10 @@ export default function Leaderboard() {
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
             {renderIcon('leaderboard', { size: 48, color: 'var(--accent-gold)' })}
           </div>
-      <h1 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', fontSize: '28px', marginBottom: '8px' }}>
+      <h1 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', fontSize: 'var(--fs-5xl)', marginBottom: '8px' }}>
             Leaderboard
           </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>
             Top funded traders ranked by profit percentage · Click a trader to view their profile
           </p>
         </div>
@@ -75,10 +75,10 @@ export default function Leaderboard() {
                   {idx < 3 ? (
                     <>
                       {renderIcon('leaderboard', { size: 18, color: idx === 0 ? 'var(--accent-gold)' : 'var(--text-secondary)' })}
-                      <span style={{ color: 'var(--text-primary)', fontSize: '13px', fontWeight: '700' }}>{idx + 1}</span>
+                      <span style={{ color: 'var(--text-primary)', fontSize: 'var(--fs-base)', fontWeight: '700' }}>{idx + 1}</span>
                     </>
                   ) : (
-                    <span style={{ color: 'var(--text-dim)', fontSize: '14px', fontWeight: '700' }}>#{idx + 1}</span>
+                    <span style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-md)', fontWeight: '700' }}>#{idx + 1}</span>
                   )}
                 </div>
 
@@ -86,22 +86,22 @@ export default function Leaderboard() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: '700', fontSize: '15px', color: 'var(--accent)', marginBottom: '3px' }}>
                     {row.full_name}
-                    <span style={{ fontSize: '11px', color: 'var(--text-dim)', fontWeight: '400', marginLeft: '8px' }}>View Profile →</span>
+                    <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', fontWeight: '400', marginLeft: '8px' }}>View Profile →</span>
                   </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
+                  <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-dim)' }}>
                     {row.country || 'Unknown'} · ${parseFloat(row.account_size).toLocaleString('en-US')} account
                   </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
                     Trader ID: {row.trader_uid || '—'} · Account ID: {row.account_uid || '—'}
                   </div>
                 </div>
 
                 {/* Profit % */}
                 <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--green)', fontFamily: 'var(--font-mono)' }}>
+                <div style={{ fontSize: 'var(--fs-2xl)', fontWeight: '800', color: 'var(--green)', fontFamily: 'var(--font-mono)' }}>
                     +{parseFloat(row.profit_pct).toFixed(2)}%
                   </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
+                  <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-dim)' }}>
                     +${parseFloat(row.profit_usd).toFixed(2)}
                   </div>
                 </div>
@@ -111,7 +111,7 @@ export default function Leaderboard() {
         )}
 
         <div style={{ textAlign: 'center', marginTop: '40px', marginBottom: '40px' }}>
-          <p style={{ color: 'var(--text-dim)', fontSize: '12px' }}>
+          <p style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-sm)' }}>
             Rankings update in real-time · Shows top 20 active funded accounts
           </p>
         </div>

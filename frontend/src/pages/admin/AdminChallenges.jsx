@@ -261,7 +261,7 @@ export default function AdminChallenges() {
       render: (account) => (
         <div>
           <div className="admin-td-mono">{account.account_uid || `#${String(account.id).padStart(5, '0')}`}</div>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>#{account.id}</div>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>#{account.id}</div>
         </div>
       )
     },
@@ -271,7 +271,7 @@ export default function AdminChallenges() {
       render: (account) => (
         <div>
           <div style={{ color: 'var(--admin-text)' }}>{account.full_name || 'Unnamed Trader'}</div>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: '11px' }}>{account.user_email || account.email}</div>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>{account.user_email || account.email}</div>
         </div>
       )
     },
@@ -293,7 +293,7 @@ export default function AdminChallenges() {
       render: (account) => (
         <div className="admin-tag-row">
           {(account.tags || []).slice(0, 2).map((tag) => <span key={tag} className="admin-tag-pill static">{tag}</span>)}
-          {(account.tags || []).length > 2 && <span style={{ color: 'var(--admin-text-muted)', fontSize: '12px' }}>+{account.tags.length - 2}</span>}
+          {(account.tags || []).length > 2 && <span style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)' }}>+{account.tags.length - 2}</span>}
         </div>
       )
     },
@@ -310,7 +310,7 @@ export default function AdminChallenges() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
         <div>
           <h1 className="admin-h1">Active Challenges</h1>
-          <p style={{ color: 'var(--admin-text-muted)', fontSize: '13px' }}>
+          <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
             Saved views, classifications, and fast account controls for Phase 1 and Phase 2 operations.
           </p>
         </div>
@@ -422,8 +422,8 @@ export default function AdminChallenges() {
                 { label: 'Peak', value: formatMoney(selectedAcc.peak_balance) }
               ].map((card) => (
                 <div key={card.label} style={{ background: 'var(--admin-bg)', padding: '16px', border: '1px solid var(--admin-border)' }}>
-                  <div style={{ fontSize: '11px', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>{card.label}</div>
-                  <div style={{ marginTop: '6px', fontSize: '22px', fontFamily: 'var(--admin-font-mono)', fontWeight: 700 }}>
+                  <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>{card.label}</div>
+                  <div style={{ marginTop: '6px', fontSize: 'var(--fs-3xl)', fontFamily: 'var(--admin-font-mono)', fontWeight: 700 }}>
                     {card.value}
                   </div>
                 </div>
@@ -462,7 +462,7 @@ export default function AdminChallenges() {
 
             <Card style={{ margin: 0 }}>
               <h3 className="admin-h3">Balance Adjustment</h3>
-              <p style={{ color: 'var(--admin-text-muted)', fontSize: '12px', marginBottom: '16px' }}>
+              <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)', marginBottom: '16px' }}>
                 Use a positive number to credit the account or a negative number to debit it.
               </p>
               <div style={{ display: 'grid', gap: '12px' }}>
