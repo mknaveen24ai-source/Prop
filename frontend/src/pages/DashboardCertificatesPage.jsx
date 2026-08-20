@@ -4,6 +4,7 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import CertificateViewer from '../components/CertificateViewer'
 import { renderIcon } from '../utils/iconMap'
+import { SkeletonCard } from '../components/ui'
 
 /**
  * DashboardCertificatesPage — the trader's earned awards.
@@ -50,9 +51,10 @@ export default function DashboardCertificatesPage() {
 
   if (loading) {
     return (
-      <Card style={{ textAlign: 'center', padding: 48 }}>
-        <p style={{ color: 'var(--muted)', margin: 0 }}>Loading your certificates…</p>
-      </Card>
+      <div style={{ display: 'grid', gap: 'var(--space-4)' }}>
+        <SkeletonCard lines={2} height={180} />
+        <SkeletonCard lines={2} height={180} />
+      </div>
     )
   }
 

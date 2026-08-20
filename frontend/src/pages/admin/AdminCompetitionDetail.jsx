@@ -3,6 +3,7 @@ import { useOutletContext, useParams, useNavigate } from 'react-router-dom'
 import { useToast } from '../../components/admin/AdminToast'
 import PrizePoolEditor from '../../components/admin/PrizePoolEditor'
 import Card from '../../components/ui/Card'
+import { SkeletonStats, SkeletonTable } from '../../components/ui'
 
 const inputStyle = { width: '100%', padding: 'var(--space-2) var(--space-2-5)', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }
 
@@ -443,7 +444,14 @@ export default function AdminCompetitionDetail() {
     }
   }
 
-  if (loading) return <div style={{ padding: 'var(--space-7)', opacity: 0.7 }}>Loading...</div>
+  if (loading) {
+    return (
+      <div style={{ padding: 'var(--space-6)' }}>
+        <SkeletonStats count={4} style={{ marginBottom: 'var(--space-6)' }} />
+        <SkeletonTable rows={10} columns={6} />
+      </div>
+    )
+  }
   if (!competition) return <div style={{ padding: 'var(--space-7)', opacity: 0.7 }}>Competition not found</div>
 
   return (

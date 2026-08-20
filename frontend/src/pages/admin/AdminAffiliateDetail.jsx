@@ -3,6 +3,7 @@ import { useOutletContext, useParams, useNavigate } from 'react-router-dom'
 import { useToast } from '../../components/admin/AdminToast'
 import AdminStatCard from '../../components/admin/AdminStatCard'
 import Card from '../../components/ui/Card'
+import { SkeletonStats, SkeletonTable } from '../../components/ui'
 
 const inputStyle = { width: '100%', padding: 'var(--space-2) var(--space-2-5)', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }
 
@@ -69,7 +70,18 @@ export default function AdminAffiliateDetail() {
     }
   }
 
-  if (loading) return <div style={{ padding: 'var(--space-7)', opacity: 0.7 }}>Loading...</div>
+  // A dimensioned stand-in rather than a one-line "Loading...". The text
+  // collapsed the page to a single row and everything below it jumped into
+  // place when the fetch landed; the skeleton holds the same shape the content
+  // will occupy, so nothing moves.
+  if (loading) {
+    return (
+      <div style={{ padding: 'var(--space-6)' }}>
+        <SkeletonStats count={4} style={{ marginBottom: 'var(--space-6)' }} />
+        <SkeletonTable rows={8} columns={5} />
+      </div>
+    )
+  }
   if (!detail) return <div style={{ padding: 'var(--space-7)', opacity: 0.7 }}>Affiliate not found</div>
 
   const { user, summary, referrals, commissions, payouts } = detail

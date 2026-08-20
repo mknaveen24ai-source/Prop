@@ -26,6 +26,18 @@ export default [
   js.configs.recommended,
 
   {
+    // Node-side tooling: the drift counter, the codemods, the shared token
+    // config and the local ESLint rules. These are CommonJS and run under Node,
+    // so `require`, `module` and `__dirname` are defined -- linting them against
+    // browser globals reported six no-undef errors for correct code.
+    files: ['scripts/**/*.js', 'eslint-rules/**/*.js', 'design-tokens.config.js'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: { ...globals.node }
+    }
+  },
+
+  {
     files: ['**/*.{js,jsx}'],
     languageOptions: {
       ecmaVersion: 2023,

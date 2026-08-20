@@ -3,6 +3,7 @@ import { useOutletContext, Link } from 'react-router-dom'
 import { useToast } from '../../components/admin/AdminToast'
 import CertificateLayoutEditor from '../../components/admin/CertificateLayoutEditor'
 import { apiUrl } from '../../config/apiBase'
+import { SkeletonTable } from '../../components/ui'
 
 /**
  * AdminCertificateTemplates — upload your own certificate design and place the
@@ -156,7 +157,13 @@ export default function AdminCertificateTemplates() {
     setDirty(true)
   }
 
-  if (loading) return <div style={{ padding: 24, color: 'var(--admin-text-muted)' }}>Loading templates…</div>
+  if (loading) {
+    return (
+      <div style={{ padding: 'var(--space-6)' }}>
+        <SkeletonTable rows={6} columns={4} />
+      </div>
+    )
+  }
 
   const fieldDef = schema?.fields.find((f) => f.key === selectedField)
   const field = layout?.fields?.[selectedField]

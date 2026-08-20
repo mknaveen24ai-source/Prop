@@ -4,6 +4,7 @@ import { analyticsAPI } from '../services/api'
 import ThemeToggle from '../components/ThemeToggle'
 import Card from '../components/ui/Card'
 import { renderIcon } from '../utils/iconMap'
+import { SkeletonCard, SkeletonStats } from '../components/ui'
 
 // Pure content — no page chrome, so it can be embedded inside the dashboard
 // (DashboardCompetitionsPage.jsx, when viewing a trader from a competition
@@ -32,7 +33,12 @@ export function TraderProfileContent({ userId, onBack }) {
   }
 
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: '80px', color: 'var(--text-muted)' }}>Loading profile...</div>
+    return (
+      <div style={{ padding: 'var(--space-6)' }}>
+        <SkeletonCard lines={2} style={{ marginBottom: 'var(--space-6)' }} />
+        <SkeletonStats count={4} />
+      </div>
+    )
   }
 
   if (notFound || !profile) {

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useOutletContext, useParams, useNavigate } from 'react-router-dom'
 import { useToast } from '../../components/admin/AdminToast'
 import Card from '../../components/ui/Card'
+import { SkeletonStats, SkeletonCard } from '../../components/ui'
 
 function StatCard({ label, value }) {
   return (
@@ -42,7 +43,14 @@ export default function AdminCompetitionAnalytics() {
 
   useEffect(() => { load() }, [load])
 
-  if (loading) return <div style={{ padding: 'var(--space-7)', opacity: 0.7 }}>Loading analytics...</div>
+  if (loading) {
+    return (
+      <div style={{ padding: 'var(--space-6)' }}>
+        <SkeletonStats count={4} style={{ marginBottom: 'var(--space-6)' }} />
+        <SkeletonCard lines={6} height={320} />
+      </div>
+    )
+  }
   if (!data) return <div style={{ padding: 'var(--space-7)', opacity: 0.7 }}>No data available</div>
 
   const { summary, entries } = data
