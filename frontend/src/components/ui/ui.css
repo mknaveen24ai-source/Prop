@@ -544,6 +544,82 @@ button.lx-card-row:focus-visible { outline: 2px solid var(--ink); outline-offset
   .lx-btn, .lx-field__control { transition: none; }
 }
 
+/* ── Interaction states ──────────────────────────────────────────────────────
+   One vocabulary for hover, press and focus, so every clickable thing on the
+   platform answers a click the same way.
+
+   Before this the primitives each had their own idea. Buttons focused with
+   `outline: 2px solid var(--ink)`, cards with a border-colour change and a
+   shadow, chips with something else again, and nothing anywhere had a PRESS
+   state -- a click produced no acknowledgement until the resulting navigation
+   or request completed, which on a slow request reads as a dead control.
+
+   The --ring and --glow-* tokens already existed and were going unused.
+
+   Press is `scale(0.98)`: enough to feel, small enough not to reflow anything
+   around it. transform is used rather than any property that affects layout,
+   so pressing a table row cannot nudge its neighbours.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.lx-interactive,
+.lx-btn,
+.lx-card--interactive,
+.lx-chip,
+.lx-card-row {
+  transition:
+    transform 90ms ease-out,
+    border-color 140ms ease-out,
+    box-shadow 140ms ease-out,
+    background-color 140ms ease-out;
+}
+
+/* Hover is an ambient lift, not a colour change: the palette is doing enough
+   work already. Guarded by `hover: hover` because on touch a :hover rule sticks
+   after the tap and leaves the control looking permanently active. */
+@media (hover: hover) {
+  .lx-interactive:hover:not(:disabled),
+  .lx-card--interactive:hover,
+  .lx-card-row:hover {
+    box-shadow: 0 0 0 1px var(--glow-primary), var(--elev-lg);
+  }
+}
+
+/* Press. `:not(:disabled)` matters -- a disabled control that still compresses
+   reads as accepting the click. */
+.lx-interactive:active:not(:disabled),
+.lx-btn:active:not(:disabled),
+.lx-chip:active:not(:disabled),
+.lx-card--interactive:active,
+.lx-card-row:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Focus. One ring, everywhere, from the token that already described it.
+   :focus-visible rather than :focus so a mouse click does not leave a ring
+   behind, while keyboard navigation always shows one. */
+.lx-interactive:focus-visible,
+.lx-btn:focus-visible,
+.lx-chip:focus-visible,
+.lx-card--interactive:focus-visible,
+.lx-card-row:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The press compression is feedback, not decoration, so it stays -- it just
+     stops being animated. The transition is what someone asking for less
+     movement is objecting to. */
+  .lx-interactive,
+  .lx-btn,
+  .lx-card--interactive,
+  .lx-chip,
+  .lx-card-row {
+    transition: none;
+  }
+}
+
+
 /* ── Touch ──────────────────────────────────────────────────────────────────
    Scoped to `pointer: coarse` so desktop density is untouched. The primitives
    below were all sized for a mouse: .lx-btn--sm resolved to roughly 22px tall
