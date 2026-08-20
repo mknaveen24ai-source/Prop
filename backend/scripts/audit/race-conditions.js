@@ -117,13 +117,6 @@ function summarize(results) {
 }
 
 /**
- * The distinct rejection messages behind a stampede.
- *
- * An UNVERIFIED check is only actionable if it says WHY nothing contended.
- * "every open was refused" sends someone reading the harness; "Maximum 1.00
- * lots per trade" sends them to the setting that needs changing.
- */
-/**
  * A news protection window blocks every trade open for 30 minutes (15 before an
  * event, 15 after), so a harness run inside one produces nothing but refusals.
  * Worth naming specifically: "every open was refused" reads like a bug, whereas
@@ -133,6 +126,14 @@ function newsWindowActive(reasonList) {
   return reasonList.some((r) => /news event/i.test(r))
 }
 
+/**
+ * The distinct rejection messages behind a stampede.
+ *
+ * An UNVERIFIED check is only actionable if it says WHY nothing contended.
+ * "every open was refused" sends someone reading the harness source; "Max
+ * combined forex exposure is 1 lots" sends them to the setting that needs
+ * changing.
+ */
 function reasons(results) {
   const seen = new Set()
   for (const r of results) {
