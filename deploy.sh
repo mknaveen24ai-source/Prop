@@ -375,6 +375,26 @@ printf '%s\n' "$PREFLIGHT_OUT" | sed 's/^/    /'
 PREFLIGHT_OK=0
 printf '%s' "$PREFLIGHT_OUT" | grep -q 'preflight passed' && PREFLIGHT_OK=1
 
+# The permissive run above reports PASS on things that must NOT ship: zero admin
+# 2FA coverage, and production env vars still holding development values. Those
+# are only blockers under DEPLOY_CHECK_STRICT=1, and before this nothing anywhere
+# set it -- not deploy.sh, not CI, not package.json. The strict gate existed and
+# was never once invoked, so a real deployment finished on "Deployment preflight
+# passed" with 0/N admins holding a second factor.
+#
+# Run strict too, and report what it finds. It cannot be the blocking check here:
+# on a first install the admin was created minutes ago and cannot have enrolled
+# 2FA yet, so failing the deploy on it would make the one-command deploy
+# impossible to complete. Reporting it is the point -- the operator finishes
+# knowing exactly what is left, rather than believing the platform is hardened.
+HARDENING_OUT="$(docker compose exec -T -e DEPLOY_CHECK_STRICT=1 backend npm run --silent deploy:preflight 2>&1 || true)"
+HARDENING_OK=0
+printf '%s' "$HARDENING_OUT" | grep -q 'preflight passed' && HARDENING_OK=1
+if [ "$HARDENING_OK" = "0" ]; then
+  warn "production hardening is incomplete — the deploy is fine, this is what remains:"
+  printf '%s\n' "$HARDENING_OUT" | grep '^FAIL' | sed 's/^/      /'
+fi
+
 if [ "$SKIP_SMOKE" = "0" ]; then
   step "Smoke test"
   info "registers a throwaway trader, issues it an account, opens and closes a trade"
@@ -402,8 +422,12 @@ fi
 PUBLIC_URL="$(get_env FRONTEND_URL)"
 
 printf '\n%s%s%s\n' "$BOLD" "════════════════════════════════════════════════════════════════" "$RESET"
-if [ "$PREFLIGHT_OK" = "1" ]; then
-  printf '%s  Stack is up.%s  %s\n' "$GREEN$BOLD" "$RESET" "$PUBLIC_URL"
+if [ "$PREFLIGHT_OK" = "1" ] && [ "$HARDENING_OK" = "1" ]; then
+  printf '%s  Stack is up and hardened.%s  %s\n' "$GREEN$BOLD" "$RESET" "$PUBLIC_URL"
+elif [ "$PREFLIGHT_OK" = "1" ]; then
+  # Deliberately distinct from a clean pass. "Stack is up" alone read as
+  # production-ready while no admin held a second factor.
+  printf '%s  Stack is up — hardening incomplete.%s  %s\n' "$YELLOW$BOLD" "$RESET" "$PUBLIC_URL"
 else
   printf '%s  Stack is up, preflight is NOT green.%s  %s\n' "$YELLOW$BOLD" "$RESET" "$PUBLIC_URL"
 fi
