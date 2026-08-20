@@ -84,7 +84,7 @@ function DashboardSectionFallback({ label = 'Loading module...' }) {
     <div
       className="lx-card ui-surface ui-empty-state"
       style={{
-        padding: '32px',
+        padding: 'var(--space-7)',
         minHeight: '220px',
         color: 'var(--text-muted)'
       }}
@@ -303,7 +303,7 @@ function Dashboard({ user, onLogout }) {
       <div className="nav dashboard-topbar" style={{
         margin: 0,
         padding: '14px 24px',
-        display: 'flex', alignItems: 'center', gap: '16px',
+        display: 'flex', alignItems: 'center', gap: 'var(--space-4)',
         background: 'var(--glass)',
         backdropFilter: 'blur(18px)',
         WebkitBackdropFilter: 'blur(18px)',
@@ -338,7 +338,7 @@ function Dashboard({ user, onLogout }) {
             aria-label={`Notifications${notifications.filter(n => !n.read).length > 0 ? ` (${notifications.filter(n => !n.read).length} unread)` : ''}`}
             aria-haspopup="true"
             aria-expanded={showNotifications}
-            style={{ display: 'flex', alignItems: 'center', padding: '8px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)', color: 'var(--muted)' }}
+            style={{ display: 'flex', alignItems: 'center', padding: 'var(--space-2)', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)', color: 'var(--muted)' }}
           >
             {renderIcon('bell', { size: 15, color: 'var(--muted)' })}
             {notifications.filter(n => !n.read).length > 0 && (
@@ -360,7 +360,7 @@ function Dashboard({ user, onLogout }) {
               background: 'var(--glass-2)', backdropFilter: 'blur(24px) saturate(160%)', WebkitBackdropFilter: 'blur(24px) saturate(160%)',
               border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', boxShadow: 'var(--elev-lg)'
             }}>
-              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--rule)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--rule)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-md)', color: 'var(--accent)' }}>Notifications</span>
                 {notifications.length > 0 && (
                   <button onClick={clearNotifications} style={{ border: 'none', background: 'transparent', color: 'var(--muted)', fontSize: 'var(--fs-xs)', cursor: 'pointer' }}>Clear all</button>
@@ -368,14 +368,14 @@ function Dashboard({ user, onLogout }) {
               </div>
               <div style={{ overflowY: 'auto', maxHeight: '340px' }}>
                 {notifications.length === 0 ? (
-                  <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>No notifications yet</div>
+                  <div style={{ padding: 'var(--space-7) var(--space-4)', textAlign: 'center', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>No notifications yet</div>
                 ) : (
                   notifications.map(n => (
                     <div key={n.id} style={{
-                      padding: '12px 16px', borderBottom: '1px solid var(--rule-soft)',
+                      padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--rule-soft)',
                       borderLeft: `3px solid ${n.type === 'error' ? 'var(--loss)' : n.type === 'success' ? 'var(--gain)' : 'var(--accent)'}`,
                     }}>
-                      <div style={{ fontSize: 'var(--fs-base)', color: 'var(--ink)', marginBottom: '4px' }}>{n.message}</div>
+                      <div style={{ fontSize: 'var(--fs-base)', color: 'var(--ink)', marginBottom: 'var(--space-1)' }}>{n.message}</div>
                       <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--muted)' }}>
                         {new Date(n.time).toLocaleString()}
                       </div>
@@ -444,13 +444,13 @@ function Dashboard({ user, onLogout }) {
         {/* Trade Page */}
         {activePage === 'trade' && (
           kyc.kycStatus !== 'approved' ? (
-            <Card style={{ textAlign: 'center', padding: '48px' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+            <Card style={{ textAlign: 'center', padding: 'var(--space-9)' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-4)' }}>
                 {renderIcon('kyc', { size: 48, color: 'var(--accent)' })}
               </div>
-              <h3 className="page-title" style={{ marginBottom: '12px', fontSize: 'var(--fs-2xl)' }}>KYC Required</h3>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>Complete your identity verification to start trading.</p>
-              <button className="btn btn-primary" onClick={() => setActivePage('kyc')} style={{ padding: '12px 32px' }}>Complete KYC</button>
+              <h3 className="page-title" style={{ marginBottom: 'var(--space-3)', fontSize: 'var(--fs-2xl)' }}>KYC Required</h3>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-5)' }}>Complete your identity verification to start trading.</p>
+              <button className="btn btn-primary" onClick={() => setActivePage('kyc')} style={{ padding: 'var(--space-3) var(--space-7)' }}>Complete KYC</button>
             </Card>
           ) : (
             // FIX (AUDIT): TradingPanel is a ~1700-line component with its own

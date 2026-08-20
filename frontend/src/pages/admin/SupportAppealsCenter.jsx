@@ -25,7 +25,7 @@ const SECTIONS = [
 
 function SectionHeader({ eyebrow, title, subtitle }) {
   return (
-    <div style={{ marginBottom: '24px' }}>
+    <div style={{ marginBottom: 'var(--space-6)' }}>
       <div className="lx-card__eyebrow">{eyebrow}</div>
       <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(22px, 2.4vw, 28px)', fontWeight: 700, color: 'var(--admin-text)', margin: '4px 0 8px' }}>
         {title}
@@ -176,7 +176,7 @@ function SupportTicketsSection() {
 
             <div className="admin-form-group">
               <label className="admin-label">Message Thread</label>
-              <div style={{ border: '1px solid var(--rule)', padding: '12px' }}>
+              <div style={{ border: '1px solid var(--rule)', padding: 'var(--space-3)' }}>
                 <div style={{ marginBottom: thread.length ? '12px' : 0 }}>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', color: 'var(--admin-text-faint)' }}>{selected.name || selected.email || 'Trader'} • {new Date(selected.created_at).toLocaleString()}</div>
                   <div style={{ fontSize: 'var(--fs-md)', color: 'var(--admin-text)' }}>{selected.message}</div>
@@ -436,7 +436,7 @@ function NotificationCenterSection() {
 
   return (
     <>
-      <Card style={{ marginBottom: '20px' }}>
+      <Card style={{ marginBottom: 'var(--space-5)' }}>
         <h2 className="admin-h2">Compose Broadcast</h2>
 
         <div className="admin-form-group">
@@ -632,7 +632,7 @@ function TosTrackingSection() {
 
   return (
     <>
-      <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)', marginBottom: '16px' }}>
+      <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)', marginBottom: 'var(--space-4)' }}>
         Current agreement version: <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--admin-text)' }}>{currentVersion}</span>
       </p>
       <Card flush>

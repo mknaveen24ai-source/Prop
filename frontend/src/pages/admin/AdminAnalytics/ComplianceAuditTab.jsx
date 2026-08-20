@@ -17,7 +17,7 @@ function formatHours(hours) {
 function LogSection({ title, columns, csvColumns, csvFilename, rows, loading, emptyIcon }) {
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px', marginBottom: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-6)', marginBottom: 'var(--space-3)' }}>
         <h2 className="admin-h2" style={{ margin: 0 }}>{title}</h2>
         <button className="admin-btn admin-btn-ghost" onClick={() => downloadCsv(csvFilename, rows, csvColumns)}>Export CSV</button>
       </div>

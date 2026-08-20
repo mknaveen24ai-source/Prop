@@ -9,14 +9,14 @@ export default function SimulatedTradingDisclaimer() {
       background: 'color-mix(in srgb, var(--muted) 4%, transparent)',
       border: '1px solid color-mix(in srgb, var(--muted) 15%, transparent)',
       padding: expanded ? '14px 16px' : '10px 16px',
-      marginBottom: '20px',
+      marginBottom: 'var(--space-5)',
       transition: 'all 0.2s ease'
     }}>
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        gap: '12px'
+        gap: 'var(--space-3)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{
@@ -69,8 +69,8 @@ export default function SimulatedTradingDisclaimer() {
 
       {expanded && (
         <div style={{
-          marginTop: '12px',
-          paddingTop: '12px',
+          marginTop: 'var(--space-3)',
+          paddingTop: 'var(--space-3)',
           borderTop: '1px solid color-mix(in srgb, var(--muted) 10%, transparent)'
         }}>
           <p style={{

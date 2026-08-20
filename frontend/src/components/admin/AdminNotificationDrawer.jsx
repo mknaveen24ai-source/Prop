@@ -87,7 +87,7 @@ export default function AdminNotificationDrawer({ open, onClose, alerts, onNavig
 
         <div className="admin-notif-drawer-body">
           {alerts.length === 0 ? (
-            <div className="admin-empty-state" style={{ padding: '32px 16px' }}>
+            <div className="admin-empty-state" style={{ padding: 'var(--space-7) var(--space-4)' }}>
               Nothing yet.
             </div>
           ) : (

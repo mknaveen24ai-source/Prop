@@ -36,7 +36,7 @@ const TAB_SUBTITLES = {
 
 function DateRangeFilter({ range, onChange, preset, onPresetChange }) {
   return (
-    <div className="admin-filter-bar" style={{ marginBottom: '20px' }}>
+    <div className="admin-filter-bar" style={{ marginBottom: 'var(--space-5)' }}>
       {DATE_PRESETS.map((p) => (
         <button
           key={p.key}
@@ -75,7 +75,7 @@ export default function AdminAnalytics() {
 
   return (
     <>
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: 'var(--space-6)' }}>
         <div className="lx-card__eyebrow">ADMIN PANEL / ANALYTICS</div>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(22px, 2.4vw, 28px)', fontWeight: 700, color: 'var(--admin-text)', margin: '4px 0 8px' }}>
           {TABS.find((t) => t.key === activeTab)?.label}
@@ -85,7 +85,7 @@ export default function AdminAnalytics() {
         </p>
       </div>
 
-      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: 'var(--space-5)' }}>
         {TABS.map((tab) => (
           <button
             key={tab.key}

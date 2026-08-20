@@ -250,7 +250,7 @@ export default function Landing() {
   }, [defaultDescription, defaultTitle, tenant]);
 
   const sectionFallback = (
-    <div className="mp-container ui-surface ui-empty-state" style={{ padding: '48px 24px', color: 'var(--muted)' }}>
+    <div className="mp-container ui-surface ui-empty-state" style={{ padding: 'var(--space-9) var(--space-6)', color: 'var(--muted)' }}>
       Loading section...
     </div>
   );
@@ -307,7 +307,7 @@ export default function Landing() {
             </div>
 
             {/* Right Actions */}
-            <div className="mp-nav-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div className="mp-nav-actions" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
               <ThemeToggle />
               <Link to={'/login'} className="btn btn-ghost mp-nav-login" style={{ textDecoration: 'none' }}>
                 Log In

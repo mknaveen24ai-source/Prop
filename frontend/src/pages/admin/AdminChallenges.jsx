@@ -307,7 +307,7 @@ export default function AdminChallenges() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-6)' }}>
         <div>
           <h1 className="admin-h1">Active Challenges</h1>
           <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
@@ -413,15 +413,15 @@ export default function AdminChallenges() {
         )}
       >
         {selectedAcc && (
-          <div style={{ display: 'grid', gap: '20px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+          <div style={{ display: 'grid', gap: 'var(--space-5)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-4)' }}>
               {[
                 { label: 'Phase', value: formatAccountType(selectedAcc.account_type) },
                 { label: 'Status', value: selectedAcc.status?.toUpperCase() },
                 { label: 'Balance', value: formatMoney(selectedAcc.current_balance) },
                 { label: 'Peak', value: formatMoney(selectedAcc.peak_balance) }
               ].map((card) => (
-                <div key={card.label} style={{ background: 'var(--admin-bg)', padding: '16px', border: '1px solid var(--admin-border)' }}>
+                <div key={card.label} style={{ background: 'var(--admin-bg)', padding: 'var(--space-4)', border: '1px solid var(--admin-border)' }}>
                   <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>{card.label}</div>
                   <div style={{ marginTop: '6px', fontSize: 'var(--fs-3xl)', fontFamily: 'var(--admin-font-mono)', fontWeight: 700 }}>
                     {card.value}
@@ -444,7 +444,7 @@ export default function AdminChallenges() {
 
             <Card style={{ margin: 0 }}>
               <h3 className="admin-h3">Account Controls</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-3)' }}>
                 <button className="admin-btn admin-btn-success" onClick={() => executeOverride('pass')} disabled={submitting}>
                   Force Pass & Queue Review
                 </button>
@@ -462,10 +462,10 @@ export default function AdminChallenges() {
 
             <Card style={{ margin: 0 }}>
               <h3 className="admin-h3">Balance Adjustment</h3>
-              <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)', marginBottom: '16px' }}>
+              <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)', marginBottom: 'var(--space-4)' }}>
                 Use a positive number to credit the account or a negative number to debit it.
               </p>
-              <div style={{ display: 'grid', gap: '12px' }}>
+              <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
                 <input
                   className="admin-input admin-font-mono"
                   type="number"

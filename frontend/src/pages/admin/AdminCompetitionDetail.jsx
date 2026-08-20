@@ -67,58 +67,58 @@ function SettingsPanel({ competition, onSave, saving, stepModels }) {
   }
 
   return (
-    <form onSubmit={submit} className="lx-card" style={{ padding: '20px', marginBottom: '24px' }}>
+    <form onSubmit={submit} className="lx-card" style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
       <h3 style={{ margin: '0 0 4px' }}>Settings</h3>
       {isLocked && (
         <p style={{ margin: '0 0 14px', fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)' }}>
           This competition is {competition.status} — dates, balance, and drawdown rules are locked to protect entries already in flight. Only description and prize display text can still be edited.
         </p>
       )}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginTop: '12px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginTop: 'var(--space-3)' }}>
         <label>
-          <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Title</div>
+          <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Title</div>
           <input style={inputStyle} value={draft.title} disabled={isLocked} onChange={(e) => update('title', e.target.value)} />
         </label>
         <label style={{ gridColumn: '1 / -1' }}>
-          <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Description</div>
+          <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Description</div>
           <input style={inputStyle} value={draft.description} onChange={(e) => update('description', e.target.value)} />
         </label>
         <label>
-          <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Start</div>
+          <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Start</div>
           <input type="datetime-local" style={inputStyle} value={draft.start_at} disabled={isLocked} onChange={(e) => update('start_at', e.target.value)} />
         </label>
         <label>
-          <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>End</div>
+          <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>End</div>
           <input type="datetime-local" style={inputStyle} value={draft.end_at} disabled={isLocked} onChange={(e) => update('end_at', e.target.value)} />
         </label>
         <label>
-          <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Starting Balance ($)</div>
+          <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Starting Balance ($)</div>
           <input type="number" style={inputStyle} value={draft.starting_balance} disabled={isLocked} onChange={(e) => update('starting_balance', e.target.value)} />
         </label>
         <label>
-          <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Max Participants</div>
+          <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Max Participants</div>
           <input type="number" style={inputStyle} value={draft.max_participants} disabled={isLocked} onChange={(e) => update('max_participants', e.target.value)} />
         </label>
         <label>
-          <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Ranking Metric</div>
+          <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Ranking Metric</div>
           <select style={inputStyle} value={draft.ranking_metric} disabled={isLocked} onChange={(e) => update('ranking_metric', e.target.value)}>
             <option value="profit_pct">Profit %</option>
             <option value="profit_usd">Profit $</option>
           </select>
         </label>
         <label>
-          <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Max Drawdown %</div>
+          <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Max Drawdown %</div>
           <input type="number" style={inputStyle} value={draft.max_drawdown_pct} disabled={isLocked} onChange={(e) => update('max_drawdown_pct', e.target.value)} />
         </label>
         <label>
-          <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Daily Drawdown %</div>
+          <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Daily Drawdown %</div>
           <input type="number" style={inputStyle} value={draft.daily_drawdown_pct} disabled={isLocked} onChange={(e) => update('daily_drawdown_pct', e.target.value)} />
         </label>
       </div>
-      <div style={{ marginTop: '16px' }}>
+      <div style={{ marginTop: 'var(--space-4)' }}>
         <PrizePoolEditor prizes={prizes} onChange={setPrizes} stepModels={stepModels} />
       </div>
-      <div style={{ marginTop: '16px' }}>
+      <div style={{ marginTop: 'var(--space-4)' }}>
         <button className="admin-btn" type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Settings'}</button>
       </div>
     </form>
@@ -260,7 +260,7 @@ function BotRosterPanel({ adminAxios, toast, competition, onEntered }) {
   const canEnter = ['upcoming', 'active'].includes(competition.status)
 
   return (
-    <Card style={{ padding: '20px', marginBottom: '24px' }}>
+    <Card style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
       <h3 style={{ margin: '0 0 4px' }}>Demo Bot Participants</h3>
       <p style={{ margin: '0 0 16px', fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)' }}>
         Bots are labeled participants with no real trading activity — their balance moves via an automated background tick.
@@ -270,7 +270,7 @@ function BotRosterPanel({ adminAxios, toast, competition, onEntered }) {
       {/* Creation controls */}
       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '18px', padding: '14px', background: 'var(--admin-bg-elevated)', borderRadius: '6px', border: '1px solid var(--admin-border)' }}>
         {/* Count */}
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
           <span style={{ fontSize: 'var(--fs-xs)', opacity: 0.7 }}>Count (1–50)</span>
           <input
             type="number"
@@ -283,7 +283,7 @@ function BotRosterPanel({ adminAxios, toast, competition, onEntered }) {
         </label>
 
         {/* Country */}
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
           <span style={{ fontSize: 'var(--fs-xs)', opacity: 0.7 }}>Country</span>
           <select
             style={{ ...inputStyle, width: '180px' }}
@@ -348,7 +348,7 @@ function BotRosterPanel({ adminAxios, toast, competition, onEntered }) {
               </tr>
             ))}
             {bots.length === 0 && (
-              <tr><td colSpan={4} style={{ padding: '16px', textAlign: 'center', opacity: 0.6 }}>No bots yet</td></tr>
+              <tr><td colSpan={4} style={{ padding: 'var(--space-4)', textAlign: 'center', opacity: 0.6 }}>No bots yet</td></tr>
             )}
           </tbody>
         </table>
@@ -443,21 +443,21 @@ export default function AdminCompetitionDetail() {
     }
   }
 
-  if (loading) return <div style={{ padding: '32px', opacity: 0.7 }}>Loading...</div>
-  if (!competition) return <div style={{ padding: '32px', opacity: 0.7 }}>Competition not found</div>
+  if (loading) return <div style={{ padding: 'var(--space-7)', opacity: 0.7 }}>Loading...</div>
+  if (!competition) return <div style={{ padding: 'var(--space-7)', opacity: 0.7 }}>Competition not found</div>
 
   return (
-    <div style={{ padding: '24px' }}>
-      <button className="admin-btn admin-btn-sm" style={{ marginBottom: '16px' }} onClick={() => navigate('/admin/competitions')}>
+    <div style={{ padding: 'var(--space-6)' }}>
+      <button className="admin-btn admin-btn-sm" style={{ marginBottom: 'var(--space-4)' }} onClick={() => navigate('/admin/competitions')}>
         ← Back to Competitions
       </button>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-5)' }}>
         <div>
           <h2 style={{ margin: '0 0 4px' }}>{competition.title}</h2>
           <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7 }}>Status: {competition.status} · {competition.entries?.length || 0} entries</div>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
           <button className="admin-btn admin-btn-sm" onClick={() => navigate(`/admin/competitions/${id}/analytics`)}>
             View Trade Analytics
           </button>
@@ -471,7 +471,7 @@ export default function AdminCompetitionDetail() {
 
       <BotRosterPanel adminAxios={adminAxios} toast={toast} competition={competition} onEntered={load} />
 
-      <Card style={{ padding: '20px', marginBottom: '24px', overflowX: 'auto' }}>
+      <Card style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-6)', overflowX: 'auto' }}>
         <h3 style={{ margin: '0 0 12px' }}>Entries</h3>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-base)' }}>
           <thead>
@@ -519,14 +519,14 @@ export default function AdminCompetitionDetail() {
               </tr>
             ))}
             {(competition.entries || []).length === 0 && (
-              <tr><td colSpan={6} style={{ padding: '20px', textAlign: 'center', opacity: 0.6 }}>No entries yet</td></tr>
+              <tr><td colSpan={6} style={{ padding: 'var(--space-5)', textAlign: 'center', opacity: 0.6 }}>No entries yet</td></tr>
             )}
           </tbody>
         </table>
       </Card>
 
       {competition.status === 'completed' && (
-        <Card style={{ padding: '20px' }}>
+        <Card style={{ padding: 'var(--space-5)' }}>
           <h3 style={{ margin: '0 0 12px' }}>Final Leaderboard (for payout reference)</h3>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-base)' }}>
             <thead>

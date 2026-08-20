@@ -322,7 +322,7 @@ function Chat() {
         </div>
 
         {showNewChat && (
-          <form onSubmit={createConversation} style={{ padding: '12px 16px', borderBottom: '1px solid var(--rule-soft)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <form onSubmit={createConversation} style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--rule-soft)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             <input
               type="text"
               placeholder="What do you need help with?"
@@ -340,9 +340,9 @@ function Chat() {
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {loading ? (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>Loading…</div>
+            <div style={{ padding: 'var(--space-6)', textAlign: 'center', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>Loading…</div>
           ) : conversations.length === 0 ? (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>No conversations yet.</div>
+            <div style={{ padding: 'var(--space-6)', textAlign: 'center', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>No conversations yet.</div>
           ) : (
             conversations.map((conv) => {
               const active = selectedConversation?.id === conv.id
@@ -357,13 +357,13 @@ function Chat() {
                     opacity: conv.status === 'closed' ? 0.6 : 1,
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)', marginBottom: 'var(--space-1)' }}>
                     <span style={{ fontSize: 'var(--fs-base)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.subject}</span>
                     {conv.unread_user_count > 0 && (
                       <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', color: 'var(--paper)', background: 'var(--accent)', borderRadius: '99px', padding: '1px 6px', flex: '0 0 auto' }}>{conv.unread_user_count}</span>
                     )}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
                     <span className="lx-badge" style={{ color: getStatusToneColor(conv.status) }}>{conv.status}</span>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', color: 'var(--muted)' }}>{conv.last_message_at ? formatTime(conv.last_message_at) : ''}</span>
                   </div>
@@ -378,7 +378,7 @@ function Chat() {
       <div className="chat-pane chat-pane--thread" style={{ background: 'var(--glass)', backdropFilter: 'blur(16px) saturate(140%)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', display: 'flex', flexDirection: 'column', height: '100%' }}>
         {selectedConversation ? (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '15px 18px', borderBottom: '3px double var(--rule)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '15px 18px', borderBottom: '3px double var(--rule)' }}>
               {/* Mobile-only: the conversation list is a separate view there,
                   so the thread needs a way back to it. */}
               <button
@@ -439,11 +439,11 @@ function Chat() {
             </div>
 
             {selectedConversation.status === 'closed' ? (
-              <div style={{ padding: '12px 16px', textAlign: 'center', fontSize: 'var(--fs-base)', color: 'var(--muted)', borderTop: '1px solid var(--rule)' }}>
+              <div style={{ padding: 'var(--space-3) var(--space-4)', textAlign: 'center', fontSize: 'var(--fs-base)', color: 'var(--muted)', borderTop: '1px solid var(--rule)' }}>
                 This conversation is closed. Start a new chat if you need further assistance.
               </div>
             ) : (
-              <form onSubmit={sendMessage} style={{ borderTop: '1px solid var(--rule)', padding: '12px 16px', display: 'flex', alignItems: 'flex-end', gap: '10px' }}>
+              <form onSubmit={sendMessage} style={{ borderTop: '1px solid var(--rule)', padding: 'var(--space-3) var(--space-4)', display: 'flex', alignItems: 'flex-end', gap: '10px' }}>
                 <textarea
                   value={newMessage}
                   onChange={handleTyping}
@@ -456,7 +456,7 @@ function Chat() {
                 <button
                   type="submit"
                   disabled={sending || !newMessage.trim()}
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 18px', border: '1px solid var(--accent)', borderRadius: '4px', background: 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: '12px 18px', border: '1px solid var(--accent)', borderRadius: '4px', background: 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer' }}
                 >
                   {sending ? 'Sending…' : 'Send'}
                 </button>
@@ -465,12 +465,12 @@ function Chat() {
           </>
         ) : (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ textAlign: 'center', padding: '40px' }}>
+            <div style={{ textAlign: 'center', padding: 'var(--space-8)' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-2xl)', marginBottom: '10px' }}>Welcome to Live Chat Support</div>
               <p style={{ color: 'var(--muted)', fontSize: 'var(--fs-base)', margin: '6px 0' }}>Start a conversation and the desk will pick it up here.</p>
               <button
                 onClick={() => setShowNewChat(true)}
-                style={{ marginTop: '16px', padding: '11px 24px', border: '1px solid var(--accent)', borderRadius: '4px', background: 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer' }}
+                style={{ marginTop: 'var(--space-4)', padding: '11px 24px', border: '1px solid var(--accent)', borderRadius: '4px', background: 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer' }}
               >
                 Start a New Conversation
               </button>
@@ -481,10 +481,10 @@ function Chat() {
 
       {/* Right rail — ticket meta + FAQs, matches the prototype. On mobile it
           rides along under the thread rather than claiming a third column. */}
-      <div className="chat-pane chat-pane--meta" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div className="chat-pane chat-pane--meta" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
         {selectedConversation && (
           <div style={{ background: 'var(--glass)', backdropFilter: 'blur(16px) saturate(140%)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', padding: '16px 18px' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px', borderBottom: '1px solid var(--rule)', paddingBottom: '10px', marginBottom: '4px' }}>This Ticket</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px', borderBottom: '1px solid var(--rule)', paddingBottom: '10px', marginBottom: 'var(--space-1)' }}>This Ticket</div>
             {ticketMeta.map((r) => (
               <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', padding: '9px 0', borderBottom: '1px solid var(--rule-soft)', fontSize: '12.5px' }}>
                 <span style={{ color: 'var(--muted)' }}>{r.label}</span>
@@ -494,7 +494,7 @@ function Chat() {
           </div>
         )}
         <div style={{ background: 'var(--glass)', backdropFilter: 'blur(16px) saturate(140%)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', padding: '16px 18px' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px', borderBottom: '1px solid var(--rule)', paddingBottom: '10px', marginBottom: '12px' }}>Common Answers</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px', borderBottom: '1px solid var(--rule)', paddingBottom: '10px', marginBottom: 'var(--space-3)' }}>Common Answers</div>
           {FAQS.map((q) => (
             <button
               key={q}

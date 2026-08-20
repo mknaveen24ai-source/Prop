@@ -62,7 +62,7 @@ function ReplaceDocButton({ docType, onUpload, uploading }) {
         onClick={() => inputRef.current?.click()}
         disabled={busy}
         className="lx-btn"
-        style={{ marginTop: '8px', padding: '6px 12px', border: '1px solid var(--warn)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--warn)', fontSize: '11.5px', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}
+        style={{ marginTop: 'var(--space-2)', padding: '6px 12px', border: '1px solid var(--warn)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--warn)', fontSize: '11.5px', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}
       >
         {busy ? 'Uploading…' : 'Replace this document'}
       </button>
@@ -206,7 +206,7 @@ export default function DashboardKYCPage({
       {kycStatus === 'rejected' && user?.kyc_rejection_reason && (
         <Card style={{ border: '1px solid var(--loss)' }}>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--loss)' }}>Reason from admin</div>
-          <div style={{ fontSize: 'var(--fs-md)', marginTop: '8px' }}>{user.kyc_rejection_reason}</div>
+          <div style={{ fontSize: 'var(--fs-md)', marginTop: 'var(--space-2)' }}>{user.kyc_rejection_reason}</div>
         </Card>
       )}
 
@@ -288,13 +288,13 @@ export default function DashboardKYCPage({
           )}
 
           {kycStatus === 'pending' && (
-            <Card style={{ textAlign: 'center', padding: '20px', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>
+            <Card style={{ textAlign: 'center', padding: 'var(--space-5)', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>
               Your documents are locked while admin reviews them. If declined, you'll be able to resubmit here.
             </Card>
           )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           <Card ruled title="What we check">
             {KYC_REQS.map((label) => (
               <div key={label} style={{ display: 'flex', gap: '10px', padding: '9px 0', borderBottom: '1px solid var(--rule-soft)' }}>

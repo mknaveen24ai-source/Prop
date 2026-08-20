@@ -62,7 +62,7 @@ export default function FirmProfitabilityTab({ dateRange }) {
         <AdminStatCard icon="payouts" label="Total Payouts" value={formatMoney(totalPayouts)} />
       </AdminStatGrid>
 
-      <Card style={{ marginBottom: '24px' }}>
+      <Card style={{ marginBottom: 'var(--space-6)' }}>
         <div className="admin-form-group" style={{ maxWidth: '260px', marginBottom: 0 }}>
           <label className="admin-label">Operating Costs (for selected range)</label>
           <input
@@ -84,8 +84,8 @@ export default function FirmProfitabilityTab({ dateRange }) {
         </BarChart>
       </AdminChart>
 
-      <h2 className="admin-h2" style={{ marginTop: '24px' }}>Model Economics</h2>
-      <Card flush style={{ marginBottom: '24px' }}>
+      <h2 className="admin-h2" style={{ marginTop: 'var(--space-6)' }}>Model Economics</h2>
+      <Card flush style={{ marginBottom: 'var(--space-6)' }}>
         <AdminDataTable columns={modelColumns} data={models} loading={loading} emptyMessage="No model data" emptyIcon="pnl" />
       </Card>
     </>

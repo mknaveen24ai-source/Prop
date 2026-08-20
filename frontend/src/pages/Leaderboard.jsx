@@ -29,11 +29,11 @@ export default function Leaderboard() {
         </div>
 
         <div style={{ maxWidth: '800px', margin: '48px auto 0', padding: '0 24px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 'var(--space-8)' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)' }}>
             {renderIcon('leaderboard', { size: 48, color: 'var(--accent-gold)' })}
           </div>
-      <h1 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', fontSize: 'var(--fs-5xl)', marginBottom: '8px' }}>
+      <h1 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', fontSize: 'var(--fs-5xl)', marginBottom: 'var(--space-2)' }}>
             Leaderboard
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>
@@ -44,8 +44,8 @@ export default function Leaderboard() {
         {loading ? (
           <div style={{ textAlign: 'center', padding: '80px', color: 'var(--text-muted)' }}>Loading...</div>
         ) : leaders.length === 0 ? (
-          <Card style={{ textAlign: 'center', padding: '64px' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+          <Card style={{ textAlign: 'center', padding: 'var(--space-10)' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-4)' }}>
               {renderIcon('analytics', { size: 40, color: 'var(--accent)' })}
             </div>
             <p style={{ color: 'var(--text-muted)' }}>No funded traders yet. Be the first!</p>
@@ -60,8 +60,8 @@ export default function Leaderboard() {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '20px',
-                  padding: '20px 24px',
+                  gap: 'var(--space-5)',
+                  padding: 'var(--space-5) var(--space-6)',
                   borderLeft: `3px solid ${idx === 0 ? 'var(--rule)' : idx === 1 ? 'var(--rule)' : idx === 2 ? 'var(--rule)' : 'var(--navy-border)'}`,
                   background: idx === 0 ? 'color-mix(in srgb, var(--muted) 4%, transparent)' : 'var(--navy-card)',
                   cursor: 'pointer',
@@ -71,7 +71,7 @@ export default function Leaderboard() {
                 onMouseLeave={e => e.currentTarget.style.background = idx === 0 ? 'color-mix(in srgb, var(--muted) 4%, transparent)' : 'var(--navy-card)'}
               >
                 {/* Rank */}
-                <div style={{ minWidth: '36px', textAlign: 'center', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '4px' }}>
+                <div style={{ minWidth: '36px', textAlign: 'center', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 'var(--space-1)' }}>
                   {idx < 3 ? (
                     <>
                       {renderIcon('leaderboard', { size: 18, color: idx === 0 ? 'var(--accent-gold)' : 'var(--text-secondary)' })}
@@ -86,12 +86,12 @@ export default function Leaderboard() {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: '700', fontSize: '15px', color: 'var(--accent)', marginBottom: '3px' }}>
                     {row.full_name}
-                    <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', fontWeight: '400', marginLeft: '8px' }}>View Profile →</span>
+                    <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', fontWeight: '400', marginLeft: 'var(--space-2)' }}>View Profile →</span>
                   </div>
                   <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-dim)' }}>
                     {row.country || 'Unknown'} · ${parseFloat(row.account_size).toLocaleString('en-US')} account
                   </div>
-                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginTop: '4px', fontFamily: 'var(--font-mono)' }}>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginTop: 'var(--space-1)', fontFamily: 'var(--font-mono)' }}>
                     Trader ID: {row.trader_uid || '—'} · Account ID: {row.account_uid || '—'}
                   </div>
                 </div>
@@ -110,7 +110,7 @@ export default function Leaderboard() {
           </div>
         )}
 
-        <div style={{ textAlign: 'center', marginTop: '40px', marginBottom: '40px' }}>
+        <div style={{ textAlign: 'center', marginTop: 'var(--space-8)', marginBottom: 'var(--space-8)' }}>
           <p style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-sm)' }}>
             Rankings update in real-time · Shows top 20 active funded accounts
           </p>

@@ -30,7 +30,7 @@ class ErrorBoundary extends React.Component {
     if (this.state.hasError && this.props.variant === 'section') {
       return (
         <div style={{
-          padding: '32px 24px',
+          padding: 'var(--space-7) var(--space-6)',
           textAlign: 'center',
           border: '1px solid var(--loss, #f87171)',
           background: 'var(--paper-2, #1f1f1f)',
@@ -88,7 +88,7 @@ class ErrorBoundary extends React.Component {
             </button>
           </div>
           {import.meta.env.DEV && this.state.error && (
-            <div style={{ marginTop: '40px', padding: '20px', background: 'var(--paper-2, #1f1f1f)', border: '1px solid var(--loss, #f87171)', width: '80%', maxWidth: '800px', overflowX: 'auto' }}>
+            <div style={{ marginTop: 'var(--space-8)', padding: 'var(--space-5)', background: 'var(--paper-2, #1f1f1f)', border: '1px solid var(--loss, #f87171)', width: '80%', maxWidth: '800px', overflowX: 'auto' }}>
               <pre style={{ color: 'var(--loss, #f87171)', fontSize: 'var(--fs-sm)', margin: 0 }}>
                 {this.state.error.toString()}
                 <br/>

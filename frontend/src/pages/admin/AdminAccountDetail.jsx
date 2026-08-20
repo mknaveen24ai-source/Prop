@@ -233,7 +233,7 @@ export default function AdminAccountDetail() {
 
   if (loading) {
     return (
-      <div style={{ display: 'grid', gap: '16px' }}>
+      <div style={{ display: 'grid', gap: 'var(--space-4)' }}>
         <div className="admin-skeleton" style={{ height: '120px' }} />
         <div className="admin-skeleton" style={{ height: '320px' }} />
       </div>
@@ -252,9 +252,9 @@ export default function AdminAccountDetail() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-4)', marginBottom: 'var(--space-6)', flexWrap: 'wrap' }}>
         <div>
-          <button className="admin-btn admin-btn-ghost" style={{ marginBottom: '12px' }} onClick={() => navigate('/admin/violations')}>
+          <button className="admin-btn admin-btn-ghost" style={{ marginBottom: 'var(--space-3)' }} onClick={() => navigate('/admin/violations')}>
             ← Back To Violations
           </button>
           <h1 className="admin-h1">Account {account.account_uid || `#${String(account.id).padStart(5, '0')}`}</h1>
@@ -265,7 +265,7 @@ export default function AdminAccountDetail() {
         <button className="admin-btn admin-btn-ghost" onClick={loadPage} disabled={submitting}>↺ Refresh</button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
         {[
           { label: 'Status', value: account.status?.toUpperCase() || 'UNKNOWN' },
           { label: 'Balance', value: formatMoney(account.current_balance) },
@@ -275,42 +275,42 @@ export default function AdminAccountDetail() {
         ].map((card) => (
           <Card key={card.label} stat style={{ margin: 0 }}>
             <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>{card.label}</div>
-            <div style={{ marginTop: '8px', fontSize: 'var(--fs-4xl)', fontFamily: 'var(--admin-font-mono)', fontWeight: 700 }}>{card.value}</div>
+            <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--fs-4xl)', fontFamily: 'var(--admin-font-mono)', fontWeight: 700 }}>{card.value}</div>
           </Card>
         ))}
       </div>
 
-      <Card style={{ marginBottom: '24px' }}>
-        <h2 className="admin-h2" style={{ marginBottom: '16px' }}>Account Snapshot</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px' }}>
+      <Card style={{ marginBottom: 'var(--space-6)' }}>
+        <h2 className="admin-h2" style={{ marginBottom: 'var(--space-4)' }}>Account Snapshot</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-4)' }}>
           <div>
             <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Trader</div>
-            <div style={{ marginTop: '4px', color: 'var(--admin-text)' }}>{account.full_name || 'Unnamed Trader'}</div>
+            <div style={{ marginTop: 'var(--space-1)', color: 'var(--admin-text)' }}>{account.full_name || 'Unnamed Trader'}</div>
             <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-sm)' }}>{account.user_email || account.email}</div>
           </div>
           <div>
             <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>UID</div>
-            <div className="admin-td-mono" style={{ marginTop: '4px' }}>{account.account_uid || account.id}</div>
+            <div className="admin-td-mono" style={{ marginTop: 'var(--space-1)' }}>{account.account_uid || account.id}</div>
           </div>
           <div>
             <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Starting Balance</div>
-            <div style={{ marginTop: '4px', color: 'var(--admin-text)' }}>{formatMoney(account.starting_balance)}</div>
+            <div style={{ marginTop: 'var(--space-1)', color: 'var(--admin-text)' }}>{formatMoney(account.starting_balance)}</div>
           </div>
           <div>
             <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Max Drawdown</div>
-            <div style={{ marginTop: '4px', color: 'var(--admin-text)' }}>{parseFloat(account.max_drawdown_pct || 0).toFixed(2)}%</div>
+            <div style={{ marginTop: 'var(--space-1)', color: 'var(--admin-text)' }}>{parseFloat(account.max_drawdown_pct || 0).toFixed(2)}%</div>
           </div>
           <div>
             <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Profit Target</div>
-            <div style={{ marginTop: '4px', color: 'var(--admin-text)' }}>{formatMoney(account.profit_target)}</div>
+            <div style={{ marginTop: 'var(--space-1)', color: 'var(--admin-text)' }}>{formatMoney(account.profit_target)}</div>
           </div>
           <div>
             <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Created</div>
-            <div style={{ marginTop: '4px', color: 'var(--admin-text)' }}>{formatTimestamp(account.created_at)}</div>
+            <div style={{ marginTop: 'var(--space-1)', color: 'var(--admin-text)' }}>{formatTimestamp(account.created_at)}</div>
           </div>
         </div>
 
-        <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        <div style={{ marginTop: 'var(--space-5)', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <AdminBadge status={account.status} label={formatLabel(account.status)} />
           <AdminBadge status={account.account_type === 'funded' ? 'gold' : 'info'} label={formatAccountType(account.account_type)} />
           {(flagMeta?.review_flagged || account.review_flagged) && <AdminBadge status="warning" label="Flagged For Review" />}
@@ -318,13 +318,13 @@ export default function AdminAccountDetail() {
         </div>
 
         {(flagMeta?.review_flag_reason || account.review_flag_reason) && (
-          <div style={{ marginTop: '16px', background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', padding: '14px' }}>
+          <div style={{ marginTop: 'var(--space-4)', background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', padding: '14px' }}>
             <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase', marginBottom: '6px' }}>Review Flag Reason</div>
             <div style={{ color: 'var(--admin-text)' }}>{flagMeta.review_flag_reason || account.review_flag_reason}</div>
           </div>
         )}
 
-        <div style={{ marginTop: '16px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ marginTop: 'var(--space-4)', display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
           <button
             className="admin-btn admin-btn-ghost"
             onClick={() => navigate(`/admin/trades?account=${account.id}`)}
@@ -346,15 +346,15 @@ export default function AdminAccountDetail() {
         </div>
       </Card>
 
-      <Card style={{ marginBottom: '24px' }}>
-        <h2 className="admin-h2" style={{ marginBottom: '16px' }}>Admin Controls</h2>
+      <Card style={{ marginBottom: 'var(--space-6)' }}>
+        <h2 className="admin-h2" style={{ marginBottom: 'var(--space-4)' }}>Admin Controls</h2>
         {!isSuperAdmin && (
-          <div style={{ marginBottom: '16px', color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
+          <div style={{ marginBottom: 'var(--space-4)', color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
             Recovery powers and balance overrides are limited to super-admin accounts.
           </div>
         )}
         {isSuperAdmin && (
-          <div style={{ marginBottom: '16px', color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
+          <div style={{ marginBottom: 'var(--space-4)', color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
             Every recovery or override action requires an explicit admin reason.
           </div>
         )}
@@ -368,7 +368,7 @@ export default function AdminAccountDetail() {
             placeholder="Why are you taking action on this account?"
           />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 'var(--space-3)', marginBottom: 'var(--space-5)' }}>
           {isSuperAdmin && canRunAction('force_close_open_trades') && (
             <button className="admin-btn admin-btn-primary" onClick={() => executeOverride('force_close_open_trades')} disabled={submitting}>
               Force Close Open Trades
@@ -417,9 +417,9 @@ export default function AdminAccountDetail() {
         </div>
 
         {isSuperAdmin && canRunAction('extend_days') && (
-          <div className="admin-form-group" style={{ marginBottom: '20px' }}>
+          <div className="admin-form-group" style={{ marginBottom: 'var(--space-5)' }}>
             <label className="admin-label">Extend Challenge Time</label>
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
               <input
                 className="admin-input admin-font-mono"
                 type="number"
@@ -443,7 +443,7 @@ export default function AdminAccountDetail() {
         {isSuperAdmin && (
           <div className="admin-form-group">
             <label className="admin-label">Balance Adjustment</label>
-            <div style={{ display: 'grid', gap: '12px' }}>
+            <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
               <input
                 className="admin-input admin-font-mono"
                 type="number"
@@ -472,7 +472,7 @@ export default function AdminAccountDetail() {
       </Card>
 
       <Card flush>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--admin-border)' }}>
+        <div style={{ padding: 'var(--space-5) var(--space-6)', borderBottom: '1px solid var(--admin-border)' }}>
           <h2 className="admin-h2" style={{ margin: 0 }}>Violations For This Account</h2>
         </div>
         <AdminDataTable
@@ -486,8 +486,8 @@ export default function AdminAccountDetail() {
         />
       </Card>
 
-      <Card flush style={{ marginTop: '24px' }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--admin-border)' }}>
+      <Card flush style={{ marginTop: 'var(--space-6)' }}>
+        <div style={{ padding: 'var(--space-5) var(--space-6)', borderBottom: '1px solid var(--admin-border)' }}>
           <h2 className="admin-h2" style={{ margin: 0 }}>Automation Action History</h2>
         </div>
         <AdminDataTable

@@ -149,7 +149,7 @@ export default function AdminEntityDrawer({
         <div className="admin-entity-drawer-header">
           <div>
             <h2 className="admin-h2" style={{ margin: 0 }}>{title}</h2>
-            <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)', marginTop: '4px' }}>
+            <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-1)' }}>
               {entityType} #{row.id}
             </div>
           </div>
@@ -251,9 +251,9 @@ export default function AdminEntityDrawer({
                   value={metaForm.status_reason}
                   onChange={(event) => setMetaForm((current) => ({ ...current, status_reason: event.target.value }))}
                   placeholder="Status reason / internal context"
-                  style={{ resize: 'vertical', minHeight: '88px', marginTop: '12px' }}
+                  style={{ resize: 'vertical', minHeight: '88px', marginTop: 'var(--space-3)' }}
                 />
-                <button className="admin-btn admin-btn-primary" style={{ marginTop: '12px' }} onClick={saveMeta}>
+                <button className="admin-btn admin-btn-primary" style={{ marginTop: 'var(--space-3)' }} onClick={saveMeta}>
                   Save Metadata
                 </button>
               </Card>

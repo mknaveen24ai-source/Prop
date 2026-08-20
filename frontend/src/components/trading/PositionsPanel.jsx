@@ -52,7 +52,7 @@ export default function PositionsPanel({
       </div>
       {batchFeedback && (
         <div className={`trade-feedback trade-feedback-${batchFeedback.type}`}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
             <div>
               <div className="trade-feedback-title">{batchFeedback.title}</div>
               <div className="trade-feedback-message">{batchFeedback.message}</div>
@@ -64,8 +64,8 @@ export default function PositionsPanel({
           {batchFeedback.detail && <div className="trade-feedback-detail">{batchFeedback.detail}</div>}
         </div>
       )}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '10px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)', gap: '10px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
           <h3 style={{ marginBottom: 0, color: 'var(--accent)', fontSize: '15px' }}>
             Open Positions & Orders ({visibleOpenTrades.length})
           </h3>
@@ -148,14 +148,14 @@ export default function PositionsPanel({
                   {!isPending && partialForm?.id === trade.id && (
                     <tr>
                       <td colSpan="9" style={{ padding: '0' }}>
-                        <div style={{ background: 'var(--navy-card)', border: '1px dashed var(--accent)', padding: '12px 16px', margin: '4px 0 8px 0', display: 'grid', gap: '10px' }}>
-                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div style={{ background: 'var(--navy-card)', border: '1px dashed var(--accent)', padding: 'var(--space-3) var(--space-4)', margin: '4px 0 8px 0', display: 'grid', gap: '10px' }}>
+                          <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text)' }}>Close Fraction (Current: {parseFloat(trade.lot_size).toFixed(2)}):</span>
-                            <input type="number" step="0.01" max={Math.max(parseFloat(trade.lot_size) - 0.01, 0.01).toFixed(2)} value={partialForm.val || ''} onChange={e => setPartialForm({ ...partialForm, val: e.target.value })} style={{ width: '80px', padding: '4px 8px', fontSize: 'var(--fs-sm)' }} />
-                            <button onClick={() => handlePartialClose(trade.id, trade.lot_size, partialForm.val)} disabled={closingTradeSet.has(trade.id)} className="btn btn-accent" style={{ padding: '4px 12px', fontSize: 'var(--fs-xs)', opacity: closingTradeSet.has(trade.id) ? 0.6 : 1, cursor: closingTradeSet.has(trade.id) ? 'not-allowed' : 'pointer' }}>{closingTradeSet.has(trade.id) ? 'Closing...' : 'Confirm Partial Close'}</button>
+                            <input type="number" step="0.01" max={Math.max(parseFloat(trade.lot_size) - 0.01, 0.01).toFixed(2)} value={partialForm.val || ''} onChange={e => setPartialForm({ ...partialForm, val: e.target.value })} style={{ width: '80px', padding: 'var(--space-1) var(--space-2)', fontSize: 'var(--fs-sm)' }} />
+                            <button onClick={() => handlePartialClose(trade.id, trade.lot_size, partialForm.val)} disabled={closingTradeSet.has(trade.id)} className="btn btn-accent" style={{ padding: 'var(--space-1) var(--space-3)', fontSize: 'var(--fs-xs)', opacity: closingTradeSet.has(trade.id) ? 0.6 : 1, cursor: closingTradeSet.has(trade.id) ? 'not-allowed' : 'pointer' }}>{closingTradeSet.has(trade.id) ? 'Closing...' : 'Confirm Partial Close'}</button>
                             <Button variant="secondary" size="sm" onClick={() => setPartialForm(null)}>Cancel</Button>
                           </div>
-                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                             {[0.25, 0.5, 0.75].map((ratio) => {
                               const currentLots = parseFloat(trade.lot_size)
                               const closeLots = Math.floor(currentLots * ratio * 100) / 100
@@ -191,13 +191,13 @@ export default function PositionsPanel({
                   {isPending && isModifying && (
                     <tr>
                       <td colSpan="9" style={{ padding: '0' }}>
-                        <div style={{ background: 'var(--navy-card)', border: '1px solid var(--accent)', padding: '16px', margin: '4px 0 8px 0' }}>
-                          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--accent)', marginBottom: '12px', fontWeight: '600' }}>
+                        <div style={{ background: 'var(--navy-card)', border: '1px solid var(--accent)', padding: 'var(--space-4)', margin: '4px 0 8px 0' }}>
+                          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--accent)', marginBottom: 'var(--space-3)', fontWeight: '600' }}>
                             Modify {trade.instrument} {trade.order_type.replace(/_/g, ' ').toUpperCase()} - Target: {trade.pending_price ? parseFloat(trade.pending_price).toFixed(dec) : '-'}
                           </div>
-                          <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-end', flexWrap: 'wrap' }}>
                             <div>
-                              <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Pending Price</label>
+                              <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: 'var(--space-1)' }}>Pending Price</label>
                               <input
                                 type="number"
                                 value={modifyForm.pending_price || ''}
@@ -208,7 +208,7 @@ export default function PositionsPanel({
                               />
                             </div>
                             <div>
-                              <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                              <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: 'var(--space-1)' }}>
                                 Stop Loss <span style={{ color: 'var(--text-dim)' }}>(blank removes)</span>
                               </label>
                               <input
@@ -221,7 +221,7 @@ export default function PositionsPanel({
                               />
                             </div>
                             <div>
-                              <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                              <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: 'var(--space-1)' }}>
                                 Take Profit <span style={{ color: 'var(--text-dim)' }}>(blank removes)</span>
                               </label>
                               <input
@@ -239,10 +239,10 @@ export default function PositionsPanel({
                             <Button variant="secondary" size="sm" onClick={cancelModify}>Cancel</Button>
                           </div>
                           {modifyError && (
-                            <div style={{ color: 'var(--red)', fontSize: 'var(--fs-sm)', marginTop: '8px' }}>{modifyError}</div>
+                            <div style={{ color: 'var(--red)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-2)' }}>{modifyError}</div>
                           )}
                           {modifySuccess && (
-                            <div style={{ color: 'var(--green)', fontSize: 'var(--fs-sm)', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ color: 'var(--green)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                               {renderIcon('approve', { size: 12, color: 'var(--accent-green)' })}
                               <span>{modifySuccess}</span>
                             </div>
@@ -260,16 +260,16 @@ export default function PositionsPanel({
                           background: 'var(--navy-card)',
                           border: '1px solid var(--accent)',
                           borderRadius: '0',
-                          padding: '16px',
+                          padding: 'var(--space-4)',
                           margin: '4px 0 8px 0'
                         }}>
-                          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--accent)', marginBottom: '12px', fontWeight: '600' }}>
+                          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--accent)', marginBottom: 'var(--space-3)', fontWeight: '600' }}>
                             ✏️ Modify {trade.instrument} {trade.direction.toUpperCase()} — Current Price:{' '}
                             {trade.current_price ? parseFloat(trade.current_price).toFixed(dec) : '—'}
                           </div>
-                          <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-end', flexWrap: 'wrap' }}>
                             <div>
-                              <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                              <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: 'var(--space-1)' }}>
                                 Stop Loss <span style={{ color: 'var(--text-dim)' }}>(leave blank to remove)</span>
                               </label>
                               <input
@@ -282,7 +282,7 @@ export default function PositionsPanel({
                               />
                             </div>
                             <div>
-                              <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                              <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', display: 'block', marginBottom: 'var(--space-1)' }}>
                                 Take Profit <span style={{ color: 'var(--text-dim)' }}>(leave blank to remove)</span>
                               </label>
                               <input
@@ -294,7 +294,7 @@ export default function PositionsPanel({
                                 style={{ width: '140px', fontSize: 'var(--fs-base)', padding: '7px 10px' }}
                               />
                             </div>
-                            <div style={{ display: 'flex', gap: '8px' }}>
+                            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                               <button
                                 className="btn btn-accent"
                                 onClick={() => submitModify(trade)}
@@ -312,10 +312,10 @@ export default function PositionsPanel({
                             </div>
                           </div>
                           {modifyError && (
-                            <div style={{ color: 'var(--red)', fontSize: 'var(--fs-sm)', marginTop: '8px' }}>{modifyError}</div>
+                            <div style={{ color: 'var(--red)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-2)' }}>{modifyError}</div>
                           )}
                           {modifySuccess && (
-                            <div style={{ color: 'var(--green)', fontSize: 'var(--fs-sm)', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ color: 'var(--green)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-2)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                               {renderIcon('approve', { size: 12, color: 'var(--accent-green)' })}
                               <span>{modifySuccess}</span>
                             </div>

@@ -20,7 +20,7 @@ function AdjustBalanceForm({ onSubmit }) {
     return <button className="admin-btn admin-btn-sm" onClick={() => setOpen(true)}>Adjust Balance</button>
   }
   return (
-    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
       <input style={{ ...inputStyle, width: '120px' }} type="number" step="0.01" placeholder="Amount (+/-)" value={amount} onChange={(e) => setAmount(e.target.value)} />
       <input style={{ ...inputStyle, width: '240px' }} placeholder="Reason (5+ chars)" value={reason} onChange={(e) => setReason(e.target.value)} />
       <button
@@ -69,18 +69,18 @@ export default function AdminAffiliateDetail() {
     }
   }
 
-  if (loading) return <div style={{ padding: '32px', opacity: 0.7 }}>Loading...</div>
-  if (!detail) return <div style={{ padding: '32px', opacity: 0.7 }}>Affiliate not found</div>
+  if (loading) return <div style={{ padding: 'var(--space-7)', opacity: 0.7 }}>Loading...</div>
+  if (!detail) return <div style={{ padding: 'var(--space-7)', opacity: 0.7 }}>Affiliate not found</div>
 
   const { user, summary, referrals, commissions, payouts } = detail
 
   return (
-    <div style={{ padding: '24px' }}>
-      <button className="admin-btn admin-btn-sm" style={{ marginBottom: '16px' }} onClick={() => navigate('/admin/affiliates')}>
+    <div style={{ padding: 'var(--space-6)' }}>
+      <button className="admin-btn admin-btn-sm" style={{ marginBottom: 'var(--space-4)' }} onClick={() => navigate('/admin/affiliates')}>
         ← Back to Affiliates
       </button>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-5)' }}>
         <div>
           <h2 style={{ margin: '0 0 4px' }}>{user.full_name}</h2>
           <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7 }}>{user.email} · Code {user.affiliate_code} · Joined {new Date(user.created_at).toLocaleDateString()}</div>
@@ -88,7 +88,7 @@ export default function AdminAffiliateDetail() {
         <AdjustBalanceForm onSubmit={handleAdjustBalance} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
         <AdminStatCard icon="users" label="Total Referrals" value={summary.total_referrals} />
         <AdminStatCard icon="approve" label="Paying Referrals" value={summary.paying_referrals} />
         <AdminStatCard icon="pnl" label="Lifetime Commission" value={formatMoney(summary.lifetime_commission)} />
@@ -96,7 +96,7 @@ export default function AdminAffiliateDetail() {
         <AdminStatCard icon="approve" label="Paid Out" value={formatMoney(summary.paid_total)} />
       </div>
 
-      <Card style={{ padding: '20px', marginBottom: '20px' }}>
+      <Card style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-5)' }}>
         <h3 style={{ margin: '0 0 14px' }}>Referrals ({referrals.total})</h3>
         <div className="admin-table-wrapper">
           <table className="admin-table">
@@ -124,7 +124,7 @@ export default function AdminAffiliateDetail() {
         </div>
       </Card>
 
-      <Card style={{ padding: '20px', marginBottom: '20px' }}>
+      <Card style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-5)' }}>
         <h3 style={{ margin: '0 0 14px' }}>Commission Ledger ({commissions.total})</h3>
         <div className="admin-table-wrapper">
           <table className="admin-table">
@@ -156,7 +156,7 @@ export default function AdminAffiliateDetail() {
         </div>
       </Card>
 
-      <Card style={{ padding: '20px' }}>
+      <Card style={{ padding: 'var(--space-5)' }}>
         <h3 style={{ margin: '0 0 14px' }}>Payout History ({payouts.total})</h3>
         <div className="admin-table-wrapper">
           <table className="admin-table">

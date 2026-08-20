@@ -441,7 +441,7 @@ export default function TradingPanel({
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-5)' }}>
       <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: 0, fontSize: 'var(--fs-3xl)' }}>
           Trading Terminal
         </h2>
@@ -449,7 +449,7 @@ export default function TradingPanel({
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          gap: 'var(--space-2)',
           padding: '8px 14px',
           background: priceFeedBackground,
           border: `1px solid ${priceFeedBorder}`,
@@ -466,7 +466,7 @@ export default function TradingPanel({
             {`● ${priceFeedLabel}`}
           </span>
           {!priceFeedLive && priceStatus.message && (
-            <span style={{ color: 'var(--text-muted)', marginLeft: '4px', fontSize: 'var(--fs-xs)' }}>
+            <span style={{ color: 'var(--text-muted)', marginLeft: 'var(--space-1)', fontSize: 'var(--fs-xs)' }}>
               {priceStatus.message}
             </span>
           )}
@@ -478,7 +478,7 @@ export default function TradingPanel({
 
       {/* Account Selector */}
       {accounts.length > 0 && (
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '10px', marginBottom: 'var(--space-5)', flexWrap: 'wrap' }}>
           {accounts.map(acc => (
             <button key={acc.id} className={`btn ${selectedAccount?.id === acc.id ? '' : 'glass-panel'}`} onClick={() => setSelectedAccount(acc)}
               style={{
@@ -504,7 +504,7 @@ export default function TradingPanel({
           selects instruments through its own picker and watchlist pane, and
           skipping this subtree stops the rAF loop from running at all there. */}
       {!isMobile && (
-      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '8px' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-1)', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
         {symbolCategoryTabs.map((tab) => (
           <button
             key={tab.key}
@@ -544,8 +544,8 @@ export default function TradingPanel({
         width: '100%',
         maxWidth: '100%',
         gap: `${SYMBOL_TICKER_GAP_PX}px`,
-        marginBottom: '20px',
-        paddingBottom: '4px'
+        marginBottom: 'var(--space-5)',
+        paddingBottom: 'var(--space-1)'
       }}>
         {/* Rendered as N identical copies back-to-back so the auto-scroll loop
             can wrap on one copy's width with no visible jump. N is measured
@@ -597,7 +597,7 @@ export default function TradingPanel({
                   style: { fill: isPinned ? 'currentColor' : 'none' }
                 })}
               </button>
-              <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', letterSpacing: '0.08em', marginBottom: '4px' }}>{instrument}</div>
+              <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', letterSpacing: '0.08em', marginBottom: 'var(--space-1)' }}>{instrument}</div>
               <div style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
                 {bidText}
               </div>
@@ -614,29 +614,29 @@ export default function TradingPanel({
 
       {/* No account yet */}
       {accounts.length === 0 && (
-        <Card style={{ textAlign: 'center', padding: '48px' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+        <Card style={{ textAlign: 'center', padding: 'var(--space-9)' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-4)' }}>
             {renderIcon('trade', { size: 48, color: 'var(--accent)' })}
           </div>
-          <h3 style={{ color: 'var(--accent)', marginBottom: '12px' }}>No Trading Account</h3>
+          <h3 style={{ color: 'var(--accent)', marginBottom: 'var(--space-3)' }}>No Trading Account</h3>
           <p style={{ color: 'var(--text-muted)' }}>Go to Dashboard to create your challenge account first.</p>
         </Card>
       )}
 
       {/* Locked account */}
       {selectedAccount?.status === 'locked' && (
-        <Card style={{ textAlign: 'center', padding: '32px', border: '1px solid var(--muted)', marginBottom: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+        <Card style={{ textAlign: 'center', padding: 'var(--space-7)', border: '1px solid var(--muted)', marginBottom: 'var(--space-5)' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)' }}>
             {renderIcon('lock', { size: 40, color: 'var(--text-secondary)' })}
           </div>
-          <h3 style={{ color: 'var(--muted)', marginBottom: '8px' }}>Account Locked</h3>
+          <h3 style={{ color: 'var(--muted)', marginBottom: 'var(--space-2)' }}>Account Locked</h3>
           <p style={{ color: 'var(--text-muted)' }}>This account has been locked by admin. Contact support.</p>
         </Card>
       )}
 
       {/* Loading state */}
       {accountLoading && (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: 'var(--fs-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+        <div style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-muted)', fontSize: 'var(--fs-md)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
           {renderIcon('timer', { size: 16, color: 'var(--text-secondary)' })}
           <span>Loading account data...</span>
         </div>
@@ -680,7 +680,7 @@ export default function TradingPanel({
       )}
 
       {!accountLoading && selectedAccount && selectedAccount.status === 'active' && !isMobile && (
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-4)' }}>
           {/* Watchlist rail (Modern Gazette handoff spec, isTrade block): pinned
               instruments with live price + sparkline. Added alongside the
               existing resizable chart/order-panel split, not replacing it —
@@ -706,7 +706,7 @@ export default function TradingPanel({
                       key={instrument}
                       onClick={() => setOrderForm((f) => ({ ...f, instrument, stop_loss: '', take_profit: '' }))}
                       style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)', width: '100%',
                         padding: '9px 14px', border: 'none', borderBottom: '1px solid var(--rule-soft)',
                         background: isSelected ? 'var(--accent-dim)' : 'transparent', cursor: 'pointer', textAlign: 'left',
                       }}
@@ -816,10 +816,10 @@ export default function TradingPanel({
       {/* Passed / Failed / Expired account message */}
       {!accountLoading && selectedAccount && ['passed', 'failed', 'expired'].includes(selectedAccount.status) && (
         <Card style={{
-          textAlign: 'center', padding: '48px',
+          textAlign: 'center', padding: 'var(--space-9)',
           border: `1px solid ${selectedAccount.status === 'passed' ? 'var(--green)' : 'var(--red)'}`
         }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-4)' }}>
             {renderIcon(
               selectedAccount.status === 'passed'
                 ? 'leaderboard'
@@ -832,7 +832,7 @@ export default function TradingPanel({
               }
             )}
           </div>
-          <h3 style={{ color: selectedAccount.status === 'passed' ? 'var(--green)' : 'var(--red)', marginBottom: '12px' }}>
+          <h3 style={{ color: selectedAccount.status === 'passed' ? 'var(--green)' : 'var(--red)', marginBottom: 'var(--space-3)' }}>
             {selectedAccount.status === 'passed'  && 'Challenge Passed!'}
             {selectedAccount.status === 'failed'  && 'Challenge Failed'}
             {selectedAccount.status === 'expired' && 'Challenge Expired'}

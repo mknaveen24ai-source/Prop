@@ -47,11 +47,11 @@ export function CompetitionsListContent({ onSelectSlug }) {
 
   return (
     <div>
-      <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+      <div style={{ textAlign: 'center', marginBottom: 'var(--space-8)' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)' }}>
           {renderIcon('leaderboard', { size: 48, color: 'var(--accent)' })}
         </div>
-        <h1 style={{ fontFamily: 'var(--font-display)', color: 'var(--ink)', fontSize: 'var(--fs-5xl)', marginBottom: '8px' }}>
+        <h1 style={{ fontFamily: 'var(--font-display)', color: 'var(--ink)', fontSize: 'var(--fs-5xl)', marginBottom: 'var(--space-2)' }}>
           Trading Competitions
         </h1>
         <p style={{ color: 'var(--muted)', fontSize: 'var(--fs-md)' }}>
@@ -62,18 +62,18 @@ export function CompetitionsListContent({ onSelectSlug }) {
       {loading ? (
         <div style={{ textAlign: 'center', padding: '80px', color: 'var(--muted)' }}>Loading...</div>
       ) : loadError ? (
-        <Card style={{ textAlign: 'center', padding: '64px', border: '1px solid var(--warn)' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+        <Card style={{ textAlign: 'center', padding: 'var(--space-10)', border: '1px solid var(--warn)' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-4)' }}>
             {renderIcon('warning', { size: 40, color: 'var(--warn)' })}
           </div>
-          <p style={{ color: 'var(--warn)', marginBottom: '12px' }}>Couldn't load competitions right now.</p>
-          <button onClick={() => window.location.reload()} className="lx-btn" style={{ padding: '8px 16px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)' }}>
+          <p style={{ color: 'var(--warn)', marginBottom: 'var(--space-3)' }}>Couldn't load competitions right now.</p>
+          <button onClick={() => window.location.reload()} className="lx-btn" style={{ padding: 'var(--space-2) var(--space-4)', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)' }}>
             Retry
           </button>
         </Card>
       ) : competitions.length === 0 ? (
-        <Card style={{ textAlign: 'center', padding: '64px' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+        <Card style={{ textAlign: 'center', padding: 'var(--space-10)' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-4)' }}>
             {renderIcon('analytics', { size: 40, color: 'var(--accent)' })}
           </div>
           <p style={{ color: 'var(--muted)' }}>No competitions scheduled right now. Check back soon!</p>
@@ -85,7 +85,7 @@ export function CompetitionsListContent({ onSelectSlug }) {
               key={c.slug}
               interactive
               onClick={() => openCompetition(c.slug)}
-              style={{ display: 'flex', alignItems: 'center', gap: '20px', padding: '20px 24px' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-5)', padding: 'var(--space-5) var(--space-6)' }}
             >
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>

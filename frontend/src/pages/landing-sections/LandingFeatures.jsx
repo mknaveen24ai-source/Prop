@@ -83,7 +83,7 @@ export default function LandingFeatures() {
     <section className="mp-section" style={{ position: 'relative' }}>
       <div className="mp-container">
         <div style={{ textAlign: 'center', marginBottom: '100px' }}>
-          <div className="mp-badge mp-reveal" style={{ marginBottom: '24px' }}>
+          <div className="mp-badge mp-reveal" style={{ marginBottom: 'var(--space-6)' }}>
             <span className="mp-badge-dot"></span>
             The Standard
           </div>
@@ -104,7 +104,7 @@ export default function LandingFeatures() {
               key={i}
               className={'mp-bento-item mp-feature-card mp-reveal mp-delay-' + ((i + 1) * 100)}
               style={{
-                display: 'flex', flexDirection: 'column', padding: '48px',
+                display: 'flex', flexDirection: 'column', padding: 'var(--space-9)',
                 gridColumn: item.colSpan,
                 minHeight: '260px',
                 background: 'var(--bg-surface)',
@@ -114,7 +114,7 @@ export default function LandingFeatures() {
               }}
             >
               <div style={{
-                marginBottom: '32px',
+                marginBottom: 'var(--space-7)',
                 width: '80px', height: '80px',
                 background: 'transparent',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -123,7 +123,7 @@ export default function LandingFeatures() {
               }}>
                 {item.icon}
               </div>
-              <h3 className="mp-h3" style={{ fontSize: 'var(--fs-4xl)', marginBottom: '16px', color: 'var(--ink)' }}>{item.title}</h3>
+              <h3 className="mp-h3" style={{ fontSize: 'var(--fs-4xl)', marginBottom: 'var(--space-4)', color: 'var(--ink)' }}>{item.title}</h3>
               <p className="mp-p-body" style={{ flexGrow: 1, fontSize: 'var(--fs-lg)', color: 'var(--muted)' }}>{item.desc}</p>
             </div>
           ))}

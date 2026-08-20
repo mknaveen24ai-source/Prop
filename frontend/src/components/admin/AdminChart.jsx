@@ -50,7 +50,7 @@ export const chartThemeProps = {
       boxShadow: 'var(--elev)'
     },
     itemStyle: { color: 'var(--admin-text)', fontSize: 'var(--fs-base)' },
-    labelStyle: { color: 'var(--admin-text-muted)', marginBottom: '8px', fontSize: 'var(--fs-sm)', fontWeight: 600 }
+    labelStyle: { color: 'var(--admin-text-muted)', marginBottom: 'var(--space-2)', fontSize: 'var(--fs-sm)', fontWeight: 600 }
   }
 };
 

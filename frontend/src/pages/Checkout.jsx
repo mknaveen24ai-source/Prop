@@ -202,7 +202,7 @@ export default function Checkout() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '24px',
+      padding: 'var(--space-6)',
       position: 'relative',
       overflow: 'hidden'
     }}>
@@ -217,10 +217,10 @@ export default function Checkout() {
       <div className="auth-ambient auth-ambient-primary" />
       <div className="auth-ambient auth-ambient-secondary" />
 
-      <div className="lx-card auth-glass-card" style={{ width: 'min(100%, 520px)', zIndex: 10, padding: '40px 32px' }}>
+      <div className="lx-card auth-glass-card" style={{ width: 'min(100%, 520px)', zIndex: 10, padding: 'var(--space-8) var(--space-7)' }}>
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>
           <div className="auth-logo-mark" style={{ margin: '0 auto 16px' }}>⚡</div>
-          <h1 style={{ fontSize: 'var(--fs-4xl)', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: '8px' }}>
+          <h1 style={{ fontSize: 'var(--fs-4xl)', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: 'var(--space-2)' }}>
             Review Your Challenge
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-md)' }}>
@@ -229,7 +229,7 @@ export default function Checkout() {
         </div>
 
         {authChecked && user && (
-          <div style={{ border: '1px solid var(--rule)', padding: '16px 20px', marginBottom: '20px' }}>
+          <div style={{ border: '1px solid var(--rule)', padding: 'var(--space-4) var(--space-5)', marginBottom: 'var(--space-5)' }}>
             {!showVoucherField ? (
               <button
                 onClick={() => setShowVoucherField(true)}
@@ -266,7 +266,7 @@ export default function Checkout() {
         )}
 
         {authChecked && user && dataLoaded && pending && model && (
-          <div style={{ border: '1px solid var(--rule)', padding: '16px 20px', marginBottom: '20px' }}>
+          <div style={{ border: '1px solid var(--rule)', padding: 'var(--space-4) var(--space-5)', marginBottom: 'var(--space-5)' }}>
             {!showCouponField ? (
               <button
                 onClick={() => setShowCouponField(true)}
@@ -314,8 +314,8 @@ export default function Checkout() {
         )}
 
         {authChecked && user && dataLoaded && pending && model && (
-          <div style={{ border: '1px solid var(--rule)', padding: '16px 20px', marginBottom: '20px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+          <div style={{ border: '1px solid var(--rule)', padding: 'var(--space-4) var(--space-5)', marginBottom: 'var(--space-5)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--fs-base)', color: 'var(--text-secondary)', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={isGift}
@@ -324,7 +324,7 @@ export default function Checkout() {
               Send this as a gift to someone else
             </label>
             {isGift && (
-              <div style={{ marginTop: '12px' }}>
+              <div style={{ marginTop: 'var(--space-3)' }}>
                 <input
                   type="email"
                   value={giftRecipientEmail}
@@ -341,7 +341,7 @@ export default function Checkout() {
                   rows={2}
                   style={{ width: '100%', resize: 'vertical' }}
                 />
-                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '8px' }}>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>
                   We'll email them a redemption code — no account required to receive it. You'll pay now, they claim it.
                 </div>
               </div>
@@ -349,7 +349,7 @@ export default function Checkout() {
           </div>
         )}
 
-        {error && <div className="error" style={{ marginBottom: '16px' }}>{error}</div>}
+        {error && <div className="error" style={{ marginBottom: 'var(--space-4)' }}>{error}</div>}
 
         {!dataLoaded && (
           <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -359,7 +359,7 @@ export default function Checkout() {
 
         {dataLoaded && pending === null && (
           <div style={{ textAlign: 'center', padding: '20px 0' }}>
-            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-md)', marginBottom: '20px' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-md)', marginBottom: 'var(--space-5)' }}>
               You haven't picked a challenge yet.
             </p>
             <Link to="/#mp-accounts" className="btn btn-primary" style={{ textDecoration: 'none' }}>
@@ -370,7 +370,7 @@ export default function Checkout() {
 
         {dataLoaded && pending && !model && (
           <div style={{ textAlign: 'center', padding: '20px 0' }}>
-            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-md)', marginBottom: '20px' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-md)', marginBottom: 'var(--space-5)' }}>
               We couldn't load this challenge model. It may no longer be available.
             </p>
             <Link to="/#mp-accounts" className="btn btn-primary" style={{ textDecoration: 'none' }}>
@@ -381,8 +381,8 @@ export default function Checkout() {
 
         {dataLoaded && pending && model && (
           <>
-            <div style={{ border: '1px solid var(--rule)', padding: '20px', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '4px' }}>
+            <div style={{ border: '1px solid var(--rule)', padding: 'var(--space-5)', marginBottom: 'var(--space-5)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 'var(--space-1)' }}>
                 <span style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-2xl)', fontWeight: 800, color: 'var(--text-primary)' }}>
                   {model.name}
                 </span>
@@ -390,7 +390,7 @@ export default function Checkout() {
                   {price != null ? (
                     finalPrice != null && finalPrice < price ? (
                       <>
-                        <span style={{ textDecoration: 'line-through', color: 'var(--text-dim)', fontSize: '15px', marginRight: '8px' }}>${price}</span>
+                        <span style={{ textDecoration: 'line-through', color: 'var(--text-dim)', fontSize: '15px', marginRight: 'var(--space-2)' }}>${price}</span>
                         <span style={{ color: 'var(--gain)' }}>${finalPrice.toFixed(2)}</span>
                       </>
                     ) : `$${price}`
@@ -406,7 +406,7 @@ export default function Checkout() {
                 </div>
               )}
               {couponResult?.valid && (
-                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--gain)', marginBottom: '16px' }}>
+                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--gain)', marginBottom: 'var(--space-4)' }}>
                   ✓ Coupon {couponResult.code} applied ({couponResult.discount_type === 'percent' ? `${couponResult.discount_value}% off` : `$${couponResult.discount_value} off`})
                 </div>
               )}
@@ -442,7 +442,7 @@ export default function Checkout() {
             </div>
 
             {isLocked && (
-              <div className="error" style={{ marginBottom: '16px' }}>
+              <div className="error" style={{ marginBottom: 'var(--space-4)' }}>
                 This account size just filled up. Please pick a different size.
               </div>
             )}
@@ -454,7 +454,7 @@ export default function Checkout() {
             )}
 
             {authChecked && !user && (
-              <div style={{ display: 'flex', gap: '12px' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
                 <Link to="/register" className="btn btn-primary" style={{ flex: 1, textDecoration: 'none', textAlign: 'center' }}>
                   Create Account
                 </Link>
@@ -475,7 +475,7 @@ export default function Checkout() {
               </button>
             )}
 
-            <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', textAlign: 'center', marginTop: '16px' }}>
+            <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', textAlign: 'center', marginTop: 'var(--space-4)' }}>
               You'll complete secure payment on our payment provider's page, then return here automatically.
             </p>
           </>

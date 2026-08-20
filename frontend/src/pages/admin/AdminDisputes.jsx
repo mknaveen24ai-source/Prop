@@ -359,14 +359,14 @@ export default function AdminDisputes() {
 
   return (
     <>
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: 'var(--space-6)' }}>
         <h1 className="admin-h1">Dispute Management</h1>
         <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
           Handle trader complaints, rule-violation contests, and case-review queues from a single workflow board.
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
         <AdminStatCard icon="warning" label="Open" value={summary.open || 0} />
         <AdminStatCard icon="activity" label="Under Review" value={summary.under_review || 0} />
         <AdminStatCard icon="approve" label="Resolved" value={summary.resolved || 0} />
@@ -449,19 +449,19 @@ export default function AdminDisputes() {
         )}
       >
         {selected && (
-          <div style={{ display: 'grid', gap: '20px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div style={{ display: 'grid', gap: 'var(--space-5)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Trader</div>
-                <div style={{ color: 'var(--admin-text)', fontWeight: 500, marginTop: '4px' }}>{selected.user_email || selected.user_name || 'Unknown trader'}</div>
+                <div style={{ color: 'var(--admin-text)', fontWeight: 500, marginTop: 'var(--space-1)' }}>{selected.user_email || selected.user_name || 'Unknown trader'}</div>
               </div>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Account</div>
-                <div className="admin-td-mono" style={{ marginTop: '4px' }}>#{selected.account_id || 'N/A'}</div>
+                <div className="admin-td-mono" style={{ marginTop: 'var(--space-1)' }}>#{selected.account_id || 'N/A'}</div>
               </div>
               <div style={{ gridColumn: 'span 2' }}>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Subject</div>
-                <div style={{ color: 'var(--admin-text)', fontWeight: 600, fontSize: 'var(--fs-lg)', marginTop: '4px' }}>
+                <div style={{ color: 'var(--admin-text)', fontWeight: 600, fontSize: 'var(--fs-lg)', marginTop: 'var(--space-1)' }}>
                   {selected.subject || selected.title || '-'}
                 </div>
               </div>
@@ -473,7 +473,7 @@ export default function AdminDisputes() {
                 <div style={{
                   background: 'var(--admin-bg)',
                   border: '1px solid var(--admin-border)',
-                  padding: '16px',
+                  padding: 'var(--space-4)',
                   color: 'var(--admin-text)',
                   fontSize: 'var(--fs-base)',
                   lineHeight: '1.6',
@@ -486,7 +486,7 @@ export default function AdminDisputes() {
 
             <Card style={{ margin: 0 }}>
               <h3 className="admin-h3">Workflow Controls</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 'var(--space-3)' }}>
                 <input
                   className="admin-input"
                   placeholder="Owner"
@@ -512,7 +512,7 @@ export default function AdminDisputes() {
               <textarea
                 className="admin-textarea"
                 rows={3}
-                style={{ marginTop: '12px' }}
+                style={{ marginTop: 'var(--space-3)' }}
                 value={metaNotes}
                 onChange={(event) => setMetaNotes(event.target.value)}
                 placeholder="Workflow notes, escalations, or external dependencies..."

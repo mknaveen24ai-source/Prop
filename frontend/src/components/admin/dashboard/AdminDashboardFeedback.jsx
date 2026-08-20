@@ -19,10 +19,10 @@ export function Skeleton({ height = 40, width = '100%', radius = 8, style = {} }
 
 export function StatsSkeleton() {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
       {Array.from({ length: 6 }).map((_, index) => (
-        <Card key={index} style={{ padding: '20px' }}>
-          <Skeleton height={12} width="60%" style={{ marginBottom: '12px' }} />
+        <Card key={index} style={{ padding: 'var(--space-5)' }}>
+          <Skeleton height={12} width="60%" style={{ marginBottom: 'var(--space-3)' }} />
           <Skeleton height={28} width="40%" />
         </Card>
       ))}
@@ -32,8 +32,8 @@ export function StatsSkeleton() {
 
 export function ChartSkeleton({ height = 220 }) {
   return (
-    <Card style={{ padding: '20px' }}>
-      <Skeleton height={14} width="45%" style={{ marginBottom: '16px' }} />
+    <Card style={{ padding: 'var(--space-5)' }}>
+      <Skeleton height={14} width="45%" style={{ marginBottom: 'var(--space-4)' }} />
       <Skeleton height={height} radius={6} />
     </Card>
   );
@@ -45,18 +45,18 @@ export function ErrorBanner({ message, onRetry }) {
       style={{
         background: 'color-mix(in srgb, var(--admin-danger) 8%, transparent)',
         border: '1px solid color-mix(in srgb, var(--admin-danger) 30%, transparent)',
-        padding: '24px',
-        marginBottom: '24px',
+        padding: 'var(--space-6)',
+        marginBottom: 'var(--space-6)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        gap: '16px',
+        gap: 'var(--space-4)',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
         <span style={{ fontSize: 'var(--fs-2xl)' }}>!</span>
         <div>
-          <div style={{ color: 'var(--admin-danger)', fontWeight: 600, marginBottom: '4px' }}>
+          <div style={{ color: 'var(--admin-danger)', fontWeight: 600, marginBottom: 'var(--space-1)' }}>
             Dashboard data unavailable
           </div>
           <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>{message}</div>

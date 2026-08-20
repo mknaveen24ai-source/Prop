@@ -735,7 +735,7 @@ export default function AdminKYC() {
     return (
       <Card>
         <h1 className="admin-h1">KYC Queue</h1>
-        <p style={{ color: 'var(--admin-text-muted)', marginBottom: '16px' }}>
+        <p style={{ color: 'var(--admin-text-muted)', marginBottom: 'var(--space-4)' }}>
           This admin session does not currently have access to the KYC queue or its supporting review endpoints.
         </p>
         <button className="admin-btn admin-btn-ghost" onClick={() => { fetchKycQueue(); fetchAuxiliary(); }}>
@@ -747,7 +747,7 @@ export default function AdminKYC() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-4)', marginBottom: 'var(--space-6)', flexWrap: 'wrap' }}>
         <div>
           <h1 className="admin-h1">KYC Queue</h1>
           <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
@@ -759,7 +759,7 @@ export default function AdminKYC() {
         </button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
         <AdminStatCard icon="kyc" label="Pending Queue" value={slaData.summary?.pending_total || 0} />
         <AdminStatCard icon="timer" label="Over SLA" value={slaData.summary?.overdue_total || 0} />
         <AdminStatCard icon="warning" label="Quality Risk High" value={qualityData.summary?.high_risk_count || 0} />
@@ -850,11 +850,11 @@ export default function AdminKYC() {
               <div className="admin-kyc-review-header">
                 <div>
                   <h2 className="admin-h2" style={{ margin: 0 }}>{selectedUser.full_name || 'Unnamed Trader'}</h2>
-                  <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)', marginTop: '4px' }}>
+                  <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)', marginTop: 'var(--space-1)' }}>
                     {selectedUser.email} - {selectedUser.kyc_document_country || selectedUser.country || 'Unknown Country'}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                   <button className="admin-btn admin-btn-ghost" onClick={() => navigate(`/admin/users?q=${encodeURIComponent(selectedUser.email || selectedUser.id)}`)}>
                     Open Profile
                   </button>
@@ -864,7 +864,7 @@ export default function AdminKYC() {
                 </div>
               </div>
 
-              <div className="admin-entity-badge-row" style={{ marginBottom: '16px' }}>
+              <div className="admin-entity-badge-row" style={{ marginBottom: 'var(--space-4)' }}>
                 <AdminBadge status={selectedUser.kyc_status || 'pending'} label={`KYC ${selectedUser.kyc_status || 'pending'}`} />
                 {selectedUser.kyc_sla_status && (
                   <AdminBadge status={getSlaBadgeStatus(selectedUser.kyc_sla_status)} label={`SLA ${selectedUser.kyc_sla_status}`} />
@@ -872,7 +872,7 @@ export default function AdminKYC() {
                 <AdminBadge status={getQualityBadgeStatus(selectedUser.quality_risk)} label={`Quality ${selectedUser.quality_risk}`} />
               </div>
 
-              <div className="admin-entity-info-grid" style={{ marginBottom: '16px' }}>
+              <div className="admin-entity-info-grid" style={{ marginBottom: 'var(--space-4)' }}>
                 <div><span>Submitted</span><strong>{formatDate(selectedUser.kyc_submitted_at || selectedUser.created_at)}</strong></div>
                 <div><span>Wait Time</span><strong>{selectedUser.kyc_wait_hours ? formatHours(selectedUser.kyc_wait_hours) : '-'}</strong></div>
                 <div><span>Quality Score</span><strong>{selectedUser.quality_score || 0}</strong></div>
@@ -915,7 +915,7 @@ export default function AdminKYC() {
               {String(selectedUser.kyc_status || '').toLowerCase() === 'pending' && (
                 <Card style={{ margin: 0 }}>
                   {!rejecting ? (
-                    <div style={{ display: 'flex', gap: '12px' }}>
+                    <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
                       <button className="admin-btn admin-btn-danger" style={{ flex: 1 }} disabled={submitting} onClick={() => setRejecting(true)}>
                         Reject
                       </button>
@@ -927,7 +927,7 @@ export default function AdminKYC() {
                       </button>
                     </div>
                   ) : (
-                    <div style={{ display: 'grid', gap: '12px' }}>
+                    <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
                       <div className="admin-form-group" style={{ margin: 0 }}>
                         <label className="admin-label">Rejection Reason</label>
                         <select className="admin-select" value={rejectReason} onChange={(event) => setRejectReason(event.target.value)}>
@@ -948,7 +948,7 @@ export default function AdminKYC() {
                           style={{ resize: 'vertical', minHeight: '88px' }}
                         />
                       )}
-                      <div style={{ display: 'flex', gap: '12px' }}>
+                      <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
                         <button className="admin-btn admin-btn-ghost" style={{ flex: 1 }} disabled={submitting} onClick={() => setRejecting(false)}>
                           Cancel
                         </button>
@@ -968,7 +968,7 @@ export default function AdminKYC() {
           )}
         </Card>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           <Card style={{ margin: 0 }}>
             <h3 className="admin-h3">Automated Checks</h3>
             {selectedUser ? (

@@ -127,7 +127,7 @@ export default function LandingFAQ() {
     <section className="mp-section" id="faq" style={{ position: 'relative' }}>
       <div className="mp-container" style={{ maxWidth: '800px' }}>
         <div style={{ textAlign: 'center', marginBottom: '60px' }}>
-          <div className="mp-badge mp-reveal" style={{ marginBottom: '20px' }}>
+          <div className="mp-badge mp-reveal" style={{ marginBottom: 'var(--space-5)' }}>
             <span className="mp-badge-dot"></span>
             FAQ
           </div>
@@ -138,7 +138,7 @@ export default function LandingFAQ() {
         </div>
 
         {/* Category Pills */}
-        <div className="mp-reveal mp-delay-300" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '48px' }}>
+        <div className="mp-reveal mp-delay-300" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: 'var(--space-9)' }}>
           {categories.map(c => {
             const isActive = activeCat === c;
             const color = catColors[c] || 'var(--muted)';
@@ -168,12 +168,12 @@ export default function LandingFAQ() {
         <div className="mp-reveal mp-delay-400" style={{
           background: 'var(--paper-2)',
           border: '1px solid var(--rule)',
-          padding: '8px 32px',
+          padding: 'var(--space-2) var(--space-7)',
         }}>
           {faqs.filter(f => f.category === activeCat).map((faq, i) => (
             <div key={i} className={'mp-faq-item ' + (openIndex === i ? 'active' : '')}>
               <button className="mp-faq-btn" onClick={() => setOpenIndex(openIndex === i ? null : i)}>
-                <span style={{ paddingRight: '20px' }}>{faq.q}</span>
+                <span style={{ paddingRight: 'var(--space-5)' }}>{faq.q}</span>
                 <div className="mp-faq-icon">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="6 9 12 15 18 9"></polyline>

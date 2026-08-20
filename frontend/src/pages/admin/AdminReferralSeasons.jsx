@@ -49,24 +49,24 @@ function CreateSeasonForm({ onCreate, creating }) {
   const inputStyle = { width: '100%', padding: '8px 10px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }
 
   return (
-    <form onSubmit={submit} className="lx-card" style={{ marginBottom: '24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+    <form onSubmit={submit} className="lx-card" style={{ marginBottom: 'var(--space-6)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
       <div style={{ gridColumn: '1 / -1' }}>
         <h3 style={{ margin: '0 0 4px' }}>Create Referral Season</h3>
       </div>
       <label style={{ gridColumn: '1 / -1' }}>
-        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Title</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Title</div>
         <input style={inputStyle} value={form.title} onChange={(e) => update('title', e.target.value)} required />
       </label>
       <label style={{ gridColumn: '1 / -1' }}>
-        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Description (shown to traders, optional)</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Description (shown to traders, optional)</div>
         <input style={inputStyle} value={form.description} onChange={(e) => update('description', e.target.value)} />
       </label>
       <label>
-        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Start</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Start</div>
         <input type="datetime-local" style={inputStyle} value={form.start_at} onChange={(e) => update('start_at', e.target.value)} required />
       </label>
       <label>
-        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>End</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>End</div>
         <input type="datetime-local" style={inputStyle} value={form.end_at} onChange={(e) => update('end_at', e.target.value)} required />
       </label>
       <div style={{ gridColumn: '1 / -1' }}>
@@ -166,8 +166,8 @@ export default function AdminReferralSeasons() {
   ]
 
   return (
-    <div style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+    <div style={{ padding: 'var(--space-6)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-5)', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
         <div>
           <h1 className="admin-h1">Referral Seasons</h1>
           <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
@@ -183,7 +183,7 @@ export default function AdminReferralSeasons() {
 
       {showForm && <CreateSeasonForm onCreate={handleCreate} creating={creating} />}
 
-      <AdminStatGrid style={{ marginBottom: '20px' }}>
+      <AdminStatGrid style={{ marginBottom: 'var(--space-5)' }}>
         <AdminStatCard icon="challenges" label="Total Seasons" value={kpis.total} />
         <AdminStatCard icon="activity" label="Active Now" value={kpis.active} />
         <AdminStatCard icon="calendar" label="Upcoming" value={kpis.upcoming} />

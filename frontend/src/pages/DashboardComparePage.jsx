@@ -50,11 +50,11 @@ export default function DashboardComparePage({ accounts = [] }) {
 
   if (accounts.length === 0) {
     return (
-      <Card style={{ textAlign: 'center', padding: '48px', maxWidth: '500px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+      <Card style={{ textAlign: 'center', padding: 'var(--space-9)', maxWidth: '500px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-4)' }}>
           {renderIcon('analytics', { size: 48, color: 'var(--accent)' })}
         </div>
-        <h3 style={{ color: 'var(--accent)', marginBottom: '12px' }}>No Accounts Yet</h3>
+        <h3 style={{ color: 'var(--accent)', marginBottom: 'var(--space-3)' }}>No Accounts Yet</h3>
         <p style={{ color: 'var(--muted)' }}>Start a challenge to see it here.</p>
       </Card>
     )
@@ -62,11 +62,11 @@ export default function DashboardComparePage({ accounts = [] }) {
 
   if (accounts.length === 1) {
     return (
-      <Card style={{ textAlign: 'center', padding: '48px', maxWidth: '500px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+      <Card style={{ textAlign: 'center', padding: 'var(--space-9)', maxWidth: '500px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-4)' }}>
           {renderIcon('analytics', { size: 48, color: 'var(--accent)' })}
         </div>
-        <h3 style={{ color: 'var(--accent)', marginBottom: '12px' }}>Only One Account</h3>
+        <h3 style={{ color: 'var(--accent)', marginBottom: 'var(--space-3)' }}>Only One Account</h3>
         <p style={{ color: 'var(--muted)' }}>Comparison view needs at least 2 accounts — start another challenge to compare performance side by side.</p>
       </Card>
     )
@@ -74,7 +74,7 @@ export default function DashboardComparePage({ accounts = [] }) {
 
   if (loading) {
     return (
-      <Card style={{ padding: '40px', textAlign: 'center' }}>
+      <Card style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
         <p style={{ color: 'var(--muted)' }}>Loading account comparison…</p>
       </Card>
     )
@@ -92,7 +92,7 @@ export default function DashboardComparePage({ accounts = [] }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
       {failedIds.length > 0 && (
-        <div style={{ padding: '12px 16px', border: '1px solid var(--warn)', borderRadius: 'var(--radius-sm)', color: 'var(--warn)', fontSize: 'var(--fs-base)' }} role="alert">
+        <div style={{ padding: 'var(--space-3) var(--space-4)', border: '1px solid var(--warn)', borderRadius: 'var(--radius-sm)', color: 'var(--warn)', fontSize: 'var(--fs-base)' }} role="alert">
           Couldn't load stats for {failedIds.length} account{failedIds.length === 1 ? '' : 's'} — the numbers below may be incomplete.
         </div>
       )}
@@ -126,7 +126,7 @@ export default function DashboardComparePage({ accounts = [] }) {
                   </div>
                 </div>
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 'var(--space-1)' }}>
                     <span>Drawdown used</span>
                     <span>{(stats.total_drawdown_used_pct || 0).toFixed(0)}%</span>
                   </div>

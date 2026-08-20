@@ -33,7 +33,7 @@ function TotpInput({ onSubmit, onBack, loading, error }) {
 
   return (
     <div>
-      <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+      <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
         <div style={{
           width: '48px', height: '48px', margin: '0 auto 16px',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -55,7 +55,7 @@ function TotpInput({ onSubmit, onBack, loading, error }) {
       </div>
 
       {error && (
-        <div className="error" style={{ marginBottom: '16px' }}>{error}</div>
+        <div className="error" style={{ marginBottom: 'var(--space-4)' }}>{error}</div>
       )}
 
       <OtpInput idPrefix="totp-digit" onChange={setCode} onComplete={onSubmit} disabled={loading} />
@@ -65,7 +65,7 @@ function TotpInput({ onSubmit, onBack, loading, error }) {
         className="btn btn-accent"
         onClick={() => onSubmit(code)}
         disabled={loading || code.length < 6}
-        style={{ width: '100%', marginBottom: '12px', marginTop: '8px', opacity: (loading || code.length < 6) ? 0.5 : 1 }}
+        style={{ width: '100%', marginBottom: 'var(--space-3)', marginTop: 'var(--space-2)', opacity: (loading || code.length < 6) ? 0.5 : 1 }}
       >
         {loading ? 'Verifying…' : 'Verify Code'}
       </button>
@@ -241,9 +241,9 @@ function Login({ onLogin, initialMode = 'login' }) {
 
         {/* ── HEADER ── */}
         {mode !== 'totp' && (
-          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-            <span className="auth-eyebrow" style={{ display: 'block', marginBottom: '12px' }}>{modeEyebrow}</span>
-            <h1 style={{ fontSize: 'var(--fs-4xl)', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: '8px' }}>
+          <div style={{ textAlign: 'center', marginBottom: 'var(--space-7)' }}>
+            <span className="auth-eyebrow" style={{ display: 'block', marginBottom: 'var(--space-3)' }}>{modeEyebrow}</span>
+            <h1 style={{ fontSize: 'var(--fs-4xl)', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: 'var(--space-2)' }}>
               Sign in to {tenant?.name || 'your portal'}.
             </h1>
             <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-md)' }}>
@@ -311,7 +311,7 @@ function Login({ onLogin, initialMode = 'login' }) {
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', marginTop: '-4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', marginTop: '-4px' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', cursor: 'pointer' }}>
                 <input
                   type="checkbox"
@@ -348,7 +348,7 @@ function Login({ onLogin, initialMode = 'login' }) {
         {/* ── FORGOT PASSWORD FORM ── */}
         {mode === 'forgot' && (
           <form onSubmit={handleForgot}>
-            <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: '20px', lineHeight: '1.6' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: 'var(--space-5)', lineHeight: '1.6' }}>
               Enter the email address associated with your account and we'll send you a reset link.
             </p>
             <div className="input-group">
@@ -366,7 +366,7 @@ function Login({ onLogin, initialMode = 'login' }) {
             <button
               className="btn btn-accent"
               type="submit"
-              style={{ width: '100%', marginTop: '8px' }}
+              style={{ width: '100%', marginTop: 'var(--space-2)' }}
               disabled={loading || !!success}
             >
               {loading ? 'Sending...' : 'Send Reset Link'}
@@ -387,7 +387,7 @@ function Login({ onLogin, initialMode = 'login' }) {
         {/* ── RESET PASSWORD FORM ── */}
         {mode === 'reset' && (
           <form onSubmit={handleReset}>
-            <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: '20px', lineHeight: '1.6' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: 'var(--space-5)', lineHeight: '1.6' }}>
               Enter the reset code from your email, then set a new password.
             </p>
 
@@ -406,7 +406,7 @@ function Login({ onLogin, initialMode = 'login' }) {
               </div>
             )}
 
-            <div className="input-group" style={{ marginBottom: '8px' }}>
+            <div className="input-group" style={{ marginBottom: 'var(--space-2)' }}>
               <label className="input-label">NEW PASSWORD</label>
               <div className="password-field-shell">
               <input
@@ -432,8 +432,8 @@ function Login({ onLogin, initialMode = 'login' }) {
             </div>
 
             {newPassword.length > 0 && (
-              <div style={{ marginBottom: '20px' }}>
-                <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
+              <div style={{ marginBottom: 'var(--space-5)' }}>
+                <div style={{ display: 'flex', gap: 'var(--space-1)', marginBottom: '6px' }}>
                   {[1,2,3,4,5].map(i => (
                     <div key={i} style={{
                       flex: 1, height: '3px', 
@@ -442,7 +442,7 @@ function Login({ onLogin, initialMode = 'login' }) {
                     }} />
                   ))}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
                   <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)' }}>Password strength</span>
                   <span style={{ fontSize: 'var(--fs-xs)', fontWeight: '600', color: resetStrength.color }}>
                     {resetStrength.label}
@@ -466,7 +466,7 @@ function Login({ onLogin, initialMode = 'login' }) {
             <button
               className="btn btn-accent"
               type="submit"
-              style={{ width: '100%', marginTop: '8px', opacity: (!resetValid || loading) ? 0.6 : 1 }}
+              style={{ width: '100%', marginTop: 'var(--space-2)', opacity: (!resetValid || loading) ? 0.6 : 1 }}
               disabled={loading || !!success || !resetValid}
             >
               {loading ? 'Resetting...' : 'Reset Password'}
@@ -475,7 +475,7 @@ function Login({ onLogin, initialMode = 'login' }) {
         )}
 
         {mode === 'login' && (
-          <p style={{ textAlign: 'center', marginTop: '24px', color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>
+          <p style={{ textAlign: 'center', marginTop: 'var(--space-6)', color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>
             No account?{' '}
             <Link to="/register" style={{ color: 'var(--accent)' }}>Register here</Link>
           </p>

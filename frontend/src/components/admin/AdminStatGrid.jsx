@@ -10,7 +10,7 @@ export default function AdminStatGrid({ children, minColumnWidth = 200, gap = 16
         display: 'grid',
         gridTemplateColumns: `repeat(auto-fit, minmax(${minColumnWidth}px, 1fr))`,
         gap: `${gap}px`,
-        marginBottom: '24px',
+        marginBottom: 'var(--space-6)',
         ...style
       }}
     >

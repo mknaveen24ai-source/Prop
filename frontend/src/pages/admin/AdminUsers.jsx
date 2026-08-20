@@ -319,7 +319,7 @@ export default function AdminUsers() {
       sortKey: 'full_name',
       width: '260px',
       render: (u) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           <div className="admin-avatar" style={{ width: '36px', height: '36px', fontSize: 'var(--fs-base)', background: u.is_banned ? 'var(--admin-danger)' : undefined }}>
             {(u.full_name || u.email || 'A').charAt(0).toUpperCase()}
           </div>
@@ -389,7 +389,7 @@ export default function AdminUsers() {
   return (
     <PageWrapper>
       <>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-6)' }}>
           <div>
             <h1 className="admin-h1">Trader Operations</h1>
             <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>Classify, segment, and act on traders with reusable filters and saved views.</p>

@@ -245,11 +245,11 @@ function Register({ onLogin }) {
 
   // ── Shared card header ──────────────────────────────────────────────────────
   const cardHeader = (
-    <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-      <span className="auth-eyebrow" style={{ display: 'block', marginBottom: '12px' }}>
+    <div style={{ textAlign: 'center', marginBottom: 'var(--space-7)' }}>
+      <span className="auth-eyebrow" style={{ display: 'block', marginBottom: 'var(--space-3)' }}>
         {step === STEP_OTP ? 'Phone Verification' : 'New Account'}
       </span>
-      <h1 style={{ fontSize: 'var(--fs-4xl)', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: '8px' }}>
+      <h1 style={{ fontSize: 'var(--fs-4xl)', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: 'var(--space-2)' }}>
         {step === STEP_OTP ? 'Verify your phone' : `Create your ${tenant?.name || 'trading'} account.`}
       </h1>
       <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-md)' }}>
@@ -258,7 +258,7 @@ function Register({ onLogin }) {
           : tenant?.brand?.tagline || 'Join the premium prop firm today'}
       </p>
       {step === STEP_FORM && giftCode && giftPreview?.valid && (
-        <div style={{ marginTop: '16px', padding: '10px 16px', border: '1px solid var(--accent)', borderRadius: '6px', fontSize: 'var(--fs-base)', color: 'var(--accent)' }}>
+        <div style={{ marginTop: 'var(--space-4)', padding: '10px 16px', border: '1px solid var(--accent)', borderRadius: '6px', fontSize: 'var(--fs-base)', color: 'var(--accent)' }}>
           🎁 You've been sent a free ${Number(giftPreview.account_size).toLocaleString()} challenge account — sign up to claim it.
         </div>
       )}
@@ -276,7 +276,7 @@ function Register({ onLogin }) {
       // flex child that overflows a centred container has its top clipped with
       // no way to scroll back to it.
       justifyContent: 'flex-start',
-      padding: '24px',
+      padding: 'var(--space-6)',
       position: 'relative'
     }}>
       <Link
@@ -292,12 +292,12 @@ function Register({ onLogin }) {
 
       <AuthMasthead eyebrow="Section B · New Members" maxWidth={460} />
 
-      <div className="lx-card auth-glass-card" style={{ width: 'min(100%, 460px)', zIndex: 10, animation: 'fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1)', padding: '40px 32px' }}>
+      <div className="lx-card auth-glass-card" style={{ width: 'min(100%, 460px)', zIndex: 10, animation: 'fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1)', padding: 'var(--space-8) var(--space-7)' }}>
 
         {cardHeader}
 
         {/* ── Step indicator ── */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '28px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: '28px' }}>
           {['Details', 'Verify Phone'].map((label, i) => {
             const active = (i === 0 && step === STEP_FORM) || (i === 1 && step === STEP_OTP)
             const done   = (i === 0 && step === STEP_OTP)
@@ -322,8 +322,8 @@ function Register({ onLogin }) {
           })}
         </div>
 
-        {error  && <div className="error"  style={{ marginBottom: '16px' }}>{error}</div>}
-        {success && <div className="success" style={{ marginBottom: '16px' }}>{success}</div>}
+        {error  && <div className="error"  style={{ marginBottom: 'var(--space-4)' }}>{error}</div>}
+        {success && <div className="success" style={{ marginBottom: 'var(--space-4)' }}>{success}</div>}
 
         {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
         {/* STEP 1 — Registration form                                 */}
@@ -361,8 +361,8 @@ function Register({ onLogin }) {
 
             {/* Password strength indicator */}
             {form.password.length > 0 && (
-              <div style={{ marginTop: '8px', marginBottom: '4px' }}>
-                <div style={{ display: 'flex', gap: '4px', marginBottom: '6px' }}>
+              <div style={{ marginTop: 'var(--space-2)', marginBottom: 'var(--space-1)' }}>
+                <div style={{ display: 'flex', gap: 'var(--space-1)', marginBottom: '6px' }}>
                   {[1,2,3,4,5].map(i => (
                     <div key={i} style={{
                       flex: 1, height: '3px',
@@ -371,7 +371,7 @@ function Register({ onLogin }) {
                     }} />
                   ))}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
                   <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)' }}>Password strength</span>
                   <span style={{ fontSize: 'var(--fs-xs)', fontWeight: '600', color: strength.color }}>{strength.label}</span>
                 </div>
@@ -387,7 +387,7 @@ function Register({ onLogin }) {
             )}
 
             <div className="input-group">
-              <label className="input-label" style={{ marginTop: '12px' }}>COUNTRY</label>
+              <label className="input-label" style={{ marginTop: 'var(--space-3)' }}>COUNTRY</label>
               <select name="country" className="select-field" value={form.country} onChange={handleChange} required>
                 <option value="">Select your country</option>
                 <option value="India">India</option>
@@ -470,13 +470,13 @@ function Register({ onLogin }) {
               id="register-send-otp-btn"
               className="btn btn-primary"
               type="submit"
-              style={{ width: '100%', marginTop: '8px', opacity: (!termsAccepted || loading || !passwordValid) ? 0.6 : 1, transition: 'opacity 0.2s' }}
+              style={{ width: '100%', marginTop: 'var(--space-2)', opacity: (!termsAccepted || loading || !passwordValid) ? 0.6 : 1, transition: 'opacity 0.2s' }}
               disabled={loading || !termsAccepted || !passwordValid}
             >
               {loading ? 'Sending code…' : 'Send Verification Code →'}
             </button>
 
-            <p style={{ textAlign: 'center', marginTop: '24px', color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>
+            <p style={{ textAlign: 'center', marginTop: 'var(--space-6)', color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>
               Already have an account?{' '}
               <Link to="/login" style={{ color: 'var(--accent)' }}>Sign in here</Link>
             </p>
@@ -489,7 +489,7 @@ function Register({ onLogin }) {
         {step === STEP_OTP && (
           <form onSubmit={handleVerifyOtp}>
             {/* OTP digit input */}
-            <div className="input-group" style={{ marginBottom: '8px' }}>
+            <div className="input-group" style={{ marginBottom: 'var(--space-2)' }}>
               <label className="input-label" style={{ textAlign: 'center', display: 'block' }}>6-DIGIT VERIFICATION CODE</label>
               <OtpInput
                 idPrefix="register-otp"
@@ -500,7 +500,7 @@ function Register({ onLogin }) {
             </div>
 
             {/* Resend + change number */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-5)' }}>
               <button
                 type="button"
                 onClick={handleResendOtp}
@@ -532,7 +532,7 @@ function Register({ onLogin }) {
               {loading ? 'Verifying…' : 'Verify & Create Account'}
             </button>
 
-            <p style={{ textAlign: 'center', marginTop: '20px', fontSize: 'var(--fs-sm)', color: 'var(--text-dim)', lineHeight: 1.6 }}>
+            <p style={{ textAlign: 'center', marginTop: 'var(--space-5)', fontSize: 'var(--fs-sm)', color: 'var(--text-dim)', lineHeight: 1.6 }}>
               The code is valid for <strong>5 minutes</strong>.<br/>
               Didn&apos;t receive it? Check that your number includes the country code (e.g. +91…).
             </p>

@@ -13,7 +13,7 @@ export default function CommandPaletteTrigger({ label = 'Search…' }) {
       type="button"
       onClick={() => window.dispatchEvent(new Event('gazette:open-command-palette'))}
       style={{
-        display: 'inline-flex', alignItems: 'center', gap: '8px',
+        display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)',
         background: 'var(--glass)', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)',
         padding: '6px 10px', color: 'var(--muted)', cursor: 'pointer', fontSize: 'var(--fs-base)',
         fontFamily: 'var(--font-ui)',
@@ -23,7 +23,7 @@ export default function CommandPaletteTrigger({ label = 'Search…' }) {
       <span>{label}</span>
       <span style={{
         fontFamily: 'var(--font-mono)', fontSize: '9.5px', color: 'var(--muted)',
-        border: '1px solid var(--rule)', borderRadius: '2px', padding: '1px 5px', marginLeft: '4px',
+        border: '1px solid var(--rule)', borderRadius: '2px', padding: '1px 5px', marginLeft: 'var(--space-1)',
       }}>
         ⌘K
       </span>

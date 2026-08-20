@@ -61,11 +61,11 @@ export default function RiskWarningBanner({ floating = false }) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      gap: '16px',
+      gap: 'var(--space-4)',
       flexWrap: 'wrap'
     }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', flex: 1 }}>
         <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, flexShrink: 0, marginTop: '2px', color: 'var(--muted)' }}>WARNING</span>
         <p style={{
           color: 'var(--text-muted)',
@@ -90,7 +90,7 @@ export default function RiskWarningBanner({ floating = false }) {
           background: 'transparent',
           border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)',
           color: 'var(--text-dim)',
-          padding: '4px 12px',
+          padding: 'var(--space-1) var(--space-3)',
           cursor: 'pointer',
           fontSize: 'var(--fs-sm)',
           flexShrink: 0,

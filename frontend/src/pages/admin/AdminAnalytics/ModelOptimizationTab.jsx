@@ -50,7 +50,7 @@ export default function ModelOptimizationTab() {
 
   return (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
         <AdminChart title="Pass Rate vs Pricing">
           <ScatterChart>
             <CartesianGrid {...chartThemeProps.grid} />
@@ -76,12 +76,12 @@ export default function ModelOptimizationTab() {
       </div>
 
       <h2 className="admin-h2">Rule Strictness vs Retention</h2>
-      <Card flush style={{ marginBottom: '24px' }}>
+      <Card flush style={{ marginBottom: 'var(--space-6)' }}>
         <AdminDataTable columns={strictnessColumns} data={strictnessVsRetention} loading={loading} emptyMessage="No data" emptyIcon="challenges" />
       </Card>
 
       <h2 className="admin-h2">A/B Test Results</h2>
-      <Card flush style={{ marginBottom: '24px' }}>
+      <Card flush style={{ marginBottom: 'var(--space-6)' }}>
         <AdminDataTable columns={abColumns} data={abTests} loading={loading} emptyMessage="No experiments running yet — infrastructure is in place (ab_experiments/ab_experiment_events), waiting on a real experiment to be wired up" emptyIcon="challenges" />
       </Card>
 
@@ -95,12 +95,12 @@ export default function ModelOptimizationTab() {
         </BarChart>
       </AdminChart>
 
-      <h2 className="admin-h2" style={{ marginTop: '24px' }}>Failure Pattern Analysis</h2>
-      <Card style={{ marginBottom: '24px' }}>
+      <h2 className="admin-h2" style={{ marginTop: 'var(--space-6)' }}>Failure Pattern Analysis</h2>
+      <Card style={{ marginBottom: 'var(--space-6)' }}>
         {failurePatterns.length === 0 ? (
           <p style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-base)' }}>No failed accounts yet.</p>
         ) : (
-          <ol style={{ margin: 0, paddingLeft: '20px' }}>
+          <ol style={{ margin: 0, paddingLeft: 'var(--space-5)' }}>
             {failurePatterns.map((f) => (
               <li key={f.reason} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--rule)', fontSize: 'var(--fs-base)' }}>
                 <span>{f.reason}</span>

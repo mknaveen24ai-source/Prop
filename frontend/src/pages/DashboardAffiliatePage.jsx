@@ -76,7 +76,7 @@ function AffiliateAnalysisTab({ summary }) {
     return <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>Loading...</div>
   }
   if (error || !data) {
-    return <Card style={{ padding: '24px', color: 'var(--red)' }}>{error || 'Could not load affiliate analytics.'}</Card>
+    return <Card style={{ padding: 'var(--space-6)', color: 'var(--red)' }}>{error || 'Could not load affiliate analytics.'}</Card>
   }
 
   const { referralsByMonth, commissionByMonth } = data
@@ -86,13 +86,13 @@ function AffiliateAnalysisTab({ summary }) {
 
   return (
     <>
-      <div style={{ display: 'grid', gap: '16px', marginBottom: '20px', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+      <div style={{ display: 'grid', gap: 'var(--space-4)', marginBottom: 'var(--space-5)', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
         <StatCell label="Total Referrals" value={totalReferrals} />
         <StatCell label="Paying Referrals" value={payingReferrals} tone="gain" />
         <StatCell label="Conversion Rate" value={`${conversionPct}%`} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-5)' }}>
         <AdminChart title="Referrals by Month" empty={referralsByMonth.length === 0 ? 'No referrals in the last 6 months' : null}>
           {referralsByMonth.length > 0 && (
             <BarChart data={referralsByMonth}>
@@ -167,7 +167,7 @@ function ReferralSeasonTab() {
     return <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>Loading...</div>
   }
   if (error) {
-    return <Card style={{ padding: '24px', color: 'var(--red)' }}>{error}</Card>
+    return <Card style={{ padding: 'var(--space-6)', color: 'var(--red)' }}>{error}</Card>
   }
   if (!season) {
     return (
@@ -184,8 +184,8 @@ function ReferralSeasonTab() {
 
   return (
     <>
-      <Card style={{ marginBottom: '20px', maxWidth: '700px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '8px', marginBottom: '6px' }}>
+      <Card style={{ marginBottom: 'var(--space-5)', maxWidth: '700px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: '6px' }}>
           <span style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, color: 'var(--text-secondary)' }}>{season.title}</span>
           <StatusBadge status={season.status} />
         </div>
@@ -196,9 +196,9 @@ function ReferralSeasonTab() {
           {new Date(season.start_at).toLocaleDateString()} – {new Date(season.end_at).toLocaleDateString()}
         </p>
         {season.prize_pool?.length > 0 && (
-          <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--rule-soft, var(--navy-border))' }}>
-            <div style={{ fontSize: 'var(--fs-xs)', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '8px' }}>Prizes</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div style={{ marginTop: '14px', paddingTop: 'var(--space-3)', borderTop: '1px solid var(--rule-soft, var(--navy-border))' }}>
+            <div style={{ fontSize: 'var(--fs-xs)', letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>Prizes</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
               {season.prize_pool.map((p, i) => (
                 <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--fs-base)' }}>
                   <span style={{ color: 'var(--text-secondary)' }}>Rank #{p.rank}</span>
@@ -209,7 +209,7 @@ function ReferralSeasonTab() {
           </div>
         )}
         {myEntry && (
-          <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--rule-soft, var(--navy-border))', display: 'flex', justifyContent: 'space-between' }}>
+          <div style={{ marginTop: '14px', paddingTop: 'var(--space-3)', borderTop: '1px solid var(--rule-soft, var(--navy-border))', display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 'var(--fs-base)', color: 'var(--text-secondary)' }}>Your standing</span>
             <span style={{ fontSize: 'var(--fs-base)', fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>
               {myRank ? `#${myRank}` : 'Unranked'} · {myEntry.new_paying_referrals} new paying referral{myEntry.new_paying_referrals === 1 ? '' : 's'}
@@ -345,7 +345,7 @@ export default function DashboardAffiliatePage() {
   if (loading) {
     return (
       <div>
-        <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: '24px', fontSize: 'var(--fs-3xl)' }}>
+        <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: 'var(--space-6)', fontSize: 'var(--fs-3xl)' }}>
           Affiliate Program
         </h2>
         <div style={{ textAlign: 'center', padding: '80px', color: 'var(--text-muted)' }}>Loading...</div>
@@ -356,10 +356,10 @@ export default function DashboardAffiliatePage() {
   if (error && !summary) {
     return (
       <div>
-        <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: '24px', fontSize: 'var(--fs-3xl)' }}>
+        <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: 'var(--space-6)', fontSize: 'var(--fs-3xl)' }}>
           Affiliate Program
         </h2>
-        <Card style={{ padding: '24px', color: 'var(--red)' }}>{error}</Card>
+        <Card style={{ padding: 'var(--space-6)', color: 'var(--red)' }}>{error}</Card>
       </div>
     )
   }
@@ -411,7 +411,7 @@ export default function DashboardAffiliatePage() {
 
   return (
     <div>
-      <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: '24px', fontSize: 'var(--fs-3xl)' }}>
+      <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: 'var(--space-6)', fontSize: 'var(--fs-3xl)' }}>
         Affiliate Program
       </h2>
 
@@ -430,12 +430,12 @@ export default function DashboardAffiliatePage() {
 
       {activeTab === 'overview' && (
         <>
-          <Card title="Your Referral Link" style={{ marginBottom: '20px', maxWidth: '700px' }}>
-            <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: '12px' }}>
+          <Card title="Your Referral Link" style={{ marginBottom: 'var(--space-5)', maxWidth: '700px' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: 'var(--space-3)' }}>
               Share this link. Anyone who signs up gets a discount on their first challenge, and you earn
               commission on every challenge they ever purchase — for life.
             </p>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
               <code ref={referralLinkRef} style={{
                 flex: '1 1 300px', padding: '10px 14px', background: 'var(--bg-surface)',
                 border: '1px solid var(--border)', borderRadius: '6px', fontSize: 'var(--fs-base)',
@@ -451,7 +451,7 @@ export default function DashboardAffiliatePage() {
               </button>
             </div>
             {copyFailed && (
-              <p style={{ marginTop: '8px', fontSize: 'var(--fs-sm)', color: 'var(--warn)' }} role="alert">
+              <p style={{ marginTop: 'var(--space-2)', fontSize: 'var(--fs-sm)', color: 'var(--warn)' }} role="alert">
                 Couldn't copy automatically — the link is selected above, press Ctrl/Cmd+C to copy it.
               </p>
             )}
@@ -460,7 +460,7 @@ export default function DashboardAffiliatePage() {
             </p>
           </Card>
 
-          <div style={{ display: 'grid', gap: '16px', marginBottom: '20px', maxWidth: '700px', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
+          <div style={{ display: 'grid', gap: 'var(--space-4)', marginBottom: 'var(--space-5)', maxWidth: '700px', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
             <StatCell label="Lifetime Commission" value={formatCurrency(summary?.lifetime_commission || 0)} tone="gain" />
             <StatCell label="Available Balance" value={formatCurrency(summary?.available_balance || 0)} />
             <StatCell label="Total Referrals" value={summary?.total_referrals || 0} />
@@ -468,7 +468,7 @@ export default function DashboardAffiliatePage() {
           </div>
 
           <Card title="Commission Tier" style={{ maxWidth: '700px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 'var(--space-2)' }}>
               <span style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, color: 'var(--text-secondary)' }}>
                 {currentTier ? `${currentTier.label || 'Tier ' + currentTier.tier_rank} — ${currentTier.commission_pct}%` : '—'}
               </span>
@@ -499,7 +499,7 @@ export default function DashboardAffiliatePage() {
                         key={t.tier_rank}
                         style={{
                           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                          padding: '8px 12px', borderRadius: '4px',
+                          padding: 'var(--space-2) var(--space-3)', borderRadius: '4px',
                           background: isCurrent ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'transparent',
                           border: isCurrent ? '1px solid var(--accent)' : '1px solid transparent',
                         }}
@@ -576,13 +576,13 @@ export default function DashboardAffiliatePage() {
 
       {activeTab === 'payouts' && (
         <>
-          <Card title="Request Payout" style={{ marginBottom: '20px', maxWidth: '700px' }}>
-            <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: '16px' }}>
+          <Card title="Request Payout" style={{ marginBottom: 'var(--space-5)', maxWidth: '700px' }}>
+            <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: 'var(--space-4)' }}>
               Available balance: {formatCurrency(summary?.available_balance || 0)}. Enter the amount you'd like to withdraw.
             </p>
             {payoutMessage && (
               <div style={{
-                padding: '10px 14px', borderRadius: '6px', marginBottom: '16px', fontSize: 'var(--fs-base)',
+                padding: '10px 14px', borderRadius: '6px', marginBottom: 'var(--space-4)', fontSize: 'var(--fs-base)',
                 background: payoutMessage.type === 'success' ? 'color-mix(in srgb, var(--green) 12%, transparent)' : 'color-mix(in srgb, var(--red) 12%, transparent)',
                 color: payoutMessage.type === 'success' ? 'var(--green)' : 'var(--red)'
               }}>
@@ -603,7 +603,7 @@ export default function DashboardAffiliatePage() {
                   step="0.01"
                   required
                 />
-                <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+                <div style={{ display: 'flex', gap: '6px', marginTop: 'var(--space-2)' }}>
                   {[0.25, 0.5, 1].map(pct => (
                     <button
                       key={pct}
@@ -656,7 +656,7 @@ export default function DashboardAffiliatePage() {
                     required
                     style={{ resize: 'vertical' }}
                   />
-                  <p style={{ marginTop: '8px', fontSize: '11.5px', color: 'var(--warn, var(--text-muted))' }}>
+                  <p style={{ marginTop: 'var(--space-2)', fontSize: '11.5px', color: 'var(--warn, var(--text-muted))' }}>
                     Double-check before submitting — crypto payouts are final. Funds sent to an incorrect address or wrong network cannot be recovered.
                   </p>
                 </div>
@@ -664,7 +664,7 @@ export default function DashboardAffiliatePage() {
               <button
                 className="btn btn-accent"
                 type="submit"
-                style={{ marginTop: '16px', padding: '12px 32px' }}
+                style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3) var(--space-7)' }}
                 disabled={submitting || !(summary?.available_balance > 0) || !(parseFloat(payoutForm.amount_requested) > 0) || parseFloat(payoutForm.amount_requested) > (summary?.available_balance || 0)}
               >
                 {submitting ? 'Submitting...' : 'Submit Payout Request'}

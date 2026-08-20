@@ -291,8 +291,8 @@ export default function AdminPlatformPnL() {
 
   if (loading) {
     return (
-      <div style={{ padding: '40px' }}>
-        <div className="admin-skeleton" style={{ height: '120px', marginBottom: '24px' }} />
+      <div style={{ padding: 'var(--space-8)' }}>
+        <div className="admin-skeleton" style={{ height: '120px', marginBottom: 'var(--space-6)' }} />
         <div className="admin-skeleton" style={{ height: '300px' }} />
       </div>
     );
@@ -300,7 +300,7 @@ export default function AdminPlatformPnL() {
 
   return (
     <>
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: 'var(--space-6)' }}>
         <h1 className="admin-h1">Platform P&amp;L</h1>
         <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
           Review B-book edge, fee revenue, and recent funded-trade outcomes with saved views and export controls.
@@ -319,14 +319,14 @@ export default function AdminPlatformPnL() {
       {ledger && (
         <>
           <h2 className="admin-h2" style={{ margin: '28px 0 16px' }}>Firm Ledger</h2>
-          <AdminStatGrid minColumnWidth={190} style={{ marginBottom: '20px' }}>
+          <AdminStatGrid minColumnWidth={190} style={{ marginBottom: 'var(--space-5)' }}>
             <AdminStatCard icon="pnl" label="Gross Fees (90d)" value={formatMoney(ledger.gross_fees_90d)} />
             <AdminStatCard icon="payouts" label="Trader Payouts (90d)" value={formatMoney(ledger.cost_breakdown.find((b) => b.label === 'Trader Payouts')?.amount || 0)} />
             <AdminStatCard icon="affiliate" label="Affiliate Payouts (90d)" value={formatMoney(ledger.cost_breakdown.find((b) => b.label === 'Affiliate Payouts')?.amount || 0)} />
             <AdminStatCard icon="funded" label="Retained (90d)" value={formatMoney(ledger.cost_breakdown.find((b) => b.label === 'Retained')?.amount || 0)} trendDirection="up" />
           </AdminStatGrid>
 
-          <Card ruled title="Fees In, Payouts Out" eyebrow="Net position · monthly" style={{ marginBottom: '24px' }}>
+          <Card ruled title="Fees In, Payouts Out" eyebrow="Net position · monthly" style={{ marginBottom: 'var(--space-6)' }}>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={ledger.monthly}>
                 <CartesianGrid {...chartThemeProps.grid} />
@@ -340,7 +340,7 @@ export default function AdminPlatformPnL() {
             </ResponsiveContainer>
           </Card>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.5fr) minmax(0,1fr)', gap: '16px', alignItems: 'start', marginBottom: '24px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.5fr) minmax(0,1fr)', gap: 'var(--space-4)', alignItems: 'start', marginBottom: 'var(--space-6)' }}>
             <Card title="Cumulative Net Revenue" eyebrow="After payouts · trailing 12 months">
               <ResponsiveContainer width="100%" height={220}>
                 <AreaChart data={ledger.monthly}>
@@ -398,7 +398,7 @@ export default function AdminPlatformPnL() {
                   ))}
                 </>
               ) : (
-                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--admin-text-faint)' }}>No paid fees in the last 90 days</div>
+                <div style={{ padding: 'var(--space-6)', textAlign: 'center', color: 'var(--admin-text-faint)' }}>No paid fees in the last 90 days</div>
               )}
             </Card>
           </div>
@@ -426,7 +426,7 @@ export default function AdminPlatformPnL() {
                 Export ledger
               </button>
             )}
-            style={{ marginBottom: '24px' }}
+            style={{ marginBottom: 'var(--space-6)' }}
           >
             <table className="lx-table">
               <thead>
@@ -456,7 +456,7 @@ export default function AdminPlatformPnL() {
         </>
       )}
 
-      <Card ruled title="Recent Platform Edge" style={{ marginBottom: '24px' }}>
+      <Card ruled title="Recent Platform Edge" style={{ marginBottom: 'var(--space-6)' }}>
         <ResponsiveContainer width="100%" height={280}>
           <AreaChart data={rollingData}>
             <defs>
@@ -476,7 +476,7 @@ export default function AdminPlatformPnL() {
         </ResponsiveContainer>
       </Card>
 
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: 'var(--space-6)' }}>
         {passFailData.length > 0 ? (
           <AdminChart title="Pass / Fail Breakdown">
             <PieChart>
@@ -517,7 +517,7 @@ export default function AdminPlatformPnL() {
         )}
       </div>
 
-      <Card style={{ marginBottom: '20px' }}>
+      <Card style={{ marginBottom: 'var(--space-5)' }}>
         <AdminFilterBar
           searchPlaceholder="Search by trade id or symbol"
           searchValue={search}

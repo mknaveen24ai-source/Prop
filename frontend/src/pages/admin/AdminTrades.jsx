@@ -331,7 +331,7 @@ export default function AdminTrades() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', gap: '16px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-6)', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
         <div>
           <h1 className="admin-h1">All Executions</h1>
           <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
@@ -410,7 +410,7 @@ export default function AdminTrades() {
       >
         {selectedTrade && (
           <div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Instrument</div>
                 <div style={{ fontSize: 'var(--fs-xl)', fontWeight: 600, color: 'var(--admin-text)' }}>{selectedTrade.symbol}</div>
@@ -431,16 +431,16 @@ export default function AdminTrades() {
               </div>
             </div>
 
-            <div style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', padding: '16px', marginBottom: '24px', textAlign: 'center' }}>
-              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>Net Floating P&L</div>
+            <div style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', padding: 'var(--space-4)', marginBottom: 'var(--space-6)', textAlign: 'center' }}>
+              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase', marginBottom: 'var(--space-1)' }}>Net Floating P&L</div>
               <div style={{ fontSize: '32px', fontFamily: 'var(--admin-font-mono)', fontWeight: 700, color: (parseFloat(selectedTrade.pnl) || 0) >= 0 ? 'var(--admin-success)' : 'var(--admin-danger)' }}>
                 {(parseFloat(selectedTrade.pnl) || 0) >= 0 ? '+' : ''}${(parseFloat(selectedTrade.pnl) || 0).toFixed(2)}
               </div>
             </div>
 
             {selectedTrade.status === 'open' && (
-              <div style={{ background: 'color-mix(in srgb, var(--admin-danger) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--admin-danger) 20%, transparent)', padding: '16px' }}>
-                <p style={{ fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)', marginBottom: '16px' }}>
+              <div style={{ background: 'color-mix(in srgb, var(--admin-danger) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--admin-danger) 20%, transparent)', padding: 'var(--space-4)' }}>
+                <p style={{ fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)', marginBottom: 'var(--space-4)' }}>
                   As an administrator, you may forcibly close this active market execution. This action will realize the current floating P&L and cannot be reversed.
                 </p>
                 <button className="admin-btn admin-btn-danger" style={{ width: '100%' }} onClick={executeForceClose}>

@@ -127,7 +127,7 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
       {/* Nav */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '20px 48px', borderBottom: '1px solid var(--nav-border)',
+        padding: 'var(--space-5) var(--space-9)', borderBottom: '1px solid var(--nav-border)',
         position: 'sticky', top: 0, background: 'var(--nav-bg)',
         backdropFilter: 'blur(12px)', zIndex: 100
       }}>
@@ -139,7 +139,7 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
         </span>
         <button onClick={() => navigate(-1)} className="btn" style={{
           background: 'transparent', border: '1px solid var(--navy-border)',
-          color: 'var(--text-muted)', padding: '8px 20px', fontSize: 'var(--fs-base)'
+          color: 'var(--text-muted)', padding: 'var(--space-2) var(--space-5)', fontSize: 'var(--fs-base)'
         }}>
           ← Back
         </button>
@@ -147,7 +147,7 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
 
       {/* Hero */}
       <div style={{
-        textAlign: 'center', padding: '64px 24px 48px',
+        textAlign: 'center', padding: 'var(--space-10) var(--space-6) var(--space-9)',
         borderBottom: '1px solid var(--navy-border)',
         background: 'radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--muted) 6%, transparent) 0%, transparent 60%)'
       }}>
@@ -155,13 +155,13 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
           display: 'inline-block', background: 'color-mix(in srgb, var(--muted) 10%, transparent)',
           border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)', borderRadius: 'var(--radius-pill)',
           padding: '5px 14px', fontSize: 'var(--fs-xs)', color: 'var(--accent)',
-          letterSpacing: '0.1em', marginBottom: '20px'
+          letterSpacing: '0.1em', marginBottom: 'var(--space-5)'
         }}>
           LEGAL DOCUMENT
         </div>
         <h1 style={{
           fontFamily: 'var(--font-display)', fontSize: 'var(--fs-6xl)', fontWeight: '700',
-          marginBottom: '12px', color: 'var(--text)'
+          marginBottom: 'var(--space-3)', color: 'var(--text)'
         }}>
           Terms of Service
         </h1>
@@ -170,12 +170,12 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
         </p>
       </div>
 
-      <div style={{ maxWidth: '860px', margin: '0 auto', padding: '48px 24px' }}>
+      <div style={{ maxWidth: '860px', margin: '0 auto', padding: 'var(--space-9) var(--space-6)' }}>
 
         {/* Intro box */}
         <div style={{
           background: 'color-mix(in srgb, var(--muted) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--muted) 20%, transparent)',
-            padding: '24px 28px', marginBottom: '40px'
+            padding: '24px 28px', marginBottom: 'var(--space-8)'
         }}>
           <p style={{ color: 'var(--text)', lineHeight: '1.8', fontSize: 'var(--fs-md)', margin: 0 }}>
             Please read these Terms of Service carefully before using our platform. By registering an account or using any part of this service, you agree to be bound by these Terms. If you do not agree, do not use this platform.
@@ -189,7 +189,7 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
             style={{
               background: 'var(--navy-card)',
               border: `1px solid ${activeSection === section.id ? 'var(--accent-dim)' : 'var(--navy-border)'}`,
-                marginBottom: '12px',
+                marginBottom: 'var(--space-3)',
               overflow: 'hidden', transition: 'border-color 0.2s ease'
             }}
           >
@@ -197,7 +197,7 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
               onClick={() => setActiveSection(activeSection === section.id ? null : section.id)}
               style={{
                 width: '100%', display: 'flex', justifyContent: 'space-between',
-                alignItems: 'center', padding: '20px 24px', background: 'transparent',
+                alignItems: 'center', padding: 'var(--space-5) var(--space-6)', background: 'transparent',
                 border: 'none', cursor: 'pointer', color: 'var(--text)', textAlign: 'left'
               }}
             >
@@ -215,7 +215,7 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
               <div style={{ padding: '0 24px 24px', borderTop: '1px solid var(--navy-border)' }}>
                 <p style={{
                   color: 'var(--text-muted)', lineHeight: '1.9', fontSize: 'var(--fs-md)',
-                  marginTop: '20px', whiteSpace: 'pre-line', margin: '20px 0 0'
+                  marginTop: 'var(--space-5)', whiteSpace: 'pre-line', margin: '20px 0 0'
                 }}>
                   {section.content}
                 </p>
@@ -226,7 +226,7 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
 
         {/* Footer note */}
         <div style={{
-          marginTop: '40px', padding: '24px', background: 'var(--navy-mid)',
+          marginTop: 'var(--space-8)', padding: 'var(--space-6)', background: 'var(--navy-mid)',
           border: '1px solid var(--navy-border)',   textAlign: 'center'
         }}>
           <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', margin: 0, lineHeight: '1.7' }}>

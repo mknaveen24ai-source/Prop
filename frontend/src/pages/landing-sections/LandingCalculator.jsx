@@ -28,7 +28,7 @@ const MODEL_HOOKS = {
 
 function InfoDot({ title }) {
   return (
-    <span title={title} style={{ display: 'inline-flex', verticalAlign: 'middle', marginLeft: '4px', cursor: 'help', opacity: 0.6 }}>
+    <span title={title} style={{ display: 'inline-flex', verticalAlign: 'middle', marginLeft: 'var(--space-1)', cursor: 'help', opacity: 0.6 }}>
       {renderIcon('info', { size: 11, color: 'currentColor' })}
     </span>
   );
@@ -101,8 +101,8 @@ export default function LandingCalculator({ onStartAssessment }) {
       position: 'relative',
     }}>
       <div className="mp-container">
-        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-          <div className="mp-badge mp-reveal" style={{ marginBottom: '20px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 'var(--space-9)' }}>
+          <div className="mp-badge mp-reveal" style={{ marginBottom: 'var(--space-5)' }}>
             Choose Your Challenge
           </div>
           <h2 className="mp-h2 mp-reveal mp-delay-100">Pick Your Path to Funded</h2>
@@ -126,7 +126,7 @@ export default function LandingCalculator({ onStartAssessment }) {
             justifyContent: 'center',
             flexWrap: 'wrap',
             gap: '10px',
-            marginBottom: '20px',
+            marginBottom: 'var(--space-5)',
           }}>
             {models.map((m) => {
               const hook = MODEL_HOOKS[m.steps] || { badge: `${m.steps} PHASES`, color: 'var(--muted)' };
@@ -153,7 +153,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                     {m.name}
                   </div>
                   <div style={{
-                    marginTop: '4px', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', fontWeight: 700,
+                    marginTop: 'var(--space-1)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', fontWeight: 700,
                     textTransform: 'uppercase', letterSpacing: '0.08em',
                     color: active ? hook.color : 'var(--muted)',
                   }}>
@@ -166,14 +166,14 @@ export default function LandingCalculator({ onStartAssessment }) {
         )}
 
         {modelsLoaded && models.length === 0 && (
-          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
+          <div style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--muted)' }}>
             Challenge models are temporarily unavailable. Please check back shortly.
           </div>
         )}
 
         {selectedModel && (
           <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-            <div className="mp-availability-pill mp-reveal mp-delay-300" style={{ display: 'inline-flex', gap: '24px', padding: '12px 28px', background: 'transparent', border: '1px solid var(--rule)' }}>
+            <div className="mp-availability-pill mp-reveal mp-delay-300" style={{ display: 'inline-flex', gap: 'var(--space-6)', padding: '12px 28px', background: 'transparent', border: '1px solid var(--rule)' }}>
               <span style={{ fontSize: 'var(--fs-base)', color: 'var(--muted)' }}>
                 Sizes Available: <span style={{ color: 'var(--ink)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{totalEnabled}</span>
               </span>
@@ -190,7 +190,7 @@ export default function LandingCalculator({ onStartAssessment }) {
           <div className="mp-account-size-grid mp-reveal mp-delay-300" style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-            gap: '16px',
+            gap: 'var(--space-4)',
             maxWidth: '1300px',
             margin: '0 auto 60px',
             alignItems: 'stretch',
@@ -223,7 +223,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                     WebkitBackdropFilter: isSoldOut || inverted ? undefined : 'blur(16px) saturate(140%)',
                     boxShadow: isSoldOut ? undefined : 'var(--elev)',
                     border: `1px solid ${inverted ? 'var(--ink)' : 'var(--rule)'}`,
-                    padding: '24px 20px',
+                    padding: 'var(--space-6) var(--space-5)',
                     display: 'flex',
                     flexDirection: 'column',
                     position: 'relative',
@@ -234,7 +234,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                     <div style={{
                       position: 'absolute', top: '-11px', left: '50%', transform: 'translateX(-50%)',
                       background: 'var(--warn)', color: 'var(--ink)', fontFamily: 'var(--font-mono)',
-                      fontSize: 'var(--fs-3xs)', fontWeight: 800, letterSpacing: '0.1em', padding: '4px 12px',
+                      fontSize: 'var(--fs-3xs)', fontWeight: 800, letterSpacing: '0.1em', padding: 'var(--space-1) var(--space-3)',
                       textTransform: 'uppercase', whiteSpace: 'nowrap',
                     }}>
                       Recommended
@@ -267,7 +267,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                     }}>
                       {isSoldOut ? 'FULL' : isUnlimited ? 'OPEN' : pct > 50 ? 'OPEN' : 'LOW'}
                     </span>
-                    <span style={{ marginLeft: '8px', fontSize: 'var(--fs-2xs)', color: mutedColor, fontFamily: 'var(--font-mono)' }}>
+                    <span style={{ marginLeft: 'var(--space-2)', fontSize: 'var(--fs-2xs)', color: mutedColor, fontFamily: 'var(--font-mono)' }}>
                       {sizeLabel(size)}
                     </span>
                   </div>
@@ -279,7 +279,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                     onClick={() => startChallenge(size)}
                     style={{
                       width: '100%',
-                      padding: '12px',
+                      padding: 'var(--space-3)',
                       marginBottom: '18px',
                       fontFamily: 'var(--font-mono)',
                       fontSize: 'var(--fs-sm)',
@@ -298,7 +298,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                   {/* Itemized rules */}
                   <div style={{ borderTop: `1px solid ${ruleColor}`, paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
                     <div>
-                      <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: inkColor, marginBottom: '4px' }}>
+                      <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: inkColor, marginBottom: 'var(--space-1)' }}>
                         Profit Target
                         <InfoDot title="The percentage gain required to pass this phase." />
                       </div>

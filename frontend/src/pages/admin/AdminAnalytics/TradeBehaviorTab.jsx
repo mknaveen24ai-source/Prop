@@ -121,7 +121,7 @@ export default function TradeBehaviorTab() {
         </BarChart>
       </AdminChart>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '16px', marginTop: '24px', alignItems: 'stretch' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 'var(--space-4)', marginTop: 'var(--space-6)', alignItems: 'stretch' }}>
         <Card>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--admin-text-muted)' }}>Avg R-Multiple</div>
           <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: 'var(--fs-5xl)', marginTop: '10px', color: avgRMultiple == null ? 'var(--admin-text-faint)' : avgRMultiple >= 0 ? 'var(--admin-success)' : 'var(--admin-danger)' }}>
@@ -140,26 +140,26 @@ export default function TradeBehaviorTab() {
         </AdminChart>
       </div>
 
-      <h2 className="admin-h2" style={{ marginTop: '24px' }}>Trade Frequency & Strategy Classification</h2>
-      <Card flush style={{ marginBottom: '24px' }}>
+      <h2 className="admin-h2" style={{ marginTop: 'var(--space-6)' }}>Trade Frequency & Strategy Classification</h2>
+      <Card flush style={{ marginBottom: 'var(--space-6)' }}>
         <AdminDataTable columns={frequencyColumns} data={tradeFrequency} loading={loading} emptyMessage="No trader data yet" emptyIcon="trade" />
       </Card>
 
       <h2 className="admin-h2">Trader Correlation Matrix</h2>
-      <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)', marginBottom: '12px' }}>
+      <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)', marginBottom: 'var(--space-3)' }}>
         Cells at or above {COPY_TRADING_THRESHOLD.toFixed(2)} are flagged as a possible copy-trading signal. Requires at least 3 overlapping trading days between two traders.
       </p>
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: 'var(--space-6)' }}>
         <CorrelationMatrix userIds={userIds} matrix={correlationMatrix} labelFor={labelFor} />
       </div>
 
       <h2 className="admin-h2">Copy-Trading Flags</h2>
-      <Card flush style={{ marginBottom: '24px' }}>
+      <Card flush style={{ marginBottom: 'var(--space-6)' }}>
         <AdminDataTable columns={copyTradingColumns} data={copyTradingFlags} loading={loading} emptyMessage="No flagged pairs" emptyIcon="dispute" />
       </Card>
 
       <h2 className="admin-h2">Abnormal Profit Spike Detection</h2>
-      <Card flush style={{ marginBottom: '24px' }}>
+      <Card flush style={{ marginBottom: 'var(--space-6)' }}>
         <AdminDataTable columns={spikeColumns} data={profitSpikes} loading={loading} emptyMessage="No spikes detected" emptyIcon="pnl" />
       </Card>
 

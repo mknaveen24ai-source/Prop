@@ -94,9 +94,9 @@ export default function CommandPalette({ results, placeholder = 'Jump to a pageâ
             ESC
           </span>
         </div>
-        <div style={{ maxHeight: '52vh', overflowY: 'auto', padding: '8px' }}>
+        <div style={{ maxHeight: '52vh', overflowY: 'auto', padding: 'var(--space-2)' }}>
           {filtered.length === 0 && (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>
+            <div style={{ padding: 'var(--space-6)', textAlign: 'center', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>
               No matches
             </div>
           )}
@@ -105,7 +105,7 @@ export default function CommandPalette({ results, placeholder = 'Jump to a pageâ
               key={`${r.group}-${r.label}-${i}`}
               onClick={() => go(r)}
               style={{
-                display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '10px 12px',
+                display: 'flex', alignItems: 'center', gap: 'var(--space-3)', width: '100%', padding: '10px 12px',
                 border: 'none', borderRadius: 'var(--radius-sm)', background: 'transparent',
                 color: 'var(--ink)', textAlign: 'left', cursor: 'pointer', transition: 'background 0.12s',
               }}

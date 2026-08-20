@@ -169,7 +169,7 @@ export default function AdminSystemHealth() {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)', marginBottom: 'var(--space-5)', flexWrap: 'wrap' }}>
         <div>
           <h2 style={{ margin: 0 }}>System Health</h2>
           <p style={{ margin: '4px 0 0', color: 'var(--admin-text-faint)', fontSize: 'var(--fs-base)' }}>
@@ -185,20 +185,20 @@ export default function AdminSystemHealth() {
       </div>
 
       {error ? (
-        <Card style={{ padding: '16px', marginBottom: '16px', borderColor: 'var(--admin-danger, #b3261e)' }}>
+        <Card style={{ padding: 'var(--space-4)', marginBottom: 'var(--space-4)', borderColor: 'var(--admin-danger, #b3261e)' }}>
           <strong>{error}</strong>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-base)', marginTop: '4px' }}>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-base)', marginTop: 'var(--space-1)' }}>
             Showing the last successful reading, if any.
           </div>
         </Card>
       ) : null}
 
-      {loading && !health ? <Card style={{ padding: '24px' }}>Loading system health…</Card> : null}
+      {loading && !health ? <Card style={{ padding: 'var(--space-6)' }}>Loading system health…</Card> : null}
 
       {degraded.length > 0 ? (
-        <Card style={{ padding: '16px', marginBottom: '16px' }}>
+        <Card style={{ padding: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
           <strong>Attention needed</strong>
-          <ul style={{ margin: '8px 0 0', paddingLeft: '20px' }}>
+          <ul style={{ margin: '8px 0 0', paddingLeft: 'var(--space-5)' }}>
             {degraded.map(([key, data]) => (
               <li key={key} style={{ fontSize: 'var(--fs-base)' }}>
                 {SECTION_LABELS[key] || key}: {data.status}
@@ -211,7 +211,7 @@ export default function AdminSystemHealth() {
       ) : null}
 
       {health ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-3)', marginBottom: 'var(--space-5)' }}>
           <AdminStatCard label="Open trades" value={sections.tradeEngine?.openTrades ?? '—'} />
           <AdminStatCard label="Connected clients" value={sections.websocket?.connected ?? '—'} />
           <AdminStatCard label="Pool waiting" value={sections.database?.waiting ?? '—'} />
@@ -219,7 +219,7 @@ export default function AdminSystemHealth() {
         </div>
       ) : null}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 'var(--space-4)' }}>
         {Object.keys(SECTION_LABELS).map((key) => {
           const data = sections[key];
           if (!data) return null;
@@ -230,8 +230,8 @@ export default function AdminSystemHealth() {
                   : null;
 
           return (
-            <Card key={key} style={{ padding: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <Card key={key} style={{ padding: 'var(--space-4)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
                 <strong>{SECTION_LABELS[key]}</strong>
                 <AdminBadge tone={statusTone(data.status)}>{data.status}</AdminBadge>
               </div>
@@ -248,7 +248,7 @@ export default function AdminSystemHealth() {
               </table>
 
               {trend && trend.length > 1 ? (
-                <div style={{ marginTop: '12px', color: 'var(--admin-accent, #6b7bff)' }}>
+                <div style={{ marginTop: 'var(--space-3)', color: 'var(--admin-accent, #6b7bff)' }}>
                   <Sparkline points={trend} />
                 </div>
               ) : null}

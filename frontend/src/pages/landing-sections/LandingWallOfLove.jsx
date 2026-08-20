@@ -46,7 +46,7 @@ export default function LandingWallOfLove() {
     <section className="mp-section" style={{ background: 'var(--paper-2)', position: 'relative' }}>
       <div className="mp-container">
         <div style={{ textAlign: 'center', marginBottom: '80px' }}>
-          <div className="mp-badge mp-reveal" style={{ marginBottom: '20px' }}>
+          <div className="mp-badge mp-reveal" style={{ marginBottom: 'var(--space-5)' }}>
             <span className="mp-badge-dot"></span>
             Community
           </div>
@@ -61,7 +61,7 @@ export default function LandingWallOfLove() {
             <div key={idx} className="mp-masonry-item">
               <div className="mp-glass-card" style={{ padding: '28px' }}>
                 {/* Role / program attribution — illustrative, not an individual identity */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: '18px' }}>
                   <div style={{
                     width: '4px', height: '36px',
                     background: 'var(--warn)',

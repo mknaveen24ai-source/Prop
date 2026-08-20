@@ -81,7 +81,7 @@ export default function OrderPanel({
   })
 
   return (
-    <div className="order-panel" style={{ padding: '20px' }}>
+    <div className="order-panel" style={{ padding: 'var(--space-5)' }}>
       {!marketStatus.open && (
         <div style={{
           background: 'var(--danger-bg)',
@@ -91,7 +91,7 @@ export default function OrderPanel({
           marginBottom: '14px',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: 'var(--space-2)'
         }}>
           <span style={{ display: 'inline-flex' }}>
             {renderIcon('warning', { size: 16, color: 'var(--accent-red)' })}
@@ -109,7 +109,7 @@ export default function OrderPanel({
           border: '1px solid var(--green)',
           borderRadius: '0',
           padding: '10px 14px',
-          marginBottom: '16px',
+          marginBottom: 'var(--space-4)',
           display: 'flex',
           alignItems: 'center',
           gap: '10px'
@@ -119,9 +119,9 @@ export default function OrderPanel({
         </div>
       )}
 
-      <div style={{ marginBottom: '16px' }}>
+      <div style={{ marginBottom: 'var(--space-4)' }}>
         <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>INSTRUMENT</label>
-        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-1)', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
           {[
             { key: 'all', label: 'All', color: 'var(--accent)' },
             { key: 'FOREX_MAJORS', label: 'FX Majors', color: 'var(--accent)' },
@@ -172,11 +172,11 @@ export default function OrderPanel({
 
       <div className="order-panel-price-card">
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--red)', marginBottom: '4px', letterSpacing: '0.08em' }}>BID</div>
+          <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--red)', marginBottom: 'var(--space-1)', letterSpacing: '0.08em' }}>BID</div>
           <div style={{ fontSize: 'var(--fs-4xl)', fontWeight: '800', color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{bid}</div>
         </div>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--green)', marginBottom: '4px', letterSpacing: '0.08em' }}>ASK</div>
+          <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--green)', marginBottom: 'var(--space-1)', letterSpacing: '0.08em' }}>ASK</div>
           <div style={{ fontSize: 'var(--fs-4xl)', fontWeight: '800', color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{ask}</div>
         </div>
         <div style={{ gridColumn: '1/-1', textAlign: 'center', fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)' }}>
@@ -264,10 +264,10 @@ export default function OrderPanel({
           border: '1px solid color-mix(in srgb, var(--muted) 15%, transparent)',
           borderRadius: '0',
           padding: '10px 12px',
-          marginBottom: '16px',
+          marginBottom: 'var(--space-4)',
           fontSize: 'var(--fs-sm)'
         }}>
-          <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-dim)', letterSpacing: '0.1em', marginBottom: '8px' }}>
+          <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-dim)', letterSpacing: '0.1em', marginBottom: 'var(--space-2)' }}>
             R:R CALCULATOR ({previewDirection.toUpperCase()} PREVIEW)
           </div>
           {orderMode === 'market' && (
@@ -327,7 +327,7 @@ export default function OrderPanel({
       )}
 
       {orderMode === 'pending' && (
-        <div style={{ marginBottom: '16px' }}>
+        <div style={{ marginBottom: 'var(--space-4)' }}>
           <div style={{ marginBottom: '14px' }}>
             <label style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>ORDER TYPE</label>
             {/* Columns live in .order-panel-type-grid (App.css) so the mobile
@@ -385,7 +385,7 @@ export default function OrderPanel({
             />
           </div>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
             <input
               type="checkbox"
               checked={Boolean(orderForm.oco_enabled)}
@@ -399,10 +399,10 @@ export default function OrderPanel({
               background: 'color-mix(in srgb, var(--muted) 4%, transparent)',
               border: '1px solid color-mix(in srgb, var(--muted) 15%, transparent)',
               borderRadius: '0',
-              padding: '12px',
+              padding: 'var(--space-3)',
               marginBottom: '14px'
             }}>
-              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '8px' }}>OCO SIBLING ORDER</div>
+              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>OCO SIBLING ORDER</div>
               <select
                 className="select-field"
                 value={orderForm.oco_order_type || 'sell_stop'}
@@ -439,7 +439,7 @@ export default function OrderPanel({
             disabled={!selectedAccount || !priceData || !marketStatus.open || isSubmitting}
             style={{ flexDirection: 'column', padding: '16px 14px', fontWeight: 800, borderColor: 'var(--loss)', color: 'var(--loss)' }}
           >
-            <div style={{ fontSize: 'var(--fs-2xs)', marginBottom: '4px', opacity: 0.7, letterSpacing: '0.1em' }}>SELL</div>
+            <div style={{ fontSize: 'var(--fs-2xs)', marginBottom: 'var(--space-1)', opacity: 0.7, letterSpacing: '0.1em' }}>SELL</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xl)' }}>{isSubmitting ? '...' : bid}</div>
           </Button>
           <Button
@@ -450,7 +450,7 @@ export default function OrderPanel({
             disabled={!selectedAccount || !priceData || !marketStatus.open || isSubmitting}
             style={{ flexDirection: 'column', padding: '16px 14px', fontWeight: 800, borderColor: 'var(--gain)', color: 'var(--gain)' }}
           >
-            <div style={{ fontSize: 'var(--fs-2xs)', marginBottom: '4px', opacity: 0.7, letterSpacing: '0.1em' }}>BUY</div>
+            <div style={{ fontSize: 'var(--fs-2xs)', marginBottom: 'var(--space-1)', opacity: 0.7, letterSpacing: '0.1em' }}>BUY</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xl)' }}>{isSubmitting ? '...' : ask}</div>
           </Button>
         </div>

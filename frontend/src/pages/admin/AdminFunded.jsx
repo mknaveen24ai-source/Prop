@@ -398,7 +398,7 @@ export default function AdminFunded() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', gap: '16px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-6)', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
         <div>
           <h1 className="admin-h1">Funded Accounts</h1>
           <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
@@ -513,15 +513,15 @@ export default function AdminFunded() {
         )}
       >
         {selectedAcc && (
-          <div style={{ display: 'grid', gap: '20px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+          <div style={{ display: 'grid', gap: 'var(--space-5)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-4)' }}>
               {[
                 { label: 'Status', value: selectedAcc.status?.toUpperCase() },
                 { label: 'Balance', value: formatMoney(selectedAcc.current_balance) },
                 { label: 'Peak', value: formatMoney(selectedAcc.peak_balance) },
                 { label: 'Paid Out', value: formatMoney(selectedAcc.total_payouts) }
               ].map((card) => (
-                <div key={card.label} style={{ background: 'var(--admin-bg)', padding: '16px', border: '1px solid var(--admin-border)' }}>
+                <div key={card.label} style={{ background: 'var(--admin-bg)', padding: 'var(--space-4)', border: '1px solid var(--admin-border)' }}>
                   <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>{card.label}</div>
                   <div style={{ marginTop: '6px', fontSize: 'var(--fs-3xl)', fontFamily: 'var(--admin-font-mono)', fontWeight: 700 }}>
                     {card.value}
@@ -544,7 +544,7 @@ export default function AdminFunded() {
 
             <Card style={{ margin: 0 }}>
               <h3 className="admin-h3">Funded Controls</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-3)' }}>
                 <button className="admin-btn admin-btn-primary" onClick={() => executeOverride('force_close_open_trades')} disabled={submitting}>
                   Force Close Open Trades
                 </button>
@@ -556,10 +556,10 @@ export default function AdminFunded() {
 
             <Card style={{ margin: 0 }}>
               <h3 className="admin-h3">Balance Adjustment</h3>
-              <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)', marginBottom: '16px' }}>
+              <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)', marginBottom: 'var(--space-4)' }}>
                 Use a positive amount to credit or a negative amount to debit the funded balance.
               </p>
-              <div style={{ display: 'grid', gap: '12px' }}>
+              <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
                 <input
                   className="admin-input admin-font-mono"
                   type="number"

@@ -140,7 +140,7 @@ function ScalingSection({ model, onSave, saving }) {
   const inputStyle = { width: '110px', padding: '6px 8px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }
 
   return (
-    <div style={{ marginTop: '18px', paddingTop: '16px', borderTop: '1px solid var(--admin-border)' }}>
+    <div style={{ marginTop: '18px', paddingTop: 'var(--space-4)', borderTop: '1px solid var(--admin-border)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
         <h4 style={{ margin: 0, fontSize: 'var(--fs-md)' }}>Scaling Plan (funded stage)</h4>
         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 'var(--fs-sm)' }}>
@@ -155,19 +155,19 @@ function ScalingSection({ model, onSave, saving }) {
       </p>
       <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <label>
-          <div style={{ fontSize: 'var(--fs-xs)', opacity: 0.7, marginBottom: '4px' }}>Milestone Every (% net profit)</div>
+          <div style={{ fontSize: 'var(--fs-xs)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Milestone Every (% net profit)</div>
           <input type="number" min="0.1" step="0.1" style={inputStyle} value={draft.scaling_target_pct} onChange={(e) => update('scaling_target_pct', e.target.value)} />
         </label>
         <label>
-          <div style={{ fontSize: 'var(--fs-xs)', opacity: 0.7, marginBottom: '4px' }}>Lot-Size Multiplier (x per milestone)</div>
+          <div style={{ fontSize: 'var(--fs-xs)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Lot-Size Multiplier (x per milestone)</div>
           <input type="number" min="1.01" step="0.1" style={inputStyle} value={draft.scaling_multiplier} onChange={(e) => update('scaling_multiplier', e.target.value)} />
         </label>
         <label>
-          <div style={{ fontSize: 'var(--fs-xs)', opacity: 0.7, marginBottom: '4px' }}>Capital Increase per Milestone (%)</div>
+          <div style={{ fontSize: 'var(--fs-xs)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Capital Increase per Milestone (%)</div>
           <input type="number" min="0" step="1" style={inputStyle} value={draft.scaling_increase_per_milestone_pct} onChange={(e) => update('scaling_increase_per_milestone_pct', e.target.value)} />
         </label>
         <label>
-          <div style={{ fontSize: 'var(--fs-xs)', opacity: 0.7, marginBottom: '4px' }}>Max Account Size ($)</div>
+          <div style={{ fontSize: 'var(--fs-xs)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Max Account Size ($)</div>
           <input type="number" min="1" step="1000" style={inputStyle} value={draft.scaling_max_account_size} onChange={(e) => update('scaling_max_account_size', e.target.value)} />
         </label>
         <button className="admin-btn admin-btn-sm" disabled={saving} onClick={() => onSave(model.slug, draft)}>
@@ -221,13 +221,13 @@ function StepModelCard({ model, onToggle, onSavePhase, onSavePricing, onSaveScal
   }
 
   return (
-    <Card style={{ marginBottom: '24px', padding: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+    <Card style={{ marginBottom: 'var(--space-6)', padding: 'var(--space-5)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
         <div>
           <h3 style={{ margin: 0 }}>{model.name}</h3>
           <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7 }}>{model.description}</div>
         </div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', cursor: 'pointer' }}>
           <span style={{ fontSize: 'var(--fs-base)', fontWeight: 600, color: model.is_active ? 'var(--admin-success)' : 'var(--admin-text-muted)' }}>
             {model.is_active ? 'Enabled' : 'Disabled'}
           </span>
@@ -357,12 +357,12 @@ export default function AdminStepModels() {
   }
 
   if (loading) {
-    return <div style={{ padding: '32px', opacity: 0.7 }}>Loading challenge models...</div>
+    return <div style={{ padding: 'var(--space-7)', opacity: 0.7 }}>Loading challenge models...</div>
   }
 
   return (
-    <div style={{ padding: '24px' }}>
-      <div style={{ marginBottom: '20px' }}>
+    <div style={{ padding: 'var(--space-6)' }}>
+      <div style={{ marginBottom: 'var(--space-5)' }}>
         <h2 style={{ margin: '0 0 4px' }}>Challenge Models</h2>
         <p style={{ margin: 0, opacity: 0.7, fontSize: 'var(--fs-base)' }}>
           Manage the 1-step, 2-step, and 3-step challenge models: enable/disable, edit phase rules, and edit pricing per account size. Changes apply platform-wide immediately.

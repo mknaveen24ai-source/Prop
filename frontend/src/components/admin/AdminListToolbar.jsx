@@ -92,7 +92,7 @@ export default function AdminListToolbar({
                     type="checkbox"
                     checked={visibleColumnKeys.includes(column.key)}
                     onChange={() => onToggleColumn && onToggleColumn(column.key)}
-                    style={{ marginRight: '8px' }}
+                    style={{ marginRight: 'var(--space-2)' }}
                   />
                   {column.header}
                 </label>

@@ -54,16 +54,16 @@ function CreateCompetitionForm({ onCreate, creating }) {
   const inputStyle = { width: '100%', padding: '8px 10px', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }
 
   return (
-    <form onSubmit={submit} className="lx-card" style={{ marginBottom: '24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+    <form onSubmit={submit} className="lx-card" style={{ marginBottom: 'var(--space-6)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
       <div style={{ gridColumn: '1 / -1' }}>
         <h3 style={{ margin: '0 0 4px' }}>Create Competition</h3>
       </div>
       <label>
-        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Title</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Title</div>
         <input style={inputStyle} value={form.title} onChange={(e) => update('title', e.target.value)} required />
       </label>
       <label>
-        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Type</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Type</div>
         <select style={inputStyle} value={form.type} onChange={(e) => update('type', e.target.value)}>
           <option value="weekly">Weekly</option>
           <option value="monthly">Monthly</option>
@@ -71,34 +71,34 @@ function CreateCompetitionForm({ onCreate, creating }) {
         </select>
       </label>
       <label>
-        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Start</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Start</div>
         <input type="datetime-local" style={inputStyle} value={form.start_at} onChange={(e) => update('start_at', e.target.value)} required />
       </label>
       <label>
-        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>End</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>End</div>
         <input type="datetime-local" style={inputStyle} value={form.end_at} onChange={(e) => update('end_at', e.target.value)} required />
       </label>
       <label>
-        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Starting Balance ($)</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Starting Balance ($)</div>
         <input type="number" style={inputStyle} value={form.starting_balance} onChange={(e) => update('starting_balance', e.target.value)} />
       </label>
       <label>
-        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Max Participants (blank = unlimited)</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Max Participants (blank = unlimited)</div>
         <input type="number" style={inputStyle} value={form.max_participants} onChange={(e) => update('max_participants', e.target.value)} />
       </label>
       <label>
-        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Ranking Metric</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Ranking Metric</div>
         <select style={inputStyle} value={form.ranking_metric} onChange={(e) => update('ranking_metric', e.target.value)}>
           <option value="profit_pct">Profit %</option>
           <option value="profit_usd">Profit $</option>
         </select>
       </label>
       <label>
-        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Max Drawdown %</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Max Drawdown %</div>
         <input type="number" style={inputStyle} value={form.max_drawdown_pct} onChange={(e) => update('max_drawdown_pct', e.target.value)} />
       </label>
       <label>
-        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '4px' }}>Daily Drawdown % (optional)</div>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Daily Drawdown % (optional)</div>
         <input type="number" style={inputStyle} value={form.daily_drawdown_pct} onChange={(e) => update('daily_drawdown_pct', e.target.value)} />
       </label>
       <div style={{ gridColumn: '1 / -1' }}>
@@ -184,8 +184,8 @@ export default function AdminCompetitions() {
   ]
 
   return (
-    <div style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+    <div style={{ padding: 'var(--space-6)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-5)', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
         <div>
           <h1 className="admin-h1">Competitions</h1>
           <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
@@ -199,7 +199,7 @@ export default function AdminCompetitions() {
 
       {showForm && <CreateCompetitionForm onCreate={handleCreate} creating={creating} />}
 
-      <AdminStatGrid style={{ marginBottom: '20px' }}>
+      <AdminStatGrid style={{ marginBottom: 'var(--space-5)' }}>
         <AdminStatCard icon="challenges" label="Total Competitions" value={kpis.total} />
         <AdminStatCard icon="activity" label="Active Now" value={kpis.active} />
         <AdminStatCard icon="calendar" label="Upcoming" value={kpis.upcoming} />

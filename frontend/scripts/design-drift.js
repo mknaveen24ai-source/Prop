@@ -110,7 +110,7 @@ function main() {
   const fontScale = readScale(css, 'fs')
 
   const files = jsxFiles()
-  const findings = { color: [], fontSize: [], spacing: [] }
+  const findings = { color: [], fontSize: [], spacing: [], spacingLiteral: [] }
 
   for (const file of files) {
     const src = fs.readFileSync(file, 'utf8')
@@ -137,10 +137,20 @@ function main() {
       }
     }
 
-    // ── spacing off the scale ───────────────────────────────────────────────
+    // ── spacing ─────────────────────────────────────────────────────────────
     // Handles the shorthand forms too: `padding: '8px 10px'` accounts for 406
     // uses on its own, and counting only single values would understate the
     // surface by more than half.
+    //
+    // Split into two kinds, because they need different work. An ON-scale
+    // literal like `padding: '16px'` renders correctly today and is a pure
+    // rename to var(--space-4) -- scriptable, invisible. An OFF-scale literal
+    // like `padding: '10px'` has no token and must move 2px one way or the
+    // other, which is a judgement per surface.
+    //
+    // An earlier version counted only the off-scale kind, which matched neither
+    // the fontSize check above nor the point of tokenising: a hardcoded 16px is
+    // still a value that will not follow the scale if the scale ever changes.
     {
       const re = /(padding|margin|gap|rowGap|columnGap)[A-Za-z]*:\s*'([0-9px\s]+)'/g
       let m
@@ -151,9 +161,8 @@ function main() {
           // 0 and 1px are legitimate outside a spacing scale: 0 is "none" and
           // 1px is a hairline rule, not a spacing step.
           if (value === 0 || value === 1) continue
-          if (!spaceScale.has(value)) {
-            findings.spacing.push({ file: relPath, line: lineOf(src, m.index), value: part, prop: m[1] })
-          }
+          const bucket = spaceScale.has(value) ? 'spacingLiteral' : 'spacing'
+          findings[bucket].push({ file: relPath, line: lineOf(src, m.index), value: part, prop: m[1] })
         }
       }
     }
@@ -168,7 +177,8 @@ function main() {
   }
   const skeletonUsers = files.filter((f) => /Skeleton(Card|Table|Stats|Line|Text)/.test(fs.readFileSync(f, 'utf8'))).length
 
-  const total = findings.color.length + findings.fontSize.length + findings.spacing.length
+  const total = findings.color.length + findings.fontSize.length +
+    findings.spacing.length + findings.spacingLiteral.length
   const result = {
     scales: {
       spacing: [...spaceScale].sort((a, b) => a - b),
@@ -179,6 +189,7 @@ function main() {
       color: findings.color.length,
       fontSize: findings.fontSize.length,
       spacing: findings.spacing.length,
+      spacingLiteral: findings.spacingLiteral.length,
       total
     },
     adoption,
@@ -214,7 +225,10 @@ function report(r, findings) {
   console.log('    hardcoded colour     ' + String(r.violations.color).padStart(5) +
     '   (' + r.allowlisted + ' files allowlisted with a reason)')
   console.log('    font-size off scale  ' + String(r.violations.fontSize).padStart(5))
-  console.log('    spacing off scale    ' + String(r.violations.spacing).padStart(5))
+  console.log('    spacing off scale    ' + String(r.violations.spacing).padStart(5) +
+    '   (needs a human - each moves 1-4px)')
+  console.log('    spacing untokenised  ' + String(r.violations.spacingLiteral).padStart(5) +
+    '   (already on scale - pure rename)')
   console.log('    ' + 'total'.padEnd(20) + ' ' + String(r.violations.total).padStart(5))
   console.log('')
   console.log('  Adoption of components that already exist')

@@ -92,7 +92,7 @@ export default function AdminTopBar({ adminAxios, onMobileMenuClick, onLogout, s
           flexDirection: 'column',
           alignItems: 'flex-end',
           gap: '2px',
-          padding: '8px 12px',
+          padding: 'var(--space-2) var(--space-3)',
           border: '1px solid var(--admin-border)',
           background: 'var(--glass)'
         }}>
@@ -150,7 +150,7 @@ export default function AdminTopBar({ adminAxios, onMobileMenuClick, onLogout, s
 
           {showProfile && (
             <div className="admin-dropdown" style={{ width: '220px' }}>
-              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--admin-border)', marginBottom: '4px' }}>
+              <div style={{ padding: 'var(--space-3) var(--space-4)', borderBottom: '1px solid var(--admin-border)', marginBottom: 'var(--space-1)' }}>
                 <strong style={{ fontSize: 'var(--fs-base)', display: 'block' }}>{session?.full_name || roleLabel}</strong>
                 <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)' }}>{session?.email || roleLabel}</span>
                 <div style={{ marginTop: '6px', fontSize: 'var(--fs-xs)', color: 'var(--admin-text-faint)' }}>
@@ -171,7 +171,7 @@ export default function AdminTopBar({ adminAxios, onMobileMenuClick, onLogout, s
               </button>
               <button
                 className="admin-dropdown-item danger"
-                style={{ marginTop: '4px', borderTop: '1px solid var(--admin-border)' }}
+                style={{ marginTop: 'var(--space-1)', borderTop: '1px solid var(--admin-border)' }}
                 onClick={async () => {
                   await onLogout?.()
                   setShowProfile(false)

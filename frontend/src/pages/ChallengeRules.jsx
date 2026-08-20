@@ -21,7 +21,7 @@ function formatDateTime(value) {
 
 function RuleRow({ label, value, accent = false }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '12px 0', borderBottom: '1px solid var(--navy-border)' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-3)', padding: '12px 0', borderBottom: '1px solid var(--navy-border)' }}>
       <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>{label}</span>
       <span style={{ color: accent ? 'var(--accent)' : 'var(--text)', fontSize: 'var(--fs-base)', fontFamily: 'var(--font-mono)', textAlign: 'right' }}>{value}</span>
     </div>
@@ -192,8 +192,8 @@ function PhaseTable({ model, currentStepNumber, isFundedAccount, isCurrentModel 
   ]
 
   return (
-    <Card style={{ marginBottom: '16px', border: isCurrentModel ? '1px solid var(--accent)' : undefined }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '4px', flexWrap: 'wrap' }}>
+    <Card style={{ marginBottom: 'var(--space-4)', border: isCurrentModel ? '1px solid var(--accent)' : undefined }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: 'var(--space-1)', flexWrap: 'wrap' }}>
         <h3 style={{ color: 'var(--accent)', fontSize: 'var(--fs-lg)', margin: 0 }}>{model.name || 'Phase Table'}</h3>
         {isCurrentModel && <span className="badge badge-success" style={{ fontSize: 'var(--fs-2xs)' }}>Your model</span>}
       </div>
@@ -202,12 +202,12 @@ function PhaseTable({ model, currentStepNumber, isFundedAccount, isCurrentModel 
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: `${180 + columns.length * 140}px` }}>
           <thead>
             <tr>
-              <th style={{ textAlign: 'left', padding: '8px 12px' }} />
+              <th style={{ textAlign: 'left', padding: 'var(--space-2) var(--space-3)' }} />
               {columns.map((c) => (
                 <th
                   key={c.key}
                   style={{
-                    textAlign: 'right', padding: '8px 12px', fontSize: 'var(--fs-sm)',
+                    textAlign: 'right', padding: 'var(--space-2) var(--space-3)', fontSize: 'var(--fs-sm)',
                     color: c.isCurrent ? 'var(--accent)' : 'var(--text)',
                     borderBottom: `2px solid ${c.isCurrent ? 'var(--accent)' : 'var(--navy-border)'}`,
                   }}
@@ -258,7 +258,7 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
 
   if (!selectedAccount) {
     return (
-      <Card style={{ padding: '48px', textAlign: 'center' }}>
+      <Card style={{ padding: 'var(--space-9)', textAlign: 'center' }}>
         <h2 className="page-title" style={{ marginBottom: '10px' }}>The Rulebook, in full</h2>
         <p style={{ color: 'var(--text-muted)' }}>Select an account to see the exact rules for that phase.</p>
       </Card>
@@ -299,8 +299,8 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
   const ruleColumns = rules ? buildRuleColumns(rules, { isFundedAccount, currentModel, currentStepNumber }) : []
 
   return (
-    <div style={{ maxWidth: '1080px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ borderBottom: '3px double var(--ink)', paddingBottom: '16px', display: 'flex', alignItems: 'flex-end', gap: '20px', flexWrap: 'wrap' }}>
+    <div style={{ maxWidth: '1080px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
+      <div style={{ borderBottom: '3px double var(--ink)', paddingBottom: 'var(--space-4)', display: 'flex', alignItems: 'flex-end', gap: 'var(--space-5)', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: '280px' }}>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--accent)' }}>{kicker}</div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '38px', fontWeight: 400, margin: '10px 0 0' }}>The Rulebook, in full</h2>
@@ -323,7 +323,7 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
       </div>
 
       {!rules ? (
-        <Card style={{ padding: '40px', textAlign: 'center' }}>
+        <Card style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
           <p style={{ color: 'var(--text-muted)' }}>Loading account rules...</p>
         </Card>
       ) : (
@@ -332,7 +332,7 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
             {ruleLimits.map((r) => (
               <Card key={r.label} stat tone={r.tone}>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>{r.label}</div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'clamp(19px,1.7vw,24px)', whiteSpace: 'nowrap', marginTop: '8px', color: r.tone }}>{r.value}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'clamp(19px,1.7vw,24px)', whiteSpace: 'nowrap', marginTop: 'var(--space-2)', color: r.tone }}>{r.value}</div>
                 <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--muted)', marginTop: '5px', lineHeight: 1.5 }}>{r.note}</div>
               </Card>
             ))}
@@ -341,15 +341,15 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--glass)', boxShadow: 'var(--elev)' }}>
             {ruleColumns.map((col, colIndex) => (
               <div key={col.title} style={{ padding: '18px 20px 8px', borderRight: colIndex < ruleColumns.length - 1 ? '1px solid var(--rule)' : 'none' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '21px', borderBottom: '1px solid var(--rule)', paddingBottom: '11px', marginBottom: '4px' }}>{col.title}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: '21px', borderBottom: '1px solid var(--rule)', paddingBottom: '11px', marginBottom: 'var(--space-1)' }}>{col.title}</div>
                 {col.items.map((item) => (
-                  <div key={item.title} style={{ display: 'flex', gap: '12px', padding: '13px 0', borderBottom: '1px solid var(--rule-soft)' }}>
+                  <div key={item.title} style={{ display: 'flex', gap: 'var(--space-3)', padding: '13px 0', borderBottom: '1px solid var(--rule-soft)' }}>
                     <span style={{ display: 'inline-flex', color: item.tone, marginTop: '3px' }}>
                       {renderIcon(item.icon, { size: 15, color: item.tone })}
                     </span>
                     <div>
                       <div style={{ fontSize: '13.5px' }}>{item.title}</div>
-                      <div style={{ fontSize: '12.5px', lineHeight: 1.62, color: 'var(--muted)', marginTop: '4px' }}>{item.body}</div>
+                      <div style={{ fontSize: '12.5px', lineHeight: 1.62, color: 'var(--muted)', marginTop: 'var(--space-1)' }}>{item.body}</div>
                     </div>
                   </div>
                 ))}
@@ -359,7 +359,7 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
 
           {sortedModels.length > 0 && (
             <div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '19px', borderBottom: '3px double var(--rule)', paddingBottom: '12px', marginBottom: '16px' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: '19px', borderBottom: '3px double var(--rule)', paddingBottom: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
                 Targets by phase
               </div>
               {sortedModels.map((model) => (

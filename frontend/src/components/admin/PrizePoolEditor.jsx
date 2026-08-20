@@ -44,10 +44,10 @@ export default function PrizePoolEditor({ prizes, onChange, stepModels = [], acc
 
   return (
     <div>
-      <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: '8px' }}>Prizes (shown to traders on the competition page)</div>
+      <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-2)' }}>Prizes (shown to traders on the competition page)</div>
       {prizes.map((p, idx) => (
         <div key={idx} style={{ border: '1px solid var(--admin-border)', borderRadius: '8px', padding: '10px', marginBottom: '10px' }}>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: p.voucher ? '10px' : 0 }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginBottom: p.voucher ? '10px' : 0 }}>
             <input
               type="number"
               min="1"
@@ -71,7 +71,7 @@ export default function PrizePoolEditor({ prizes, onChange, stepModels = [], acc
           </label>
 
           {p.voucher && (
-            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
               <select
                 className="admin-select"
                 style={{ flex: 1 }}

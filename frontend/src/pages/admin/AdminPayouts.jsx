@@ -322,14 +322,14 @@ export default function AdminPayouts() {
   return (
     <PageWrapper>
       <>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-6)' }}>
           <div>
             <h1 className="admin-h1">Payout Operations</h1>
             <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>Review finance queues with saved views, classifications, tags, and risk context.</p>
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
           <AdminStatCard icon="wallet" label="Total Requests" value={summary.total || 0} />
           <AdminStatCard icon="history" label="Pending" value={summary.pending || 0} />
           <AdminStatCard icon="approve" label="Paid" value={summary.paid || 0} />

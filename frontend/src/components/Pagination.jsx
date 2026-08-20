@@ -71,7 +71,7 @@ export default function Pagination({ page, totalPages, onPageChange, pageSize, t
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      gap: '12px',
+      gap: 'var(--space-3)',
       padding: '12px 0',
       flexWrap: 'wrap',
     }}>

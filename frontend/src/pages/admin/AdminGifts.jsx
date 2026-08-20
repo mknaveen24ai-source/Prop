@@ -55,7 +55,7 @@ export default function AdminGifts() {
 
   return (
     <>
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: 'var(--space-6)' }}>
         <h1 className="admin-h1">Gift Vouchers</h1>
         <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
           Challenge accounts purchased as gifts. Buyers create these at checkout — this view is for
@@ -90,27 +90,27 @@ export default function AdminGifts() {
             <table className="admin-table" style={{ width: '100%', fontSize: 13 }}>
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'left', padding: '8px' }}>Code</th>
-                  <th style={{ textAlign: 'left', padding: '8px' }}>Status</th>
-                  <th style={{ textAlign: 'left', padding: '8px' }}>Size</th>
-                  <th style={{ textAlign: 'left', padding: '8px' }}>Purchaser</th>
-                  <th style={{ textAlign: 'left', padding: '8px' }}>Recipient</th>
-                  <th style={{ textAlign: 'left', padding: '8px' }}>Issued</th>
-                  <th style={{ textAlign: 'left', padding: '8px' }}>Expires</th>
-                  <th style={{ textAlign: 'left', padding: '8px' }}></th>
+                  <th style={{ textAlign: 'left', padding: 'var(--space-2)' }}>Code</th>
+                  <th style={{ textAlign: 'left', padding: 'var(--space-2)' }}>Status</th>
+                  <th style={{ textAlign: 'left', padding: 'var(--space-2)' }}>Size</th>
+                  <th style={{ textAlign: 'left', padding: 'var(--space-2)' }}>Purchaser</th>
+                  <th style={{ textAlign: 'left', padding: 'var(--space-2)' }}>Recipient</th>
+                  <th style={{ textAlign: 'left', padding: 'var(--space-2)' }}>Issued</th>
+                  <th style={{ textAlign: 'left', padding: 'var(--space-2)' }}>Expires</th>
+                  <th style={{ textAlign: 'left', padding: 'var(--space-2)' }}></th>
                 </tr>
               </thead>
               <tbody>
                 {gifts.map((gift) => (
                   <tr key={gift.id} style={{ borderTop: '1px solid var(--admin-border)' }}>
-                    <td style={{ padding: '8px', fontFamily: 'var(--font-mono)' }}>{gift.code}</td>
-                    <td style={{ padding: '8px', color: STATUS_COLORS[gift.status] || 'var(--admin-text)' }}>{gift.status}</td>
-                    <td style={{ padding: '8px' }}>${Number(gift.account_size).toLocaleString()}</td>
-                    <td style={{ padding: '8px' }}>{gift.purchaser_email || '—'}</td>
-                    <td style={{ padding: '8px' }}>{gift.recipient_email}</td>
-                    <td style={{ padding: '8px' }}>{gift.issued_at ? new Date(gift.issued_at).toLocaleDateString() : '—'}</td>
-                    <td style={{ padding: '8px' }}>{gift.expires_at ? new Date(gift.expires_at).toLocaleDateString() : '—'}</td>
-                    <td style={{ padding: '8px' }}>
+                    <td style={{ padding: 'var(--space-2)', fontFamily: 'var(--font-mono)' }}>{gift.code}</td>
+                    <td style={{ padding: 'var(--space-2)', color: STATUS_COLORS[gift.status] || 'var(--admin-text)' }}>{gift.status}</td>
+                    <td style={{ padding: 'var(--space-2)' }}>${Number(gift.account_size).toLocaleString()}</td>
+                    <td style={{ padding: 'var(--space-2)' }}>{gift.purchaser_email || '—'}</td>
+                    <td style={{ padding: 'var(--space-2)' }}>{gift.recipient_email}</td>
+                    <td style={{ padding: 'var(--space-2)' }}>{gift.issued_at ? new Date(gift.issued_at).toLocaleDateString() : '—'}</td>
+                    <td style={{ padding: 'var(--space-2)' }}>{gift.expires_at ? new Date(gift.expires_at).toLocaleDateString() : '—'}</td>
+                    <td style={{ padding: 'var(--space-2)' }}>
                       {gift.status === 'issued' && (
                         <button
                           className="admin-btn admin-btn-ghost"

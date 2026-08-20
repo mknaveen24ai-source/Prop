@@ -122,11 +122,11 @@ export default function AdminCertificates() {
   const revokedCount = data.certificates.filter((c) => c.status === 'revoked').length
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ padding: 'var(--space-6)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <h1 className="admin-h1">Certificates</h1>
-          <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)', marginBottom: '20px' }}>
+          <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)', marginBottom: 'var(--space-5)' }}>
             Issued automatically when a promotion is approved or a payout is paid. Search by trader name, email or certificate ID.
           </p>
         </div>
@@ -138,7 +138,7 @@ export default function AdminCertificates() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
         <AdminStatCard icon="leaderboard" label="Total Issued" value={data.total || 0} />
         <AdminStatCard icon="warning" label="Revoked (page)" value={revokedCount} />
         <AdminStatCard icon="users" label="On This Page" value={data.certificates.length} />

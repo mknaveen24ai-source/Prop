@@ -98,7 +98,7 @@ export default function AdminTradingEconomics() {
 
   if (loading) {
     return (
-      <div style={{ padding: '40px', display: 'grid', gap: '16px' }}>
+      <div style={{ padding: 'var(--space-8)', display: 'grid', gap: 'var(--space-4)' }}>
         {Array(4).fill(0).map((_, index) => (
           <div key={index} className="admin-skeleton" style={{ height: '48px' }} />
         ))}
@@ -110,7 +110,7 @@ export default function AdminTradingEconomics() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-7)' }}>
         <div>
           <h1 className="admin-h1">Trading Economics</h1>
           <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>

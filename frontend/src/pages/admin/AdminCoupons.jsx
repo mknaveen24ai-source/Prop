@@ -126,7 +126,7 @@ export default function AdminCoupons() {
 
   if (loading) {
     return (
-      <div style={{ padding: '40px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '14px' }}>
+      <div style={{ padding: 'var(--space-8)', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '14px' }}>
         {Array(4).fill(0).map((_, index) => (
           <div key={index} className="admin-skeleton" style={{ height: '200px' }} />
         ))}
@@ -136,7 +136,7 @@ export default function AdminCoupons() {
 
   return (
     <>
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: 'var(--space-6)' }}>
         <h1 className="admin-h1">Coupons</h1>
         <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
           Codes traders can enter at checkout for a percent or fixed-dollar discount. Each code can only be

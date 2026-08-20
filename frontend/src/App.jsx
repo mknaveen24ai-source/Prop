@@ -235,7 +235,7 @@ function AppRoutes() {
             border: '1px solid var(--rule)',
             fontSize: 'var(--fs-base)',
             fontFamily: 'var(--font-ui, system-ui, sans-serif)',
-            padding: '12px 16px',
+            padding: 'var(--space-3) var(--space-4)',
             maxWidth: '360px',
           },
           success: {

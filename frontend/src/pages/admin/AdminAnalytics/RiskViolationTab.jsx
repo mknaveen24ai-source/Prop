@@ -126,8 +126,8 @@ export default function RiskViolationTab() {
         </PieChart>
       </AdminChart>
 
-      <h2 className="admin-h2" style={{ marginTop: '24px' }}>Daily Drawdown Tracking — Active Accounts</h2>
-      <Card flush style={{ marginBottom: '24px' }}>
+      <h2 className="admin-h2" style={{ marginTop: 'var(--space-6)' }}>Daily Drawdown Tracking — Active Accounts</h2>
+      <Card flush style={{ marginBottom: 'var(--space-6)' }}>
         <AdminDataTable columns={drawdownColumns} data={accounts} loading={accountsLoading} emptyMessage="No active accounts" emptyIcon="violations" />
       </Card>
 
@@ -138,7 +138,7 @@ export default function RiskViolationTab() {
         ))}
       </AdminFilterBar>
 
-      <Card flush style={{ marginBottom: '24px' }}>
+      <Card flush style={{ marginBottom: 'var(--space-6)' }}>
         <AdminDataTable
           columns={violationColumns}
           data={filteredViolations}
@@ -152,8 +152,8 @@ export default function RiskViolationTab() {
       <AdminModal isOpen={!!evidenceRow} onClose={() => setEvidenceRow(null)} title={evidenceRow ? `Violation #${evidenceRow.id} — ${evidenceRow.violation_type}` : ''} size="lg">
         {evidenceRow && (
           <div>
-            <p style={{ fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)', marginBottom: '16px' }}>{evidenceRow.message}</p>
-            <Card flush style={{ marginBottom: '24px' }}>
+            <p style={{ fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)', marginBottom: 'var(--space-4)' }}>{evidenceRow.message}</p>
+            <Card flush style={{ marginBottom: 'var(--space-6)' }}>
               <AdminDataTable
                 columns={[
                   { header: 'Opened', render: (row) => new Date(row.open_time).toLocaleTimeString(), isMono: true },

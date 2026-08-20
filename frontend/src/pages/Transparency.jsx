@@ -659,7 +659,7 @@ function PayoutsSection() {
       </div>
 
       <div className="tr-chart-card full-width" style={{ padding: 0 }}>
-        <div style={{ padding: '20px 24px 12px', borderBottom: '1px solid var(--rule-soft)' }}>
+        <div style={{ padding: 'var(--space-5) var(--space-6) var(--space-3)', borderBottom: '1px solid var(--rule-soft)' }}>
           <div className="tr-chart-title">Payout History</div>
           <div className="tr-chart-subtitle">All verified payouts — trader identities anonymized</div>
         </div>
@@ -677,7 +677,7 @@ function PayoutsSection() {
             <tbody>
               {payouts.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: 'var(--space-8)', color: 'var(--text-muted)' }}>
                     No payouts recorded yet.
                   </td>
                 </tr>
@@ -696,7 +696,7 @@ function PayoutsSection() {
           </table>
         </div>
         {totalPages > 1 && (
-          <div style={{ padding: '16px 24px' }}>
+          <div style={{ padding: 'var(--space-4) var(--space-6)' }}>
             <div className="tr-pagination">
               <button className="tr-page-btn" onClick={() => setPage(p => p - 1)} disabled={page <= 1}>← Prev</button>
               <span className="tr-page-btn current">{page}</span>

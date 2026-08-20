@@ -41,7 +41,7 @@ export default function DashboardProfilePage({
   return (
     <div>
       <Card style={{ maxWidth: '700px' }}>
-        <h3 style={{ marginBottom: '20px', color: 'var(--accent)' }}>Name & Address</h3>
+        <h3 style={{ marginBottom: 'var(--space-5)', color: 'var(--accent)' }}>Name & Address</h3>
         <form onSubmit={updateProfile}>
           <div className="grid-2">
             <Field
@@ -64,7 +64,7 @@ export default function DashboardProfilePage({
             />
           </div>
 
-          <div style={{ marginTop: '16px' }}>
+          <div style={{ marginTop: 'var(--space-4)' }}>
             <Field
               label="Address Line 1"
               value={profileForm.address_line1}
@@ -73,7 +73,7 @@ export default function DashboardProfilePage({
             />
           </div>
 
-          <div style={{ marginTop: '16px' }}>
+          <div style={{ marginTop: 'var(--space-4)' }}>
             <Field
               label="Address Line 2 (optional)"
               value={profileForm.address_line2}
@@ -82,7 +82,7 @@ export default function DashboardProfilePage({
             />
           </div>
 
-          <div className="grid-2" style={{ marginTop: '16px' }}>
+          <div className="grid-2" style={{ marginTop: 'var(--space-4)' }}>
             <Field
               label="City"
               value={profileForm.city}
@@ -95,7 +95,7 @@ export default function DashboardProfilePage({
             />
           </div>
 
-          <div style={{ marginTop: '16px', maxWidth: '240px' }}>
+          <div style={{ marginTop: 'var(--space-4)', maxWidth: '240px' }}>
             <Field
               label="Postal Code"
               value={profileForm.postal_code}
@@ -103,45 +103,45 @@ export default function DashboardProfilePage({
             />
           </div>
 
-          <Button type="submit" style={{ marginTop: '20px' }} disabled={profileSaving}>
+          <Button type="submit" style={{ marginTop: 'var(--space-5)' }} disabled={profileSaving}>
             {profileSaving ? 'Saving...' : 'Save Changes'}
           </Button>
         </form>
       </Card>
 
-      <div style={{ maxWidth: '700px', marginTop: '24px' }}>
-        <h3 style={{ marginBottom: '12px', color: 'var(--accent)' }}>Security</h3>
+      <div style={{ maxWidth: '700px', marginTop: 'var(--space-6)' }}>
+        <h3 style={{ marginBottom: 'var(--space-3)', color: 'var(--accent)' }}>Security</h3>
         <TwoFactorSetup apiBase={API_URL} />
       </div>
 
       {platformRules && (
-        <div style={{ maxWidth: '700px', marginTop: '24px' }}>
-          <h3 style={{ marginBottom: '12px', color: 'var(--accent)' }}>Platform Trading Rules</h3>
+        <div style={{ maxWidth: '700px', marginTop: 'var(--space-6)' }}>
+          <h3 style={{ marginBottom: 'var(--space-3)', color: 'var(--accent)' }}>Platform Trading Rules</h3>
           <Card>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: '14px' }}>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', letterSpacing: '.06em', textTransform: 'uppercase' }}>Profit Share</div>
-                <div style={{ fontSize: '15px', marginTop: '4px' }}>{platformRules.profit_share_pct}%</div>
+                <div style={{ fontSize: '15px', marginTop: 'var(--space-1)' }}>{platformRules.profit_share_pct}%</div>
               </div>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', letterSpacing: '.06em', textTransform: 'uppercase' }}>Max Daily Trades</div>
-                <div style={{ fontSize: '15px', marginTop: '4px' }}>{platformRules.max_daily_trades ?? 'Unlimited'}</div>
+                <div style={{ fontSize: '15px', marginTop: 'var(--space-1)' }}>{platformRules.max_daily_trades ?? 'Unlimited'}</div>
               </div>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', letterSpacing: '.06em', textTransform: 'uppercase' }}>Minimum Hold Time</div>
-                <div style={{ fontSize: '15px', marginTop: '4px' }}>{platformRules.min_hold_seconds}s</div>
+                <div style={{ fontSize: '15px', marginTop: 'var(--space-1)' }}>{platformRules.min_hold_seconds}s</div>
               </div>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', letterSpacing: '.06em', textTransform: 'uppercase' }}>Minimum Lot Size</div>
-                <div style={{ fontSize: '15px', marginTop: '4px' }}>{parseFloat(platformRules.min_lot_size || 0).toFixed(2)}</div>
+                <div style={{ fontSize: '15px', marginTop: 'var(--space-1)' }}>{parseFloat(platformRules.min_lot_size || 0).toFixed(2)}</div>
               </div>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', letterSpacing: '.06em', textTransform: 'uppercase' }}>Weekend Holding</div>
-                <div style={{ fontSize: '15px', marginTop: '4px' }}>{platformRules.weekend_holding_enabled ? 'Allowed' : 'Not allowed'}</div>
+                <div style={{ fontSize: '15px', marginTop: 'var(--space-1)' }}>{platformRules.weekend_holding_enabled ? 'Allowed' : 'Not allowed'}</div>
               </div>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', letterSpacing: '.06em', textTransform: 'uppercase' }}>Inactivity Policy</div>
-                <div style={{ fontSize: '15px', marginTop: '4px' }}>
+                <div style={{ fontSize: '15px', marginTop: 'var(--space-1)' }}>
                   {platformRules.inactivity_auto_fail_enabled ? `Auto-fail after ${platformRules.inactivity_fail_days} days idle` : 'No auto-fail'}
                 </div>
               </div>

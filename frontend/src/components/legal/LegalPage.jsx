@@ -50,7 +50,7 @@ export default function LegalPage({ eyebrow = 'LEGAL DOCUMENT', title, intro, se
         </button>
         <button onClick={() => navigate(-1)} className="btn" style={{
           background: 'transparent', border: '1px solid var(--navy-border)',
-          color: 'var(--text-muted)', padding: '8px 20px', fontSize: 'var(--fs-base)'
+          color: 'var(--text-muted)', padding: 'var(--space-2) var(--space-5)', fontSize: 'var(--fs-base)'
         }}>
           ← Back
         </button>
@@ -66,13 +66,13 @@ export default function LegalPage({ eyebrow = 'LEGAL DOCUMENT', title, intro, se
           display: 'inline-block', background: 'color-mix(in srgb, var(--muted) 10%, transparent)',
           border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)', borderRadius: 'var(--radius-pill)',
           padding: '5px 14px', fontSize: 'var(--fs-xs)', color: 'var(--cyan)',
-          letterSpacing: '0.1em', marginBottom: '20px'
+          letterSpacing: '0.1em', marginBottom: 'var(--space-5)'
         }}>
           {eyebrow}
         </div>
         <h1 style={{
           fontFamily: 'var(--font-display)', fontSize: 'clamp(26px, 6vw, 40px)', fontWeight: '700',
-          marginBottom: '12px', color: 'var(--text)'
+          marginBottom: 'var(--space-3)', color: 'var(--text)'
         }}>
           {title}
         </h1>
@@ -86,7 +86,7 @@ export default function LegalPage({ eyebrow = 'LEGAL DOCUMENT', title, intro, se
           <div style={{
             background: 'color-mix(in srgb, var(--muted) 5%, transparent)',
             border: '1px solid color-mix(in srgb, var(--muted) 15%, transparent)',
-            padding: '24px 28px', marginBottom: '40px'
+            padding: '24px 28px', marginBottom: 'var(--space-8)'
           }}>
             <p style={{ color: 'var(--text)', lineHeight: '1.8', fontSize: 'var(--fs-md)', margin: 0, whiteSpace: 'pre-line' }}>
               {intro}
@@ -105,7 +105,7 @@ export default function LegalPage({ eyebrow = 'LEGAL DOCUMENT', title, intro, se
               style={{
                 background: 'var(--navy-card)',
                 border: `1px solid ${isOpen ? 'color-mix(in srgb, var(--muted) 30%, transparent)' : 'var(--navy-border)'}`,
-                marginBottom: '12px',
+                marginBottom: 'var(--space-3)',
                 overflow: 'hidden',
                 transition: 'border-color 0.2s ease'
               }}
@@ -118,7 +118,7 @@ export default function LegalPage({ eyebrow = 'LEGAL DOCUMENT', title, intro, se
                   onClick={() => setOpenId(isOpen ? null : section.id)}
                   style={{
                     width: '100%', display: 'flex', justifyContent: 'space-between',
-                    alignItems: 'center', gap: '16px', padding: '20px 24px', background: 'transparent',
+                    alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-5) var(--space-6)', background: 'transparent',
                     border: 'none', cursor: 'pointer', color: 'var(--text)', textAlign: 'left',
                     fontFamily: 'var(--font-ui)', fontSize: 'var(--fs-md)', fontWeight: '600', letterSpacing: '0.05em'
                   }}
@@ -153,7 +153,7 @@ export default function LegalPage({ eyebrow = 'LEGAL DOCUMENT', title, intro, se
 
         {contactEmail && (
           <div style={{
-            marginTop: '40px', padding: '24px', background: 'var(--navy-mid)',
+            marginTop: 'var(--space-8)', padding: 'var(--space-6)', background: 'var(--navy-mid)',
             border: '1px solid var(--navy-border)', textAlign: 'center'
           }}>
             <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', margin: 0, lineHeight: '1.7' }}>

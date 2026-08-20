@@ -34,7 +34,7 @@ export default function LandingAffiliate() {
     <section className="mp-section" style={{ position: 'relative' }}>
       <div className="mp-container">
         <div style={{ textAlign: 'center', marginBottom: '60px' }}>
-          <div className="mp-badge mp-reveal" style={{ marginBottom: '20px' }}>
+          <div className="mp-badge mp-reveal" style={{ marginBottom: 'var(--space-5)' }}>
             <span className="mp-badge-dot"></span>
             Affiliate Program
           </div>
@@ -57,7 +57,7 @@ export default function LandingAffiliate() {
                   display: 'inline-block', padding: '5px 14px',
                   background: 'transparent', fontSize: 'var(--fs-xs)',
                   textTransform: 'uppercase', letterSpacing: '0.15em',
-                  color: 'var(--gain)', marginBottom: '16px',
+                  color: 'var(--gain)', marginBottom: 'var(--space-4)',
                   border: '1px solid var(--gain)', fontFamily: 'var(--font-mono)',
                 }}>
                   {step.diff}
@@ -69,7 +69,7 @@ export default function LandingAffiliate() {
           ))}
         </div>
 
-        <div style={{ textAlign: 'center', marginTop: '48px' }}>
+        <div style={{ textAlign: 'center', marginTop: 'var(--space-9)' }}>
           <Link to="/register" className="mp-btn-primary" style={{ textDecoration: 'none' }}>
             Create Your Account &amp; Get Your Link
           </Link>

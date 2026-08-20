@@ -40,13 +40,13 @@ function AffiliateAnalysisTab({ adminAxios, toast }) {
 
   return (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
         <AdminStatCard icon="users" label="Total Referrals" value={funnel.totalReferrals} />
         <AdminStatCard icon="pnl" label="Paying Referrals" value={funnel.payingReferrals} />
         <AdminStatCard icon="activity" label="Conversion Rate" value={`${funnel.conversionPct}%`} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-6)', marginBottom: 'var(--space-6)' }}>
         <AdminChart title="Commission Paid by Month">
           {commissionByMonth.length > 0 ? (
             <BarChart data={commissionByMonth}>
@@ -84,7 +84,7 @@ function AffiliateAnalysisTab({ adminAxios, toast }) {
         </AdminChart>
       </div>
 
-      <Card ruled flush title="Top Affiliates" style={{ marginBottom: '24px' }}>
+      <Card ruled flush title="Top Affiliates" style={{ marginBottom: 'var(--space-6)' }}>
         <div className="admin-table-wrapper">
           <table className="admin-table">
             <thead>
@@ -161,13 +161,13 @@ export default function AdminAffiliates() {
   const totalPages = Math.max(1, Math.ceil(data.total / data.pageSize))
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ padding: 'var(--space-6)' }}>
       <h1 className="admin-h1">Affiliates</h1>
-      <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)', marginBottom: '20px' }}>
+      <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)', marginBottom: 'var(--space-5)' }}>
         Traders who have referred at least one signup. Commission is a lifetime revenue share, not a one-time bonus.
       </p>
 
-      <div style={{ display: 'flex', gap: '2px', padding: '3px', border: '1px solid var(--admin-border)', borderRadius: '4px', background: 'var(--admin-elevated)', width: 'fit-content', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', gap: '2px', padding: '3px', border: '1px solid var(--admin-border)', borderRadius: '4px', background: 'var(--admin-elevated)', width: 'fit-content', marginBottom: 'var(--space-6)' }}>
         {[{ id: 'directory', label: 'Directory' }, { id: 'analysis', label: 'Analysis' }].map((tab) => (
           <button
             key={tab.id}
@@ -188,13 +188,13 @@ export default function AdminAffiliates() {
         <AffiliateAnalysisTab adminAxios={adminAxios} toast={toast} />
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
             <AdminStatCard icon="users" label="Active Affiliates" value={data.total || 0} />
             <AdminStatCard icon="pnl" label="Lifetime Commission (page)" value={formatMoney(totalCommission)} />
             <AdminStatCard icon="wallet" label="Available Balance (page)" value={formatMoney(totalBalance)} />
           </div>
 
-          <div style={{ marginBottom: '16px' }}>
+          <div style={{ marginBottom: 'var(--space-4)' }}>
             <input
               className="admin-input"
               style={{ maxWidth: '360px' }}
@@ -241,7 +241,7 @@ export default function AdminAffiliates() {
           </div>
 
           {totalPages > 1 && (
-            <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)', justifyContent: 'center' }}>
               <button className="admin-btn admin-btn-sm" disabled={data.page <= 1} onClick={() => fetchAffiliates(data.page - 1)}>Previous</button>
               <span style={{ padding: '6px 12px', fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)' }}>Page {data.page} of {totalPages}</span>
               <button className="admin-btn admin-btn-sm" disabled={data.page >= totalPages} onClick={() => fetchAffiliates(data.page + 1)}>Next</button>

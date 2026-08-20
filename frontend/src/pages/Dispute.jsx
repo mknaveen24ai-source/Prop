@@ -133,12 +133,12 @@ export default function Dispute({ user, accounts }) {
   if (eligibleAccounts.length === 0) {
     return (
       <div style={{ maxWidth: '640px', margin: '0 auto' }}>
-        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-3xl)', marginBottom: '8px' }}>File an Appeal</h2>
-        <Card style={{ textAlign: 'center', padding: '48px 32px', marginTop: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-3xl)', marginBottom: 'var(--space-2)' }}>File an Appeal</h2>
+        <Card style={{ textAlign: 'center', padding: 'var(--space-9) var(--space-7)', marginTop: 'var(--space-4)' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-4)' }}>
             {renderIcon('approve', { size: 40, color: 'var(--gain)' })}
           </div>
-          <h3 style={{ marginBottom: '8px' }}>No Eligible Accounts</h3>
+          <h3 style={{ marginBottom: 'var(--space-2)' }}>No Eligible Accounts</h3>
           <p style={{ color: 'var(--muted)', fontSize: 'var(--fs-md)' }}>
             Appeals can only be filed for failed or expired challenge accounts. You don't have any accounts in those states.
           </p>
@@ -154,7 +154,7 @@ export default function Dispute({ user, accounts }) {
       <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-3xl)', margin: 0 }}>File an Appeal</h2>
 
       <div className="ui-split" style={{ alignItems: 'start', '--split': 'minmax(0,1.35fr) minmax(0,1fr)' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           {successId && (
             <Card style={{ border: '1px solid var(--gain)' }}>
               <div style={{ color: 'var(--gain)', fontSize: 'var(--fs-md)' }}>
@@ -171,7 +171,7 @@ export default function Dispute({ user, accounts }) {
             <select
               value={form.account_id}
               onChange={(e) => setForm((f) => ({ ...f, account_id: e.target.value }))}
-              style={{ width: '100%', marginTop: '8px', padding: '10px 12px', border: '1px solid var(--rule)', borderRadius: '4px', background: 'var(--paper)', color: 'var(--ink)', fontSize: 'var(--fs-base)' }}
+              style={{ width: '100%', marginTop: 'var(--space-2)', padding: '10px 12px', border: '1px solid var(--rule)', borderRadius: '4px', background: 'var(--paper)', color: 'var(--ink)', fontSize: 'var(--fs-base)' }}
             >
               <option value="">— Select account —</option>
               {eligibleAccounts.map((acc) => (
@@ -187,7 +187,7 @@ export default function Dispute({ user, accounts }) {
               linked at submission time (or shown here as pre-submit context). */}
           {form.account_id && violation && (
             <div style={{ border: '1px solid var(--loss)', borderRadius: '4px', background: 'var(--glass-2)', backdropFilter: 'blur(16px)', boxShadow: 'var(--elev)', padding: '18px 20px' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
                 <span style={{ display: 'inline-flex', color: 'var(--loss)', marginTop: '3px' }}>{renderIcon('warning', { size: 18, color: 'var(--loss)' })}</span>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--loss)' }}>Violation under appeal · V-{violation.id}</div>
@@ -195,22 +195,22 @@ export default function Dispute({ user, accounts }) {
                   <div style={{ fontSize: 'var(--fs-base)', color: 'var(--muted)', marginTop: '6px', lineHeight: 1.6 }}>{violation.message}</div>
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: '12px', marginTop: '16px', borderTop: '1px solid var(--rule-soft)', paddingTop: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 'var(--space-3)', marginTop: 'var(--space-4)', borderTop: '1px solid var(--rule-soft)', paddingTop: '14px' }}>
                 <div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Account</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '15px', marginTop: '4px' }}>{violationContext.account_uid}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '15px', marginTop: 'var(--space-1)' }}>{violationContext.account_uid}</div>
                 </div>
                 <div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Detected</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '15px', marginTop: '4px' }}>{formatDateTime(violation.first_detected_at)}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '15px', marginTop: 'var(--space-1)' }}>{formatDateTime(violation.first_detected_at)}</div>
                 </div>
                 <div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Severity</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '15px', marginTop: '4px', color: 'var(--loss)' }}>{titleCase(violation.severity)}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '15px', marginTop: 'var(--space-1)', color: 'var(--loss)' }}>{titleCase(violation.severity)}</div>
                 </div>
                 <div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Source</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '15px', marginTop: '4px' }}>System-flagged</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '15px', marginTop: 'var(--space-1)' }}>System-flagged</div>
                 </div>
               </div>
             </div>
@@ -223,11 +223,11 @@ export default function Dispute({ user, accounts }) {
 
           <Card ruled title="Grounds for appeal">
             {error && (
-              <div style={{ background: 'color-mix(in srgb, var(--loss) 10%, transparent)', border: '1px solid var(--loss)', padding: '10px 14px', marginBottom: '16px', color: 'var(--loss)', fontSize: 'var(--fs-base)' }}>
+              <div style={{ background: 'color-mix(in srgb, var(--loss) 10%, transparent)', border: '1px solid var(--loss)', padding: '10px 14px', marginBottom: 'var(--space-4)', color: 'var(--loss)', fontSize: 'var(--fs-base)' }}>
                 {error}
               </div>
             )}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 'var(--space-2)' }}>
               {DISPUTE_REASONS.map((r) => {
                 const active = form.reason === r
                 return (
@@ -259,13 +259,13 @@ export default function Dispute({ user, accounts }) {
               placeholder="Describe the sequence of events, with times in UTC. Attach platform screenshots below."
               style={{ width: '100%', resize: 'vertical', padding: '12px 14px', border: '1px solid var(--rule)', borderRadius: '4px', background: 'var(--paper)', color: 'var(--ink)', fontSize: '13.5px', lineHeight: 1.6 }}
             />
-            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--muted)', textAlign: 'right', marginTop: '4px' }}>{form.description.length} / 2000 (min 30)</div>
+            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--muted)', textAlign: 'right', marginTop: 'var(--space-1)' }}>{form.description.length} / 2000 (min 30)</div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '12px', padding: '12px 14px', border: '1px dashed var(--rule)', borderRadius: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginTop: 'var(--space-3)', padding: '12px 14px', border: '1px dashed var(--rule)', borderRadius: '4px' }}>
               <span style={{ display: 'inline-flex', color: 'var(--accent)' }}>{renderIcon('file', { size: 16, color: 'var(--accent)' })}</span>
               <div style={{ flex: 1, fontSize: '12.5px', color: 'var(--muted)' }}>
                 {evidenceFile ? `${evidenceFile.name} (${Math.round(evidenceFile.size / 1024)}KB)` : `Attach evidence — trade log, platform screenshot or broker statement (under ${Math.round(MAX_EVIDENCE_BYTES / 1024)}KB)`}
-                {evidenceError && <div style={{ color: 'var(--loss)', marginTop: '4px' }}>{evidenceError}</div>}
+                {evidenceError && <div style={{ color: 'var(--loss)', marginTop: 'var(--space-1)' }}>{evidenceError}</div>}
               </div>
               <label style={{ padding: '8px 14px', border: '1px solid var(--rule)', borderRadius: '4px', background: 'transparent', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.1em', textTransform: 'uppercase', cursor: 'pointer' }}>
                 Browse
@@ -273,7 +273,7 @@ export default function Dispute({ user, accounts }) {
               </label>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+            <div style={{ display: 'flex', gap: '10px', marginTop: 'var(--space-4)' }}>
               <button
                 onClick={handleSubmit}
                 disabled={loading}
@@ -292,15 +292,15 @@ export default function Dispute({ user, accounts }) {
           </Card>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           <Card title="How appeals run">
             {APPEAL_TIMELINE.map((t, idx) => (
-              <div key={t.label} style={{ display: 'flex', gap: '12px' }}>
+              <div key={t.label} style={{ display: 'flex', gap: 'var(--space-3)' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: '0 0 auto' }}>
                   <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: 'var(--accent)', flex: '0 0 auto' }} />
                   {idx < APPEAL_TIMELINE.length - 1 && <span style={{ width: '1px', flex: 1, background: 'var(--rule)', marginTop: '2px' }} />}
                 </div>
-                <div style={{ paddingBottom: '16px' }}>
+                <div style={{ paddingBottom: 'var(--space-4)' }}>
                   <div style={{ fontSize: 'var(--fs-base)' }}>{t.label}</div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)', marginTop: '3px' }}>{t.meta}</div>
                 </div>

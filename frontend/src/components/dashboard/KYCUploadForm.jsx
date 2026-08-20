@@ -123,14 +123,14 @@ function WebcamCapture({ onCapture, onCancel }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: 'var(--glass-2)', border: '1px solid var(--rule-soft)', borderTop: '3px double var(--ink)', padding: '28px', width: '600px', maxWidth: '95vw', display: 'flex', flexDirection: 'column', gap: '16px', backdropFilter: 'blur(20px) saturate(140%)', WebkitBackdropFilter: 'blur(20px) saturate(140%)' }}>
+      <div style={{ background: 'var(--glass-2)', border: '1px solid var(--rule-soft)', borderTop: '3px double var(--ink)', padding: '28px', width: '600px', maxWidth: '95vw', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', backdropFilter: 'blur(20px) saturate(140%)', WebkitBackdropFilter: 'blur(20px) saturate(140%)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ margin: 0, color: 'var(--text, #fff)', fontSize: '17px', fontWeight: 700 }}>Live Photo Capture</h3>
           <button type="button" onClick={handleCancel} style={{ background: 'none', border: 'none', color: 'var(--text-muted, #888)', fontSize: 'var(--fs-3xl)', cursor: 'pointer', lineHeight: 1 }}>x</button>
         </div>
 
         {error ? (
-          <div style={{ background: 'color-mix(in srgb, var(--loss) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--loss) 40%, transparent)', padding: '16px', color: 'var(--loss)', fontSize: 'var(--fs-md)', lineHeight: 1.6 }}>
+          <div style={{ background: 'color-mix(in srgb, var(--loss) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--loss) 40%, transparent)', padding: 'var(--space-4)', color: 'var(--loss)', fontSize: 'var(--fs-md)', lineHeight: 1.6 }}>
             {error}
           </div>
         ) : (
@@ -148,7 +148,7 @@ function WebcamCapture({ onCapture, onCancel }) {
                 <img src={captured} alt="Captured live selfie" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               )}
               {!ready && !captured && (
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', gap: '12px' }}>
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', gap: 'var(--space-3)' }}>
                   <div style={{ width: '32px', height: '32px', border: '3px solid var(--rule)', borderTopColor: 'var(--ink)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                   <span style={{ fontSize: 'var(--fs-base)' }}>Starting camera...</span>
                 </div>
@@ -159,7 +159,7 @@ function WebcamCapture({ onCapture, onCancel }) {
               Hold your government ID next to your face and make sure both your face and document are readable.
             </p>
 
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
               {!captured ? (
                 <>
                   <button type="button" onClick={takeSnapshot} disabled={!ready} style={{ flex: 1, padding: '14px', fontSize: '15px', fontWeight: 700, cursor: ready ? 'pointer' : 'not-allowed', background: ready ? 'var(--ink)' : 'var(--rule)', border: 'none', color: 'var(--paper)', opacity: ready ? 1 : 0.5 }}>
@@ -278,7 +278,7 @@ export default function KYCUploadForm({
     return (
       <div>
         <label htmlFor={inputId}>{label}</label>
-        <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginBottom: '8px', lineHeight: 1.5 }}>
+        <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginBottom: 'var(--space-2)', lineHeight: 1.5 }}>
           {helper}
         </p>
         <div
@@ -286,7 +286,7 @@ export default function KYCUploadForm({
           style={{
             border: `1.5px dashed ${error ? 'var(--red)' : 'var(--border)'}`,
             minHeight: '150px',
-            padding: '20px',
+            padding: 'var(--space-5)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -299,7 +299,7 @@ export default function KYCUploadForm({
         >
           {file ? (
             <div>
-              <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--accent-green)', fontWeight: 800, letterSpacing: '0.08em', marginBottom: '8px' }}>UPLOADED</div>
+              <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--accent-green)', fontWeight: 800, letterSpacing: '0.08em', marginBottom: 'var(--space-2)' }}>UPLOADED</div>
               <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-primary)', wordBreak: 'break-word' }}>{file.name}</div>
               <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '6px' }}>{fileSizeKb(file)}</div>
             </div>
@@ -327,8 +327,8 @@ export default function KYCUploadForm({
       )}
 
       <Card>
-        <h3 style={{ color: 'var(--accent)', marginBottom: '8px' }}>Submit your documents</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-md)', marginBottom: '24px' }}>
+        <h3 style={{ color: 'var(--accent)', marginBottom: 'var(--space-2)' }}>Submit your documents</h3>
+        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-md)', marginBottom: 'var(--space-6)' }}>
           Country, government ID details, ID document, and a live photo — all reviewed by admin.
         </p>
 
@@ -405,10 +405,10 @@ export default function KYCUploadForm({
             })}
           </div>
 
-          <div className="grid-2 kyc-upload-grid" style={{ marginTop: '16px' }}>
+          <div className="grid-2 kyc-upload-grid" style={{ marginTop: 'var(--space-4)' }}>
             <div>
               <label htmlFor="selfie_input">Live Photo / Selfie</label>
-              <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginBottom: '8px' }}>
+              <p style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', marginBottom: 'var(--space-2)' }}>
                 Use camera or upload a clear selfie with your ID.
               </p>
 
@@ -438,21 +438,21 @@ export default function KYCUploadForm({
                     >
                       x
                     </button>
-                    <div style={{ padding: '8px', fontSize: 'var(--fs-sm)', color: 'var(--green-light)' }}>
+                    <div style={{ padding: 'var(--space-2)', fontSize: 'var(--fs-sm)', color: 'var(--green-light)' }}>
                       {selfie?.name} - {fileSizeKb(selfie)}
                     </div>
                   </div>
                 ) : selfie ? (
-                  <div style={{ padding: '20px' }}>
-                    <div style={{ fontSize: 'var(--fs-4xl)', marginBottom: '8px' }}>IMG</div>
+                  <div style={{ padding: 'var(--space-5)' }}>
+                    <div style={{ fontSize: 'var(--fs-4xl)', marginBottom: 'var(--space-2)' }}>IMG</div>
                     <div style={{ fontSize: 'var(--fs-base)', color: 'var(--green-light)' }}>{selfie.name}</div>
-                    <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '4px' }}>{fileSizeKb(selfie)}</div>
+                    <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>{fileSizeKb(selfie)}</div>
                   </div>
                 ) : (
-                  <div style={{ padding: '20px' }}>
-                    <div style={{ fontSize: 'var(--fs-4xl)', marginBottom: '8px' }}>+</div>
+                  <div style={{ padding: 'var(--space-5)' }}>
+                    <div style={{ fontSize: 'var(--fs-4xl)', marginBottom: 'var(--space-2)' }}>+</div>
                     <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)' }}>Click to upload live photo</div>
-                    <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginTop: '4px' }}>JPG or PNG - max 5MB</div>
+                    <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginTop: 'var(--space-1)' }}>JPG or PNG - max 5MB</div>
                   </div>
                 )}
               </div>
@@ -462,7 +462,7 @@ export default function KYCUploadForm({
               <button
                 type="button"
                 onClick={() => setShowCamera(true)}
-                style={{ marginTop: '8px', width: '100%', padding: '10px', background: 'transparent', border: '1px solid var(--rule)', color: 'var(--accent)', fontSize: 'var(--fs-base)', fontWeight: 600, cursor: 'pointer', transition: 'border-color 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                style={{ marginTop: 'var(--space-2)', width: '100%', padding: '10px', background: 'transparent', border: '1px solid var(--rule)', color: 'var(--accent)', fontSize: 'var(--fs-base)', fontWeight: 600, cursor: 'pointer', transition: 'border-color 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}
               >
                 Use Live Camera Instead
               </button>
@@ -471,13 +471,13 @@ export default function KYCUploadForm({
             </div>
           </div>
 
-          <div style={{ marginTop: '20px', padding: '16px', background: 'var(--glass)', border: '1px solid var(--rule-soft)', marginBottom: '20px' }}>
+          <div style={{ marginTop: 'var(--space-5)', padding: 'var(--space-4)', background: 'var(--glass)', border: '1px solid var(--rule-soft)', marginBottom: 'var(--space-5)' }}>
             <p style={{ margin: 0, fontSize: 'var(--fs-base)', color: 'var(--text-muted)' }}>
               Your documents are stored securely and only used for identity verification. Admin can review the submitted details, ID document, and live photo.
             </p>
           </div>
 
-          <button className="btn btn-accent" type="submit" style={{ padding: '12px 32px' }} disabled={uploading || !canSubmit}>
+          <button className="btn btn-accent" type="submit" style={{ padding: 'var(--space-3) var(--space-7)' }} disabled={uploading || !canSubmit}>
             {uploading ? 'Uploading...' : 'Submit for Verification'}
           </button>
         </form>

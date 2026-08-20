@@ -82,11 +82,11 @@ export default function DashboardPayoutsPage({
   if (!fundedAccount) {
     return (
       <div>
-        <Card style={{ textAlign: 'center', padding: '48px', maxWidth: '500px' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+        <Card style={{ textAlign: 'center', padding: 'var(--space-9)', maxWidth: '500px' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-4)' }}>
             {renderIcon('payouts', { size: 48, color: 'var(--accent)' })}
           </div>
-          <h3 style={{ color: 'var(--accent)', marginBottom: '12px' }}>No Funded Account Yet</h3>
+          <h3 style={{ color: 'var(--accent)', marginBottom: 'var(--space-3)' }}>No Funded Account Yet</h3>
           <p style={{ color: 'var(--muted)' }}>Complete Phase 1 and Phase 2 to unlock payouts.</p>
         </Card>
       </div>
@@ -116,7 +116,7 @@ export default function DashboardPayoutsPage({
         {kpis.map((k) => (
           <Card key={k.label} stat tone={k.tone}>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>{k.label}</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'clamp(20px,1.8vw,25px)', whiteSpace: 'nowrap', marginTop: '8px', color: k.tone }}>{k.value}</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'clamp(20px,1.8vw,25px)', whiteSpace: 'nowrap', marginTop: 'var(--space-2)', color: k.tone }}>{k.value}</div>
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '10px', marginTop: '6px' }}>
               <span style={{ fontSize: '11.5px', color: 'var(--muted)' }}>{k.sub}</span>
               {k.spark.length > 1 && <Sparkline data={k.spark} tone={k.tone} width={70} height={24} />}
@@ -128,7 +128,7 @@ export default function DashboardPayoutsPage({
       <div className="ui-split" style={{ alignItems: 'start', '--split': 'minmax(0,1fr) minmax(0,1.5fr)' }}>
         {/* Request a payout */}
         <form onSubmit={requestPayout} style={{ background: 'var(--glass-2)', backdropFilter: 'blur(18px)', border: '1px solid var(--accent)', borderRadius: '4px', boxShadow: 'var(--elev)', padding: '18px 20px' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-2xl)', borderBottom: '3px double var(--rule)', paddingBottom: '12px', marginBottom: '16px' }}>Request a payout</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-2xl)', borderBottom: '3px double var(--rule)', paddingBottom: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>Request a payout</div>
 
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '6px' }}>
             Amount available — {formatCurrency(availableProfit)}
@@ -149,7 +149,7 @@ export default function DashboardPayoutsPage({
                 key={pct}
                 type="button"
                 onClick={() => setPayoutForm({ ...payoutForm, amount_requested: String(presetAmount(pct)) })}
-                style={{ flex: 1, padding: '8px', border: '1px solid var(--rule)', borderRadius: '4px', background: 'transparent', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.08em', textTransform: 'uppercase', cursor: 'pointer' }}
+                style={{ flex: 1, padding: 'var(--space-2)', border: '1px solid var(--rule)', borderRadius: '4px', background: 'transparent', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.08em', textTransform: 'uppercase', cursor: 'pointer' }}
               >
                 {pct === 1 ? 'Max' : `${pct * 100}%`}
               </button>
@@ -216,12 +216,12 @@ export default function DashboardPayoutsPage({
               required
               style={{ width: '100%', marginTop: '6px', resize: 'vertical' }}
             />
-            <p style={{ marginTop: '8px', fontSize: 'var(--fs-xs)', color: 'var(--warn)' }}>
+            <p style={{ marginTop: 'var(--space-2)', fontSize: 'var(--fs-xs)', color: 'var(--warn)' }}>
               Double-check before submitting — crypto payouts are final. Funds sent to an incorrect address or wrong network cannot be recovered.
             </p>
           </div>
 
-          <div style={{ borderTop: '1px solid var(--rule-soft)', marginTop: '14px', paddingTop: '12px' }}>
+          <div style={{ borderTop: '1px solid var(--rule-soft)', marginTop: '14px', paddingTop: 'var(--space-3)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', padding: '5px 0', fontSize: '12.5px' }}>
               <span style={{ color: 'var(--muted)' }}>Requested amount</span>
               <span style={{ fontFamily: 'var(--font-mono)' }}>{formatCurrency(payoutForm.amount_requested || 0)}</span>
@@ -239,16 +239,16 @@ export default function DashboardPayoutsPage({
           <button
             type="submit"
             disabled={availableProfit < 50}
-            style={{ width: '100%', marginTop: '16px', padding: '13px', border: '1px solid var(--accent)', borderRadius: '4px', background: availableProfit < 50 ? 'var(--rule)' : 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: '11.5px', letterSpacing: '.12em', textTransform: 'uppercase', cursor: availableProfit < 50 ? 'not-allowed' : 'pointer' }}
+            style={{ width: '100%', marginTop: 'var(--space-4)', padding: '13px', border: '1px solid var(--accent)', borderRadius: '4px', background: availableProfit < 50 ? 'var(--rule)' : 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: '11.5px', letterSpacing: '.12em', textTransform: 'uppercase', cursor: availableProfit < 50 ? 'not-allowed' : 'pointer' }}
           >
             {availableProfit < 50 ? 'Minimum $50 required' : 'Submit request'}
           </button>
         </form>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           {/* Profit split accrual */}
           <Card>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', borderBottom: '1px solid var(--rule-soft)', paddingBottom: '12px', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', borderBottom: '1px solid var(--rule-soft)', paddingBottom: 'var(--space-3)', marginBottom: '14px' }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '19px' }}>Profit split accrual</div>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: '3px' }}>
@@ -275,7 +275,7 @@ export default function DashboardPayoutsPage({
             {accrualData.length > 1 ? (
               <EquityCurveChart data={accrualData} height={200} tone="var(--gain)" />
             ) : (
-              <div style={{ textAlign: 'center', padding: '48px', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>Not enough trading history yet for this range.</div>
+              <div style={{ textAlign: 'center', padding: 'var(--space-9)', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>Not enough trading history yet for this range.</div>
             )}
           </Card>
 
@@ -284,14 +284,14 @@ export default function DashboardPayoutsPage({
             <button
               onClick={() => { const link = document.createElement('a'); link.href = `${API_URL}/api/payouts/statement`; link.target = '_blank'; link.click() }}
               className="lx-btn"
-              style={{ padding: '8px 12px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)' }}
+              style={{ padding: 'var(--space-2) var(--space-3)', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)' }}
               title="Download your payout statement as HTML (printable / save as PDF)"
             >
               Download Statement
             </button>
           )}>
             {payouts.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '48px', color: 'var(--muted)' }}>No payouts requested yet.</div>
+              <div style={{ textAlign: 'center', padding: 'var(--space-9)', color: 'var(--muted)' }}>No payouts requested yet.</div>
             ) : (
               <>
                 <div className="lx-table-wrap">

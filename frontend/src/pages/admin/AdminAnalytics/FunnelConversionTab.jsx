@@ -103,13 +103,13 @@ export default function FunnelConversionTab() {
 
   return (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
         <FunnelChart title="Acquisition Funnel — Visitors to Purchases" data={acquisitionFunnel} />
         <FunnelChart title="Challenge Funnel — Start to Funded" data={challengeFunnel} />
       </div>
 
       <h2 className="admin-h2">Time-to-Outcome & Retry Rate per Phase</h2>
-      <Card flush style={{ marginBottom: '24px' }}>
+      <Card flush style={{ marginBottom: 'var(--space-6)' }}>
         <AdminDataTable columns={timingColumns} data={phaseTiming} loading={loading} emptyMessage="No completed phases yet" emptyIcon="timer" />
       </Card>
 

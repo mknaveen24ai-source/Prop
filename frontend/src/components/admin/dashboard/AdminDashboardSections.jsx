@@ -50,7 +50,7 @@ export function AdminDashboardAlerts({ loading, error, alerts, navigate }) {
   if (loading || error || !alerts?.length) return null;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${alerts.length}, minmax(0,1fr))`, gap: '12px', marginBottom: '24px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${alerts.length}, minmax(0,1fr))`, gap: 'var(--space-3)', marginBottom: 'var(--space-6)' }}>
       {alerts.map((a) => (
         <div
           key={a.kicker}
@@ -65,7 +65,7 @@ export function AdminDashboardAlerts({ loading, error, alerts, navigate }) {
           </span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.15em', textTransform: 'uppercase', color: `var(--${a.tone})` }}>{a.kicker}</div>
-            <div style={{ fontSize: '13.5px', marginTop: '4px', lineHeight: 1.45 }}>{a.text}</div>
+            <div style={{ fontSize: '13.5px', marginTop: 'var(--space-1)', lineHeight: 1.45 }}>{a.text}</div>
           </div>
           <button
             onClick={() => navigate(ALERT_ROUTES[a.go] ? ALERT_ROUTES[a.go] : `/admin/${a.go}`)}
@@ -137,7 +137,7 @@ export function AdminDashboardCharts({
 
   return (
     <>
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 'var(--space-6)', marginBottom: 'var(--space-6)' }}>
         {loading ? (
           <ChartSkeleton height={220} />
         ) : (
@@ -215,7 +215,7 @@ export function AdminDashboardAttention({ loading, error, overview, funnelData, 
   if (loading || error || !overview) return null;
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.2fr)', gap: '16px', alignItems: 'start', marginBottom: '32px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.2fr)', gap: 'var(--space-4)', alignItems: 'start', marginBottom: 'var(--space-7)' }}>
       <AdminChart title="Challenge Pipeline" eyebrow="Last 90 days · conversion at each gate">
         <BarChart data={funnelData} layout="vertical">
             <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} stroke="var(--rule)" />
@@ -261,13 +261,13 @@ export function AdminDashboardAttention({ loading, error, overview, funnelData, 
         )}
       >
         {attentionQueue.length === 0 ? (
-          <div style={{ padding: '24px 4px', textAlign: 'center', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>Nothing needs attention right now.</div>
+          <div style={{ padding: 'var(--space-6) var(--space-1)', textAlign: 'center', color: 'var(--muted)', fontSize: 'var(--fs-base)' }}>Nothing needs attention right now.</div>
         ) : (
           attentionQueue.map((q) => (
             <button
               key={q.key}
               onClick={() => navigate(ATTENTION_ROUTES[q.key] || '/admin')}
-              style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '11px 6px', border: 'none', borderBottom: '1px solid var(--rule-soft)', background: 'transparent', color: 'var(--ink)', textAlign: 'left', cursor: 'pointer' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', width: '100%', padding: '11px 6px', border: 'none', borderBottom: '1px solid var(--rule-soft)', background: 'transparent', color: 'var(--ink)', textAlign: 'left', cursor: 'pointer' }}
             >
               <span style={{ display: 'inline-flex', color: 'var(--warn)' }}>{renderIcon(ATTENTION_ICONS[q.key] || 'flag', { size: 16, color: 'var(--warn)' })}</span>
               <span style={{ flex: 1, minWidth: 0 }}>

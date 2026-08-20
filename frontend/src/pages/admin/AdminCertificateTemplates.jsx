@@ -216,7 +216,7 @@ export default function AdminCertificateTemplates() {
                   key={template.id}
                   onClick={() => setSelectedId(template.id)}
                   style={{
-                    padding: '8px 12px', cursor: 'pointer', textAlign: 'left',
+                    padding: 'var(--space-2) var(--space-3)', cursor: 'pointer', textAlign: 'left',
                     background: String(template.id) === String(selectedId) ? 'var(--admin-accent)' : 'transparent',
                     color: String(template.id) === String(selectedId) ? 'var(--paper)' : 'var(--admin-text-muted)',
                     border: '1px solid var(--admin-border)', fontFamily: 'var(--font-mono)', fontSize: 11
@@ -278,7 +278,7 @@ export default function AdminCertificateTemplates() {
                     key={def.key}
                     onClick={() => setSelectedField(def.key)}
                     style={{
-                      padding: '4px 8px', fontSize: 10, fontFamily: 'var(--font-mono)', cursor: 'pointer',
+                      padding: 'var(--space-1) var(--space-2)', fontSize: 10, fontFamily: 'var(--font-mono)', cursor: 'pointer',
                       background: def.key === selectedField ? 'var(--admin-accent)' : 'transparent',
                       color: def.key === selectedField ? 'var(--paper)' : 'var(--admin-text-muted)',
                       border: '1px solid var(--admin-border)',

@@ -28,7 +28,7 @@ const STEPS = [
     title: 'Trading Rules',
     body: (
       <div>
-        <div className="ui-cols ui-cols--keep-2" style={{ marginTop: '8px', '--cols-gap': '8px' }}>
+        <div className="ui-cols ui-cols--keep-2" style={{ marginTop: 'var(--space-2)', '--cols-gap': '8px' }}>
           {[
             ['Profit Target',    'Set by your model'],
             ['Max Drawdown',     'Set by your model'],
@@ -142,7 +142,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
       position: 'fixed', inset: 0,
       background: 'rgba(0,0,0,0.75)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 9999, padding: '20px',
+      zIndex: 9999, padding: 'var(--space-5)',
       backdropFilter: 'blur(4px)'
     }}>
       <div style={{
@@ -164,7 +164,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
             position: 'absolute', top: '16px', right: '16px',
             background: 'transparent', border: 'none',
             color: 'var(--text-dim)', fontSize: 'var(--fs-sm)',
-            cursor: 'pointer', padding: '4px 8px'
+            cursor: 'pointer', padding: 'var(--space-1) var(--space-2)'
           }}
         >
           Skip tour
@@ -189,7 +189,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
         </div>
 
         {/* Icon */}
-        <div style={{ fontSize: 'var(--fs-7xl)', marginBottom: '16px', lineHeight: 1 }}>
+        <div style={{ fontSize: 'var(--fs-7xl)', marginBottom: 'var(--space-4)', lineHeight: 1 }}>
           {current.icon}
         </div>
 
@@ -271,7 +271,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
         {/* Step counter */}
         <div style={{
           textAlign: 'center',
-          marginTop: '16px',
+          marginTop: 'var(--space-4)',
           fontSize: 'var(--fs-xs)',
           color: 'var(--text-dim)'
         }}>

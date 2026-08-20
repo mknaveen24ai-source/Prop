@@ -307,7 +307,7 @@ export default function AdminEmailJobs() {
           <div style={{ color: 'var(--admin-text)', fontSize: 'var(--fs-sm)' }}>
             {job.last_error ? String(job.last_error).slice(0, 90) : 'No error recorded'}
           </div>
-          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)', marginTop: '4px' }}>
+          <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)', marginTop: 'var(--space-1)' }}>
             {job.preview_url ? 'Preview captured' : job.provider_message_id ? 'Provider receipt stored' : 'No preview path'}
           </div>
         </div>
@@ -346,7 +346,7 @@ export default function AdminEmailJobs() {
   return (
     <PageWrapper>
       <>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-6)' }}>
           <div>
             <h1 className="admin-h1">Email Job Monitor</h1>
             <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
@@ -355,7 +355,7 @@ export default function AdminEmailJobs() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
           <AdminStatCard icon="mail" label="Total Jobs" value={summary.total || 0} />
           <AdminStatCard icon="timer" label="Queued / Retry" value={(summary.pending || 0) + (summary.sending || 0) + (summary.retry || 0)} />
           <AdminStatCard icon="approve" label="Delivered" value={summary.sent || 0} />
@@ -430,7 +430,7 @@ export default function AdminEmailJobs() {
               style={{ width: 'min(960px, calc(100vw - 32px))', maxHeight: '88vh', overflowY: 'auto', margin: 0 }}
               onMouseDown={(event) => event.stopPropagation()}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-start', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)', alignItems: 'flex-start', marginBottom: '18px' }}>
                 <div>
                   <h2 className="admin-h2" style={{ marginBottom: '6px' }}>Email Job MAIL-{String(drawerRow.id).padStart(6, '0')}</h2>
                   <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)' }}>{drawerRow.to_email}</div>
@@ -451,7 +451,7 @@ export default function AdminEmailJobs() {
                 <div><span>Sent</span><strong>{formatDateTime(drawerRow.sent_at)}</strong></div>
               </div>
 
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: '18px' }}>
                 {Array.isArray(drawerRow.allowed_actions) && drawerRow.allowed_actions.includes('retry_email_job') && (
                   <button className="admin-btn admin-btn-primary" onClick={() => retryJob(drawerRow)} disabled={retryingId === String(drawerRow.id)}>
                     {retryingId === String(drawerRow.id) ? 'Re-queuing...' : 'Retry Now'}
@@ -466,10 +466,10 @@ export default function AdminEmailJobs() {
 
               <Card style={{ margin: 0, background: 'var(--admin-bg)' }}>
                 <h3 className="admin-h3">Provider / Preview</h3>
-                <div style={{ display: 'grid', gap: '8px', marginBottom: '14px' }}>
-                  <div><strong style={{ display: 'block', marginBottom: '4px' }}>Provider Message ID</strong><span className="admin-font-mono">{drawerRow.provider_message_id || '—'}</span></div>
-                  <div><strong style={{ display: 'block', marginBottom: '4px' }}>Preview Path</strong><span className="admin-font-mono">{drawerRow.preview_url || '—'}</span></div>
-                  <div><strong style={{ display: 'block', marginBottom: '4px' }}>Unique Key</strong><span className="admin-font-mono">{drawerRow.unique_key || '—'}</span></div>
+                <div style={{ display: 'grid', gap: 'var(--space-2)', marginBottom: '14px' }}>
+                  <div><strong style={{ display: 'block', marginBottom: 'var(--space-1)' }}>Provider Message ID</strong><span className="admin-font-mono">{drawerRow.provider_message_id || '—'}</span></div>
+                  <div><strong style={{ display: 'block', marginBottom: 'var(--space-1)' }}>Preview Path</strong><span className="admin-font-mono">{drawerRow.preview_url || '—'}</span></div>
+                  <div><strong style={{ display: 'block', marginBottom: 'var(--space-1)' }}>Unique Key</strong><span className="admin-font-mono">{drawerRow.unique_key || '—'}</span></div>
                 </div>
                 <div>
                   <strong style={{ display: 'block', marginBottom: '6px' }}>Last Error</strong>

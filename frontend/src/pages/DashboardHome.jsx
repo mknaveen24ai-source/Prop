@@ -75,7 +75,7 @@ function accountPhaseText(account, isSelected, stats) {
 
 function AccountChipsRow({ accounts, selectedAccount, onSelect, stats, onOpenRulesPage, onStartChallenge }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'stretch', gap: '12px', flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', alignItems: 'stretch', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
       {accounts.map((account) => {
         const isSelected = selectedAccount?.id === account.id
         return (
@@ -104,7 +104,7 @@ function AccountChipsRow({ accounts, selectedAccount, onSelect, stats, onOpenRul
           </button>
         )
       })}
-      <div style={{ flex: 1, minWidth: '180px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', flexWrap: 'wrap' }}>
+      <div style={{ flex: 1, minWidth: '180px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
         <button
           onClick={onOpenRulesPage}
           className="lx-btn"
@@ -128,7 +128,7 @@ function AccountChipsRow({ accounts, selectedAccount, onSelect, stats, onOpenRul
 function KpiCard({ icon, label, value, delta, sub, tone, sparkData }) {
   return (
     <Card stat tone={tone}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--muted)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--muted)' }}>
         <span style={{ display: 'inline-flex', color: tone }}>{renderIcon(icon, { size: 13, color: tone })}</span>
         {label}
       </div>
@@ -207,26 +207,26 @@ function ConsistencyRiskBlock({ consistency, dailyDrawdown, totalDrawdownUsedPct
   ].filter(Boolean)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
       <Card>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--rule-soft)', paddingBottom: '10px', marginBottom: '14px' }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px' }}>Consistency</div>
         </div>
         {consistency ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
             <div style={{ width: '110px', flex: '0 0 110px' }}>
               <ConsistencyDonut score={consistency.score} />
             </div>
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '9px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '12.5px', borderBottom: '1px solid var(--rule-soft)', paddingBottom: '7px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', fontSize: '12.5px', borderBottom: '1px solid var(--rule-soft)', paddingBottom: '7px' }}>
                 <span style={{ color: 'var(--muted)' }}>Best day</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>{formatMoney(consistency.best_day_profit)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '12.5px', borderBottom: '1px solid var(--rule-soft)', paddingBottom: '7px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', fontSize: '12.5px', borderBottom: '1px solid var(--rule-soft)', paddingBottom: '7px' }}>
                 <span style={{ color: 'var(--muted)' }}>Share of profit</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--gain)' }}>{consistency.best_day_pct.toFixed(1)}%</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', fontSize: '12.5px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', fontSize: '12.5px' }}>
                 <span style={{ color: 'var(--muted)' }}>Firm limit</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)' }}>{consistency.threshold_pct.toFixed(1)}%</span>
               </div>
@@ -244,7 +244,7 @@ function ConsistencyRiskBlock({ consistency, dailyDrawdown, totalDrawdownUsedPct
         </div>
         {risks.map((r) => (
           <div key={r.label} style={{ padding: '12px 0', borderBottom: '1px solid var(--rule-soft)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'baseline' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', alignItems: 'baseline' }}>
               <span style={{ fontSize: 'var(--fs-base)' }}>{r.label}</span>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', color: r.tone }}>{r.usedLabel}</span>
             </div>
@@ -266,7 +266,7 @@ function OpenPositionsTable({ positions }) {
 
   return (
     <Card ruled title="Open Positions" actions={(
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', color: 'var(--muted)' }}>Floating</span>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-md)', color: floatingTotal >= 0 ? 'var(--gain)' : 'var(--loss)' }}>{formatSigned(floatingTotal)}</span>
       </div>
@@ -322,7 +322,7 @@ function SessionHeat({ matrix, hours }) {
 
   return (
     <div className="ui-scroll-x">
-      <div className="heatmap-grid" style={{ marginBottom: '4px' }}>
+      <div className="heatmap-grid" style={{ marginBottom: 'var(--space-1)' }}>
         <div />
         {hours.map((h) => (
           <div key={h} style={{ fontSize: '8px', textAlign: 'center', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
@@ -347,7 +347,7 @@ function SessionHeat({ matrix, hours }) {
           ))}
         </div>
       ))}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', borderTop: '1px solid var(--rule-soft)', paddingTop: '8px', fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: '10px', borderTop: '1px solid var(--rule-soft)', paddingTop: 'var(--space-2)', fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)' }}>
         <span style={{ color: 'var(--loss)' }}>Loss</span>
         <span style={{ flex: '0 0 60px', height: '4px', background: 'linear-gradient(90deg, var(--loss), var(--rule-soft), var(--gain))', borderRadius: '2px' }} />
         <span style={{ color: 'var(--gain)' }}>Gain</span>
@@ -378,18 +378,18 @@ function PayoutCycleBanner({ payoutCycle, onRequestPayout }) {
   const boxes = [{ v: String(d).padStart(2, '0'), l: 'Days' }, { v: String(h).padStart(2, '0'), l: 'Hours' }, { v: String(m).padStart(2, '0'), l: 'Min' }, { v: String(s).padStart(2, '0'), l: 'Sec' }]
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap', background: 'var(--glass-2)', border: '1px solid var(--accent)', borderRadius: 'var(--radius-sm)', boxShadow: 'var(--elev)', padding: '16px 20px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-5)', flexWrap: 'wrap', background: 'var(--glass-2)', border: '1px solid var(--accent)', borderRadius: 'var(--radius-sm)', boxShadow: 'var(--elev)', padding: 'var(--space-4) var(--space-5)' }}>
       <div style={{ flex: 1, minWidth: '220px' }}>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--accent)' }}>Next payout window</div>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: '21px', marginTop: '4px' }}>Eligible for a profit share payout</div>
-        <div style={{ fontSize: 'var(--fs-base)', color: 'var(--muted)', marginTop: '4px' }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: '21px', marginTop: 'var(--space-1)' }}>Eligible for a profit share payout</div>
+        <div style={{ fontSize: 'var(--fs-base)', color: 'var(--muted)', marginTop: 'var(--space-1)' }}>
           Cycle closes {new Date(payoutCycle.next_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} · estimated share {formatMoney(payoutCycle.estimated_share)}
         </div>
       </div>
       {boxes.map((b) => (
         <div key={b.l} style={{ minWidth: '70px', textAlign: 'center', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper)', padding: '10px 12px' }}>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xl)', color: 'var(--accent)', fontVariantNumeric: 'tabular-nums' }}>{b.v}</div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: '4px' }}>{b.l}</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: 'var(--space-1)' }}>{b.l}</div>
         </div>
       ))}
       <button
@@ -436,7 +436,7 @@ function ScalingProgressCard({ scaling }) {
         </div>
       ) : (
         <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: '4px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 'var(--space-1)' }}>
             <span>Progress to milestone {nextMilestone}</span>
             <span>{scaling.progress_pct.toFixed(0)}%</span>
           </div>
@@ -610,7 +610,7 @@ export default function DashboardHome({
     if (!selectedAccount) {
       return (
         <PageWrapper>
-          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--muted)' }}>
+          <div style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--muted)' }}>
             No accounts yet.
           </div>
         </PageWrapper>
@@ -620,8 +620,8 @@ export default function DashboardHome({
       <PageWrapper>
         <div role="status" aria-live="polite" aria-busy="true">
           <span className="ui-skeleton-srlabel">Loading account stats</span>
-          <SkeletonStats count={4} style={{ marginBottom: '16px' }} />
-          <SkeletonCard lines={4} style={{ marginBottom: '16px' }} />
+          <SkeletonStats count={4} style={{ marginBottom: 'var(--space-4)' }} />
+          <SkeletonCard lines={4} style={{ marginBottom: 'var(--space-4)' }} />
           <SkeletonTable rows={5} columns={5} />
         </div>
       </PageWrapper>
@@ -631,8 +631,8 @@ export default function DashboardHome({
   if (selectedAccount.status === 'locked') {
     return (
       <PageWrapper>
-        <Card style={{ textAlign: 'center', padding: '32px' }}>
-          <h3 style={{ color: 'var(--muted)', marginBottom: '8px' }}>Account Locked</h3>
+        <Card style={{ textAlign: 'center', padding: 'var(--space-7)' }}>
+          <h3 style={{ color: 'var(--muted)', marginBottom: 'var(--space-2)' }}>Account Locked</h3>
           <p style={{ color: 'var(--text-muted)' }}>This account has been locked by admin. Contact support for assistance.</p>
         </Card>
       </PageWrapper>
@@ -728,7 +728,7 @@ export default function DashboardHome({
           </div>
         )}
         {equityCurve.length > 1 && (
-          <div style={{ display: 'flex', gap: '22px', borderTop: '1px solid var(--rule-soft)', marginTop: '8px', padding: '11px 2px 6px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '22px', borderTop: '1px solid var(--rule-soft)', marginTop: 'var(--space-2)', padding: '11px 2px 6px', flexWrap: 'wrap' }}>
             {[
               { label: 'Opening', value: formatMoney(equityCurve[0].value), tone: 'var(--muted)' },
               { label: 'Current', value: formatMoney(equityCurve[equityCurve.length - 1].value), tone: 'var(--ink)' },

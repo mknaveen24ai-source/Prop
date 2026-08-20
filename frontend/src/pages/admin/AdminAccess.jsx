@@ -15,10 +15,10 @@ function AccessCard({ title, value, helper, status = 'neutral' }) {
 
   return (
     <Card stat tone={accent} style={{ marginBottom: 0 }}>
-      <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
+      <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 'var(--space-2)' }}>
         {title}
       </div>
-      <div style={{ fontSize: 'var(--fs-5xl)', fontWeight: 700, color: accent, marginBottom: '8px' }}>
+      <div style={{ fontSize: 'var(--fs-5xl)', fontWeight: 700, color: accent, marginBottom: 'var(--space-2)' }}>
         {value}
       </div>
       <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)' }}>{helper}</div>
@@ -29,7 +29,7 @@ function AccessCard({ title, value, helper, status = 'neutral' }) {
 function SecurityFlag({ label, healthy, detail }) {
   return (
     <Card style={{ marginBottom: 0 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', marginBottom: '8px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-3)', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
         <div style={{ fontWeight: 600 }}>{label}</div>
         <AdminBadge status={healthy ? 'success' : 'danger'} label={healthy ? 'OK' : 'Needs Action'} />
       </div>
@@ -313,11 +313,11 @@ export default function AdminAccess() {
   }, [session, twoFaStatus])
 
   if (loading) {
-    return <Card style={{ marginBottom: '24px' }}>Loading admin access controls...</Card>
+    return <Card style={{ marginBottom: 'var(--space-6)' }}>Loading admin access controls...</Card>
   }
 
   return (
-    <div style={{ display: 'grid', gap: '24px' }}>
+    <div style={{ display: 'grid', gap: 'var(--space-6)' }}>
       <div>
         <h1 className="admin-h1">Access & Security</h1>
         <p style={{ color: 'var(--admin-text-muted)', maxWidth: '920px', margin: 0 }}>
@@ -326,7 +326,7 @@ export default function AdminAccess() {
         </p>
       </div>
 
-      <div style={{ display: 'grid', gap: '16px', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+      <div style={{ display: 'grid', gap: 'var(--space-4)', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
         {currentAdminCards.map((card) => (
           <AccessCard
             key={card.title}
@@ -338,8 +338,8 @@ export default function AdminAccess() {
         ))}
       </div>
 
-      <Card style={{ marginBottom: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center', marginBottom: '18px' }}>
+      <Card style={{ marginBottom: 'var(--space-6)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)', alignItems: 'center', marginBottom: '18px' }}>
           <div>
             <h2 className="admin-h2" style={{ marginBottom: '6px' }}>Admin 2FA</h2>
             <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
@@ -355,18 +355,18 @@ export default function AdminAccess() {
         </div>
 
         {twoFaStatus?.legacy_env_fallback ? (
-          <div style={{ padding: '16px', border: '1px solid color-mix(in srgb, var(--admin-warning) 25%, transparent)', background: 'color-mix(in srgb, var(--admin-warning) 8%, transparent)', color: 'var(--admin-text)' }}>
+          <div style={{ padding: 'var(--space-4)', border: '1px solid color-mix(in srgb, var(--admin-warning) 25%, transparent)', background: 'color-mix(in srgb, var(--admin-warning) 8%, transparent)', color: 'var(--admin-text)' }}>
             This session is using the legacy `.env` bootstrap path. Create your first DB-backed platform admin, sign in with that account, and then enroll 2FA.
           </div>
         ) : setupPayload ? (
-          <div style={{ display: 'grid', gap: '20px', gridTemplateColumns: 'minmax(240px, 320px) minmax(280px, 1fr)' }}>
+          <div style={{ display: 'grid', gap: 'var(--space-5)', gridTemplateColumns: 'minmax(240px, 320px) minmax(280px, 1fr)' }}>
             <Card style={{ marginBottom: 0, background: 'var(--admin-bg)' }}>
               <div style={{ fontWeight: 600, marginBottom: '10px' }}>Scan QR Code</div>
               <img src={setupPayload.qr} alt="Admin 2FA QR" style={{ width: '100%', maxWidth: '240px', background: 'var(--paper)', padding: '10px' }} />
             </Card>
             <Card style={{ marginBottom: 0, background: 'var(--admin-bg)' }}>
               <div style={{ fontWeight: 600, marginBottom: '10px' }}>Verify Setup</div>
-              <div style={{ fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)', marginBottom: '12px' }}>
+              <div style={{ fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)', marginBottom: 'var(--space-3)' }}>
                 Manual secret: <span className="admin-font-mono" style={{ color: 'var(--admin-text)' }}>{setupPayload.secret}</span>
               </div>
               <div className="admin-form-group">
@@ -378,7 +378,7 @@ export default function AdminAccess() {
                   placeholder="Enter 6-digit code"
                 />
               </div>
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
                 <button className="admin-btn admin-btn-primary" onClick={handleVerifySetup} disabled={busyKey === '2fa-verify' || !setupCode.trim()}>
                   {busyKey === '2fa-verify' ? 'Verifying...' : 'Enable 2FA'}
                 </button>
@@ -389,10 +389,10 @@ export default function AdminAccess() {
             </Card>
           </div>
         ) : (
-          <div style={{ display: 'grid', gap: '16px', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+          <div style={{ display: 'grid', gap: 'var(--space-4)', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
             <Card style={{ marginBottom: 0, background: 'var(--admin-bg)' }}>
               <div style={{ fontWeight: 600, marginBottom: '10px' }}>Enrollment</div>
-              <div style={{ fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)', marginBottom: '16px' }}>
+              <div style={{ fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)', marginBottom: 'var(--space-4)' }}>
                 {twoFaStatus?.totp_enabled
                   ? 'This admin account already requires TOTP during login.'
                   : 'Enroll this admin account with an authenticator app and one-time backup codes.'}
@@ -407,7 +407,7 @@ export default function AdminAccess() {
             {twoFaStatus?.totp_enabled && (
               <Card style={{ marginBottom: 0, background: 'var(--admin-bg)' }}>
                 <div style={{ fontWeight: 600, marginBottom: '10px' }}>Disable 2FA</div>
-                <div style={{ fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)', marginBottom: '12px' }}>
+                <div style={{ fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)', marginBottom: 'var(--space-3)' }}>
                   Enter an authenticator code or a remaining backup code to remove 2FA from this admin account.
                 </div>
                 <div className="admin-form-group">
@@ -428,17 +428,17 @@ export default function AdminAccess() {
         )}
 
         {backupCodes.length > 0 && (
-          <Card style={{ marginTop: '20px', marginBottom: 0, background: 'var(--admin-bg)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+          <Card style={{ marginTop: 'var(--space-5)', marginBottom: 0, background: 'var(--admin-bg)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-3)', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
               <div style={{ fontWeight: 600 }}>Backup Codes</div>
               <AdminBadge status="warning" label="Shown Once" />
             </div>
-            <div style={{ fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)', marginBottom: '12px' }}>
+            <div style={{ fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)', marginBottom: 'var(--space-3)' }}>
               Save these codes securely. Each code can be used only once if your authenticator app is unavailable.
             </div>
             <div style={{ display: 'grid', gap: '10px', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
               {backupCodes.map((code) => (
-                <div key={code} className="admin-font-mono" style={{ padding: '12px', border: '1px solid var(--admin-border)', background: 'var(--admin-surface)' }}>
+                <div key={code} className="admin-font-mono" style={{ padding: 'var(--space-3)', border: '1px solid var(--admin-border)', background: 'var(--admin-surface)' }}>
                   {code}
                 </div>
               ))}
@@ -450,8 +450,8 @@ export default function AdminAccess() {
       {isSuperAdmin && (
         <>
           <div>
-            <h2 className="admin-h2" style={{ marginBottom: '12px' }}>Security Checklist</h2>
-            <div style={{ display: 'grid', gap: '16px', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+            <h2 className="admin-h2" style={{ marginBottom: 'var(--space-3)' }}>Security Checklist</h2>
+            <div style={{ display: 'grid', gap: 'var(--space-4)', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
               <SecurityFlag
                 label="DB-backed Admin Migration"
                 healthy={securityStatus?.migration?.platform_admin_bootstrap_complete === true}
@@ -481,8 +481,8 @@ export default function AdminAccess() {
             </div>
           </div>
 
-          <Card style={{ marginBottom: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center', marginBottom: '18px' }}>
+          <Card style={{ marginBottom: 'var(--space-6)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)', alignItems: 'center', marginBottom: '18px' }}>
               <div>
                 <h2 className="admin-h2" style={{ marginBottom: '6px' }}>Create Platform Admin</h2>
                 <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
@@ -520,8 +520,8 @@ export default function AdminAccess() {
             </form>
           </Card>
 
-          <Card style={{ marginBottom: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center', marginBottom: '16px' }}>
+          <Card style={{ marginBottom: 'var(--space-6)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
               <div>
                 <h2 className="admin-h2" style={{ marginBottom: '6px' }}>Platform Admin Accounts</h2>
                 <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
@@ -565,7 +565,7 @@ export default function AdminAccess() {
                       <td className="admin-td"><AdminBadge status={adminUser.totp_enabled ? 'success' : 'warning'} label={adminUser.totp_enabled ? 'Enabled' : 'Disabled'} /></td>
                       <td className="admin-td">{formatDate(adminUser.last_login_at)}</td>
                       <td className="admin-td">
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                           <button className="admin-btn admin-btn-ghost admin-btn-sm" onClick={() => revokeAdminSessions(adminUser.id)} disabled={busyKey === `revoke-${adminUser.id}`}>
                             Revoke Sessions
                           </button>
@@ -595,8 +595,8 @@ export default function AdminAccess() {
             </div>
           </Card>
 
-          <Card style={{ marginBottom: '24px' }}>
-            <div style={{ marginBottom: '16px' }}>
+          <Card style={{ marginBottom: 'var(--space-6)' }}>
+            <div style={{ marginBottom: 'var(--space-4)' }}>
               <h2 className="admin-h2" style={{ marginBottom: '6px' }}>Permission Matrix</h2>
               <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
                 Read-only reference — the exact capability strings each role is granted, straight from backend/routes/middleware.js. This is what requireAdminCapability(...) actually checks on every gated route, not a separate approximation.
@@ -630,8 +630,8 @@ export default function AdminAccess() {
             </div>
           </Card>
 
-          <Card style={{ marginBottom: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center', marginBottom: '16px' }}>
+          <Card style={{ marginBottom: 'var(--space-6)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
               <div>
                 <h2 className="admin-h2" style={{ marginBottom: '6px' }}>Admin Action Audit Log</h2>
                 <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>

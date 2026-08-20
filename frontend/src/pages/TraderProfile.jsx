@@ -38,11 +38,11 @@ export function TraderProfileContent({ userId, onBack }) {
   if (notFound || !profile) {
     return (
       <div style={{ textAlign: 'center', padding: '80px 24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-4)' }}>
           {renderIcon('search', { size: 40, color: 'var(--accent)' })}
         </div>
-        <h2 style={{ color: 'var(--accent)', marginBottom: '12px' }}>Profile Not Found</h2>
-        <p style={{ color: 'var(--text-muted)', marginBottom: '24px' }}>This trader profile is private or does not exist.</p>
+        <h2 style={{ color: 'var(--accent)', marginBottom: 'var(--space-3)' }}>Profile Not Found</h2>
+        <p style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-6)' }}>This trader profile is private or does not exist.</p>
         <button onClick={goBack} className="btn" style={{ border: '1px solid var(--navy-border)', padding: '10px 24px', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
           ← Back
         </button>
@@ -65,15 +65,15 @@ export function TraderProfileContent({ userId, onBack }) {
         onClick={goBack}
         style={{
           background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 'var(--fs-base)',
-          cursor: 'pointer', padding: 0, marginBottom: '20px', display: 'inline-flex', alignItems: 'center', gap: '6px'
+          cursor: 'pointer', padding: 0, marginBottom: 'var(--space-5)', display: 'inline-flex', alignItems: 'center', gap: '6px'
         }}
       >
         ← Back
       </button>
 
       {/* ── Profile Header ── */}
-      <Card style={{ marginBottom: '20px', padding: '32px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
+      <Card style={{ marginBottom: 'var(--space-5)', padding: 'var(--space-7)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-6)', flexWrap: 'wrap' }}>
           {/* Avatar */}
           <div style={{
             width: '72px', height: '72px', borderRadius: '50%',
@@ -90,12 +90,12 @@ export function TraderProfileContent({ userId, onBack }) {
     <h1 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', fontSize: 'var(--fs-3xl)', marginBottom: '6px' }}>
               {trader.full_name}
             </h1>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}>
                 {renderIcon('location', { size: 12 })} {trader.country || 'Unknown'}
               </span>
               <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-dim)' }}>·</span>
-              <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-dim)', display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}>
                 {renderIcon('calendar', { size: 12 })} Joined {joinDate}
               </span>
               {trader.is_funded && (
@@ -104,7 +104,7 @@ export function TraderProfileContent({ userId, onBack }) {
                   background: 'color-mix(in srgb, var(--muted) 12%, transparent)',
                   border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)',
                   fontSize: 'var(--fs-xs)', color: 'var(--cyan)', fontWeight: '600',
-                  display: 'inline-flex', alignItems: 'center', gap: '4px'
+                  display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)'
                 }}>
                   {renderIcon('star', { size: 11 })} FUNDED TRADER
                 </span>
@@ -115,7 +115,7 @@ export function TraderProfileContent({ userId, onBack }) {
                   background: 'color-mix(in srgb, var(--muted) 10%, transparent)',
                   border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)',
                   fontSize: 'var(--fs-xs)', color: 'var(--accent)', fontWeight: '600',
-                  display: 'inline-flex', alignItems: 'center', gap: '4px'
+                  display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)'
                 }}>
                   {renderIcon('leaderboard', { size: 11 })} {trader.total_phases_passed} Phase{trader.total_phases_passed !== 1 ? 's' : ''} Passed
                 </span>
@@ -126,7 +126,7 @@ export function TraderProfileContent({ userId, onBack }) {
       </Card>
 
       {/* ── Key Stats ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 'var(--space-3)', marginBottom: 'var(--space-5)' }}>
         {[
           { label: 'Total Profit',    value: `+$${parseFloat(stats.total_profit || 0).toFixed(2)}`,         color: 'var(--green)' },
           { label: 'Win Rate',        value: `${winRate}%`,                                                  color: parseFloat(winRate) >= 50 ? 'var(--green)' : 'var(--red)' },
@@ -136,7 +136,7 @@ export function TraderProfileContent({ userId, onBack }) {
           { label: 'Challenges',      value: trader.total_accounts || 0,                                     color: 'var(--text-muted)' },
         ].map(s => (
           <div key={s.label} className="stat-card" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 'var(--fs-2xl)', fontWeight: '700', color: s.color, fontFamily: 'var(--font-mono)', marginBottom: '4px' }}>
+            <div style={{ fontSize: 'var(--fs-2xl)', fontWeight: '700', color: s.color, fontFamily: 'var(--font-mono)', marginBottom: 'var(--space-1)' }}>
               {s.value}
             </div>
             <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', letterSpacing: '0.06em' }}>{s.label}</div>
@@ -146,12 +146,12 @@ export function TraderProfileContent({ userId, onBack }) {
 
       {/* ── Trading Style ── */}
       {(stats.favourite_instrument || stats.avg_hold_mins) && (
-        <Card style={{ marginBottom: '20px' }}>
-          <h3 style={{ color: 'var(--accent)', marginBottom: '16px', fontSize: 'var(--fs-md)', letterSpacing: '0.08em' }}>TRADING STYLE</h3>
-          <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+        <Card style={{ marginBottom: 'var(--space-5)' }}>
+          <h3 style={{ color: 'var(--accent)', marginBottom: 'var(--space-4)', fontSize: 'var(--fs-md)', letterSpacing: '0.08em' }}>TRADING STYLE</h3>
+          <div style={{ display: 'flex', gap: 'var(--space-6)', flexWrap: 'wrap' }}>
             {stats.favourite_instrument && (
               <div>
-                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginBottom: '4px' }}>FAVOURITE INSTRUMENT</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginBottom: 'var(--space-1)' }}>FAVOURITE INSTRUMENT</div>
             <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
                   {stats.favourite_instrument}
                 </div>
@@ -159,7 +159,7 @@ export function TraderProfileContent({ userId, onBack }) {
             )}
             {stats.avg_hold_mins && (
               <div>
-                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginBottom: '4px' }}>AVG HOLD TIME</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginBottom: 'var(--space-1)' }}>AVG HOLD TIME</div>
             <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>
                   {stats.avg_hold_mins < 60
                     ? `${Math.round(stats.avg_hold_mins)}m`
@@ -169,7 +169,7 @@ export function TraderProfileContent({ userId, onBack }) {
             )}
             {stats.profit_factor && (
               <div>
-                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginBottom: '4px' }}>PROFIT FACTOR</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginBottom: 'var(--space-1)' }}>PROFIT FACTOR</div>
             <div style={{ fontSize: '15px', fontWeight: '700', color: parseFloat(stats.profit_factor) >= 1.5 ? 'var(--green)' : 'var(--text)', fontFamily: 'var(--font-mono)' }}>
                   {parseFloat(stats.profit_factor).toFixed(2)}
                 </div>
@@ -199,10 +199,10 @@ export default function TraderProfile() {
   return (
     <div style={{ minHeight: '100dvh', background: 'var(--navy)' }}>
       <div className="nav">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
           <span className="nav-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>PROP FIRM</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           <button onClick={() => navigate('/leaderboard')} style={{ background: 'transparent', border: '1px solid var(--navy-border)', color: 'var(--text-muted)', padding: '7px 16px', cursor: 'pointer', fontSize: 'var(--fs-base)' }}>
             ← Leaderboard
           </button>
@@ -210,7 +210,7 @@ export default function TraderProfile() {
         </div>
       </div>
 
-      <div style={{ maxWidth: '760px', margin: '0 auto', padding: '48px 24px' }}>
+      <div style={{ maxWidth: '760px', margin: '0 auto', padding: 'var(--space-9) var(--space-6)' }}>
         <TraderProfileContent userId={userId} onBack={() => navigate('/leaderboard')} />
       </div>
     </div>

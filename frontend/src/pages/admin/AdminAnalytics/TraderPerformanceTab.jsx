@@ -93,7 +93,7 @@ export default function TraderPerformanceTab() {
 
       <AdminFilterBar searchPlaceholder="Search by trader email or name..." searchValue={search} onSearchChange={setSearch} />
 
-      <Card flush style={{ marginBottom: '24px' }}>
+      <Card flush style={{ marginBottom: 'var(--space-6)' }}>
         <AdminDataTable
           columns={columns}
           data={sorted}
@@ -119,9 +119,9 @@ export default function TraderPerformanceTab() {
             </LineChart>
           </AdminChart>
 
-          <Card style={{ marginTop: '24px' }}>
+          <Card style={{ marginTop: 'var(--space-6)' }}>
             <h2 className="admin-h2">Full Stat Block — {selected.fullName || selected.email || selected.traderId}</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 'var(--space-4)' }}>
               {[
                 ['Win Rate', `${selected.winRate}%`],
                 ['Risk:Reward', selected.riskReward.toFixed(1)],
@@ -134,7 +134,7 @@ export default function TraderPerformanceTab() {
               ].map(([label, value]) => (
                 <div key={label}>
                   <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-faint)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xl)', color: 'var(--admin-text)', marginTop: '4px' }}>{value}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xl)', color: 'var(--admin-text)', marginTop: 'var(--space-1)' }}>{value}</div>
                 </div>
               ))}
             </div>

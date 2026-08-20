@@ -30,7 +30,7 @@ export default function LandingScaling() {
     <section className="mp-section" style={{ position: 'relative' }}>
       <div className="mp-container">
         <div style={{ textAlign: 'center', marginBottom: '80px' }}>
-          <div className="mp-badge mp-reveal" style={{ marginBottom: '20px' }}>
+          <div className="mp-badge mp-reveal" style={{ marginBottom: 'var(--space-5)' }}>
             <span className="mp-badge-dot"></span>
             How It Works
           </div>
@@ -57,7 +57,7 @@ export default function LandingScaling() {
                   background: 'transparent',
                   fontSize: 'var(--fs-xs)',
                   textTransform: 'uppercase', letterSpacing: '0.15em',
-                  color: step.color, marginBottom: '16px',
+                  color: step.color, marginBottom: 'var(--space-4)',
                   border: `1px solid ${step.color}`,
               fontFamily: 'var(--font-mono)',
                 }}>
@@ -67,7 +67,7 @@ export default function LandingScaling() {
                 <p className="mp-p-body">{step.text}</p>
 
                 {idx === 3 && (
-                  <div style={{ marginTop: '20px', height: '2px', background: 'var(--rule)', overflow: 'hidden' }}>
+                  <div style={{ marginTop: 'var(--space-5)', height: '2px', background: 'var(--rule)', overflow: 'hidden' }}>
                     <div style={{
                       height: '100%', width: '100%',
                       background: 'var(--ink)',

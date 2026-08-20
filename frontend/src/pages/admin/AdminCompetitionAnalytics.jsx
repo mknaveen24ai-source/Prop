@@ -42,15 +42,15 @@ export default function AdminCompetitionAnalytics() {
 
   useEffect(() => { load() }, [load])
 
-  if (loading) return <div style={{ padding: '32px', opacity: 0.7 }}>Loading analytics...</div>
-  if (!data) return <div style={{ padding: '32px', opacity: 0.7 }}>No data available</div>
+  if (loading) return <div style={{ padding: 'var(--space-7)', opacity: 0.7 }}>Loading analytics...</div>
+  if (!data) return <div style={{ padding: 'var(--space-7)', opacity: 0.7 }}>No data available</div>
 
   const { summary, entries } = data
   const sortedEntries = [...entries].sort((a, b) => b[sortKey] - a[sortKey])
 
   return (
-    <div style={{ padding: '24px' }}>
-      <button className="admin-btn admin-btn-sm" style={{ marginBottom: '16px' }} onClick={() => navigate(`/admin/competitions/${id}`)}>
+    <div style={{ padding: 'var(--space-6)' }}>
+      <button className="admin-btn admin-btn-sm" style={{ marginBottom: 'var(--space-4)' }} onClick={() => navigate(`/admin/competitions/${id}`)}>
         ← Back to Competition
       </button>
 
@@ -59,7 +59,7 @@ export default function AdminCompetitionAnalytics() {
         Participant trading performance for this competition's window only.
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '14px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '14px', marginBottom: 'var(--space-6)' }}>
         <StatCard label="Participants" value={summary.participant_count} />
         <StatCard label="Total Trades" value={summary.total_trades} />
         <StatCard label="Overall Win Rate" value={`${summary.overall_win_rate}%`} />
@@ -67,8 +67,8 @@ export default function AdminCompetitionAnalytics() {
         <StatCard label="Most Active Trader" value={summary.most_active_trader || '—'} />
       </div>
 
-      <Card style={{ padding: '20px', overflowX: 'auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+      <Card style={{ padding: 'var(--space-5)', overflowX: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 'var(--space-3)' }}>
           <span style={{ fontSize: 'var(--fs-sm)', opacity: 0.7 }}>Sort by:</span>
           {SORT_OPTIONS.map((opt) => (
             <button
@@ -113,7 +113,7 @@ export default function AdminCompetitionAnalytics() {
               </tr>
             ))}
             {sortedEntries.length === 0 && (
-              <tr><td colSpan={9} style={{ padding: '20px', textAlign: 'center', opacity: 0.6 }}>No entries yet</td></tr>
+              <tr><td colSpan={9} style={{ padding: 'var(--space-5)', textAlign: 'center', opacity: 0.6 }}>No entries yet</td></tr>
             )}
           </tbody>
         </table>

@@ -302,7 +302,7 @@ export default function AdminAccountLinking() {
       header: 'Evidence',
       key: 'signals',
       render: (row) => (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)' }}>
           {(row.signal_types || []).map((type) => (
             <span
               key={type}
@@ -326,7 +326,7 @@ export default function AdminAccountLinking() {
       key: 'score',
       sortKey: 'score',
       render: (row) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <strong style={{ fontSize: '15px' }}>{row.score}</strong>
           <AdminBadge status={confidenceTone(row.confidence)} label={row.confidence} />
         </div>
@@ -391,7 +391,7 @@ export default function AdminAccountLinking() {
   return (
     <PageWrapper>
       <>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-6)' }}>
           <div>
             <h1 className="admin-h1">Account Linking</h1>
             <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
@@ -406,7 +406,7 @@ export default function AdminAccountLinking() {
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid var(--admin-border)' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-5)', borderBottom: '1px solid var(--admin-border)' }}>
           {TABS.map((item) => (
             <button
               key={item.key}
@@ -425,7 +425,7 @@ export default function AdminAccountLinking() {
 
         {tab === 'clusters' && (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
               <AdminStatCard icon="warning" label="Open clusters" value={summary.open || 0} />
               <AdminStatCard icon="flag" label="High confidence" value={summary.high_confidence || 0} />
               <AdminStatCard icon="users" label="Traders involved" value={summary.users_involved || 0} />
@@ -558,16 +558,16 @@ export default function AdminAccountLinking() {
           {detailLoading && <p style={{ color: 'var(--admin-text-muted)' }}>Loading evidence…</p>}
 
           {!detailLoading && detail && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
               {graph && graph.nodes?.length > 0 && (
                 <div>
-                  <h3 style={{ fontSize: 'var(--fs-base)', marginBottom: '8px' }}>Link graph</h3>
+                  <h3 style={{ fontSize: 'var(--fs-base)', marginBottom: 'var(--space-2)' }}>Link graph</h3>
                   <ClusterGraph nodes={graph.nodes} edges={graph.edges} />
                 </div>
               )}
 
               <div>
-                <h3 style={{ fontSize: 'var(--fs-base)', marginBottom: '8px' }}>Linked traders</h3>
+                <h3 style={{ fontSize: 'var(--fs-base)', marginBottom: 'var(--space-2)' }}>Linked traders</h3>
                 <table className="admin-table" style={{ width: '100%' }}>
                   <thead>
                     <tr>
@@ -590,7 +590,7 @@ export default function AdminAccountLinking() {
               </div>
 
               <div>
-                <h3 style={{ fontSize: 'var(--fs-base)', marginBottom: '8px' }}>Why these accounts were linked</h3>
+                <h3 style={{ fontSize: 'var(--fs-base)', marginBottom: 'var(--space-2)' }}>Why these accounts were linked</h3>
                 <table className="admin-table" style={{ width: '100%' }}>
                   <thead>
                     <tr><th>Signal</th><th>Detail</th><th>Traders</th><th>Weight</th></tr>
@@ -618,7 +618,7 @@ export default function AdminAccountLinking() {
                     ))}
                   </tbody>
                 </table>
-                <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', marginTop: '8px' }}>
+                <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', marginTop: 'var(--space-2)' }}>
                   Weights are reduced the more users share a value — a device or network seen across many
                   accounts is usually shared infrastructure (office, VPN, browser anti-fingerprinting),
                   not a ring. Detection never locks or flags an account on its own.
@@ -632,7 +632,7 @@ export default function AdminAccountLinking() {
                 </div>
               )}
 
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
                 <button
                   className="admin-btn admin-btn-ghost"
                   onClick={() => resolveCluster(detail.cluster, 'false_positive', 'Why is this not account sharing?')}

@@ -402,14 +402,14 @@ export default function AdminChat() {
 
   return (
     <>
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: 'var(--space-6)' }}>
         <h1 className="admin-h1">Support Inbox</h1>
         <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
           Manage trader conversations with saved views, attention filters, and quick bulk status actions.
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
         <AdminStatCard icon="OPEN" label="Open" value={Number(stats.open_count || 0).toLocaleString()} />
         <AdminStatCard icon="WAIT" label="Pending" value={Number(stats.pending_count || 0).toLocaleString()} />
         <AdminStatCard icon="READ" label="Needs Attention" value={Number(stats.unread_count || 0).toLocaleString()} />
@@ -417,7 +417,7 @@ export default function AdminChat() {
         <AdminStatCard icon="dispute" label="Open Appeals" value={appealsOpen} onClick={() => navigate('/admin/disputes')} />
       </div>
 
-      <Card style={{ marginBottom: '20px' }}>
+      <Card style={{ marginBottom: 'var(--space-5)' }}>
         <AdminFilterBar
           searchPlaceholder="Search by trader, subject, or latest message"
           searchValue={search}
@@ -480,7 +480,7 @@ export default function AdminChat() {
           display: 'flex',
           flexDirection: 'column'
         }}>
-          <div style={{ padding: '16px', borderBottom: '1px solid var(--admin-border)' }}>
+          <div style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--admin-border)' }}>
             <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)' }}>
               {filteredConversations.length} conversation{filteredConversations.length === 1 ? '' : 's'} in this view
             </div>
@@ -488,11 +488,11 @@ export default function AdminChat() {
 
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {loadingConversations ? (
-              <div style={{ padding: '24px', textAlign: 'center', color: 'var(--admin-text-faint)' }}>
+              <div style={{ padding: 'var(--space-6)', textAlign: 'center', color: 'var(--admin-text-faint)' }}>
                 Loading conversations...
               </div>
             ) : filteredConversations.length === 0 ? (
-              <div style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--admin-text-muted)' }}>
+              <div style={{ padding: 'var(--space-8) var(--space-4)', textAlign: 'center', color: 'var(--admin-text-muted)' }}>
                 No support conversations match this view.
               </div>
             ) : filteredConversations.map((conversation) => {
@@ -518,11 +518,11 @@ export default function AdminChat() {
                         toggleConversationSelection(conversation.id);
                       }}
                       onClick={(event) => event.stopPropagation()}
-                      style={{ marginTop: '4px' }}
+                      style={{ marginTop: 'var(--space-1)' }}
                     />
 
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
                         {visibleColumnKeys.includes('user') && (
                           <div style={{ minWidth: 0 }}>
                             <div style={{
@@ -536,7 +536,7 @@ export default function AdminChat() {
                               {conversation.user_email || conversation.user_name || `User #${conversation.user_id}`}
                             </div>
                             {visibleColumnKeys.includes('subject') && (
-                              <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)', marginTop: '4px' }}>
+                              <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-1)' }}>
                                 {conversation.subject || 'No subject'}
                               </div>
                             )}
@@ -571,7 +571,7 @@ export default function AdminChat() {
                         </div>
                       )}
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', gap: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-2)', gap: '10px' }}>
                         {visibleColumnKeys.includes('status') && (
                           <span style={{
                             color: statusColor(conversation.status),
@@ -607,18 +607,18 @@ export default function AdminChat() {
           {selectedConversation ? (
             <>
               <div style={{
-                padding: '16px 24px',
+                padding: 'var(--space-4) var(--space-6)',
                 borderBottom: '1px solid var(--admin-border)',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                gap: '16px'
+                gap: 'var(--space-4)'
               }}>
                 <div>
                   <div style={{ color: 'var(--admin-text)', fontWeight: 600 }}>
                     {selectedConversation.user_email || selectedConversation.user_name || 'Unknown user'}
                   </div>
-                  <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)', marginTop: '4px' }}>
+                  <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-1)' }}>
                     {selectedConversation.subject || 'No subject'}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
@@ -655,10 +655,10 @@ export default function AdminChat() {
               <div style={{
                 flex: 1,
                 overflowY: 'auto',
-                padding: '24px',
+                padding: 'var(--space-6)',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '16px'
+                gap: 'var(--space-4)'
               }}>
                 {loadingMessages ? (
                   <div style={{ color: 'var(--admin-text-faint)', textAlign: 'center' }}>
@@ -673,7 +673,7 @@ export default function AdminChat() {
                   return (
                     <div
                       key={message.id || index}
-                      style={{ display: 'flex', flexDirection: isAdmin ? 'row-reverse' : 'row', gap: '12px' }}
+                      style={{ display: 'flex', flexDirection: isAdmin ? 'row-reverse' : 'row', gap: 'var(--space-3)' }}
                     >
                       <div
                         className="admin-avatar"
@@ -689,7 +689,7 @@ export default function AdminChat() {
                       </div>
                       <div style={{ maxWidth: '70%' }}>
                         <div style={{
-                          padding: '12px 16px',
+                          padding: 'var(--space-3) var(--space-4)',
                           borderRadius: isAdmin ? '16px 4px 16px 16px' : '4px 16px 16px 16px',
                           background: isAdmin ? 'var(--admin-accent)' : 'var(--admin-surface)',
                           color: isAdmin ? 'var(--paper)' : 'var(--admin-text)',
@@ -703,7 +703,7 @@ export default function AdminChat() {
                         <div style={{
                           fontSize: 'var(--fs-xs)',
                           color: 'var(--admin-text-faint)',
-                          marginTop: '4px',
+                          marginTop: 'var(--space-1)',
                           textAlign: isAdmin ? 'right' : 'left'
                         }}>
                           {message.sender_name || (isAdmin ? 'Support' : 'Trader')} · {formatDateTime(message.created_at)}
@@ -716,17 +716,17 @@ export default function AdminChat() {
               </div>
 
               {traderTyping && (
-                <div style={{ padding: '4px 24px', fontSize: 'var(--fs-sm)', color: 'var(--admin-text-faint)', fontStyle: 'italic' }}>
+                <div style={{ padding: 'var(--space-1) var(--space-6)', fontSize: 'var(--fs-sm)', color: 'var(--admin-text-faint)', fontStyle: 'italic' }}>
                   Trader is typing…
                 </div>
               )}
 
               {selectedConversation.status !== 'closed' && (
                 <div style={{
-                  padding: '16px 24px',
+                  padding: 'var(--space-4) var(--space-6)',
                   borderTop: '1px solid var(--admin-border)',
                   display: 'flex',
-                  gap: '12px',
+                  gap: 'var(--space-3)',
                   alignItems: 'flex-end'
                 }}>
                   <textarea
@@ -768,7 +768,7 @@ export default function AdminChat() {
         </div>
 
         {selectedConversation && (
-          <div style={{ width: '260px', flexShrink: 0, marginLeft: '16px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>
+          <div style={{ width: '260px', flexShrink: 0, marginLeft: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', overflowY: 'auto' }}>
             <Card title="Trader Snapshot">
               {traderSnapshot ? (
                 <>
@@ -787,7 +787,7 @@ export default function AdminChat() {
                   ))}
                   <button
                     className="admin-btn admin-btn-ghost admin-btn-full"
-                    style={{ width: '100%', marginTop: '12px' }}
+                    style={{ width: '100%', marginTop: 'var(--space-3)' }}
                     onClick={() => navigate(`/admin/users?q=${encodeURIComponent(selectedConversation.user_email || '')}`)}
                   >
                     Open full record

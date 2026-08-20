@@ -78,18 +78,18 @@ export default function AdminAffiliatePayouts() {
   const pendingCount = data.rows.filter(r => r.status === 'pending').length
 
   return (
-    <div style={{ padding: '24px' }}>
+    <div style={{ padding: 'var(--space-6)' }}>
       <h1 className="admin-h1">Affiliate Payouts</h1>
-      <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)', marginBottom: '24px' }}>
+      <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)', marginBottom: 'var(--space-6)' }}>
         Approving settles the affiliate's entire current available balance (not just the requested amount, if it has since grown).
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
         <AdminStatCard icon="history" label="On This Page" value={data.rows.length} />
         <AdminStatCard icon="wallet" label="Pending On Page" value={pendingCount} />
       </div>
 
-      <div style={{ marginBottom: '16px', display: 'flex', gap: '8px' }}>
+      <div style={{ marginBottom: 'var(--space-4)', display: 'flex', gap: 'var(--space-2)' }}>
         {['pending', 'paid', 'rejected', 'all'].map((s) => (
           <button
             key={s}
@@ -145,7 +145,7 @@ export default function AdminAffiliatePayouts() {
       </div>
 
       {totalPages > 1 && (
-        <div style={{ display: 'flex', gap: '8px', marginTop: '16px', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)', justifyContent: 'center' }}>
           <button className="admin-btn admin-btn-sm" disabled={data.page <= 1} onClick={() => fetchPayouts(data.page - 1, status)}>Previous</button>
           <span style={{ padding: '6px 12px', fontSize: 'var(--fs-base)', color: 'var(--admin-text-muted)' }}>Page {data.page} of {totalPages}</span>
           <button className="admin-btn admin-btn-sm" disabled={data.page >= totalPages} onClick={() => fetchPayouts(data.page + 1, status)}>Next</button>

@@ -888,7 +888,7 @@ export default function AdminCommandCenter() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-4)', marginBottom: 'var(--space-6)', flexWrap: 'wrap' }}>
         <div>
           <h1 className="admin-h1">Command Center</h1>
           <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
@@ -900,7 +900,7 @@ export default function AdminCommandCenter() {
         </button>
       </div>
 
-      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: 'var(--space-5)' }}>
         {TABS.map((tab) => (
           <button
             key={tab.key}
@@ -1099,13 +1099,13 @@ export default function AdminCommandCenter() {
         )}
       >
         {actionContext && (
-          <div style={{ display: 'grid', gap: '16px' }}>
+          <div style={{ display: 'grid', gap: 'var(--space-4)' }}>
             <div style={{ background: 'var(--admin-bg)', border: '1px solid var(--admin-border)', padding: '14px' }}>
-              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>Target Summary</div>
+              <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase', marginBottom: 'var(--space-2)' }}>Target Summary</div>
               <div style={{ color: 'var(--admin-text)' }}>
                 {actionContext.scope === 'bulk' ? `${selectedActionRows.length} selected row(s)` : '1 selected row'}
               </div>
-              <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-sm)', marginTop: '8px', display: 'grid', gap: '4px' }}>
+              <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-2)', display: 'grid', gap: 'var(--space-1)' }}>
                 {selectedActionRows.slice(0, 4).map((row) => (
                   <div key={`${actionContext.action}-${row.id}`}>
                     {actionContext.tab === 'accounts'
@@ -1147,7 +1147,7 @@ export default function AdminCommandCenter() {
             )}
 
             {needsManualAccount(actionContext.action) && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-3)' }}>
                 <div className="admin-form-group" style={{ margin: 0 }}>
                   <label className="admin-label">Account Type</label>
                   <select

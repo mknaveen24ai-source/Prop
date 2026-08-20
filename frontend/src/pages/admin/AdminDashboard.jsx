@@ -60,7 +60,7 @@ export default function AdminDashboard() {
 
   return (
     <PageWrapper>
-      <div style={{ paddingBottom: '40px', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ paddingBottom: 'var(--space-8)', display: 'flex', flexDirection: 'column' }}>
         <h1 className="admin-h1">Command Center</h1>
 
         {error && <ErrorBanner message={error} onRetry={retry} />}

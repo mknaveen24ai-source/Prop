@@ -259,7 +259,7 @@ export default function Sidebar({
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '12px',
+            gap: 'var(--space-3)',
             padding: collapsed ? '24px 14px' : '24px 20px',
             borderBottom: '1px solid var(--border)',
             justifyContent: collapsed ? 'center' : 'flex-start',
@@ -322,7 +322,7 @@ export default function Sidebar({
                         fontFamily: 'inherit',
                         fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--text-muted)',
                         textTransform: 'uppercase', letterSpacing: '0.1em',
-                        marginBottom: '8px', padding: '0 12px',
+                        marginBottom: 'var(--space-2)', padding: '0 12px',
                       }}
                     >
                       <span style={{ flex: 1, textAlign: 'left' }}>{group.label}</span>
@@ -391,7 +391,7 @@ export default function Sidebar({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '12px',
+              gap: 'var(--space-3)',
               width: '100%',
               padding: collapsed ? '8px' : '10px 12px',
               background: activePage === 'profile' ? 'var(--accent-glow)' : 'var(--bg-hover)',

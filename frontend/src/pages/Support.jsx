@@ -73,7 +73,7 @@ export default function Support({ user }) {
   if (selectedTicket) {
     return (
       <div>
-        <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: '8px', fontSize: 'var(--fs-3xl)' }}>Support Chat</h2>
+        <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: 'var(--space-2)', fontSize: 'var(--fs-3xl)' }}>Support Chat</h2>
         <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-md)', marginBottom: '28px' }}>Chatting with our support team.</p>
         <TicketChat ticket={selectedTicket} user={user} onBack={() => { setSelectedTicket(null); loadTickets() }} />
       </div>
@@ -93,7 +93,7 @@ export default function Support({ user }) {
         
         {activeTab === 'new' ? (
           <Card className="trader-service-card">
-            {error && <div style={{ background: 'color-mix(in srgb, var(--red) 10%, transparent)', border: '1px solid var(--red)', padding: '12px 16px', marginBottom: '20px', color: 'var(--red)', fontSize: 'var(--fs-base)' }}>{error}</div>}
+            {error && <div style={{ background: 'color-mix(in srgb, var(--red) 10%, transparent)', border: '1px solid var(--red)', padding: 'var(--space-3) var(--space-4)', marginBottom: 'var(--space-5)', color: 'var(--red)', fontSize: 'var(--fs-base)' }}>{error}</div>}
             
             <div className="input-group">
               <label className="input-label">CATEGORY</label>
@@ -132,29 +132,29 @@ export default function Support({ user }) {
           </Card>
         ) : (
           <Card flush className="trader-service-card service-table-card">
-            {loadingTickets ? <div style={{ padding: '24px', color:'var(--text-muted)' }}>Loading tickets...</div> : 
-             tickets.length === 0 ? <div style={{ padding: '40px 24px', textAlign:'center', color:'var(--text-muted)' }}>You have no support tickets.</div> :
+            {loadingTickets ? <div style={{ padding: 'var(--space-6)', color:'var(--text-muted)' }}>Loading tickets...</div> : 
+             tickets.length === 0 ? <div style={{ padding: 'var(--space-8) var(--space-6)', textAlign:'center', color:'var(--text-muted)' }}>You have no support tickets.</div> :
              <table style={{ width:'100%', borderCollapse:'collapse' }}>
                <thead>
                  <tr style={{ borderBottom:'1px solid var(--navy-border)', background:'var(--navy)' }}>
-                   <th style={{ padding:'12px 16px', textAlign:'left', color:'var(--text-muted)', fontSize: 'var(--fs-sm)', fontWeight: 600 }}>TICKET</th>
-                   <th style={{ padding:'12px 16px', textAlign:'left', color:'var(--text-muted)', fontSize: 'var(--fs-sm)', fontWeight: 600 }}>STATUS</th>
-                   <th style={{ padding:'12px 16px', textAlign:'left', color:'var(--text-muted)', fontSize: 'var(--fs-sm)', fontWeight: 600 }}>DATE</th>
+                   <th style={{ padding: 'var(--space-3) var(--space-4)', textAlign:'left', color:'var(--text-muted)', fontSize: 'var(--fs-sm)', fontWeight: 600 }}>TICKET</th>
+                   <th style={{ padding: 'var(--space-3) var(--space-4)', textAlign:'left', color:'var(--text-muted)', fontSize: 'var(--fs-sm)', fontWeight: 600 }}>STATUS</th>
+                   <th style={{ padding: 'var(--space-3) var(--space-4)', textAlign:'left', color:'var(--text-muted)', fontSize: 'var(--fs-sm)', fontWeight: 600 }}>DATE</th>
                  </tr>
                </thead>
                <tbody>
                  {tickets.map(t => (
                    <tr key={t.id} onClick={() => setSelectedTicket(t)} style={{ borderBottom:'1px solid var(--navy-border)', cursor:'pointer', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background='var(--navy-hover)'} onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-                     <td style={{ padding:'16px' }}>
+                     <td style={{ padding: 'var(--space-4)' }}>
                        <div style={{ color:'var(--text)', fontWeight:600, fontSize: 'var(--fs-md)' }}>{t.subject}</div>
-                       <div style={{ color:'var(--text-dim)', fontSize: 'var(--fs-sm)', marginTop:'4px' }}>#{t.id} • {t.category.toUpperCase()}</div>
+                       <div style={{ color:'var(--text-dim)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-1)' }}>#{t.id} • {t.category.toUpperCase()}</div>
                      </td>
-                     <td style={{ padding:'16px' }}>
-                       <span style={{ padding:'4px 8px', fontSize: 'var(--fs-xs)', fontWeight:600, background: t.status === 'resolved' || t.status === 'closed' ? 'color-mix(in srgb, var(--green) 10%, transparent)' : t.status === 'open' ? 'color-mix(in srgb, var(--red) 10%, transparent)' : 'color-mix(in srgb, var(--muted) 10%, transparent)', color: t.status === 'resolved' || t.status === 'closed' ? 'var(--green)' : t.status === 'open' ? 'var(--red)' : 'var(--accent)' }}>
+                     <td style={{ padding: 'var(--space-4)' }}>
+                       <span style={{ padding: 'var(--space-1) var(--space-2)', fontSize: 'var(--fs-xs)', fontWeight:600, background: t.status === 'resolved' || t.status === 'closed' ? 'color-mix(in srgb, var(--green) 10%, transparent)' : t.status === 'open' ? 'color-mix(in srgb, var(--red) 10%, transparent)' : 'color-mix(in srgb, var(--muted) 10%, transparent)', color: t.status === 'resolved' || t.status === 'closed' ? 'var(--green)' : t.status === 'open' ? 'var(--red)' : 'var(--accent)' }}>
                          {t.status.toUpperCase()}
                        </span>
                      </td>
-                     <td style={{ padding:'16px', color:'var(--text-muted)', fontSize: 'var(--fs-base)' }}>{formatDate(t.created_at)}</td>
+                     <td style={{ padding: 'var(--space-4)', color:'var(--text-muted)', fontSize: 'var(--fs-base)' }}>{formatDate(t.created_at)}</td>
                    </tr>
                  ))}
                </tbody>
@@ -166,14 +166,14 @@ export default function Support({ user }) {
         {/* ── Help Panel (Sidebar) ── */}
         <div className="service-side-panel">
           {user && (
-            <Card style={{ padding: '16px 20px' }}>
+            <Card style={{ padding: 'var(--space-4) var(--space-5)' }}>
               <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-dim)', marginBottom: '10px', letterSpacing: '0.08em' }}>SUBMITTING AS</div>
-              <div style={{ fontSize: 'var(--fs-md)', color: 'var(--text)', fontWeight: '600', marginBottom: '4px' }}>{user.full_name}</div>
+              <div style={{ fontSize: 'var(--fs-md)', color: 'var(--text)', fontWeight: '600', marginBottom: 'var(--space-1)' }}>{user.full_name}</div>
               <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{user.email}</div>
             </Card>
           )}
-          <Card style={{ padding: '16px 20px' }}>
-            <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-dim)', marginBottom: '12px', letterSpacing: '0.08em' }}>RESPONSE TIMES</div>
+          <Card style={{ padding: 'var(--space-4) var(--space-5)' }}>
+            <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-dim)', marginBottom: 'var(--space-3)', letterSpacing: '0.08em' }}>RESPONSE TIMES</div>
             {[ { label: 'KYC / Payout', time: '24 hours' }, { label: 'Account Issues', time: '24–48 hours' }, { label: 'Technical Bugs', time: '48–72 hours' } ].map(row => (
               <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid var(--navy-border)' }}>
                 <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{row.label}</span>
@@ -219,33 +219,33 @@ function TicketChat({ ticket, user, onBack }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '65vh', border:'1px solid var(--navy-border)', background:'var(--navy-card)', overflow:'hidden' }}>
-      <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--navy-border)', display: 'flex', alignItems: 'center', background:'color-mix(in srgb, var(--navy) 40%, transparent)' }}>
-        <button onClick={onBack} style={{ background:'transparent', border:'none', color:'var(--text-muted)', cursor:'pointer', marginRight:'16px', fontSize: 'var(--fs-4xl)', lineHeight:'1', display: 'inline-flex', alignItems: 'center' }}>
+      <div style={{ padding: 'var(--space-4) var(--space-5)', borderBottom: '1px solid var(--navy-border)', display: 'flex', alignItems: 'center', background:'color-mix(in srgb, var(--navy) 40%, transparent)' }}>
+        <button onClick={onBack} style={{ background:'transparent', border:'none', color:'var(--text-muted)', cursor:'pointer', marginRight: 'var(--space-4)', fontSize: 'var(--fs-4xl)', lineHeight:'1', display: 'inline-flex', alignItems: 'center' }}>
           {renderIcon('arrow', { size: 18, color: 'currentColor', style: { transform: 'rotate(180deg)' } })}
         </button>
         <div>
           <h3 style={{ margin: 0, color: 'var(--text)', fontSize: 'var(--fs-lg)' }}>{ticket.subject}</h3>
-          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-dim)', marginTop:'4px' }}>Ticket #{ticket.id} • {ticket.status.toUpperCase()}</div>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-dim)', marginTop: 'var(--space-1)' }}>Ticket #{ticket.id} • {ticket.status.toUpperCase()}</div>
         </div>
       </div>
       
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display:'flex', flexDirection:'column', gap:'16px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-6)', display:'flex', flexDirection:'column', gap: 'var(--space-4)' }}>
         {loading ? <div style={{ color:'var(--text-muted)' }}>Loading chat...</div> : (
           <>
             {/* Original message */}
             <div style={{ alignSelf: 'flex-end', maxWidth: '75%' }}>
-              <div style={{ fontSize: 'var(--fs-xs)', color:'var(--text-muted)', marginBottom:'4px', textAlign:'right', marginRight:'4px' }}>You • {formatTime(ticket.created_at)}</div>
-              <div style={{ background: 'var(--accent)', color: 'var(--paper)', padding: '12px 16px', lineHeight:'1.5', whiteSpace:'pre-wrap' }}>
+              <div style={{ fontSize: 'var(--fs-xs)', color:'var(--text-muted)', marginBottom: 'var(--space-1)', textAlign:'right', marginRight: 'var(--space-1)' }}>You • {formatTime(ticket.created_at)}</div>
+              <div style={{ background: 'var(--accent)', color: 'var(--paper)', padding: 'var(--space-3) var(--space-4)', lineHeight:'1.5', whiteSpace:'pre-wrap' }}>
                 {ticket.message}
               </div>
             </div>
 
             {messages.map(m => (
               <div key={m.id} style={{ alignSelf: m.sender_type === 'user' ? 'flex-end' : 'flex-start', maxWidth: '75%' }}>
-                <div style={{ fontSize: 'var(--fs-xs)', color:'var(--text-muted)', marginBottom:'4px', marginLeft: m.sender_type === 'user' ? 0 : '4px', marginRight: m.sender_type === 'user' ? '4px' : 0, textAlign: m.sender_type === 'user' ? 'right' : 'left' }}>
+                <div style={{ fontSize: 'var(--fs-xs)', color:'var(--text-muted)', marginBottom: 'var(--space-1)', marginLeft: m.sender_type === 'user' ? 0 : '4px', marginRight: m.sender_type === 'user' ? '4px' : 0, textAlign: m.sender_type === 'user' ? 'right' : 'left' }}>
                   {m.sender_name || (m.sender_type==='admin'?'Support Team':'You')} • {formatTime(m.created_at)}
                 </div>
-                <div style={{ background: m.sender_type === 'user' ? 'var(--accent)' : 'var(--navy)', color: m.sender_type === 'user' ? 'var(--paper)' : 'var(--text)', padding: '12px 16px', lineHeight:'1.5', whiteSpace:'pre-wrap' }}>
+                <div style={{ background: m.sender_type === 'user' ? 'var(--accent)' : 'var(--navy)', color: m.sender_type === 'user' ? 'var(--paper)' : 'var(--text)', padding: 'var(--space-3) var(--space-4)', lineHeight:'1.5', whiteSpace:'pre-wrap' }}>
                   {m.message}
                 </div>
               </div>
@@ -255,14 +255,14 @@ function TicketChat({ ticket, user, onBack }) {
         )}
       </div>
 
-      <div style={{ padding: '16px', borderTop: '1px solid var(--navy-border)', background:'color-mix(in srgb, var(--navy) 40%, transparent)' }}>
-        <div style={{ display: 'flex', gap: '12px' }}>
+      <div style={{ padding: 'var(--space-4)', borderTop: '1px solid var(--navy-border)', background:'color-mix(in srgb, var(--navy) 40%, transparent)' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
           <input
              value={reply}
              onChange={e => setReply(e.target.value)}
              onKeyDown={e => e.key === 'Enter' && handleSend()}
              placeholder="Type a reply..."
-             style={{ flex: 1, padding: '12px 16px', borderRadius: 'var(--radius-pill)', border: '1px solid var(--navy-border)', background: 'var(--navy)', color: 'var(--text)', outline: 'none' }}
+             style={{ flex: 1, padding: 'var(--space-3) var(--space-4)', borderRadius: 'var(--radius-pill)', border: '1px solid var(--navy-border)', background: 'var(--navy)', color: 'var(--text)', outline: 'none' }}
              disabled={ticket.status === 'closed'}
           />
           <button
@@ -272,7 +272,7 @@ function TicketChat({ ticket, user, onBack }) {
              Send
           </button>
         </div>
-        {ticket.status === 'closed' && <div style={{ fontSize: 'var(--fs-xs)', color:'var(--red)', marginTop:'8px', textAlign:'center' }}>This ticket is closed.</div>}
+        {ticket.status === 'closed' && <div style={{ fontSize: 'var(--fs-xs)', color:'var(--red)', marginTop: 'var(--space-2)', textAlign:'center' }}>This ticket is closed.</div>}
       </div>
     </div>
   )

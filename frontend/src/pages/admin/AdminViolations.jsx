@@ -493,7 +493,7 @@ export default function AdminViolations() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-4)', marginBottom: 'var(--space-6)', flexWrap: 'wrap' }}>
         <div>
           <h1 className="admin-h1">Automation Violations</h1>
           <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
@@ -506,7 +506,7 @@ export default function AdminViolations() {
         <button className="admin-btn admin-btn-ghost" onClick={() => fetchAll()} disabled={loading}>Refresh</button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
         <AdminStatCard icon="warning" label="Open Violations" value={summary?.totals?.total_open || 0} />
         <AdminStatCard icon="warning" label="Critical Open" value={summary?.totals?.critical_open || 0} />
         <AdminStatCard icon="activity" label="High Severity" value={summary?.totals?.high_open || 0} />
@@ -569,7 +569,7 @@ export default function AdminViolations() {
         ) : null}
       />
 
-      <Card flush style={{ marginBottom: '24px' }}>
+      <Card flush style={{ marginBottom: 'var(--space-6)' }}>
         <AdminDataTable
           columns={columns}
           data={filteredViolations}
@@ -604,7 +604,7 @@ export default function AdminViolations() {
       </Card>
 
       <Card>
-        <h2 className="admin-h2" style={{ marginBottom: '16px' }}>Top Violation Types (Last 24h)</h2>
+        <h2 className="admin-h2" style={{ marginBottom: 'var(--space-4)' }}>Top Violation Types (Last 24h)</h2>
         {summary?.top_types_last_24h?.length > 0 ? (
           <div style={{ display: 'grid', gap: '10px' }}>
             {summary.top_types_last_24h.map((item) => (
@@ -654,34 +654,34 @@ export default function AdminViolations() {
       >
         {selectedViolation && (
           <div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px', marginBottom: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Type</div>
-                <div style={{ marginTop: '4px', color: 'var(--admin-text)', fontWeight: 600 }}>{formatLabel(selectedViolation.violation_type)}</div>
+                <div style={{ marginTop: 'var(--space-1)', color: 'var(--admin-text)', fontWeight: 600 }}>{formatLabel(selectedViolation.violation_type)}</div>
               </div>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Severity</div>
-                <div style={{ marginTop: '4px' }}>
+                <div style={{ marginTop: 'var(--space-1)' }}>
                   <AdminBadge status={getSeverityTone(selectedViolation.severity)} label={formatLabel(selectedViolation.severity)} />
                 </div>
               </div>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Account ID</div>
-                <div className="admin-td-mono" style={{ marginTop: '4px' }}>{selectedViolation.account_id || '-'}</div>
+                <div className="admin-td-mono" style={{ marginTop: 'var(--space-1)' }}>{selectedViolation.account_id || '-'}</div>
               </div>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>User ID</div>
-                <div className="admin-td-mono" style={{ marginTop: '4px' }}>{selectedViolation.user_id || '-'}</div>
+                <div className="admin-td-mono" style={{ marginTop: 'var(--space-1)' }}>{selectedViolation.user_id || '-'}</div>
               </div>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Status</div>
-                <div style={{ marginTop: '4px' }}>
+                <div style={{ marginTop: 'var(--space-1)' }}>
                   <AdminBadge status={selectedViolation.status === 'resolved' ? 'success' : 'danger'} label={formatLabel(selectedViolation.status)} />
                 </div>
               </div>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Hit Count</div>
-                <div className="admin-td-mono" style={{ marginTop: '4px' }}>{selectedViolation.hit_count || 1}</div>
+                <div className="admin-td-mono" style={{ marginTop: 'var(--space-1)' }}>{selectedViolation.hit_count || 1}</div>
               </div>
             </div>
 
@@ -698,22 +698,22 @@ export default function AdminViolations() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px', marginBottom: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>First Detected</div>
-                <div style={{ marginTop: '4px', color: 'var(--admin-text)' }}>{formatTimestamp(selectedViolation.first_detected_at)}</div>
+                <div style={{ marginTop: 'var(--space-1)', color: 'var(--admin-text)' }}>{formatTimestamp(selectedViolation.first_detected_at)}</div>
               </div>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Last Detected</div>
-                <div style={{ marginTop: '4px', color: 'var(--admin-text)' }}>{formatTimestamp(selectedViolation.last_detected_at)}</div>
+                <div style={{ marginTop: 'var(--space-1)', color: 'var(--admin-text)' }}>{formatTimestamp(selectedViolation.last_detected_at)}</div>
               </div>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Instrument</div>
-                <div className="admin-td-mono" style={{ marginTop: '4px' }}>{selectedViolation.instrument || '-'}</div>
+                <div className="admin-td-mono" style={{ marginTop: 'var(--space-1)' }}>{selectedViolation.instrument || '-'}</div>
               </div>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>Source</div>
-                <div style={{ marginTop: '4px', color: 'var(--admin-text)' }}>{formatLabel(selectedViolation.source)}</div>
+                <div style={{ marginTop: 'var(--space-1)', color: 'var(--admin-text)' }}>{formatLabel(selectedViolation.source)}</div>
               </div>
             </div>
 
@@ -736,7 +736,7 @@ export default function AdminViolations() {
             {isSuperAdmin && selectedViolation.account_id && (
               <div className="admin-form-group">
                 <label className="admin-label">Account Actions</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-3)' }}>
                   <button className="admin-btn admin-btn-warning" onClick={() => performAccountAction('flag_for_review')} disabled={saving || !!actionLoading}>
                     {actionLoading === 'flag_for_review' ? 'Flagging...' : 'Flag For Review'}
                   </button>

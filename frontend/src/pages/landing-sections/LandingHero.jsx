@@ -193,12 +193,12 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
           style={{
             display: 'grid',
             gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 1fr)',
-            gap: '48px',
+            gap: 'var(--space-9)',
             alignItems: 'center',
           }}
         >
           <div style={{ position: 'relative', zIndex: 10 }}>
-            <div className="mp-badge mp-reveal mp-active" style={{ marginBottom: '32px' }}>
+            <div className="mp-badge mp-reveal mp-active" style={{ marginBottom: 'var(--space-7)' }}>
               <ScrambleText text={landingCopy.heroBadge} delay={500} />
             </div>
 
@@ -211,7 +211,7 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
                 to the single lead paragraph below on narrow viewports. */}
             <div
               className="mp-hero-intro mp-reveal mp-delay-200 mp-active"
-              style={{ display: 'flex', gap: '22px', maxWidth: '640px', marginBottom: '40px' }}
+              style={{ display: 'flex', gap: '22px', maxWidth: '640px', marginBottom: 'var(--space-8)' }}
             >
               <p style={{
                 flex: 1, fontSize: '15px', lineHeight: 1.72, color: 'var(--mp-text-secondary)',
@@ -221,7 +221,7 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
               </p>
             </div>
 
-            <div className="mp-reveal mp-delay-300 mp-active" style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div className="mp-reveal mp-delay-300 mp-active" style={{ display: 'flex', gap: 'var(--space-6)', flexWrap: 'wrap', alignItems: 'center' }}>
               <button
                 className="mp-btn-primary"
                 onClick={() => {
@@ -238,7 +238,7 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
               <button className="mp-btn-secondary" onClick={() => {
                 if (onSecondaryCta) onSecondaryCta();
                 scrollToCalculator();
-              }} style={{ padding: '20px 40px' }}>
+              }} style={{ padding: 'var(--space-5) var(--space-8)' }}>
                 View Account Sizes
               </button>
             </div>
@@ -282,7 +282,7 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
                 position: 'relative', zIndex: 1,
                 border: '1px solid var(--rule)', background: 'var(--glass)',
                 backdropFilter: 'blur(14px) saturate(140%)', WebkitBackdropFilter: 'blur(14px) saturate(140%)',
-                padding: '12px', boxShadow: 'var(--elev), 0 0 60px -30px var(--glow-primary)',
+                padding: 'var(--space-3)', boxShadow: 'var(--elev), 0 0 60px -30px var(--glow-primary)',
               }}>
                 <div style={{
                   aspectRatio: '4 / 5', border: '1px solid var(--rule-soft)',
@@ -305,7 +305,7 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
           a phone — where the hero is shorter and the stat rows stack — it lands
           on top of "Payout Cycles". Hidden below `md` via .mp-scroll-cue: it is
           decorative, and scrolling needs no prompting on a touch screen. */}
-      <div className="mp-scroll-cue" style={{ position: 'absolute', bottom: '40px', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', opacity: 0.4, animation: 'mp-scroll-bounce 2s ease-in-out infinite' }}>
+      <div className="mp-scroll-cue" style={{ position: 'absolute', bottom: '40px', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-2)', opacity: 0.4, animation: 'mp-scroll-bounce 2s ease-in-out infinite' }}>
               <span style={{ fontSize: 'var(--fs-2xs)', textTransform: 'uppercase', letterSpacing: '0.2em', fontFamily: 'var(--font-mono)' }}>Scroll to explore</span>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="6 9 12 15 18 9" />

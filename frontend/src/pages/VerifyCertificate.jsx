@@ -191,7 +191,7 @@ export default function VerifyCertificate() {
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 8,
                   background: 'var(--brand-primary)', color: 'var(--on-primary)',
-                  padding: '12px 24px', textDecoration: 'none', fontWeight: 700,
+                  padding: 'var(--space-3) var(--space-6)', textDecoration: 'none', fontWeight: 700,
                   fontFamily: 'var(--font-mono)', fontSize: 12,
                   letterSpacing: '.12em', textTransform: 'uppercase'
                 }}

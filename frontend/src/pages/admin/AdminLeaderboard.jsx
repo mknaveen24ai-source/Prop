@@ -340,7 +340,7 @@ export default function AdminLeaderboard() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', gap: '16px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-6)', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
         <div>
           <h1 className="admin-h1">Leaderboard Management</h1>
           <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
@@ -349,14 +349,14 @@ export default function AdminLeaderboard() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
         <AdminStatCard icon="RANK" label="Ranked Traders" value={summary.total.toLocaleString()} />
         <AdminStatCard icon="SHOW" label="Visible" value={summary.visible.toLocaleString()} />
         <AdminStatCard icon="HIDE" label="Hidden" value={summary.hidden.toLocaleString()} />
         <AdminStatCard icon="WR" label="Avg Win Rate" value={`${summary.avgWinRate.toFixed(1)}%`} />
       </div>
 
-      <Card style={{ marginBottom: '20px' }}>
+      <Card style={{ marginBottom: 'var(--space-5)' }}>
         <AdminFilterBar
           searchPlaceholder="Search by trader, email, country, or account UID"
           searchValue={search}

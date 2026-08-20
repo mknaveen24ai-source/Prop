@@ -26,7 +26,7 @@ function Card({ children, style }) {
       background: 'var(--navy-card)',
       border: '1px solid var(--navy-border)',
       borderRadius: '0',
-      padding: '24px',
+      padding: 'var(--space-6)',
       ...style
     }}>
       {children}
@@ -78,8 +78,8 @@ function Alert({ type = 'info', children }) {
   return (
     <div style={{
       background: 'transparent', border: `1px solid ${s.border}`, color: s.color,
-      padding: '12px 16px', fontSize: 'var(--fs-base)',
-      lineHeight: 1.6, marginBottom: '16px'
+      padding: 'var(--space-3) var(--space-4)', fontSize: 'var(--fs-base)',
+      lineHeight: 1.6, marginBottom: 'var(--space-4)'
     }}>
       {children}
     </div>
@@ -119,7 +119,7 @@ function TotpBox({ onComplete, disabled }) {
   }
 
   return (
-    <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }} onPaste={handlePaste}>
+    <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'center' }} onPaste={handlePaste}>
       {digits.map((d, i) => (
         <input key={i} ref={refs[i]}
           type="text" inputMode="numeric" pattern="[0-9]*" maxLength={1}
@@ -249,7 +249,7 @@ function TwoFactorSetup({ apiBase = '' }) {
     return (
       <Card>
         <h3 style={{ color: 'var(--text)', marginBottom: '6px' }}>🔐 Set Up Two-Factor Authentication</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: '20px', lineHeight: 1.6 }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: 'var(--space-5)', lineHeight: 1.6 }}>
           Scan the QR code with Google Authenticator or Authy. Then enter the 6-digit code below to confirm.
         </p>
 
@@ -257,10 +257,10 @@ function TwoFactorSetup({ apiBase = '' }) {
 
         {/* QR Code */}
         {qrUrl && (
-          <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <div style={{ textAlign: 'center', marginBottom: 'var(--space-5)' }}>
             <div style={{
               display: 'inline-block', background: '#fff',
-              padding: '12px', border: '1px solid var(--rule)'
+              padding: 'var(--space-3)', border: '1px solid var(--rule)'
             }}>
               <img src={qrUrl} alt="2FA QR Code" style={{ display: 'block', width: '180px', height: '180px' }} />
             </div>
@@ -269,7 +269,7 @@ function TwoFactorSetup({ apiBase = '' }) {
 
         {/* Manual secret */}
         {plainSecret && (
-          <div style={{ marginBottom: '24px' }}>
+          <div style={{ marginBottom: 'var(--space-6)' }}>
             <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '6px', letterSpacing: '0.06em' }}>
               CAN'T SCAN? ENTER THIS KEY MANUALLY:
             </div>
@@ -286,7 +286,7 @@ function TwoFactorSetup({ apiBase = '' }) {
         )}
 
         {/* 6-digit verify */}
-        <div style={{ marginBottom: '16px' }}>
+        <div style={{ marginBottom: 'var(--space-4)' }}>
           <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '0.06em', textAlign: 'center' }}>
             ENTER THE 6-DIGIT CODE FROM YOUR APP
           </div>
@@ -294,12 +294,12 @@ function TwoFactorSetup({ apiBase = '' }) {
         </div>
 
         {setupLoading && (
-          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-sm)', marginTop: '8px' }}>
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-2)' }}>
             Verifying…
           </div>
         )}
 
-        <div style={{ marginTop: '16px' }}>
+        <div style={{ marginTop: 'var(--space-4)' }}>
           <Btn variant="ghost" onClick={() => { setSetupPhase('idle'); setSetupError('') }} style={{ width: '100%' }}>
             Cancel
           </Btn>
@@ -312,9 +312,9 @@ function TwoFactorSetup({ apiBase = '' }) {
   if (setupPhase === 'done') {
     return (
       <Card>
-        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 'var(--space-5)' }}>
           <div style={{ fontSize: '36px' }}>✅</div>
-          <h3 style={{ color: 'var(--text)', marginTop: '8px' }}>2FA Enabled Successfully!</h3>
+          <h3 style={{ color: 'var(--text)', marginTop: 'var(--space-2)' }}>2FA Enabled Successfully!</h3>
         </div>
 
         <Alert type="warning">
@@ -325,7 +325,7 @@ function TwoFactorSetup({ apiBase = '' }) {
         {/* Backup codes grid */}
         <div style={{
           background: 'var(--navy-hover)', border: '1px solid var(--navy-border)',
-          borderRadius: '0', padding: '16px', marginBottom: '16px'
+          borderRadius: '0', padding: 'var(--space-4)', marginBottom: 'var(--space-4)'
         }}>
           <div className="ui-cols" style={{ '--cols-gap': '8px' }}>
             {backupCodes.map((code, i) => (
@@ -333,7 +333,7 @@ function TwoFactorSetup({ apiBase = '' }) {
                 fontFamily: 'monospace', fontSize: 'var(--fs-md)',
                 color: 'var(--text)', letterSpacing: '0.08em',
                 background: 'var(--navy-card)', borderRadius: '0',
-                padding: '8px 12px', textAlign: 'center',
+                padding: 'var(--space-2) var(--space-3)', textAlign: 'center',
                 border: '1px solid var(--navy-border)'
               }}>
                 {code}
@@ -357,7 +357,7 @@ function TwoFactorSetup({ apiBase = '' }) {
     return (
       <Card>
         <h3 style={{ color: 'var(--text)', marginBottom: '6px' }}>Disable Two-Factor Authentication</h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: '20px', lineHeight: 1.6 }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', marginBottom: 'var(--space-5)', lineHeight: 1.6 }}>
           Enter your account password and a valid 2FA code to confirm.
         </p>
 
@@ -377,7 +377,7 @@ function TwoFactorSetup({ apiBase = '' }) {
           />
         </div>
 
-        <div style={{ marginBottom: '20px' }}>
+        <div style={{ marginBottom: 'var(--space-5)' }}>
           <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '0.06em', textAlign: 'center' }}>
             2FA CODE FROM AUTHENTICATOR APP
           </div>
@@ -385,7 +385,7 @@ function TwoFactorSetup({ apiBase = '' }) {
         </div>
 
         {disableLoading && (
-          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-sm)', marginBottom: '8px' }}>
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 'var(--fs-sm)', marginBottom: 'var(--space-2)' }}>
             Disabling 2FA…
           </div>
         )}
@@ -400,7 +400,7 @@ function TwoFactorSetup({ apiBase = '' }) {
   // ── STATUS VIEW (default) ──────────────────────────────────────────────────
   return (
     <Card>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-4)' }}>
         <div style={{
           width: '44px', height: '44px', borderRadius: '0', flexShrink: 0,
           background: is2faEnabled ? 'color-mix(in srgb, var(--gain) 12%, transparent)' : 'color-mix(in srgb, var(--loss) 8%, transparent)',
@@ -410,7 +410,7 @@ function TwoFactorSetup({ apiBase = '' }) {
           {is2faEnabled ? '🔐' : '🔓'}
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: 'var(--space-1)' }}>
             <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: '15px' }}>
               Two-Factor Authentication
             </span>
@@ -431,7 +431,7 @@ function TwoFactorSetup({ apiBase = '' }) {
         </div>
       </div>
 
-      <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
+      <div style={{ marginTop: 'var(--space-5)', display: 'flex', gap: '10px' }}>
         {!is2faEnabled && (
           <Btn variant="accent" onClick={startSetup} disabled={setupLoading}>
             {setupLoading ? 'Loading…' : '🔐 Enable 2FA'}
@@ -445,7 +445,7 @@ function TwoFactorSetup({ apiBase = '' }) {
       </div>
 
       {statusError && (
-        <div style={{ marginTop: '12px' }}>
+        <div style={{ marginTop: 'var(--space-3)' }}>
           <Alert type="error">{statusError}</Alert>
         </div>
       )}

@@ -16,7 +16,7 @@ export default function ListToolbar({ searchValue, onSearchChange, placeholder =
         <input
           type="text"
           className="lx-field__control"
-          style={{ paddingLeft: '32px' }}
+          style={{ paddingLeft: 'var(--space-7)' }}
           placeholder={placeholder}
           value={searchValue || ''}
           onChange={(e) => onSearchChange && onSearchChange(e.target.value)}

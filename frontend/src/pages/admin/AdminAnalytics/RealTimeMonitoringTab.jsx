@@ -69,11 +69,11 @@ export default function RealTimeMonitoringTab() {
       </AdminStatGrid>
 
       <h2 className="admin-h2">Open Positions — All Accounts</h2>
-      <Card flush style={{ marginBottom: '24px' }}>
+      <Card flush style={{ marginBottom: 'var(--space-6)' }}>
         <AdminDataTable columns={positionColumns} data={positions} loading={loading} emptyMessage="No open positions" emptyIcon="trades" />
       </Card>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 'var(--space-4)', marginBottom: 'var(--space-6)' }}>
         <AdminChart title="Firm Exposure per Instrument (Lots)">
           <BarChart data={exposure} {...barHoverHandlers(setExposureActiveIndex)}>
             <CartesianGrid {...chartThemeProps.grid} />
@@ -103,13 +103,13 @@ export default function RealTimeMonitoringTab() {
           </BarChart>
         </AdminChart>
 
-        <Card style={{ marginBottom: '24px' }}>
-          <h3 className="admin-h2" style={{ marginBottom: '16px' }}>Directional Bias</h3>
+        <Card style={{ marginBottom: 'var(--space-6)' }}>
+          <h3 className="admin-h2" style={{ marginBottom: 'var(--space-4)' }}>Directional Bias</h3>
           <div style={{ display: 'flex', height: '28px', border: '1px solid var(--rule)' }}>
             <div style={{ width: `${buyPct}%`, background: 'var(--admin-success)' }} />
             <div style={{ width: `${100 - buyPct}%`, background: 'var(--admin-danger)' }} />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-2)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)' }}>
             <span style={{ color: 'var(--admin-success)' }}>BUY {buyPct}%</span>
             <span style={{ color: 'var(--admin-danger)' }}>SELL {100 - buyPct}%</span>
           </div>

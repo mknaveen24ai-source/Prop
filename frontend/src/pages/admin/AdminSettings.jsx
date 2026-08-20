@@ -228,7 +228,7 @@ export default function AdminSettings() {
 
   if (loading) {
     return (
-      <div style={{ padding: '40px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '24px' }}>
+      <div style={{ padding: 'var(--space-8)', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 'var(--space-6)' }}>
         {Array(6).fill(0).map((_, index) => (
           <div key={index} className="admin-skeleton" style={{ height: '240px' }} />
         ))}
@@ -238,14 +238,14 @@ export default function AdminSettings() {
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-7)' }}>
         <div>
           <h1 className="admin-h1">Platform Settings</h1>
           <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
             Changes are audited and take effect immediately (30s cache on trading rules).
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
           {dirty && (
             <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--admin-warning)', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--admin-warning)', display: 'inline-block' }} />
@@ -331,10 +331,10 @@ export default function AdminSettings() {
         </div>
       </Card>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 'var(--space-6)' }}>
         {SETTINGS_GROUPS.map(group => (
           <Card key={group.title}>
-            <h3 className="admin-h3" style={{ marginBottom: '20px', borderBottom: '1px solid var(--admin-border)', paddingBottom: '12px' }}>
+            <h3 className="admin-h3" style={{ marginBottom: 'var(--space-5)', borderBottom: '1px solid var(--admin-border)', paddingBottom: 'var(--space-3)' }}>
               {group.title}
             </h3>
             {group.fields.map(field => {
@@ -352,7 +352,7 @@ export default function AdminSettings() {
               <div key={field.key} className="admin-form-group">
                 <label className="admin-label">
                   {field.label}
-                  {field.hint && <span style={{ color: 'var(--admin-text-faint)', fontWeight: 400, marginLeft: '8px', textTransform: 'none' }}>{field.hint}</span>}
+                  {field.hint && <span style={{ color: 'var(--admin-text-faint)', fontWeight: 400, marginLeft: 'var(--space-2)', textTransform: 'none' }}>{field.hint}</span>}
                 </label>
                 {field.type === 'select' ? (
                   <select
@@ -400,7 +400,7 @@ export default function AdminSettings() {
         ))}
       </div>
 
-      <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingBottom: '8px', marginTop: '24px' }}>
+      <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', paddingBottom: 'var(--space-2)', marginTop: 'var(--space-6)' }}>
         <button className="admin-btn admin-btn-ghost" onClick={loadSettings} disabled={saving}>Discard</button>
         <button className="admin-btn admin-btn-primary" onClick={handleSave} disabled={saving || !dirty}>
           {saving ? 'Saving...' : 'Save changes'}

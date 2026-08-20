@@ -46,13 +46,13 @@ export default function AdminStatCard({
         {trend && (
           <div className={`admin-stat-trend ${trendDirection}`}>
             {trendIcon}
-            <span style={{ marginLeft: '4px' }}>{trend}</span>
+            <span style={{ marginLeft: 'var(--space-1)' }}>{trend}</span>
           </div>
         )}
       </div>
       <div>
         <div className="admin-stat-value" style={alert ? { color: alertColor } : undefined}>{value}</div>
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '8px', marginTop: '3px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 'var(--space-2)', marginTop: '3px' }}>
           <div className="admin-stat-label">{label}</div>
           {Array.isArray(spark) && spark.length > 1 && (
             <span style={{ width: '52px', height: '20px', flex: '0 0 auto' }}>
