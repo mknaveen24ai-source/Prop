@@ -253,7 +253,7 @@ function Dashboard({ user, onLogout }) {
             <button
               onClick={dismissAnnouncement}
               aria-label="Dismiss announcement"
-              style={{ background: 'none', border: 'none', color: c.text, cursor: 'pointer', fontSize: 'var(--fs-lg)', opacity: 0.7, padding: '0 4px' }}
+              style={{ background: 'none', border: 'none', color: c.text, cursor: 'pointer', fontSize: 'var(--fs-lg)', opacity: 0.7, padding: '0 var(--space-1)' }}
             >
               {renderIcon('close', { size: 16, color: c.text })}
             </button>

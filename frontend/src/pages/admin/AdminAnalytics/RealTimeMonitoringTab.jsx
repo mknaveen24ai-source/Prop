@@ -114,7 +114,7 @@ export default function RealTimeMonitoringTab() {
             <span style={{ color: 'var(--admin-danger)' }}>SELL {100 - buyPct}%</span>
           </div>
 
-          <h3 className="admin-h2" style={{ margin: '24px 0 12px' }}>Risk Concentration Alerts</h3>
+          <h3 className="admin-h2" style={{ margin: 'var(--space-6) 0 var(--space-3)' }}>Risk Concentration Alerts</h3>
           {riskAlerts.length === 0 ? (
             <p style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-base)' }}>No instrument exceeds the 30% concentration threshold.</p>
           ) : (

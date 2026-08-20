@@ -123,7 +123,7 @@ export default function Competitions() {
           <ThemeToggle />
         </div>
 
-        <div style={{ maxWidth: '800px', margin: '48px auto 0', padding: '0 24px' }}>
+        <div style={{ maxWidth: '800px', margin: '48px auto 0', padding: '0 var(--space-6)' }}>
           <CompetitionsListContent />
         </div>
       </div>

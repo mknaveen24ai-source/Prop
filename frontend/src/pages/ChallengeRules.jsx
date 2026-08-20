@@ -21,7 +21,7 @@ function formatDateTime(value) {
 
 function RuleRow({ label, value, accent = false }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-3)', padding: '12px 0', borderBottom: '1px solid var(--navy-border)' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-3)', padding: 'var(--space-3) 0', borderBottom: '1px solid var(--navy-border)' }}>
       <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>{label}</span>
       <span style={{ color: accent ? 'var(--accent)' : 'var(--text)', fontSize: 'var(--fs-base)', fontFamily: 'var(--font-mono)', textAlign: 'right' }}>{value}</span>
     </div>
@@ -303,8 +303,8 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
       <div style={{ borderBottom: '3px double var(--ink)', paddingBottom: 'var(--space-4)', display: 'flex', alignItems: 'flex-end', gap: 'var(--space-5)', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: '280px' }}>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--accent)' }}>{kicker}</div>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '38px', fontWeight: 400, margin: '10px 0 0' }}>The Rulebook, in full</h2>
-          <p style={{ fontSize: 'var(--fs-md)', lineHeight: 1.7, color: 'var(--muted)', maxWidth: '64ch', margin: '10px 0 0' }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '38px', fontWeight: 400, margin: 'var(--space-2-5) 0 0' }}>The Rulebook, in full</h2>
+          <p style={{ fontSize: 'var(--fs-md)', lineHeight: 1.7, color: 'var(--muted)', maxWidth: '64ch', margin: 'var(--space-2-5) 0 0' }}>
             Everything that can end this account is printed on this page. Nothing is held in a separate schedule, and nothing changes while a challenge is running.
           </p>
         </div>
@@ -376,7 +376,7 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
 
           <Card>
             <h3 style={{ color: 'var(--accent)', marginBottom: 'var(--space-3-5)', fontSize: 'var(--fs-lg)' }}>Live Status</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 32px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 var(--space-7)' }}>
               <div>
                 <RuleRow label="Status" value={String(selectedAccount.status || '—').toUpperCase()} />
                 <RuleRow label="Live Equity" value={formatMoney(liveEquity)} accent />

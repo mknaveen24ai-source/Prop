@@ -22,7 +22,7 @@ export default function ThemeToggle() {
         background: 'var(--paper)',
         border: '1px solid var(--border-strong)',
         borderRadius: '20px',
-        padding: '0 4px',
+        padding: '0 var(--space-1)',
         cursor: 'pointer',
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         overflow: 'hidden',

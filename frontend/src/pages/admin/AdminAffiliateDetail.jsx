@@ -82,7 +82,7 @@ export default function AdminAffiliateDetail() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-5)' }}>
         <div>
-          <h2 style={{ margin: '0 0 4px' }}>{user.full_name}</h2>
+          <h2 style={{ margin: '0 0 var(--space-1)' }}>{user.full_name}</h2>
           <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7 }}>{user.email} · Code {user.affiliate_code} · Joined {new Date(user.created_at).toLocaleDateString()}</div>
         </div>
         <AdjustBalanceForm onSubmit={handleAdjustBalance} />
@@ -97,7 +97,7 @@ export default function AdminAffiliateDetail() {
       </div>
 
       <Card style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-5)' }}>
-        <h3 style={{ margin: '0 0 14px' }}>Referrals ({referrals.total})</h3>
+        <h3 style={{ margin: '0 0 var(--space-3-5)' }}>Referrals ({referrals.total})</h3>
         <div className="admin-table-wrapper">
           <table className="admin-table">
             <thead>
@@ -125,7 +125,7 @@ export default function AdminAffiliateDetail() {
       </Card>
 
       <Card style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-5)' }}>
-        <h3 style={{ margin: '0 0 14px' }}>Commission Ledger ({commissions.total})</h3>
+        <h3 style={{ margin: '0 0 var(--space-3-5)' }}>Commission Ledger ({commissions.total})</h3>
         <div className="admin-table-wrapper">
           <table className="admin-table">
             <thead>
@@ -157,7 +157,7 @@ export default function AdminAffiliateDetail() {
       </Card>
 
       <Card style={{ padding: 'var(--space-5)' }}>
-        <h3 style={{ margin: '0 0 14px' }}>Payout History ({payouts.total})</h3>
+        <h3 style={{ margin: '0 0 var(--space-3-5)' }}>Payout History ({payouts.total})</h3>
         <div className="admin-table-wrapper">
           <table className="admin-table">
             <thead>

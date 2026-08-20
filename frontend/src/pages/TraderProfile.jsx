@@ -180,7 +180,7 @@ export function TraderProfileContent({ userId, onBack }) {
       )}
 
       {/* ── Privacy notice ── */}
-      <div style={{ textAlign: 'center', padding: '20px 0' }}>
+      <div style={{ textAlign: 'center', padding: 'var(--space-5) 0' }}>
         <p style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-sm)' }}>
           Only aggregated public statistics are shown. No personal contact information is displayed.
         </p>

@@ -477,7 +477,7 @@ export default function AdminEmailJobs() {
                 </div>
               </Card>
 
-              <Card style={{ margin: '16px 0 0', background: 'var(--admin-bg)' }}>
+              <Card style={{ margin: 'var(--space-4) 0 0', background: 'var(--admin-bg)' }}>
                 <h3 className="admin-h3">Payload</h3>
                 <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)' }}>
                   {JSON.stringify(drawerRow.payload_json || {}, null, 2)}

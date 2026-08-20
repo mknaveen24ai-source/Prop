@@ -156,7 +156,7 @@ export default function DashboardPayoutsPage({
             ))}
           </div>
 
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', margin: '16px 0 8px' }}>Cryptocurrency</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', margin: 'var(--space-4) 0 var(--space-2)' }}>Cryptocurrency</div>
           {CRYPTO_CURRENCIES.map((m) => {
             const active = payoutCurrency === m.id
             return (
@@ -181,7 +181,7 @@ export default function DashboardPayoutsPage({
 
           {payoutCurrency === 'usdt' && (
             <>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', margin: '12px 0 8px' }}>Network</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', margin: 'var(--space-3) 0 var(--space-2)' }}>Network</div>
               {USDT_NETWORKS.map((n) => {
                 const active = payoutNetwork === n.id
                 return (

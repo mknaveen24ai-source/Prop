@@ -45,7 +45,7 @@ function TotpInput({ onSubmit, onBack, loading, error }) {
             <path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="var(--accent)" strokeWidth="1.6" strokeLinecap="round" />
           </svg>
         </div>
-        <h2 style={{ color: 'var(--text)', fontSize: 'var(--fs-2xl)', margin: '0 0 6px' }}>
+        <h2 style={{ color: 'var(--text)', fontSize: 'var(--fs-2xl)', margin: '0 0 var(--space-1-5)' }}>
           Two-Factor Authentication
         </h2>
         <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', lineHeight: '1.5' }}>

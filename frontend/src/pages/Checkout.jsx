@@ -253,7 +253,7 @@ export default function Checkout() {
                   />
                   <button
                     className="btn btn-primary"
-                    style={{ width: 'auto', padding: '0 20px' }}
+                    style={{ width: 'auto', padding: '0 var(--space-5)' }}
                     disabled={!voucherCode.trim() || redeemingVoucher}
                     onClick={handleRedeemVoucher}
                   >
@@ -300,7 +300,7 @@ export default function Checkout() {
                   />
                   <button
                     className="btn btn-primary"
-                    style={{ width: 'auto', padding: '0 20px' }}
+                    style={{ width: 'auto', padding: '0 var(--space-5)' }}
                     disabled={!couponCode.trim() || validatingCoupon}
                     onClick={handleApplyCoupon}
                   >
@@ -352,13 +352,13 @@ export default function Checkout() {
         {error && <div className="error" style={{ marginBottom: 'var(--space-4)' }}>{error}</div>}
 
         {!dataLoaded && (
-          <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-muted)' }}>
+          <div style={{ padding: 'var(--space-8) 0', textAlign: 'center', color: 'var(--text-muted)' }}>
             Loading your selection…
           </div>
         )}
 
         {dataLoaded && pending === null && (
-          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          <div style={{ textAlign: 'center', padding: 'var(--space-5) 0' }}>
             <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-md)', marginBottom: 'var(--space-5)' }}>
               You haven't picked a challenge yet.
             </p>
@@ -369,7 +369,7 @@ export default function Checkout() {
         )}
 
         {dataLoaded && pending && !model && (
-          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          <div style={{ textAlign: 'center', padding: 'var(--space-5) 0' }}>
             <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-md)', marginBottom: 'var(--space-5)' }}>
               We couldn't load this challenge model. It may no longer be available.
             </p>
@@ -448,7 +448,7 @@ export default function Checkout() {
             )}
 
             {!authChecked && (
-              <div style={{ textAlign: 'center', padding: '12px 0', color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>
+              <div style={{ textAlign: 'center', padding: 'var(--space-3) 0', color: 'var(--text-muted)', fontSize: 'var(--fs-base)' }}>
                 Checking your session…
               </div>
             )}

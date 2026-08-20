@@ -45,26 +45,8 @@ const MAX = (() => {
   return i === -1 ? null : parseInt(process.argv[i + 1], 10)
 })()
 
-/**
- * Files where a raw colour literal is correct, with the reason it is correct.
- *
- * An allowlist without reasons becomes a place to hide things. Each entry has to
- * survive being read aloud.
- */
-const COLOR_ALLOWLIST = [
-  ['src/ErrorBoundary.jsx',
-    'renders after the app has thrown; the stylesheet and its custom properties may never have loaded'],
-  ['src/components/admin/CertificateLayoutEditor.jsx',
-    'hex IS the data here - the admin picks colours for certificate fields'],
-  ['src/components/admin/ClusterGraph.jsx',
-    'paints to canvas, which cannot resolve CSS custom properties'],
-  ['src/BrandingContext.jsx',
-    'ships the fallback brand palette the tokens themselves are derived from']
-]
-
-function isAllowlisted(relPath) {
-  return COLOR_ALLOWLIST.some(([file]) => relPath === file)
-}
+const { isColorAllowlisted, COLOR_ALLOWLIST, SUPPRESSION_PATTERN } =
+  require('../design-tokens.config.js')
 
 /** Every .jsx under src/. */
 function jsxFiles() {
@@ -122,7 +104,7 @@ function suppressionReason(lines, lineNumber) {
   ]
   for (const line of candidates) {
     if (!line) continue
-    const m = line.match(/design-drift-allow:\s*(\S.*?)\s*(?:\*\/|$)/)
+    const m = line.match(SUPPRESSION_PATTERN)
     if (m && m[1].length > 0) return m[1]
   }
   return null
@@ -235,7 +217,7 @@ function main() {
     //
     // Matched as patterns rather than by allowlisting the files, so a genuine
     // hardcoded colour added to Transparency.jsx tomorrow is still caught.
-    if (!isAllowlisted(relPath)) {
+    if (!isColorAllowlisted(relPath)) {
       const fallbackRanges = []
       const fallbackPatterns = [
         /var\(\s*--[a-z0-9-]+\s*,\s*(#[0-9a-fA-F]{3,8})\s*\)/g,
@@ -291,7 +273,13 @@ function main() {
     // the fontSize check above nor the point of tokenising: a hardcoded 16px is
     // still a value that will not follow the scale if the scale ever changes.
     {
-      const re = /(padding|margin|gap|rowGap|columnGap)[A-Za-z]*:\s*'([0-9px\s]+)'/g
+      // The value pattern is deliberately permissive. An earlier `'([0-9px\s]+)'`
+      // required the WHOLE value to be digits, px and spaces, so it silently skipped
+      // `padding: '20px clamp(16px, 4vw, 48px)'` and 16 others like it -- the counter
+      // read 337 where the ESLint rule, which parses properly, read 365. A counter
+      // that under-reports is the more dangerous direction: it makes the ceiling in
+      // CI look met while drift accumulates behind it.
+      const re = /(padding|margin|gap|rowGap|columnGap)[A-Za-z]*:\s*'([^']*)'/g
       let m
       while ((m = re.exec(src))) {
         const parts = m[2].match(/([0-9.]+)px/g) || []

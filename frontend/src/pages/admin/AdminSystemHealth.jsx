@@ -172,7 +172,7 @@ export default function AdminSystemHealth() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)', marginBottom: 'var(--space-5)', flexWrap: 'wrap' }}>
         <div>
           <h2 style={{ margin: 0 }}>System Health</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--admin-text-faint)', fontSize: 'var(--fs-base)' }}>
+          <p style={{ margin: 'var(--space-1) 0 0', color: 'var(--admin-text-faint)', fontSize: 'var(--fs-base)' }}>
             Refreshes every {POLL_MS / 1000}s
             {lastUpdated ? ` · last updated ${lastUpdated.toLocaleTimeString()}` : ''}
           </p>
@@ -198,7 +198,7 @@ export default function AdminSystemHealth() {
       {degraded.length > 0 ? (
         <Card style={{ padding: 'var(--space-4)', marginBottom: 'var(--space-4)' }}>
           <strong>Attention needed</strong>
-          <ul style={{ margin: '8px 0 0', paddingLeft: 'var(--space-5)' }}>
+          <ul style={{ margin: 'var(--space-2) 0 0', paddingLeft: 'var(--space-5)' }}>
             {degraded.map(([key, data]) => (
               <li key={key} style={{ fontSize: 'var(--fs-base)' }}>
                 {SECTION_LABELS[key] || key}: {data.status}

@@ -745,7 +745,7 @@ function ActivitySection() {
         <div className="tr-chart-subtitle">Recent platform events, auto-refreshing</div>
         <div className="tr-activity-feed" style={{ marginTop: 16 }}>
           {(!events || events.length === 0) ? (
-            <div style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', padding: 'var(--space-8) 0' }}>
               No recent activity.
             </div>
           ) : events.map((ev, i) => (
@@ -767,7 +767,7 @@ function ActivitySection() {
         <div className="tr-chart-subtitle">Leading funded traders by profit percentage</div>
         <div className="tr-performers-list" style={{ marginTop: 16 }}>
           {(!performers || performers.length === 0) ? (
-            <div style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>
+            <div style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', padding: 'var(--space-8) 0' }}>
               No funded traders yet.
             </div>
           ) : performers.map((p, i) => (

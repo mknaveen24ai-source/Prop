@@ -322,7 +322,7 @@ export default function Sidebar({
                         fontFamily: 'inherit',
                         fontSize: 'var(--fs-xs)', fontWeight: 700, color: 'var(--text-muted)',
                         textTransform: 'uppercase', letterSpacing: '0.1em',
-                        marginBottom: 'var(--space-2)', padding: '0 12px',
+                        marginBottom: 'var(--space-2)', padding: '0 var(--space-3)',
                       }}
                     >
                       <span style={{ flex: 1, textAlign: 'left' }}>{group.label}</span>
@@ -352,7 +352,7 @@ export default function Sidebar({
                 type="button"
                 onClick={() => theme !== 'dark' && toggleTheme()}
                 style={{
-                  flex: 1, padding: '6px 0', border: 'none', borderRadius: '3px', cursor: 'pointer',
+                  flex: 1, padding: 'var(--space-1-5) 0', border: 'none', borderRadius: '3px', cursor: 'pointer',
                   fontFamily: 'var(--font-mono)', fontSize: '10.5px', letterSpacing: '.08em', textTransform: 'uppercase',
                   background: theme === 'dark' ? 'var(--accent)' : 'transparent',
                   color: theme === 'dark' ? 'var(--paper)' : 'var(--muted)',
@@ -364,7 +364,7 @@ export default function Sidebar({
                 type="button"
                 onClick={() => theme !== 'light' && toggleTheme()}
                 style={{
-                  flex: 1, padding: '6px 0', border: 'none', borderRadius: '3px', cursor: 'pointer',
+                  flex: 1, padding: 'var(--space-1-5) 0', border: 'none', borderRadius: '3px', cursor: 'pointer',
                   fontFamily: 'var(--font-mono)', fontSize: '10.5px', letterSpacing: '.08em', textTransform: 'uppercase',
                   background: theme === 'light' ? 'var(--accent)' : 'transparent',
                   color: theme === 'light' ? 'var(--paper)' : 'var(--muted)',
@@ -500,7 +500,7 @@ export default function Sidebar({
                     position: 'absolute', top: '-4px', right: '-8px',
                     background: 'var(--accent)', color: 'var(--navy)',
                     borderRadius: 'var(--radius-pill)', fontSize: 'var(--fs-3xs)', fontWeight: '700',
-                    padding: '0 4px', lineHeight: '14px', minWidth: '14px',
+                    padding: '0 var(--space-1)', lineHeight: '14px', minWidth: '14px',
                     textAlign: 'center'
                   }}>
                     {pendingPayouts}

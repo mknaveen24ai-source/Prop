@@ -68,9 +68,9 @@ function SettingsPanel({ competition, onSave, saving, stepModels }) {
 
   return (
     <form onSubmit={submit} className="lx-card" style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
-      <h3 style={{ margin: '0 0 4px' }}>Settings</h3>
+      <h3 style={{ margin: '0 0 var(--space-1)' }}>Settings</h3>
       {isLocked && (
-        <p style={{ margin: '0 0 14px', fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)' }}>
+        <p style={{ margin: '0 0 var(--space-3-5)', fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)' }}>
           This competition is {competition.status} — dates, balance, and drawdown rules are locked to protect entries already in flight. Only description and prize display text can still be edited.
         </p>
       )}
@@ -261,8 +261,8 @@ function BotRosterPanel({ adminAxios, toast, competition, onEntered }) {
 
   return (
     <Card style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-6)' }}>
-      <h3 style={{ margin: '0 0 4px' }}>Demo Bot Participants</h3>
-      <p style={{ margin: '0 0 16px', fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)' }}>
+      <h3 style={{ margin: '0 0 var(--space-1)' }}>Demo Bot Participants</h3>
+      <p style={{ margin: '0 0 var(--space-4)', fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)' }}>
         Bots are labeled participants with no real trading activity — their balance moves via an automated background tick.
         Names and countries are generated randomly unless overridden.
       </p>
@@ -454,7 +454,7 @@ export default function AdminCompetitionDetail() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-5)' }}>
         <div>
-          <h2 style={{ margin: '0 0 4px' }}>{competition.title}</h2>
+          <h2 style={{ margin: '0 0 var(--space-1)' }}>{competition.title}</h2>
           <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7 }}>Status: {competition.status} · {competition.entries?.length || 0} entries</div>
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
@@ -472,7 +472,7 @@ export default function AdminCompetitionDetail() {
       <BotRosterPanel adminAxios={adminAxios} toast={toast} competition={competition} onEntered={load} />
 
       <Card style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-6)', overflowX: 'auto' }}>
-        <h3 style={{ margin: '0 0 12px' }}>Entries</h3>
+        <h3 style={{ margin: '0 0 var(--space-3)' }}>Entries</h3>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-base)' }}>
           <thead>
             <tr style={{ textAlign: 'left', opacity: 0.7 }}>
@@ -527,7 +527,7 @@ export default function AdminCompetitionDetail() {
 
       {competition.status === 'completed' && (
         <Card style={{ padding: 'var(--space-5)' }}>
-          <h3 style={{ margin: '0 0 12px' }}>Final Leaderboard (for payout reference)</h3>
+          <h3 style={{ margin: '0 0 var(--space-3)' }}>Final Leaderboard (for payout reference)</h3>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-base)' }}>
             <thead>
               <tr style={{ textAlign: 'left', opacity: 0.7 }}>

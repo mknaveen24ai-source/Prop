@@ -233,7 +233,7 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
 
         {prizePool.length > 0 && (
           <Card title="Prize Pool">
-            <div style={{ padding: '0 8px', display: 'flex', justifyContent: 'center' }}>
+            <div style={{ padding: '0 var(--space-2)', display: 'flex', justifyContent: 'center' }}>
               <PieChart width={180} height={140}>
                 <Pie
                   data={prizePool}
@@ -263,7 +263,7 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
               </div>
             )}
             {prizePool.map((p, idx) => (
-              <div key={p.rank} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)', padding: '8px 0', borderBottom: '1px solid var(--rule-soft)' }}>
+              <div key={p.rank} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)', padding: 'var(--space-2) 0', borderBottom: '1px solid var(--rule-soft)' }}>
                 <span style={{ width: '9px', height: '9px', background: PRIZE_TONES[idx % PRIZE_TONES.length], flex: '0 0 auto' }} />
                 <span style={{ flex: 1, fontSize: '12.5px' }}>#{p.rank} place</span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12.5px' }}>{p.label}</span>
@@ -424,7 +424,7 @@ export default function CompetitionDetail() {
           <ThemeToggle />
         </div>
 
-        <div style={{ maxWidth: '1040px', margin: '48px auto 0', padding: '0 24px 48px' }}>
+        <div style={{ maxWidth: '1040px', margin: '48px auto 0', padding: '0 var(--space-6) var(--space-9)' }}>
           <CompetitionDetailContent slug={slug} />
         </div>
       </div>

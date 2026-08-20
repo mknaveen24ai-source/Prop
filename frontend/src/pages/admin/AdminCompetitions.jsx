@@ -56,7 +56,7 @@ function CreateCompetitionForm({ onCreate, creating }) {
   return (
     <form onSubmit={submit} className="lx-card" style={{ marginBottom: 'var(--space-6)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-3-5)' }}>
       <div style={{ gridColumn: '1 / -1' }}>
-        <h3 style={{ margin: '0 0 4px' }}>Create Competition</h3>
+        <h3 style={{ margin: '0 0 var(--space-1)' }}>Create Competition</h3>
       </div>
       <label>
         <div style={{ fontSize: 'var(--fs-sm)', opacity: 0.7, marginBottom: 'var(--space-1)' }}>Title</div>

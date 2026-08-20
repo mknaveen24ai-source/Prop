@@ -71,6 +71,18 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Design token drift (ratchet)
+        # A ceiling, not a gate on zero. The cleanup that introduced this left
+        # 609 values needing a per-surface design decision -- each moves type or
+        # spacing by 1-4px, which is a judgement, not a codemod. Blocking on
+        # zero would mean either shipping those changes unreviewed or turning
+        # the check off, and the second always wins.
+        #
+        # So the number may only go down. Lower the --max in package.json with
+        # the commit that lowers the count; a change that adds drift fails here
+        # rather than being noticed a year later.
+        run: npm run design:drift:ci
+
       - name: npm audit (high/critical only)
         # No longer allowed to fail: the vite/esbuild advisories that forced
         # continue-on-error were cleared by the Vite 4 -> 8 upgrade.

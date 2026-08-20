@@ -467,7 +467,7 @@ function Chat() {
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ textAlign: 'center', padding: 'var(--space-8)' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-2xl)', marginBottom: 'var(--space-2-5)' }}>Welcome to Live Chat Support</div>
-              <p style={{ color: 'var(--muted)', fontSize: 'var(--fs-base)', margin: '6px 0' }}>Start a conversation and the desk will pick it up here.</p>
+              <p style={{ color: 'var(--muted)', fontSize: 'var(--fs-base)', margin: 'var(--space-1-5) 0' }}>Start a conversation and the desk will pick it up here.</p>
               <button
                 onClick={() => setShowNewChat(true)}
                 style={{ marginTop: 'var(--space-4)', padding: '11px 24px', border: '1px solid var(--accent)', borderRadius: '4px', background: 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer' }}

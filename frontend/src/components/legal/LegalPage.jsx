@@ -138,11 +138,11 @@ export default function LegalPage({ eyebrow = 'LEGAL DOCUMENT', title, intro, se
                 role="region"
                 aria-labelledby={buttonId}
                 hidden={!isOpen}
-                style={{ padding: '0 24px 24px', borderTop: '1px solid var(--navy-border)' }}
+                style={{ padding: '0 var(--space-6) var(--space-6)', borderTop: '1px solid var(--navy-border)' }}
               >
                 <p style={{
                   color: 'var(--text-muted)', lineHeight: '1.9', fontSize: 'var(--fs-md)',
-                  whiteSpace: 'pre-line', margin: '20px 0 0'
+                  whiteSpace: 'pre-line', margin: 'var(--space-5) 0 0'
                 }}>
                   {section.content}
                 </p>

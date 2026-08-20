@@ -780,7 +780,7 @@ export default function AdminChat() {
                     { label: 'Country', value: traderSnapshot.country || '—' },
                     { label: 'Joined', value: traderSnapshot.created_at ? formatDate(traderSnapshot.created_at) : '—' },
                   ].map((r) => (
-                    <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', padding: '8px 0', borderBottom: '1px solid var(--admin-border)', fontSize: '12.5px' }}>
+                    <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', padding: 'var(--space-2) 0', borderBottom: '1px solid var(--admin-border)', fontSize: '12.5px' }}>
                       <span style={{ color: 'var(--admin-text-muted)' }}>{r.label}</span>
                       <span style={{ fontFamily: 'var(--admin-font-mono)', color: r.tone || 'var(--admin-text)', textAlign: 'right', textTransform: 'capitalize' }}>{r.value}</span>
                     </div>

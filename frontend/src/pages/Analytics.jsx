@@ -1091,25 +1091,25 @@ export default function Analytics({ selectedAccount }) {
             </div>
 
             <div style={{ display: 'grid', gap: 'var(--space-2-5)', marginBottom: 'var(--space-3-5)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--navy-border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-2-5) 0', borderBottom: '1px solid var(--navy-border)' }}>
                 <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>Recent trend (last 5 trades)</span>
                 <span style={{ color: Number(payoutForecast.trend_pnl_last_5_trades || 0) >= 0 ? 'var(--green)' : 'var(--red)', fontSize: 'var(--fs-sm)', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>
                   {formatSignedCurrency(payoutForecast.trend_pnl_last_5_trades || 0)}
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--navy-border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-2-5) 0', borderBottom: '1px solid var(--navy-border)' }}>
                 <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>Profit gap to minimum request</span>
                 <span style={{ color: 'var(--text)', fontSize: 'var(--fs-sm)', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>
                   {formatCurrency(payoutForecast.profit_gap_to_min_request || 0)}
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--navy-border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-2-5) 0', borderBottom: '1px solid var(--navy-border)' }}>
                 <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>KYC status</span>
                 <span style={{ color: String(payoutForecast.kyc_status || '').toLowerCase() === 'approved' ? 'var(--green)' : 'var(--red)', fontSize: 'var(--fs-sm)', fontWeight: '700' }}>
                   {formatStrategyLabel(payoutForecast.kyc_status)}
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-2-5) 0' }}>
                 <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)' }}>Open exposure blockers</span>
                 <span style={{ color: Number(payoutForecast.open_trade_count || 0) + Number(payoutForecast.pending_order_count || 0) > 0 ? 'var(--red)' : 'var(--green)', fontSize: 'var(--fs-sm)', fontWeight: '700' }}>
                   {Number(payoutForecast.open_trade_count || 0) + Number(payoutForecast.pending_order_count || 0)}

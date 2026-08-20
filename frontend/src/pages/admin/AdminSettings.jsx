@@ -341,7 +341,7 @@ export default function AdminSettings() {
               const isBooleanToggle = field.type === 'select' && Array.isArray(field.options)
                 && field.options.length === 2 && field.options.includes('true') && field.options.includes('false')
               return isBooleanToggle ? (
-                <div key={field.key} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4-5)', padding: '14px 0', borderBottom: '1px solid var(--admin-border)' }}>
+                <div key={field.key} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4-5)', padding: 'var(--space-3-5) 0', borderBottom: '1px solid var(--admin-border)' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '13.5px' }}>{field.label}</div>
                     {field.hint && <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)', marginTop: '3px', lineHeight: 1.5 }}>{field.hint}</div>}

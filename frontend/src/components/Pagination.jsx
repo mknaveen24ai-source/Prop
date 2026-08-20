@@ -42,7 +42,7 @@ export default function Pagination({ page, totalPages, onPageChange, pageSize, t
     justifyContent: 'center',
     minWidth: '34px',
     height: '34px',
-    padding: '0 8px',
+    padding: '0 var(--space-2)',
     border: isActive
       ? '1px solid var(--accent)'
       : '1px solid var(--border)',
@@ -72,7 +72,7 @@ export default function Pagination({ page, totalPages, onPageChange, pageSize, t
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: 'var(--space-3)',
-      padding: '12px 0',
+      padding: 'var(--space-3) 0',
       flexWrap: 'wrap',
     }}>
       <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', fontWeight: 500 }}>
@@ -95,7 +95,7 @@ export default function Pagination({ page, totalPages, onPageChange, pageSize, t
         {/* Page numbers */}
         {getPages().map((p, i) =>
           p === '...' ? (
-            <span key={`ellipsis-${i}`} style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', padding: '0 4px' }}>
+            <span key={`ellipsis-${i}`} style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-base)', padding: '0 var(--space-1)' }}>
               …
             </span>
           ) : (

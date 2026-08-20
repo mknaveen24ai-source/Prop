@@ -86,9 +86,13 @@ function main() {
 
       for (const part of parts) {
         const px = parseFloat(part)
-        if (!/^[0-9.]+px$/.test(part)) { allMappable = false; break }
-        // 0 and 1px stay literal, and do not disqualify the declaration.
+        // A bare `0` carries no unit, which is valid CSS and extremely common:
+        // `padding: '12px 0'`. Testing the px format FIRST treated it as
+        // unparseable and disqualified the whole declaration, which is why 166
+        // otherwise-migratable values were left behind. 0 and 1px are checked
+        // before the format, not after.
         if (px === 0 || px === 1) { rewritten.push(part); continue }
+        if (!/^[0-9.]+px$/.test(part)) { allMappable = false; break }
         const token = scale.get(px)
         if (!token) {
           allMappable = false

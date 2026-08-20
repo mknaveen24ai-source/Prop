@@ -313,7 +313,7 @@ export default function Dispute({ user, accounts }) {
               <div style={{ fontSize: '12.5px', color: 'var(--muted)' }}>Not enough decided appeals yet to show a rate.</div>
             ) : (
               overturnRates.map((o) => (
-                <div key={o.label} style={{ padding: '10px 0', borderBottom: '1px solid var(--rule-soft)' }}>
+                <div key={o.label} style={{ padding: 'var(--space-2-5) 0', borderBottom: '1px solid var(--rule-soft)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', fontSize: '12.5px' }}>
                     <span>{o.label}</span>
                     <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--gain)' }}>{o.pct}%</span>

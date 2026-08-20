@@ -448,7 +448,7 @@ function Register({ onLogin }) {
             {/* Terms checkbox */}
             <div className="auth-consent-panel" style={{
               display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2-5)',
-              margin: '20px 0 16px', padding: 'var(--space-3-5)',
+              margin: 'var(--space-5) 0 var(--space-4)', padding: 'var(--space-3-5)',
               borderColor: termsAccepted ? 'var(--accent)' : undefined,
               transition: 'border-color 0.2s ease'
             }}>

@@ -148,7 +148,7 @@ export default function PositionsPanel({
                   {!isPending && partialForm?.id === trade.id && (
                     <tr>
                       <td colSpan="9" style={{ padding: '0' }}>
-                        <div style={{ background: 'var(--navy-card)', border: '1px dashed var(--accent)', padding: 'var(--space-3) var(--space-4)', margin: '4px 0 8px 0', display: 'grid', gap: 'var(--space-2-5)' }}>
+                        <div style={{ background: 'var(--navy-card)', border: '1px dashed var(--accent)', padding: 'var(--space-3) var(--space-4)', margin: 'var(--space-1) 0 var(--space-2) 0', display: 'grid', gap: 'var(--space-2-5)' }}>
                           <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text)' }}>Close Fraction (Current: {parseFloat(trade.lot_size).toFixed(2)}):</span>
                             <input type="number" step="0.01" max={Math.max(parseFloat(trade.lot_size) - 0.01, 0.01).toFixed(2)} value={partialForm.val || ''} onChange={e => setPartialForm({ ...partialForm, val: e.target.value })} style={{ width: '80px', padding: 'var(--space-1) var(--space-2)', fontSize: 'var(--fs-sm)' }} />
@@ -191,7 +191,7 @@ export default function PositionsPanel({
                   {isPending && isModifying && (
                     <tr>
                       <td colSpan="9" style={{ padding: '0' }}>
-                        <div style={{ background: 'var(--navy-card)', border: '1px solid var(--accent)', padding: 'var(--space-4)', margin: '4px 0 8px 0' }}>
+                        <div style={{ background: 'var(--navy-card)', border: '1px solid var(--accent)', padding: 'var(--space-4)', margin: 'var(--space-1) 0 var(--space-2) 0' }}>
                           <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--accent)', marginBottom: 'var(--space-3)', fontWeight: '600' }}>
                             Modify {trade.instrument} {trade.order_type.replace(/_/g, ' ').toUpperCase()} - Target: {trade.pending_price ? parseFloat(trade.pending_price).toFixed(dec) : '-'}
                           </div>
@@ -261,7 +261,7 @@ export default function PositionsPanel({
                           border: '1px solid var(--accent)',
                           borderRadius: '0',
                           padding: 'var(--space-4)',
-                          margin: '4px 0 8px 0'
+                          margin: 'var(--space-1) 0 var(--space-2) 0'
                         }}>
                           <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--accent)', marginBottom: 'var(--space-3)', fontWeight: '600' }}>
                             ✏️ Modify {trade.instrument} {trade.direction.toUpperCase()} — Current Price:{' '}

@@ -233,7 +233,7 @@ function ConsistencyRiskBlock({ consistency, dailyDrawdown, totalDrawdownUsedPct
             </div>
           </div>
         ) : (
-          <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-base)', padding: '8px 0' }}>Not enough closed-trade history yet.</div>
+          <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-base)', padding: 'var(--space-2) 0' }}>Not enough closed-trade history yet.</div>
         )}
       </Card>
 
@@ -243,7 +243,7 @@ function ConsistencyRiskBlock({ consistency, dailyDrawdown, totalDrawdownUsedPct
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)' }}>Live</div>
         </div>
         {risks.map((r) => (
-          <div key={r.label} style={{ padding: '12px 0', borderBottom: '1px solid var(--rule-soft)' }}>
+          <div key={r.label} style={{ padding: 'var(--space-3) 0', borderBottom: '1px solid var(--rule-soft)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', alignItems: 'baseline' }}>
               <span style={{ fontSize: 'var(--fs-base)' }}>{r.label}</span>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', color: r.tone }}>{r.usedLabel}</span>

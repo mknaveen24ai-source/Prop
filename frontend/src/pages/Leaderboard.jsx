@@ -28,7 +28,7 @@ export default function Leaderboard() {
           <ThemeToggle />
         </div>
 
-        <div style={{ maxWidth: '800px', margin: '48px auto 0', padding: '0 24px' }}>
+        <div style={{ maxWidth: '800px', margin: '48px auto 0', padding: '0 var(--space-6)' }}>
         <div style={{ textAlign: 'center', marginBottom: 'var(--space-8)' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)' }}>
             {renderIcon('leaderboard', { size: 48, color: 'var(--accent-gold)' })}

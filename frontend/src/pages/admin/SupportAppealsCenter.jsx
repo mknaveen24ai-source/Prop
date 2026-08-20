@@ -27,7 +27,7 @@ function SectionHeader({ eyebrow, title, subtitle }) {
   return (
     <div style={{ marginBottom: 'var(--space-6)' }}>
       <div className="lx-card__eyebrow">{eyebrow}</div>
-      <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(22px, 2.4vw, 28px)', fontWeight: 700, color: 'var(--admin-text)', margin: '4px 0 8px' }}>
+      <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(22px, 2.4vw, 28px)', fontWeight: 700, color: 'var(--admin-text)', margin: 'var(--space-1) 0 var(--space-2)' }}>
         {title}
       </h1>
       {subtitle && (

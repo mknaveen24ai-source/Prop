@@ -879,7 +879,7 @@ export default function AdminKYC() {
                 <div><span>Funded Accounts</span><strong>{selectedUser.funded_accounts || 0}</strong></div>
               </div>
 
-              <Card style={{ margin: '0 0 16px 0' }}>
+              <Card style={{ margin: '0 0 var(--space-4) 0' }}>
                 <h3 className="admin-h3">Submitted Identity Details</h3>
                 <div className="admin-entity-info-grid">
                   <div><span>Country</span><strong>{selectedUser.kyc_document_country || selectedUser.country || '-'}</strong></div>

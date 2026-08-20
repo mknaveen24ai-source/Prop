@@ -223,10 +223,10 @@ We encourage you to review this policy periodically. Your continued use of the p
             </button>
 
             {activeSection === section.id && (
-              <div style={{ padding: '0 24px 24px', borderTop: '1px solid var(--navy-border)' }}>
+              <div style={{ padding: '0 var(--space-6) var(--space-6)', borderTop: '1px solid var(--navy-border)' }}>
                 <p style={{
                   color: 'var(--text-muted)', lineHeight: '1.9', fontSize: 'var(--fs-md)',
-                  whiteSpace: 'pre-line', margin: '20px 0 0'
+                  whiteSpace: 'pre-line', margin: 'var(--space-5) 0 0'
                 }}>
                   {section.content}
                 </p>

@@ -43,7 +43,7 @@ export default function SimulatedTradingDisclaimer() {
                 onClick={() => setExpanded(true)}
                 style={{
                   background: 'transparent', border: 'none', color: 'var(--accent)',
-                  fontSize: 'var(--fs-sm)', cursor: 'pointer', padding: '0 0 0 6px',
+                  fontSize: 'var(--fs-sm)', cursor: 'pointer', padding: '0 0 0 var(--space-1-5)',
                   fontFamily: 'var(--font-ui)', textDecoration: 'underline'
                 }}
               >

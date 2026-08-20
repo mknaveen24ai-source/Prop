@@ -54,8 +54,8 @@ export default function AdminCompetitionAnalytics() {
         ← Back to Competition
       </button>
 
-      <h2 style={{ margin: '0 0 4px' }}>Trade Analytics</h2>
-      <p style={{ margin: '0 0 20px', opacity: 0.7, fontSize: 'var(--fs-base)' }}>
+      <h2 style={{ margin: '0 0 var(--space-1)' }}>Trade Analytics</h2>
+      <p style={{ margin: '0 0 var(--space-5)', opacity: 0.7, fontSize: 'var(--fs-base)' }}>
         Participant trading performance for this competition's window only.
       </p>
 

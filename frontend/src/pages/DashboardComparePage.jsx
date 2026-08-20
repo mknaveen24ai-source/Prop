@@ -104,7 +104,7 @@ export default function DashboardComparePage({ accounts = [] }) {
               <span className="lx-badge" style={{ color: getStatusToneColor(account.status) }}>{String(account.status || '').toUpperCase()}</span>
             </div>
             {failed || !stats ? (
-              <div style={{ color: 'var(--muted)', fontSize: '12.5px', padding: '12px 0' }}>Stats unavailable</div>
+              <div style={{ color: 'var(--muted)', fontSize: '12.5px', padding: 'var(--space-3) 0' }}>Stats unavailable</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2-5)' }}>
                 <div>

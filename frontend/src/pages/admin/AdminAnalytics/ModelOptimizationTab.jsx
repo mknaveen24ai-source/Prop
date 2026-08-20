@@ -102,7 +102,7 @@ export default function ModelOptimizationTab() {
         ) : (
           <ol style={{ margin: 0, paddingLeft: 'var(--space-5)' }}>
             {failurePatterns.map((f) => (
-              <li key={f.reason} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--rule)', fontSize: 'var(--fs-base)' }}>
+              <li key={f.reason} style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-2) 0', borderBottom: '1px solid var(--rule)', fontSize: 'var(--fs-base)' }}>
                 <span>{f.reason}</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--admin-text-muted)' }}>{f.count}</span>
               </li>

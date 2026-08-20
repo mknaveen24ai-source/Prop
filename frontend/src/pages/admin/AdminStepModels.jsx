@@ -363,7 +363,7 @@ export default function AdminStepModels() {
   return (
     <div style={{ padding: 'var(--space-6)' }}>
       <div style={{ marginBottom: 'var(--space-5)' }}>
-        <h2 style={{ margin: '0 0 4px' }}>Challenge Models</h2>
+        <h2 style={{ margin: '0 0 var(--space-1)' }}>Challenge Models</h2>
         <p style={{ margin: 0, opacity: 0.7, fontSize: 'var(--fs-base)' }}>
           Manage the 1-step, 2-step, and 3-step challenge models: enable/disable, edit phase rules, and edit pricing per account size. Changes apply platform-wide immediately.
         </p>

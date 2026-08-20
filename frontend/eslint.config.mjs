@@ -2,6 +2,12 @@ import js from '@eslint/js'
 import globals from 'globals'
 import react from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
+import { createRequire } from 'node:module'
+
+// Local rules live in eslint-rules/. CommonJS, because that is what the ESLint
+// rule API expects, and this config file is an ES module.
+const require = createRequire(import.meta.url)
+const designTokens = require('./eslint-rules/design-tokens.js')
 
 // Same philosophy as backend/eslint.config.js: real defects are errors and
 // block CI; hygiene is a warning and cleaned up incrementally. No formatting
@@ -34,7 +40,8 @@ export default [
     },
     plugins: {
       react,
-      'react-hooks': reactHooks
+      'react-hooks': reactHooks,
+      'design-tokens': designTokens
     },
     settings: {
       react: { version: 'detect' }
@@ -72,6 +79,21 @@ export default [
       'react-hooks/exhaustive-deps': 'warn',
       'no-useless-escape': 'warn',
       'prefer-const': ['warn', { destructuring: 'all' }],
+
+      // ── Design-token drift: warn ────────────────────────────────────────────
+      // Hygiene by the definition above, so warnings rather than errors. The
+      // ceiling in `npm run design:drift:ci` is what stops the count growing;
+      // these exist so the feedback arrives in the editor, before a value is
+      // written down, rather than in CI after the fact.
+      //
+      // Both these rules and scripts/design-drift.js read the scales out of
+      // styles/tokens.css. Neither keeps its own copy: a checker holding a
+      // private copy of the scale can be wrong in exactly the way the brief
+      // behind this work was wrong -- it called --space-3 16px when it is 12px
+      // -- while still reporting full marks.
+      'design-tokens/no-hardcoded-spacing': 'warn',
+      'design-tokens/no-hardcoded-font-size': 'warn',
+      'design-tokens/no-hardcoded-color': 'warn',
 
       // ── React Compiler-era rules: warn ──────────────────────────────────────
       // These ship as errors in eslint-plugin-react-hooks v6+ and describe what

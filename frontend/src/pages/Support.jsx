@@ -268,7 +268,7 @@ function TicketChat({ ticket, user, onBack }) {
           <button
              onClick={handleSend}
              disabled={sending || ticket.status === 'closed'}
-             style={{ padding: '0 24px', borderRadius: 'var(--radius-pill)', background: ticket.status === 'closed' ? 'var(--navy-border)' : 'var(--accent)', color: 'var(--paper)', border: 'none', fontWeight: 600, cursor: ticket.status === 'closed' ? 'not-allowed' : 'pointer' }}>
+             style={{ padding: '0 var(--space-6)', borderRadius: 'var(--radius-pill)', background: ticket.status === 'closed' ? 'var(--navy-border)' : 'var(--accent)', color: 'var(--paper)', border: 'none', fontWeight: 600, cursor: ticket.status === 'closed' ? 'not-allowed' : 'pointer' }}>
              Send
           </button>
         </div>

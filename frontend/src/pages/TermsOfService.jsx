@@ -212,10 +212,10 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
             </button>
 
             {activeSection === section.id && (
-              <div style={{ padding: '0 24px 24px', borderTop: '1px solid var(--navy-border)' }}>
+              <div style={{ padding: '0 var(--space-6) var(--space-6)', borderTop: '1px solid var(--navy-border)' }}>
                 <p style={{
                   color: 'var(--text-muted)', lineHeight: '1.9', fontSize: 'var(--fs-md)',
-                  marginTop: 'var(--space-5)', whiteSpace: 'pre-line', margin: '20px 0 0'
+                  marginTop: 'var(--space-5)', whiteSpace: 'pre-line', margin: 'var(--space-5) 0 0'
                 }}>
                   {section.content}
                 </p>

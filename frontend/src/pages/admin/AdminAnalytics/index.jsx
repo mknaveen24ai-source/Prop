@@ -77,7 +77,7 @@ export default function AdminAnalytics() {
     <>
       <div style={{ marginBottom: 'var(--space-6)' }}>
         <div className="lx-card__eyebrow">ADMIN PANEL / ANALYTICS</div>
-        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(22px, 2.4vw, 28px)', fontWeight: 700, color: 'var(--admin-text)', margin: '4px 0 8px' }}>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(22px, 2.4vw, 28px)', fontWeight: 700, color: 'var(--admin-text)', margin: 'var(--space-1) 0 var(--space-2)' }}>
           {TABS.find((t) => t.key === activeTab)?.label}
         </h1>
         <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)', maxWidth: '640px' }}>
