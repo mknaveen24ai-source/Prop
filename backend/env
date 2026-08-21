@@ -1,0 +1,86 @@
+PORT=5000
+
+# ── Database ─────────────────────────────────────────────────────────────────
+# LOCAL (dev): postgresql://postgres:Propfirm+123@localhost:5432/propfirm
+# PRODUCTION: Replace with Railway / Supabase / Neon PostgreSQL URL
+DATABASE_URL=postgresql://postgres:Propfirm+123@localhost:5432/propfirm
+
+# ── Node Environment ─────────────────────────────────────────────────────────
+# Change to "production" before deploying to server
+NODE_ENV=development
+
+# ── JWT Auth Secrets ─────────────────────────────────────────────────────────
+JWT_SECRET=63c9b8494198fce3293eeafcb06db1ea164aab98f16c91c87d871c41b80ac88b
+JWT_EXPIRES_IN=24h
+ADMIN_JWT_SECRET=b4785fbfd4fe087e43539817737a2b5031f7266003d81a74b75c012eb7015916
+
+# ── Frontend & CORS ───────────────────────────────────────────────────────────
+# LOCAL: http://localhost:3000
+# PRODUCTION: Replace with your Railway/Vercel/Netlify URL
+FRONTEND_URL=http://localhost:3000
+CORS_ORIGINS=http://localhost:3000
+
+# ── Proxy Trust ───────────────────────────────────────────────────────────────
+# Set to "true" when deployed behind nginx / Railway / Cloudflare
+TRUST_PROXY=false
+
+# ── Price History Retention ───────────────────────────────────────────────────
+PRICE_HISTORY_RETAIN_DAYS=7
+PRICE_HISTORY_1H_RETAIN_DAYS=90
+
+# ── Redis ─────────────────────────────────────────────────────────────────────
+# Redis Cloud URL already configured — enable it when ready for production
+REDIS_URL=redis://localhost:6379
+REDIS_ENABLED=false
+
+# ── Email (Resend SMTP) ───────────────────────────────────────────────────────
+SMTP_HOST=smtp.resend.com
+SMTP_PORT=465
+SMTP_USER=resend
+SMTP_PASS=re_Cr8QVMUV_BrjpDtPb945UfNdJhxq51Hzc
+# IMPORTANT: Set this to your actual verified sender email (not the smtp user)
+# e.g.  SMTP_FROM=support@yourdomain.com
+SMTP_FROM=noreply@propfirm.com
+
+# ── Legacy / Unused ───────────────────────────────────────────────────────────
+SENDGRID_API_KEY=your_sendgrid_key_goes_here
+TWELVEDATA_API_KEY=8743332ccc5848b8831f6f51c68fbfc4
+
+# ── Admin Credentials ─────────────────────────────────────────────────────────
+ADMIN_PASSWORD=$2b$12$7uO2yMTkZ87LoTURXFQ5KOYquCI9ctAuPMBZPz7MW1nVUJ3ebipGO
+
+# ── MT5 Price Feed (DWX) ──────────────────────────────────────────────────────
+DWX_PATH=C:\Users\mknav\AppData\Roaming\MetaQuotes\Terminal\D0E8209F77C8CF37AD8BF550E51FF075\MQL5\Files\DWX
+# ── Two-Factor Authentication (TOTP) ─────────────────────────────────────────
+# 32-byte AES-256 key for encrypting TOTP secrets at rest (64 hex chars)
+TOTP_ENCRYPTION_KEY=ed6564634691c47b32e4ced11ad8a473679c19fefde340fb9c61f9e803360584
+
+# ── KYC File Encryption ───────────────────────────────────────────────────────
+# 32-byte key for encrypting uploaded KYC documents at rest (64 hex chars)
+KYC_FILE_ENCRYPTION_KEY=c9f77bde2313adab98dede858d7ca2cb865b3fe21df26a9332dd5f2d4478dd7d
+
+# ── Platform Branding ─────────────────────────────────────────────────────────
+PLATFORM_NAME=PropFirm
+FIRM_NAME=PropFirm
+
+# ── SMS OTP Configuration ─────────────────────────────────────────────────────
+# SMS_PROVIDER=mock   → Free, logs OTP to console (development only)
+# SMS_PROVIDER=twilio → Real SMS via Twilio (fill in the keys below)
+SMS_PROVIDER=mock
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_PHONE_NUMBER=
+
+
+# ── Error Monitoring (Sentry) ─────────────────────────────────────────────────
+# Get from: https://sentry.io → your Node.js project → Settings → Client Keys (DSN)
+# Leave blank to disable (safe for local dev — Sentry won't be initialized)
+SENTRY_DSN=
+
+# Flipped 2026-08-17 after scripts/engine-equivalence.js confirmed identical
+# decisions. See .env.template for the eod_peak_equity trade-off.
+ENGINE_MODE=event
+
+# FX cutover 2026-08-19 — see the note in .env.template. Verified READY by
+# `npm run fx:cutover-check` before flipping.
+FX_CONVERSION_ENABLED=true
