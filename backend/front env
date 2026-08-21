@@ -1,0 +1,19 @@
+# ── API origin ───────────────────────────────────────────────────────────────
+# Leave EMPTY. An empty value means "same origin", which is correct in both
+# environments:
+#   dev  — vite.config.mjs proxies /api and /socket.io to localhost:5000
+#   prod — deploy/nginx/propfirm.conf proxies the same paths to backend:5000
+#
+# Only set this if the API genuinely lives on a different origin. If you do,
+# use a bare origin: no trailing slash, no /api suffix (paths already include it).
+VITE_API_URL=
+
+# ── Sentry error monitoring ──────────────────────────────────────────────────
+# Get your DSN from: https://sentry.io → Project → Settings → Client Keys
+# Leave blank to disable Sentry (safe, and the default for local development).
+VITE_SENTRY_DSN=
+VITE_APP_VERSION=1.0.0
+
+# FX conversion — must stay in step with the backend's FX_CONVERSION_ENABLED.
+# Out of step, the terminal shows one number and the balance moves by another.
+VITE_FX_CONVERSION_ENABLED=true
