@@ -67,7 +67,9 @@ export default function ComplianceAuditTab({ dateRange }) {
     })();
   }, [adminAxios]);
 
-  const tradeLog = data?.tradeLog || [];
+  // `|| []` makes a new array whenever data is absent, so the memo below
+  // keyed on it never actually memoised.
+  const tradeLog = useMemo(() => data?.tradeLog || [], [data]);
   const violationHistory = data?.violationHistory || [];
   const payoutHistory = data?.payoutHistory || [];
   const accountActivity = data?.accountActivity || [];

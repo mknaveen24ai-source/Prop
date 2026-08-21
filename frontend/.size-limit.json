@@ -1,0 +1,20 @@
+[
+  {
+    "name": "entry path (index + vendor)",
+    "path": ["build/assets/index-*.js", "build/assets/vendor-*.js"],
+    "limit": "128 KB",
+    "gzip": true
+  },
+  {
+    "name": "entry CSS",
+    "path": "build/assets/index-*.css",
+    "limit": "15 KB",
+    "gzip": true
+  },
+  {
+    "name": "charts chunk (recharts, shared by 17 views)",
+    "path": "build/assets/charts-*.js",
+    "limit": "120 KB",
+    "gzip": true
+  }
+]

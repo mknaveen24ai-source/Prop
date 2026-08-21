@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import { analyticsAPI } from '../services/api'
 import ThemeToggle from '../components/ThemeToggle'
 import Card from '../components/ui/Card'
@@ -206,7 +206,7 @@ export default function TraderProfile() {
     <div style={{ minHeight: '100dvh', background: 'var(--navy)' }}>
       <div className="nav">
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
-          <span className="nav-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>PROP FIRM</span>
+          <Link className="nav-logo" to="/" style={{ cursor: 'pointer', textDecoration: 'none', color: 'inherit' }}>PROP FIRM</Link>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           <button onClick={() => navigate('/leaderboard')} style={{ background: 'transparent', border: '1px solid var(--navy-border)', color: 'var(--text-muted)', padding: '7px 16px', cursor: 'pointer', fontSize: 'var(--fs-base)' }}>

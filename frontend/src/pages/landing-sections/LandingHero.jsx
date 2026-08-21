@@ -9,7 +9,6 @@ function ScrambleText({ text, delay = 0 }) {
 
   React.useEffect(() => {
     let iteration = 0;
-    let timeout;
     let interval;
 
     const start = () => {
@@ -24,7 +23,7 @@ function ScrambleText({ text, delay = 0 }) {
       }, 30);
     };
 
-    timeout = setTimeout(start, delay);
+    const timeout = setTimeout(start, delay);
     return () => {
       clearTimeout(timeout);
       clearInterval(interval);

@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
+import useFocusTrap from '../../hooks/useFocusTrap'
 import { renderIcon } from '../../utils/iconMap'
 
 // Alerts are derived live from violation/KYC/payout counts (no backend
@@ -29,15 +30,7 @@ function saveReadIds(ids) {
 
 export default function AdminNotificationDrawer({ open, onClose, alerts, onNavigate }) {
   const [readIds, setReadIds] = useState(loadReadIds)
-
-  useEffect(() => {
-    if (!open) return undefined
-    function handleKeyDown(event) {
-      if (event.key === 'Escape') onClose?.()
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [open, onClose])
+  const panelRef = useFocusTrap(open, onClose)
 
   function markRead(id) {
     setReadIds((prev) => {
@@ -70,7 +63,14 @@ export default function AdminNotificationDrawer({ open, onClose, alerts, onNavig
         onClick={onClose}
         aria-hidden="true"
       />
-      <aside className={`admin-notif-drawer${open ? ' is-open' : ''}`} aria-hidden={!open}>
+      <aside
+        ref={panelRef}
+        className={`admin-notif-drawer${open ? ' is-open' : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Alerts"
+        inert={!open}
+      >
         <div className="admin-notif-drawer-header">
           <strong style={{ fontSize: 'var(--fs-md)' }}>Alerts</strong>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3-5)' }}>

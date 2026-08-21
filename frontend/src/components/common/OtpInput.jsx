@@ -14,7 +14,12 @@ export default function OtpInput({
 }) {
   const [digits, setDigits] = useState(() => Array(length).fill(''))
   const refs = useRef([])
-  if (refs.current.length !== length) refs.current = Array(length).fill(null)
+  // Trim in an effect, not in render: resizing the array during render is a ref
+  // write React does not know about. The ref callbacks below repopulate it, and
+  // they run before any effect, so the mount focus still finds refs.current[0].
+  useEffect(() => {
+    refs.current.length = length
+  }, [length])
 
   useEffect(() => {
     if (autoFocus) refs.current[0]?.focus()

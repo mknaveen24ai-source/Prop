@@ -1,0 +1,143 @@
+/* ── Accessibility baseline ───────────────────────────────────────────────────
+   Platform-wide rules that apply to every control, including the ones that do
+   not carry a design-system class.
+
+   Loaded LAST in App.css's cascade so it can act as a floor, but written at low
+   specificity so anything more specific — notably ui.css's `.lx-*` interaction
+   vocabulary — still wins. This sheet is the safety net, not the design.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* ── Skip link ────────────────────────────────────────────────────────────────
+   First focusable thing on the page. Off-screen until focused rather than
+   `display: none`, because a hidden element is not focusable and a skip link
+   that cannot be focused is not a skip link. */
+.skip-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10000;
+  transform: translateY(-120%);
+  padding: var(--space-3) var(--space-5);
+  background: var(--paper-2);
+  color: var(--ink);
+  border: 1px solid var(--rule-control);
+  border-radius: 0 0 var(--radius-sm) 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: transform 120ms ease-out;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+/* ── Visually hidden ──────────────────────────────────────────────────────────
+   For text that only a screen reader should reach: live-region announcements,
+   labels on icon-only controls where a visible label would crowd the layout.
+   The 1px-clip technique rather than `display: none` or `visibility: hidden`,
+   both of which remove the node from the accessibility tree entirely. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Universal focus ring ─────────────────────────────────────────────────────
+   ui.css already gives `.lx-btn`, `.lx-chip`, `.lx-card-row` and friends a ring
+   from the --ring token. This is the floor beneath that, for every control that
+   never got a design-system class: native buttons and links, the hand-rolled
+   `.input-field` sites, admin controls, and anything given tabindex to make it
+   keyboard-reachable.
+
+   :focus-visible, not :focus, so a mouse click does not leave a ring behind.
+   The `:where()` wrapper keeps specificity at zero, so this can never beat a
+   component's own focus treatment — it only fills in where there is none. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--glow-accent);
+}
+
+/* Anything explicitly made interactive must show it. A pointer cursor on a
+   non-focusable element is the signature of a div-with-onClick. */
+[role='button']:not(:disabled),
+[role='option'],
+[role='tab'] {
+  cursor: pointer;
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────────────
+   Vestibular-safe default. ui.css, skeleton.css and ledger-desk-overrides.css
+   each already handle their own animations; this catches everything they do
+   not, including keyframes in animations.css and any inline transition.
+
+   Durations go to 0.01ms rather than 0, and iteration-count to 1 rather than 0,
+   so animations still *complete* and their `animationend`/`transitionend`
+   events still fire. Setting them to zero outright strands any code waiting on
+   those events — a modal that never finishes its exit transition never
+   unmounts. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Reduced transparency ─────────────────────────────────────────────────────
+   The frosted-glass surfaces are semi-transparent with a heavy backdrop blur.
+   For low visual acuity that is text sitting on whatever happens to be behind
+   it, at reduced effective contrast — and the contrast ratios asserted in
+   tokens.contrast.test.js assume an opaque --paper-2 behind the text, so a
+   translucent surface silently invalidates them.
+
+   Redefining the three glass tokens is enough to cover all ~100 `var(--glass*)`
+   sites and the blur with them; no component changes. Both themes are handled
+   because the tokens resolve per-theme. */
+@media (prefers-reduced-transparency: reduce) {
+  :root,
+  [data-theme='dark'],
+  [data-theme='light'] {
+    --glass: var(--paper-2);
+    --glass-2: var(--paper-2);
+    --glass-hi: var(--paper);
+  }
+
+  /* The blur costs GPU time and now buys nothing behind an opaque fill. */
+  * {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+/* ── Forced colours (Windows High Contrast) ───────────────────────────────────
+   In forced-colors mode the browser replaces the palette wholesale, which
+   erases any boundary drawn with a colour it has overridden. Borders are
+   re-anchored to the system keywords so controls keep their outlines. */
+@media (forced-colors: active) {
+  .lx-btn,
+  .lx-chip,
+  .lx-field__control,
+  .input-field,
+  .select-field,
+  .textarea-field {
+    border: 1px solid ButtonBorder;
+  }
+
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}

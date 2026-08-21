@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useRef } from 'react'
+import useFocusTrap from '../../hooks/useFocusTrap'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import useBodyScrollLock from '../../hooks/useBodyScrollLock'
@@ -29,40 +30,10 @@ export default function BottomSheet({
   padded = true,
   children,
 }) {
-  const panelRef = useRef(null)
   const closeBtnRef = useRef(null)
+  const panelRef = useFocusTrap(open, onClose, { initialFocusRef: closeBtnRef })
 
   useBodyScrollLock(open)
-
-  useEffect(() => {
-    if (!open) return undefined
-    closeBtnRef.current?.focus()
-
-    function handleKeyDown(e) {
-      if (e.key === 'Escape') {
-        onClose?.()
-        return
-      }
-      if (e.key !== 'Tab' || !panelRef.current) return
-
-      const focusable = panelRef.current.querySelectorAll(
-        'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
-      )
-      if (focusable.length === 0) return
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault()
-        last.focus()
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault()
-        first.focus()
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [open, onClose])
 
   return (
     <AnimatePresence>

@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useSyncExternalStore } from 'react'
+import React, { useRef, useSyncExternalStore } from 'react'
+import useFocusTrap from '../hooks/useFocusTrap'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X, Download, ArrowRight } from 'lucide-react'
 
@@ -68,14 +69,9 @@ function usePrefersReducedMotion() {
 export default function CertificateCelebrationModal({ certificate, open, onClose, onView }) {
   const reducedMotion = usePrefersReducedMotion()
   const closeRef = useRef(null)
-
-  useEffect(() => {
-    if (!open) return undefined
-    closeRef.current?.focus()
-    function onKeyDown(e) { if (e.key === 'Escape') onClose?.() }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [open, onClose])
+  // Was Escape-only: Tab walked straight out of the modal into the page behind
+  // it while the scrim still covered everything.
+  const panelRef = useFocusTrap(open, onClose, { initialFocusRef: closeRef })
 
   if (!certificate) return null
 
@@ -83,6 +79,7 @@ export default function CertificateCelebrationModal({ certificate, open, onClose
     <AnimatePresence>
       {open && (
         <motion.div
+          ref={panelRef}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

@@ -82,7 +82,10 @@ export async function requestWithRetry(requestFn, options = {}) {
       return await requestFn()
     } catch (error) {
       lastError = error
-      const status = error?.response?.status
+      // `catch` binds `unknown` under strict mode; axios errors are the only
+      // thing that reaches here and the optional chain already guards a
+      // non-axios throw.
+      const status = /** @type {any} */ (error)?.response?.status
       const retryable = !status || status >= 500
       if (!retryable || attempt === retries) break
       await wait(baseDelayMs * (attempt + 1))
@@ -115,7 +118,9 @@ const api = axios.create({
 // Collection is memoized and cached in sessionStorage, so this is a map lookup
 // per request, not a re-fingerprint — see utils/deviceSignature.js.
 api.interceptors.request.use((config) => {
-  config.headers = config.headers || {}
+  // AxiosHeaders is a class with methods; a bare object literal is a valid
+  // assignment at runtime (axios normalises it) but not to the declared type.
+  config.headers = config.headers || /** @type {any} */ ({})
   if (!config.headers['X-Request-ID']) {
     config.headers['X-Request-ID'] = randomToken()
   }
@@ -188,8 +193,11 @@ export const authAPI = {
   // Axios passes all config keys through to error.config in interceptors,
   // which is how the response interceptor reads it to skip the /login redirect.
   // This is documented axios behavior (not undocumented) since axios v0.19+.
-  getProfile: () => 
-    api.get('/api/auth/me', { skipAuthRedirect: true }),
+  getProfile: () =>
+    // skipAuthRedirect is a custom key read back off error.config by the
+    // response interceptor (see the note above). Axios passes unknown config
+    // keys through untouched, but they are not in AxiosRequestConfig.
+    api.get('/api/auth/me', /** @type {any} */ ({ skipAuthRedirect: true })),
   
   updateTheme: (theme) =>
     api.patch('/api/auth/theme', { theme }),

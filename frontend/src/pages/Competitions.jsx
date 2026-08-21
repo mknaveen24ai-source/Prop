@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import ThemeToggle from '../components/ThemeToggle'
 import { PageWrapper } from '../App'
@@ -113,13 +113,12 @@ export function CompetitionsListContent({ onSelectSlug }) {
 
 // Standalone full page — used for the public/direct-URL route.
 export default function Competitions() {
-  const navigate = useNavigate()
 
   return (
     <PageWrapper>
       <div style={{ minHeight: '100dvh', background: 'var(--paper)' }}>
         <div className="nav">
-          <span className="nav-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>PROP FIRM</span>
+          <Link className="nav-logo" to="/" style={{ cursor: 'pointer', textDecoration: 'none', color: 'inherit' }}>PROP FIRM</Link>
           <ThemeToggle />
         </div>
 

@@ -264,11 +264,11 @@ export default function AdminLayout() {
             onLogout={logout}
             onMobileMenuClick={() => setMobileMenuOpen(true)}
           />
-          <main className="admin-content" id="admin-scroll-container">
+          <div className="admin-content" id="admin-scroll-container">
             <ErrorBoundary variant="section" label="This admin page" key={location.pathname}>
               <Outlet context={{ adminAxios, socket, session }} />
             </ErrorBoundary>
-          </main>
+          </div>
         </div>
       </div>
     </AdminToastProvider>

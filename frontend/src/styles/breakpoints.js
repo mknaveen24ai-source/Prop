@@ -53,3 +53,37 @@ export function queryForKey(key) {
     default: return '(min-width: 0px)'
   }
 }
+
+/**
+ * The device matrix the responsive checks run against.
+ *
+ * Lives here, beside the breakpoints, for the same reason `design-drift.js`
+ * parses `tokens.css` instead of carrying its own copy of the spacing scale: a
+ * checker holding a private copy of the thing it checks can be wrong and
+ * confident at the same time. Both `scripts/responsive-drift.js` and
+ * `e2e/tests/responsive.spec.js` read this list through
+ * `scripts/lib/viewports.js`, so the static counter and the browser assertions
+ * cannot end up testing different phones.
+ *
+ * `min` is the narrowest width any of them presents. It is what makes a fixed
+ * inline width a defect rather than a preference: an element wider than this
+ * cannot fit the narrowest device we claim to support, whatever CSS wraps it.
+ *
+ * 280 is the Galaxy Z Fold folded — the narrowest mainstream viewport in
+ * existence. The target there is "nothing overflows the document", not
+ * "everything is legible"; a 24-hour heatmap cannot be legible at 280px and
+ * asserting that it is would only get the suite muted.
+ */
+export const TEST_VIEWPORTS = Object.freeze([
+  Object.freeze({ name: 'foldable',  width: 280, height: 653, label: 'Galaxy Z Fold (folded)' }),
+  Object.freeze({ name: 'compact',   width: 320, height: 568, label: 'iPhone SE / Galaxy S8' }),
+  Object.freeze({ name: 'flagship',  width: 393, height: 852, label: 'iPhone 15 Pro / Galaxy S24' }),
+  Object.freeze({ name: 'tablet',    width: 768, height: 1024, label: 'iPad Mini portrait' }),
+  Object.freeze({ name: 'landscape', width: 852, height: 393, label: 'phone rotated 90deg' }),
+])
+
+/** Narrowest width in the matrix — the overflow threshold for static checks. */
+export const NARROWEST_VIEWPORT = TEST_VIEWPORTS.reduce(
+  (min, v) => Math.min(min, v.width),
+  Infinity
+)

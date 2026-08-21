@@ -128,6 +128,12 @@
   top: 0;
   left: 0;
   bottom: 0;
+  /* Pinned to three screen edges. On a notched phone in landscape the left
+     inset is what keeps the nav icons out from under the rounded corner; all
+     three resolve to 0 on hardware without insets. */
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+  padding-left: var(--safe-left);
   width: var(--admin-sidebar-w);
   background: var(--admin-surface);
   border-right: 1px solid var(--admin-border);
@@ -329,6 +335,14 @@
   border-radius: 0;
   cursor: pointer;
   white-space: nowrap;
+  /* It is a <button> now (it navigates, so it had to be reachable by keyboard).
+     These reset the UA defaults a button brings and the div did not have. */
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
 }
 .admin-user-profile:hover {
   background: var(--admin-elevated);
@@ -717,6 +731,23 @@
 /* ==========================================================================
    TABLES
    ========================================================================== */
+/* Chrome-free scroll container, for tables that already sit inside a Card or a
+   panel and must not gain a second border. `.admin-table-wrapper` carries a
+   border, a background and a blur; using it for a nested table draws a box
+   inside a box.
+
+   This exists because three admin tables and three trader ones were written
+   with no scroller at all. That is not a cosmetic omission: `.lx-table` takes a
+   `min-width: 560px` floor below the md breakpoint, so an unwrapped one pushes
+   the DOCUMENT to 572px inside a 320px viewport -- measured, not inferred --
+   and the whole page scrolls sideways rather than the table. */
+.admin-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
 .admin-table-wrapper {
   overflow-x: auto;
   border: 1px solid var(--admin-border);
@@ -827,6 +858,141 @@
 }
 .admin-page-btn:hover:not(:disabled) { background: var(--admin-elevated); }
 .admin-page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ==========================================================================
+   RECORD CARDS  (AdminDataTable mobileCard)
+   ==========================================================================
+   Below the md breakpoint AdminDataTable stops rendering a table and renders
+   these instead. The swap happens in JS, not CSS -- see AdminDataTable.jsx for
+   why an admin page does not dual-render both representations the way
+   ui/Table.jsx does.
+
+   Nothing here is inside a media query on purpose: these rules only ever apply
+   to markup the component decides to mount, so a second breakpoint declared
+   here could only ever disagree with the one in breakpoints.js.
+   ========================================================================== */
+.admin-cards-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.admin-card {
+  border: 1px solid var(--admin-border);
+  background: var(--admin-surface);
+  padding: var(--space-4);
+}
+.admin-card--selected {
+  border-color: var(--admin-accent);
+  background: color-mix(in srgb, var(--admin-accent) 10%, transparent);
+}
+
+.admin-card__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-card__select {
+  flex: 0 0 auto;
+  width: var(--space-4-5);
+  height: var(--space-4-5);
+}
+
+/* `all: unset` so the button form of the title inherits the div form's looks
+   exactly; without it the two variants differ by a browser default and the
+   card visibly changes when a page passes onRowClick. */
+.admin-card__title {
+  all: unset;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  color: var(--admin-text);
+  overflow-wrap: anywhere;
+}
+button.admin-card__title { cursor: pointer; }
+button.admin-card__title:focus-visible {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: 2px;
+}
+
+/* Two columns of label/value. `minmax(0, 1fr)` rather than `1fr`: a grid track
+   defaults to a min-content floor, so one long unbroken value (an account id,
+   an email) would push the second column off the card instead of wrapping. */
+.admin-card__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-3) 0 0;
+}
+.admin-card__fields > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.admin-card__fields dt {
+  font-family: var(--admin-font-mono);
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--admin-text-faint);
+}
+.admin-card__fields dd {
+  margin: 0;
+  font-size: var(--fs-md);
+  color: var(--admin-text);
+  overflow-wrap: anywhere;
+}
+
+/* Full-width action buttons rather than the desktop kebab. Wrapping rather
+   than scrolling: a row of actions that scrolls sideways inside a card the
+   user is already scrolling vertically is two gestures competing. */
+.admin-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--admin-border);
+}
+.admin-card__action-slot { flex: 1 1 auto; }
+.admin-card__action {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--touch-min);
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  border: 1px solid var(--admin-border);
+  color: var(--admin-text);
+  font-family: var(--admin-font-mono);
+  font-size: var(--fs-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.admin-card__action:hover { background: var(--admin-elevated); }
+.admin-card__action.danger { color: var(--admin-danger); border-color: var(--admin-danger); }
+
+.admin-card__skeleton-title { height: var(--space-4-5); width: 60%; }
+.admin-card__skeleton-line { height: var(--space-4); width: 100%; margin-top: var(--space-3); }
+
+/* Table-mode helpers that used to be inline styles in AdminDataTable.jsx.
+   Moved into the stylesheet so a media query can reach them at all -- an
+   inline style is exactly what cannot be overridden responsively. */
+/* --space-9 (48px) rather than the 50px this used to be inline: an actions
+   column holds one icon button, and 2px is not worth a value off the scale. */
+.admin-th-actions { width: var(--space-9); }
+.admin-td-actions { text-align: right; }
+.admin-skeleton--box { height: var(--space-3-5); width: var(--space-3-5); }
+.admin-skeleton--short { height: var(--space-4); width: 60%; }
+.admin-skeleton--full { height: var(--space-4); width: 100%; }
 
 /* Filter Bar */
 .admin-filter-bar {
@@ -1105,6 +1271,11 @@
   top: 0;
   right: 0;
   bottom: 0;
+  /* Full-height right-hand drawer: notch at the top, home indicator at the
+     bottom, and the right inset in landscape. */
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+  padding-right: var(--safe-right);
   width: min(100%, 380px);
   background: var(--admin-elevated);
   border-left: 1px solid var(--admin-border-strong);
@@ -1481,3 +1652,58 @@
 @keyframes adminToastIn { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
 @keyframes adminPulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
 @keyframes adminShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* ==========================================================================
+   CHAT DESK
+   ==========================================================================
+   Two panes: a conversation list and the thread. These were inline styles in
+   AdminChat.jsx, which meant the list's fixed 360px could not be reached by any
+   media query -- on a 393px phone it left the thread about a fingernail wide.
+   ========================================================================== */
+.admin-chat-desk {
+  display: flex;
+  height: calc(100vh - var(--admin-topbar-h) - 260px);
+}
+
+.admin-chat-list {
+  width: 360px;
+  flex-shrink: 0;
+  background: var(--admin-surface);
+  border-right: 1px solid var(--admin-border);
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-chat-thread {
+  flex: 1;
+  /* Without a min-width floor of 0 a flex item refuses to shrink below its
+     content, so a long message would push the list pane off-screen instead of
+     wrapping. */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--admin-bg);
+  border: 1px solid var(--admin-border);
+  border-left: none;
+}
+
+/* bp: md (768px) — see src/styles/breakpoints.js
+   Stack rather than shrink. Two panes side by side stop being two panes well
+   before they stop fitting, and an operator triaging tickets on a phone needs
+   the thread readable more than they need both visible at once. */
+@media (max-width: 767px) {
+  .admin-chat-desk {
+    flex-direction: column;
+    height: auto;
+  }
+  .admin-chat-list {
+    width: 100%;
+    max-height: 40vh;
+    border-right: none;
+    border-bottom: 1px solid var(--admin-border);
+  }
+  .admin-chat-thread {
+    border-left: 1px solid var(--admin-border);
+    min-height: 60vh;
+  }
+}

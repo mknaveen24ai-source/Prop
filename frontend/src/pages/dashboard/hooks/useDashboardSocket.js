@@ -221,11 +221,20 @@ export default function useDashboardSocket({
 
     socket.on('account_update', (data) => {
       const isPhasePassedEvent = /^phase\d+_passed$/.test(data?.event || '')
+      const isFailure = data?.event === 'account_failed'
       if (data?.message) {
         const pnlSuffix = data.pnl != null ? ` P&L: ${formatCurrency(data.pnl, { signed: true })}` : ''
-        handlersRef.current.setSuccess(data.message + pnlSuffix)
+        // A breach that fails the account goes to the error banner, which is
+        // the assertive live region. It used to go to setSuccess -- announced
+        // politely, in a green success banner, for the single most consequential
+        // event a trader can receive.
+        if (isFailure) {
+          handlersRef.current.setError(data.message + pnlSuffix)
+        } else {
+          handlersRef.current.setSuccess(data.message + pnlSuffix)
+        }
         handlersRef.current.pushNotification(data.message + pnlSuffix,
-          data.event === 'account_failed' ? 'error' : isPhasePassedEvent ? 'success' : 'info')
+          isFailure ? 'error' : isPhasePassedEvent ? 'success' : 'info')
       }
       if (isPhasePassedEvent) {
         const phaseLabel = `Phase ${data.event.match(/^phase(\d+)_passed$/)[1]}`

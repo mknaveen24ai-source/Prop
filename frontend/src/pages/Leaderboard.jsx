@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import axios from 'axios'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import ThemeToggle from '../components/ThemeToggle'
 import { PageWrapper } from '../App'
 import { renderIcon } from '../utils/iconMap'
@@ -24,7 +24,7 @@ export default function Leaderboard() {
     <PageWrapper>
       <div style={{ minHeight: '100dvh', background: 'var(--navy)' }}>
         <div className="nav">
-          <span className="nav-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>PROP FIRM</span>
+          <Link className="nav-logo" to="/" style={{ cursor: 'pointer', textDecoration: 'none', color: 'inherit' }}>PROP FIRM</Link>
           <ThemeToggle />
         </div>
 

@@ -24,7 +24,7 @@ const path = require('path')
 // Same allowlist and suppression marker the drift script uses. Kept in one file
 // on purpose: when the two checkers held separate lists they promptly disagreed,
 // reporting 0 and 10 hardcoded colours for the same codebase.
-const { isColorAllowlisted, SUPPRESSION_PATTERN } = require('../design-tokens.config.js')
+const { isColorAllowlisted, SUPPRESSION_PATTERN, HEX_COLOR_EXACT } = require('../design-tokens.config.js')
 
 const TOKENS = path.join(__dirname, '..', 'src', 'styles', 'tokens.css')
 
@@ -158,7 +158,11 @@ const noHardcodedColor = {
     return {
       Literal(node) {
         if (typeof node.value !== 'string') return
-        if (!/^#[0-9a-fA-F]{3,8}$/.test(node.value.trim())) return
+        // Shared with scripts/design-drift.js. See HEX_COLOR_EXACT in
+        // design-tokens.config.js for why the length set is 3/4/6/8 rather
+        // than a 3-to-8 range: seven hex characters is not a colour, and
+        // reference numbers like #4820194 are not colour literals.
+        if (!HEX_COLOR_EXACT.test(node.value.trim())) return
         if (isColorAllowlisted(context.filename || context.getFilename())) return
 
         // A hex used as a FALLBACK is not a hardcoded colour: the token is read

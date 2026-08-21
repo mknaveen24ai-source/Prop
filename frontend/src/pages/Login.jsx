@@ -275,8 +275,9 @@ function Login({ onLogin, initialMode = 'login' }) {
         {mode === 'login' && (
           <form onSubmit={handleLogin}>
             <div className="input-group">
-              <label className="input-label">EMAIL</label>
+              <label className="input-label" htmlFor="login-email">EMAIL</label>
               <input
+                id="login-email"
                 type="email"
                 className="input-field"
                 value={email}
@@ -288,9 +289,10 @@ function Login({ onLogin, initialMode = 'login' }) {
             </div>
 
             <div className="input-group">
-              <label className="input-label">PASSWORD</label>
+              <label className="input-label" htmlFor="login-password">PASSWORD</label>
               <div className="password-field-shell">
                 <input
+                  id="login-password"
                   type={showPassword ? 'text' : 'password'}
                   className="input-field password-input-field"
                   value={password}
@@ -352,8 +354,9 @@ function Login({ onLogin, initialMode = 'login' }) {
               Enter the email address associated with your account and we'll send you a reset link.
             </p>
             <div className="input-group">
-              <label className="input-label">EMAIL</label>
+              <label className="input-label" htmlFor="reset-email">EMAIL</label>
               <input
+                id="reset-email"
                 type="email"
                 className="input-field"
                 value={email}
@@ -394,8 +397,9 @@ function Login({ onLogin, initialMode = 'login' }) {
             {/* FIX (CRITICAL #2): Manual token input field */}
             {!resetToken && (
               <div className="input-group">
-                <label className="input-label">RESET CODE</label>
+                <label className="input-label" htmlFor="reset-code">RESET CODE</label>
                 <input
+                  id="reset-code"
                   type="text"
                   className="input-field"
                   value={manualToken}
@@ -407,9 +411,10 @@ function Login({ onLogin, initialMode = 'login' }) {
             )}
 
             <div className="input-group" style={{ marginBottom: 'var(--space-2)' }}>
-              <label className="input-label">NEW PASSWORD</label>
+              <label className="input-label" htmlFor="reset-new-password">NEW PASSWORD</label>
               <div className="password-field-shell">
               <input
+                id="reset-new-password"
                 type={showNewPassword ? 'text' : 'password'}
                 className="input-field password-input-field"
                 value={newPassword}

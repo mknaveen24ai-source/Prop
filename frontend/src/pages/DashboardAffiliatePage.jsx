@@ -381,7 +381,7 @@ export default function DashboardAffiliatePage() {
   const totalPayoutPages = Math.max(1, Math.ceil(payouts.total / payouts.pageSize))
 
   const referralColumns = [
-    { key: 'full_name', header: 'Name' },
+    { key: 'full_name', header: 'Name', primary: true },
     { key: 'country', header: 'Country', render: r => r.country || '—' },
     { key: 'referred_at', header: 'Joined', render: r => new Date(r.referred_at).toLocaleDateString() },
     { key: 'status', header: 'Status', render: r => (
@@ -391,7 +391,7 @@ export default function DashboardAffiliatePage() {
   ]
 
   const commissionColumns = [
-    { key: 'referred_full_name', header: 'From', render: c => c.referred_full_name || (c.order_id ? '—' : 'Manual adjustment') },
+    { key: 'referred_full_name', header: 'From', primary: true, render: c => c.referred_full_name || (c.order_id ? '—' : 'Manual adjustment') },
     { key: 'order_amount', header: 'Order Amount', align: 'right', render: c => c.order_amount != null ? formatCurrency(c.order_amount) : '—' },
     { key: 'commission_rate_pct', header: 'Rate', align: 'right', render: c => c.commission_rate_pct != null ? `${c.commission_rate_pct}%` : '—' },
     { key: 'commission_amount', header: 'Commission', align: 'right', render: c => (
@@ -535,6 +535,7 @@ export default function DashboardAffiliatePage() {
           </button>
         )}>
           <Table
+            mobileCard
             columns={referralColumns}
             rows={referrals.rows}
             emptyMessage="No referrals yet. Share your link to get started."
@@ -560,6 +561,7 @@ export default function DashboardAffiliatePage() {
           </button>
         )}>
           <Table
+            mobileCard
             columns={commissionColumns}
             rows={commissions.rows}
             emptyMessage="No commissions earned yet."
@@ -682,7 +684,8 @@ export default function DashboardAffiliatePage() {
             </button>
           )}>
             <Table
-              columns={payoutColumns}
+              mobileCard
+            columns={payoutColumns}
               rows={payouts.rows}
               emptyMessage="No payout requests yet."
             />

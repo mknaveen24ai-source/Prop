@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import AdminBadge from '../../components/admin/AdminBadge'
 import AdminDataTable from '../../components/admin/AdminDataTable'
@@ -34,7 +34,10 @@ export default function AdminPromotionReviews() {
   const toast = useToast()
 
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  // Approving CREATES a real funded account, so a double submit creates two.
+  // A ref rather than state: two clicks in the same tick would both read a
+  // stale `false` off state, which is precisely the case being guarded.
+  const savingRef = useRef(false)
   const [month, setMonth] = useState(currentMonth())
   const [status, setStatus] = useState('pending')
   const [quota, setQuota] = useState(null)
@@ -75,6 +78,7 @@ export default function AdminPromotionReviews() {
   }, [params, status])
 
   async function reviewAction(row, action) {
+    if (savingRef.current) return
     const note = action === 'reject'
       ? window.prompt('Rejection reason')
       : window.prompt('Approval note (optional)', '')
@@ -83,7 +87,7 @@ export default function AdminPromotionReviews() {
       return
     }
 
-    setSaving(true)
+    savingRef.current = true
     try {
       const res = await adminAxios.post(`/api/admin/promotion-reviews/${row.id}/${action}`, { note })
       toast.success(res.data?.message || `Promotion ${action}ed`)
@@ -91,7 +95,7 @@ export default function AdminPromotionReviews() {
     } catch (error) {
       toast.error(error?.response?.data?.error || `Could not ${action} promotion`)
     } finally {
-      setSaving(false)
+      savingRef.current = false
     }
   }
 

@@ -257,7 +257,7 @@ export default function Dispute({ user, accounts }) {
               rows={6}
               maxLength={2000}
               placeholder="Describe the sequence of events, with times in UTC. Attach platform screenshots below."
-              style={{ width: '100%', resize: 'vertical', padding: 'var(--space-3) var(--space-3-5)', border: '1px solid var(--rule)', borderRadius: '4px', background: 'var(--paper)', color: 'var(--ink)', fontSize: '13.5px', lineHeight: 1.6 }}
+              style={{ width: '100%', resize: 'vertical', padding: 'var(--space-3) var(--space-3-5)', border: '1px solid var(--rule)', borderRadius: '4px', background: 'var(--paper)', color: 'var(--ink)', fontSize: 'var(--fs-control)', lineHeight: 1.6 }}
             />
             <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--muted)', textAlign: 'right', marginTop: 'var(--space-1)' }}>{form.description.length} / 2000 (min 30)</div>
 
@@ -332,6 +332,10 @@ export default function Dispute({ user, accounts }) {
           mock but necessary for a trader with more than one appeal. */}
       {myDisputes.length > 0 && (
         <Card ruled flush title="My Appeals">
+          {/* .lx-table takes a min-width: 560px floor below md, so an unwrapped
+              one pushes the document to 572px inside a 320px viewport and the
+              whole page scrolls sideways instead of the table. */}
+          <div className="lx-table-wrap">
           <table className="lx-table">
             <thead>
               <tr>
@@ -369,6 +373,7 @@ export default function Dispute({ user, accounts }) {
               ))}
             </tbody>
           </table>
+          </div>
         </Card>
       )}
     </div>

@@ -301,7 +301,7 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
   return (
     <div style={{ maxWidth: '1080px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
       <div style={{ borderBottom: '3px double var(--ink)', paddingBottom: 'var(--space-4)', display: 'flex', alignItems: 'flex-end', gap: 'var(--space-5)', flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: '280px' }}>
+        <div style={{ flex: 1, minWidth: 'min(280px, 100%)' }}>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--accent)' }}>{kicker}</div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '38px', fontWeight: 400, margin: 'var(--space-2-5) 0 0' }}>The Rulebook, in full</h2>
           <p style={{ fontSize: 'var(--fs-md)', lineHeight: 1.7, color: 'var(--muted)', maxWidth: '64ch', margin: 'var(--space-2-5) 0 0' }}>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
+import { rowInteractionProps } from '../../utils/interactive'
 import { useOutletContext, useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell } from 'recharts'
 import { useToast } from '../../components/admin/AdminToast'
@@ -223,7 +224,7 @@ export default function AdminAffiliates() {
                   <tr><td className="admin-td" colSpan={6}>No affiliates found.</td></tr>
                 ) : (
                   data.rows.map((row) => (
-                    <tr key={row.user_id} onClick={() => navigate(`/admin/affiliates/${row.user_id}`)} style={{ cursor: 'pointer' }}>
+                    <tr key={row.user_id} {...rowInteractionProps(() => navigate(`/admin/affiliates/${row.user_id}`))} style={{ cursor: 'pointer' }}>
                       <td className="admin-td">
                         <div>{row.full_name || 'Unknown'}</div>
                         <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-xs)' }}>{row.email}</div>

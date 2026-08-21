@@ -55,8 +55,6 @@ function Register({ onLogin }) {
   // OTP step
   const [otpCode, setOtpCode] = useState('')
   const [otpResetKey, setOtpResetKey] = useState(0)
-  const [phoneVerifiedToken, setPhoneVerifiedToken] = useState(null)
-  const [otpSent, setOtpSent] = useState(false)
   const [otpCooldown, setOtpCooldown] = useState(0) // seconds until resend allowed
 
   // UI state
@@ -133,7 +131,6 @@ function Register({ onLogin }) {
         `${API_URL}/api/auth/phone-otp/send`,
         { phone }
       )
-      setOtpSent(true)
       setStep(STEP_OTP)
       setSuccess('A 6-digit verification code has been sent to your phone.')
       // Start 60-second cooldown for resend
@@ -195,7 +192,6 @@ function Register({ onLogin }) {
         { phone: form.phone.trim(), code: otpCode }
       )
       const token = res.data.phone_verified_token
-      setPhoneVerifiedToken(token)
       setSuccess('Phone verified! Creating your account…')
       // Immediately proceed to registration
       await handleRegister(token)
@@ -239,7 +235,6 @@ function Register({ onLogin }) {
       setError(err.response?.data?.error || 'Registration failed. Please try again.')
       // Go back to form step so user can retry
       setStep(STEP_FORM)
-      setPhoneVerifiedToken(null)
     }
   }
 
@@ -331,21 +326,22 @@ function Register({ onLogin }) {
         {step === STEP_FORM && (
           <form onSubmit={handleSendOtp}>
             <div className="input-group">
-              <label className="input-label">FULL NAME</label>
-              <input type="text" name="full_name" className="input-field" value={form.full_name} onChange={handleChange} placeholder="John Smith" required />
+              <label className="input-label" htmlFor="register-full-name">FULL NAME</label>
+              <input id="register-full-name" type="text" name="full_name" className="input-field" value={form.full_name} onChange={handleChange} placeholder="John Smith" required />
             </div>
 
             <div className="input-group">
-              <label className="input-label">EMAIL</label>
-              <input type="email" name="email" className="input-field" value={form.email} onChange={handleChange} placeholder="your@email.com" required autoComplete="email" />
+              <label className="input-label" htmlFor="register-email">EMAIL</label>
+              <input id="register-email" type="email" name="email" className="input-field" value={form.email} onChange={handleChange} placeholder="your@email.com" required autoComplete="email" />
             </div>
 
             <div className="input-group">
-              <label className="input-label">PASSWORD</label>
+              <label className="input-label" htmlFor="register-password">PASSWORD</label>
               <div className="password-field-shell">
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  name="password"
+                  id="register-password"
+                name="password"
                   className="input-field password-input-field"
                   value={form.password}
                   onChange={handleChange}
@@ -387,8 +383,8 @@ function Register({ onLogin }) {
             )}
 
             <div className="input-group">
-              <label className="input-label" style={{ marginTop: 'var(--space-3)' }}>COUNTRY</label>
-              <select name="country" className="select-field" value={form.country} onChange={handleChange} required>
+              <label className="input-label" htmlFor="register-country" style={{ marginTop: 'var(--space-3)' }}>COUNTRY</label>
+              <select id="register-country" name="country" className="select-field" value={form.country} onChange={handleChange} required>
                 <option value="">Select your country</option>
                 <option value="India">India</option>
                 <option value="United Kingdom">United Kingdom</option>
@@ -408,7 +404,7 @@ function Register({ onLogin }) {
 
             {/* Phone — shown with a lock icon since it will be OTP-verified */}
             <div className="input-group">
-              <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
+              <label className="input-label" htmlFor="register-phone" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
                 PHONE / WHATSAPP
                 <span style={{
                   fontSize: 'var(--fs-2xs)', fontWeight: 600, padding: '2px 7px', borderRadius: 'var(--radius-pill)',
@@ -417,6 +413,7 @@ function Register({ onLogin }) {
               </label>
               <input
                 type="text"
+                id="register-phone"
                 name="phone"
                 className="input-field"
                 value={form.phone}
@@ -430,8 +427,8 @@ function Register({ onLogin }) {
             </div>
 
             <div className="input-group">
-              <label className="input-label">REFERRAL CODE (optional)</label>
-              <input type="text" name="referred_by" className="input-field" value={form.referred_by} onChange={handleChange} placeholder="Enter referral code if you have one" />
+              <label className="input-label" htmlFor="register-referral">REFERRAL CODE (optional)</label>
+              <input id="register-referral" type="text" name="referred_by" className="input-field" value={form.referred_by} onChange={handleChange} placeholder="Enter referral code if you have one" />
               {form.referred_by.trim() && !checkingReferral && referralCheck && (
                 referralCheck.valid ? (
                   <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--gain)', marginTop: '5px', marginBottom: 0 }}>
@@ -456,12 +453,12 @@ function Register({ onLogin }) {
                 style={{ marginTop: '2px', accentColor: 'var(--accent)', cursor: 'pointer', flexShrink: 0 }} />
               <label htmlFor="terms" style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', lineHeight: '1.6', cursor: 'pointer' }}>
                 I have read and agree to the{' '}
-                <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Terms of Service</a>,{' '}
-                <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Privacy Policy</a>, and{' '}
+                <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>Terms of Service</a>,{' '}
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>Privacy Policy</a>, and{' '}
                 {/* Refund terms must be disclosed before purchase, not after —
                     linking them at the point of consent is what makes the
                     withdrawal-right waiver in the refund policy enforceable. */}
-                <a href="/refund-policy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none' }}>Refund Policy</a>.
+                <a href="/refund-policy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>Refund Policy</a>.
                 {' '}I confirm I am not a resident of the United States, Canada, or any sanctioned jurisdiction.
               </label>
             </div>

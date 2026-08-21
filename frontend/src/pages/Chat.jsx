@@ -45,6 +45,23 @@ function Chat() {
   const supportTypingTimeoutRef = useRef(null)
   const messagesEndRef = useRef(null)
 
+  // Auto-scroll to bottom when new messages arrive
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  const loadConversations = async () => {
+    try {
+      const res = await axios.get(`${API_URL}/api/chat/conversations`)
+      setConversations(res.data)
+      setLoading(false)
+    } catch (error) {
+      console.error('Failed to load conversations:', error)
+      setLoading(false)
+    }
+  }
+
+
   // Initialize socket connection
   useEffect(() => {
     // FIX (HIGH #8): Use reference counting to prevent connection leaks
@@ -123,11 +140,6 @@ function Chat() {
     }
   }, [selectedConversation])
 
-  // Auto-scroll to bottom when new messages arrive
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
-
   useEffect(() => {
     scrollToBottom()
   }, [messages])
@@ -136,17 +148,6 @@ function Chat() {
   useEffect(() => {
     loadConversations()
   }, [])
-
-  const loadConversations = async () => {
-    try {
-      const res = await axios.get(`${API_URL}/api/chat/conversations`)
-      setConversations(res.data)
-      setLoading(false)
-    } catch (error) {
-      console.error('Failed to load conversations:', error)
-      setLoading(false)
-    }
-  }
 
   const createConversation = async (e) => {
     e.preventDefault()
@@ -425,7 +426,7 @@ function Chat() {
                         border: `1px solid ${msg.is_admin ? 'var(--rule)' : 'var(--accent)'}`,
                         color: msg.is_admin ? 'var(--ink)' : 'var(--paper)',
                       }}>
-                        <div style={{ fontSize: '13.5px', lineHeight: 1.55 }}>{msg.message}</div>
+                        <div style={{ fontSize: 'var(--fs-control)', lineHeight: 1.55 }}>{msg.message}</div>
                         <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', marginTop: '7px', textAlign: 'right', opacity: 0.75 }}>{formatTime(msg.created_at)}</div>
                       </div>
                     </div>
@@ -451,7 +452,7 @@ function Chat() {
                   placeholder="Write to the desk… (Enter to send)"
                   rows={2}
                   disabled={sending}
-                  style={{ flex: 1, resize: 'none', padding: '11px 13px', border: '1px solid var(--rule)', borderRadius: '4px', background: 'var(--paper)', color: 'var(--ink)', fontSize: '13.5px', lineHeight: 1.5 }}
+                  style={{ flex: 1, resize: 'none', padding: '11px 13px', border: '1px solid var(--rule)', borderRadius: '4px', background: 'var(--paper)', color: 'var(--ink)', fontSize: 'var(--fs-control)', lineHeight: 1.5 }}
                 />
                 <button
                   type="submit"

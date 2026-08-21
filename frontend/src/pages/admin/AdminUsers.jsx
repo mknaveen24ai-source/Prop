@@ -382,7 +382,6 @@ export default function AdminUsers() {
     return actions;
   };
 
-  const selectedRows = rows.filter((row) => selectedIds.includes(String(row.id)));
   const allSelected = rows.length > 0 && selectedIds.length === rows.length;
   const someSelected = selectedIds.length > 0 && selectedIds.length < rows.length;
 

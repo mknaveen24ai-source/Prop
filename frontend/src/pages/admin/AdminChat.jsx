@@ -471,15 +471,11 @@ export default function AdminChat() {
         />
       </Card>
 
-      <div style={{ display: 'flex', height: 'calc(100vh - var(--admin-topbar-h) - 260px)', gap: '0' }}>
-        <div style={{
-          width: '360px',
-          flexShrink: 0,
-          background: 'var(--admin-surface)',
-          borderRight: '1px solid var(--admin-border)',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
+      {/* Layout moved to admin.css so a media query can stack the two panes.
+          Inline, the 360px list pane was unreachable and left roughly a
+          fingernail of thread beside it on a phone. */}
+      <div className="admin-chat-desk">
+        <div className="admin-chat-list">
           <div style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--admin-border)' }}>
             <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)' }}>
               {filteredConversations.length} conversation{filteredConversations.length === 1 ? '' : 's'} in this view
@@ -596,14 +592,7 @@ export default function AdminChat() {
           </div>
         </div>
 
-        <div style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          background: 'var(--admin-bg)',
-          border: '1px solid var(--admin-border)',
-          borderLeft: 'none'
-        }}>
+        <div className="admin-chat-thread">
           {selectedConversation ? (
             <>
               <div style={{

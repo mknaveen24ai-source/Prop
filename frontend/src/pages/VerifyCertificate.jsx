@@ -105,7 +105,7 @@ export default function VerifyCertificate() {
         </button>
       </header>
 
-      <main className="ui-shell-section ui-shell-gutter" style={{ paddingTop: 'var(--space-8)', paddingBottom: 'var(--space-8)' }}>
+      <div className="ui-shell-section ui-shell-gutter" style={{ paddingTop: 'var(--space-8)', paddingBottom: 'var(--space-8)' }}>
         {loading && <p style={{ color: 'var(--muted)', textAlign: 'center' }}>Verifying certificate…</p>}
 
         {!loading && failed && (
@@ -201,7 +201,7 @@ export default function VerifyCertificate() {
             </div>
           </>
         )}
-      </main>
+      </div>
     </div>
   )
 }

@@ -14,6 +14,10 @@
 @import './components/ui/ui.css';
 @import './styles/ledger-desk-overrides.css';
 @import './styles/animations.css';
+/* Last: the accessibility floor (focus ring, skip link, reduced motion and
+   reduced transparency). Written with :where() so it never outranks a
+   component's own treatment -- it only fills in where there is none. */
+@import './styles/a11y.css';
 
 /* ── 4. Global Setup ── */
 *, *::before, *::after {
@@ -431,7 +435,9 @@ h1, h2, h3, h4, h5, h6 {
 .input-field, .select-field, .textarea-field {
   width: 100%;
   background: var(--paper);
-  border: 1px solid var(--border);
+  /* --rule-control, not --border: this boundary is what identifies the field,
+     so WCAG 1.4.11 applies and --border (=--rule) is 1.66:1. */
+  border: 1px solid var(--rule-control);
   padding: var(--space-3-5) var(--space-4);
   color: var(--text-primary);
   font-family: var(--font-ui);
@@ -914,6 +920,13 @@ h1, h2, h3, h4, h5, h6 {
   display: flex; flex-direction: column;
   transition: width 0.25s ease;
   z-index: 100;
+  /* Pinned to three screen edges, so it meets the notch at the top and the
+     home indicator at the bottom. In landscape on a notched phone the left
+     inset is the one that bites: without it the rail's icons sit under the
+     rounded corner. All four resolve to 0 on hardware without insets. */
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+  padding-left: var(--safe-left);
 }
 .sidebar.collapsed { width: 64px; }
 .sidebar-header { padding: var(--space-5); display: flex; align-items: center; border-bottom: 1px solid var(--border); }
@@ -1036,9 +1049,12 @@ h1, h2, h3, h4, h5, h6 {
      needed 468px and the bar scrolled sideways on every phone with no
      affordance that it did. The tabs now share the width instead. */
   justify-content: space-between;
-  padding-bottom: var(--safe-bottom);
+  /* --safe-bottom-min, not --safe-bottom: this bar rests on the bottom edge, and
+     the plain inset is 0 on any phone without a home indicator. */
+  padding-bottom: var(--safe-bottom-min);
   padding-left: var(--safe-left);
   padding-right: var(--safe-right);
+  min-height: var(--mobile-tabbar-h);
 }
 .mobile-tab-btn {
   flex: 1 1 0; min-width: 0;
@@ -1150,6 +1166,12 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 0;
 }
 
+/* Moved out of RiskWarningBanner.jsx's inline style so a media query can reach
+   it. The 48px gutter is a quarter of a 320px screen on each side. */
+.risk-warning-banner {
+  padding: var(--space-3) var(--space-9);
+}
+
 .risk-warning-banner-floating {
   position: fixed;
   top: 0;
@@ -1159,6 +1181,24 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 0;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+  /* Pinned to the top of the viewport, so it sits under the notch without this.
+     --safe-top rather than a raw env(): index.html sets viewport-fit=cover,
+     which is what makes the token resolve to anything but 0. */
+  padding-top: calc(var(--space-3) + var(--safe-top));
+  padding-left: calc(var(--space-9) + var(--safe-left));
+  padding-right: calc(var(--space-9) + var(--safe-right));
+}
+
+/* bp: md (768px) — see src/styles/breakpoints.js */
+@media (max-width: 767px) {
+  .risk-warning-banner {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+  .risk-warning-banner-floating {
+    padding-left: calc(var(--space-4) + var(--safe-left));
+    padding-right: calc(var(--space-4) + var(--safe-right));
+  }
 }
 
 .order-panel-price-card {
@@ -1723,3 +1763,85 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* End */
+
+/* ==========================================================================
+   CONNECTION STATUS BAR
+   ==========================================================================
+   Bottom-pinned, because the top of a phone screen already carries the risk
+   banner and the app chrome, and this has to be noticed without covering the
+   price.
+
+   Two insets to clear, not one: the mobile tab bar sits at the bottom on
+   phones, and the home indicator sits under that. --safe-bottom-min covers the
+   second and yields a real gutter on hardware with no inset at all.
+   ========================================================================== */
+.conn-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  padding-bottom: var(--safe-bottom-min);
+  padding-left: calc(var(--space-4) + var(--safe-left));
+  padding-right: calc(var(--space-4) + var(--safe-right));
+  font-size: var(--fs-base);
+  text-align: center;
+  border-top: 1px solid var(--rule);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.conn-bar--offline {
+  background: color-mix(in srgb, var(--loss) 16%, var(--paper-2));
+  color: var(--ink);
+}
+.conn-bar--online {
+  background: color-mix(in srgb, var(--gain) 16%, var(--paper-2));
+  color: var(--ink);
+}
+.conn-bar--update {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.conn-bar__dot {
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: currentColor;
+  flex: 0 0 auto;
+}
+
+.conn-bar__action {
+  min-height: var(--touch-min);
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.conn-bar__action:hover { background: var(--glass); }
+
+/* bp: md (768px) — see src/styles/breakpoints.js
+   Clear the mobile tab bar, which is itself pinned to the bottom edge.
+
+   Selected by the tab bar's PRESENCE rather than by `.mode-trader`, because
+   ConnectionStatusBar renders outside the Router while `.mode-trader` is a
+   class on a page-level div inside it. A descendant selector would never have
+   matched, and the bar would have sat on top of the nav on every phone --
+   silently, since the rule would simply never apply rather than error. */
+@media (max-width: 767px) {
+  body:has(.sidebar-mobile-bottom) .conn-bar {
+    bottom: calc(var(--mobile-tabbar-h) + var(--safe-bottom));
+    padding-bottom: var(--space-3);
+  }
+}

@@ -29,7 +29,11 @@ export default function AdminActionMenu({ actions, row }) {
       {open && (
         <div className="admin-dropdown">
           {actions.map((action, i) => React.isValidElement(action) ? (
-            <div key={i} onClick={() => setOpen(false)}>{action}</div>
+            // Not interactive itself -- it wraps a caller-supplied element and
+            // closes the menu once that element is used. The listener stays on
+            // the wrapper (the child's own handler is the caller's), but it is
+            // presentational, so it takes no role and no tab stop.
+            <div key={i} role="presentation" onClick={() => setOpen(false)}>{action}</div>
           ) : (
             <button
               key={i}

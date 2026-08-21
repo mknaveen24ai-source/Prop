@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { rowInteractionProps } from '../utils/interactive'
 import axios from 'axios'
 import { renderIcon } from '../utils/iconMap'
 import Card from '../components/ui/Card'
@@ -134,6 +135,7 @@ export default function Support({ user }) {
           <Card flush className="trader-service-card service-table-card">
             {loadingTickets ? <div style={{ padding: 'var(--space-6)', color:'var(--text-muted)' }}>Loading tickets...</div> : 
              tickets.length === 0 ? <div style={{ padding: 'var(--space-8) var(--space-6)', textAlign:'center', color:'var(--text-muted)' }}>You have no support tickets.</div> :
+             <div className="lx-table-wrap">
              <table style={{ width:'100%', borderCollapse:'collapse' }}>
                <thead>
                  <tr style={{ borderBottom:'1px solid var(--navy-border)', background:'var(--navy)' }}>
@@ -144,7 +146,7 @@ export default function Support({ user }) {
                </thead>
                <tbody>
                  {tickets.map(t => (
-                   <tr key={t.id} onClick={() => setSelectedTicket(t)} style={{ borderBottom:'1px solid var(--navy-border)', cursor:'pointer', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background='var(--navy-hover)'} onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                   <tr key={t.id} {...rowInteractionProps(() => setSelectedTicket(t))} style={{ borderBottom:'1px solid var(--navy-border)', cursor:'pointer', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background='var(--navy-hover)'} onMouseLeave={e => e.currentTarget.style.background='transparent'}>
                      <td style={{ padding: 'var(--space-4)' }}>
                        <div style={{ color:'var(--text)', fontWeight:600, fontSize: 'var(--fs-md)' }}>{t.subject}</div>
                        <div style={{ color:'var(--text-dim)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-1)' }}>#{t.id} • {t.category.toUpperCase()}</div>
@@ -159,6 +161,7 @@ export default function Support({ user }) {
                  ))}
                </tbody>
              </table>
+             </div>
             }
           </Card>
         )}

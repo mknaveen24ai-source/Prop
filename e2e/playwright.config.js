@@ -61,9 +61,63 @@ module.exports = defineConfig({
       // The readiness report scored responsive/mobile lowest (18 media queries
       // for 4,600 lines of CSS). This project exists so regressions there are
       // at least visible.
+      //
+      // Needs a RUNNING STACK, which is why it stayed unwired in CI for so
+      // long: the e2e job builds Storybook and nothing else. The `responsive`
+      // project below covers the same ground without a backend and is the one
+      // that gates every commit; this stays the deeper check against real
+      // routes and real data.
       name: 'mobile',
       use: { ...devices['Pixel 7'] },
       grep: /@mobile/
+    },
+    {
+      // Viewport matrix over the layout surfaces, against the Storybook build.
+      //
+      // Unlike `visual` this asserts GEOMETRY, not pixels -- scrollWidth against
+      // clientWidth, bounding boxes against --touch-min -- so it is not hostage
+      // to font rasterisation and needs no pinned container. That means it runs
+      // on a developer's machine as readily as in CI, which matters: a check
+      // that only ever runs in CI is one people find out they have broken at
+      // the worst possible moment.
+      //
+      // Each test sets its own viewport from the device matrix in
+      // frontend/src/styles/breakpoints.js, so nothing is fixed here.
+      name: 'responsive',
+      grep: /@responsive/,
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: process.env.STORYBOOK_URL || 'http://localhost:6006',
+        // Touch emulation, so `@media (pointer: coarse)` -- which is what
+        // raises the controls to 44px -- actually applies. Without it the tap
+        // target assertions measure the desktop density and fail for a reason
+        // that has nothing to do with a phone.
+        hasTouch: true,
+        isMobile: false,
+        deviceScaleFactor: 1
+      }
+    },
+    {
+      // Automated WCAG scan (axe-core) over the real app rather than Storybook:
+      // page title, landmark structure, heading order and cross-component
+      // contrast only exist once a page is assembled, and a component-level
+      // scan cannot see any of them.
+      //
+      // Its own project because it points at the APP (E2E_BASE_URL), while
+      // `responsive` and `visual` point at a Storybook build. Running under the
+      // default `chromium` project would make it inherit whichever baseURL that
+      // happened to have.
+      //
+      // The public block needs only a served frontend. The trader and admin
+      // blocks skip unless E2E_EMAIL / E2E_ADMIN_EMAIL are set, so this is
+      // useful locally without a seeded database and complete in the `a11y` CI
+      // job, which provisions one.
+      name: 'a11y',
+      grep: /@a11y/,
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: process.env.E2E_BASE_URL || 'http://localhost:3000'
+      }
     },
     {
       // Visual regression over the design system, served from a Storybook build

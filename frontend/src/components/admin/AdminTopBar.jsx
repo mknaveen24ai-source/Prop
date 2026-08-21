@@ -75,7 +75,7 @@ export default function AdminTopBar({ adminAxios, onMobileMenuClick, onLogout, s
   return (
     <header className="admin-topbar">
       <div className="admin-topbar-left">
-        <button className="admin-hamburger" onClick={onMobileMenuClick}>
+        <button className="admin-hamburger" type="button" aria-label="Open navigation menu" onClick={onMobileMenuClick}>
           <Menu size={18} color="var(--admin-text)" />
         </button>
         <div className="admin-breadcrumb">
@@ -115,7 +115,14 @@ export default function AdminTopBar({ adminAxios, onMobileMenuClick, onLogout, s
         </button>
 
         <div style={{ position: 'relative' }} ref={notifRef}>
-          <button className="admin-icon-btn" style={{ position: 'relative' }} onClick={() => setShowNotifications((visible) => !visible)}>
+          <button
+            className="admin-icon-btn"
+            type="button"
+            aria-label={alerts.length > 0 ? `Alerts, ${alerts.length} unread` : 'Alerts'}
+            aria-expanded={showNotifications}
+            style={{ position: 'relative' }}
+            onClick={() => setShowNotifications((visible) => !visible)}
+          >
             {renderIcon('bell', { size: 16, color: 'var(--admin-text)' })}
             {alerts.length > 0 && (
               <span
@@ -144,7 +151,14 @@ export default function AdminTopBar({ adminAxios, onMobileMenuClick, onLogout, s
         </div>
 
         <div style={{ position: 'relative' }} ref={profileRef}>
-          <button className="admin-icon-btn" style={{ background: 'var(--admin-accent)', color: 'var(--paper)', border: 'none' }} onClick={() => setShowProfile((visible) => !visible)}>
+          <button
+            className="admin-icon-btn"
+            type="button"
+            aria-label="Account menu"
+            aria-expanded={showProfile}
+            style={{ background: 'var(--admin-accent)', color: 'var(--paper)', border: 'none' }}
+            onClick={() => setShowProfile((visible) => !visible)}
+          >
             {initials}
           </button>
 

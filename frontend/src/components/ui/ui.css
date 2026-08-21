@@ -62,7 +62,9 @@
 .lx-btn--secondary {
   background: transparent;
   color: var(--ink);
-  border-color: var(--rule);
+  /* The outline is the only thing that says "button" here, so it has to clear
+     3:1 rather than sit at the decorative hairline weight. */
+  border-color: var(--rule-control);
 }
 .lx-btn--secondary:hover:not(:disabled) { border-color: var(--ink); }
 
@@ -254,7 +256,8 @@
 .lx-field__control {
   width: 100%;
   background: var(--paper);
-  border: 1px solid var(--rule);
+  /* Control boundary -- see --rule-control in tokens.css. */
+  border: 1px solid var(--rule-control);
   color: var(--ink);
   font-family: var(--font-ui);
   font-size: var(--fs-md);
@@ -507,7 +510,8 @@ button.lx-card-row:focus-visible { outline: 2px solid var(--ink); outline-offset
   text-transform: uppercase;
   padding: var(--space-1-5) var(--space-3);
   border-radius: var(--radius-pill);
-  border: 1px solid var(--rule);
+  /* Chips are toggles; their outline identifies them. */
+  border: 1px solid var(--rule-control);
   background: transparent;
   color: var(--muted);
   cursor: pointer;

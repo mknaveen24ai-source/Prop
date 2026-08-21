@@ -323,6 +323,7 @@ function BotRosterPanel({ adminAxios, toast, competition, onEntered }) {
       {loading ? (
         <div style={{ opacity: 0.6, fontSize: 'var(--fs-base)' }}>Loading bots...</div>
       ) : (
+        <div className="admin-table-scroll">
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-base)' }}>
           <thead>
             <tr style={{ textAlign: 'left', opacity: 0.7 }}>
@@ -353,6 +354,7 @@ function BotRosterPanel({ adminAxios, toast, competition, onEntered }) {
             )}
           </tbody>
         </table>
+        </div>
       )}
     </Card>
   )
@@ -481,6 +483,7 @@ export default function AdminCompetitionDetail() {
 
       <Card style={{ padding: 'var(--space-5)', marginBottom: 'var(--space-6)', overflowX: 'auto' }}>
         <h3 style={{ margin: '0 0 var(--space-3)' }}>Entries</h3>
+        <div className="admin-table-scroll">
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-base)' }}>
           <thead>
             <tr style={{ textAlign: 'left', opacity: 0.7 }}>
@@ -531,12 +534,14 @@ export default function AdminCompetitionDetail() {
             )}
           </tbody>
         </table>
+        </div>
       </Card>
 
       {competition.status === 'completed' && (
         <Card style={{ padding: 'var(--space-5)' }}>
           <h3 style={{ margin: '0 0 var(--space-3)' }}>Final Leaderboard (for payout reference)</h3>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-base)' }}>
+          <div className="admin-table-scroll">
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--fs-base)' }}>
             <thead>
               <tr style={{ textAlign: 'left', opacity: 0.7 }}>
                 <th style={{ padding: 'var(--space-2) var(--space-2-5)' }}>Rank</th>
@@ -563,6 +568,7 @@ export default function AdminCompetitionDetail() {
               ))}
             </tbody>
           </table>
+          </div>
         </Card>
       )}
     </div>

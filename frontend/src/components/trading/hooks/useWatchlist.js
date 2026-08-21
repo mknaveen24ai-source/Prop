@@ -31,12 +31,18 @@ export default function useWatchlist(prices, availableInstruments) {
   // Rolling per-instrument price history for the Watchlist rail's sparklines
   // (Modern Gazette handoff spec: every stat/table row gets one). Buffered in
   // a ref so a price tick doesn't force a re-render on its own — only the
-  // periodic tick below does, capped well under the sparkline's own 100x34
+  // periodic publish below does, capped well under the sparkline's own 100x34
   // resolution.
-  // The tick value itself is never read — bumping it is what re-renders the
-  // component so the sparklines pick up the buffered history.
+  //
+  // The buffer stays private. What callers get is `priceHistory`, a snapshot
+  // republished on the interval, because a ref read during render is a value
+  // React never re-renders for: consumers had to reach into `.current` and
+  // then depend on something else to redraw them. Publishing a new object
+  // identity every 4s is the same cadence with none of that coupling. The copy
+  // is shallow — the per-instrument arrays are shared, not cloned — so it costs
+  // one object of a few dozen keys.
   const priceHistoryRef = useRef({})
-  const [, setHistoryTick] = useState(0)
+  const [priceHistory, setPriceHistory] = useState({})
 
   useEffect(() => {
     const entries = Object.entries(prices || {})
@@ -54,7 +60,7 @@ export default function useWatchlist(prices, availableInstruments) {
   }, [prices])
 
   useEffect(() => {
-    const iv = setInterval(() => setHistoryTick((t) => t + 1), 4000)
+    const iv = setInterval(() => setPriceHistory({ ...priceHistoryRef.current }), 4000)
     return () => clearInterval(iv)
   }, [])
 
@@ -76,7 +82,7 @@ export default function useWatchlist(prices, availableInstruments) {
     togglePin,
     tickerCategory,
     setTickerCategory,
-    priceHistoryRef,
+    priceHistory,
     tickerInstruments
   }
 }

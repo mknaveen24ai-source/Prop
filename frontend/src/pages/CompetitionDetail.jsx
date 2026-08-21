@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { Link, useParams, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { PieChart, Pie, Cell } from 'recharts'
 import api from '../services/api'
@@ -366,6 +366,9 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
           <div style={{ textAlign: 'center', padding: 'var(--space-9)', color: 'var(--muted)' }}>No entries yet. Be the first to join!</div>
         ) : (
           <>
+            {/* Scroller, not decoration: .lx-table has a min-width floor below
+                md and overflows the document without one. */}
+            <div className="lx-table-wrap">
             <table className="lx-table">
               <thead>
                 <tr>
@@ -401,6 +404,7 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
                 ))}
               </tbody>
             </table>
+            </div>
             <div style={{ padding: 'var(--space-2-5) var(--space-4-5)' }}>
               <Pagination page={standingsPage} totalPages={standingsTotalPages} onPageChange={setStandingsPage} pageSize={STANDINGS_PAGE_SIZE} total={leaders.length} />
             </div>
@@ -414,13 +418,12 @@ export function CompetitionDetailContent({ slug, onBack, onSelectTrader }) {
 // Standalone full page — used for the public/direct-URL route.
 export default function CompetitionDetail() {
   const { slug } = useParams()
-  const navigate = useNavigate()
 
   return (
     <PageWrapper>
       <div style={{ minHeight: '100dvh', background: 'var(--paper)' }}>
         <div className="nav">
-          <span className="nav-logo" onClick={() => navigate('/competitions')} style={{ cursor: 'pointer' }}>PROP FIRM</span>
+          <Link className="nav-logo" to="/competitions" style={{ cursor: 'pointer', textDecoration: 'none', color: 'inherit' }}>PROP FIRM</Link>
           <ThemeToggle />
         </div>
 

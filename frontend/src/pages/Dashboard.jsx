@@ -389,8 +389,16 @@ function Dashboard({ user, onLogout }) {
       </div>
 
       <div className="dashboard-page-content dashboard-page-stack">
-        {error && <div className="error" role="alert" aria-live="assertive">{error}</div>}
-        {success && <div className="success" role="status" aria-live="polite">{success}</div>}
+        {/* Always mounted, even when empty. A live region that is created in
+            the same commit as its text is frequently not announced at all --
+            the screen reader has to be observing the node before it changes.
+            Only the contents are conditional. */}
+        <div role="alert" aria-live="assertive" className={error ? 'error' : undefined}>
+          {error || null}
+        </div>
+        <div role="status" aria-live="polite" className={success ? 'success' : undefined}>
+          {success || null}
+        </div>
 
         {/* Dashboard Page */}
         {activePage === 'dashboard' && (

@@ -364,15 +364,21 @@ export default function Analytics({ selectedAccount }) {
       ctx.fillStyle = pnl >= 0 ? tokens.gain : tokens.loss
       ctx.fill()
     })
-  }, [curveRange, getActiveCurve, replayIndex])
+  }, [getActiveCurve, replayIndex])
 
+  // Read the id out first so the declared dependency is the same value the
+  // compiler infers. With `[selectedAccount?.id]` on a callback whose body
+  // mentions `selectedAccount`, the compiler infers the whole object, cannot
+  // reconcile that with the narrower declared dep, and gives up optimising the
+  // component altogether.
+  const selectedAccountId = selectedAccount?.id
   const fetchAnalytics = useCallback(async () => {
-    if (!selectedAccount?.id) return
+    if (!selectedAccountId) return
     setLoading(true)
     setError('')
     try {
       const res = await axios.get(`${API_URL}/api/trades/analytics`, {
-        params: { account_id: selectedAccount.id }
+        params: { account_id: selectedAccountId }
       })
       setData(res.data)
     } catch {
@@ -380,7 +386,7 @@ export default function Analytics({ selectedAccount }) {
     } finally {
       setLoading(false)
     }
-  }, [selectedAccount?.id])
+  }, [selectedAccountId])
 
   useEffect(() => {
     fetchAnalytics()
@@ -900,6 +906,11 @@ export default function Analytics({ selectedAccount }) {
           </div>
 
           <div style={{ overflowX: 'auto' }}>
+            {/* Below md the target for this grid is "nothing overflows the
+                document", not "the heatmap is legible" -- 24 hourly columns
+                across 7 weekdays cannot be legible at 280px, and the parent
+                above scrolls it rather than letting it push the page.
+                responsive-drift-allow: 24h x 7d has an irreducible width; the parent scrolls it */}
             <div style={{ minWidth: '980px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '100px repeat(24, minmax(28px, 1fr))', gap: 'var(--space-1)', marginBottom: 'var(--space-1-5)' }}>
                 <div />

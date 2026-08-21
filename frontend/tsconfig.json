@@ -1,0 +1,60 @@
+{
+  "//": [
+    "Type-checking for a .jsx codebase, via JSDoc rather than a file rename.",
+    "",
+    "checkJs + allowJs means `tsc --noEmit` type-checks the existing .js files",
+    "using their JSDoc annotations. No file is renamed, no import path changes,",
+    "the Vite build is untouched (esbuild still does the transpiling), and",
+    "finance.test.js / instruments.test.js keep working as they are. Renaming to",
+    ".ts would have bought stricter guarantees at the cost of touching every",
+    "import site and leaving the tree half .ts and half .jsx.",
+    "",
+    "`include` is deliberately narrow and grows as each area is annotated. A",
+    "tsconfig that covers everything on day one reports thousands of errors, and",
+    "the only way to get CI green is to relax the compiler until it says nothing",
+    "-- which is how a type-check gate ends up proving nothing. These are the",
+    "money-adjacent modules, which is where an undefined property costs real",
+    "value: finance.js does the Decimal arithmetic, instruments.js decides what",
+    "may be traded, services/api.js shapes every payload, store/useStore.js holds",
+    "the live balances.",
+    "",
+    "Widen it by adding a path here, fixing what it reports, and committing both",
+    "together. `npm run typecheck` is a blocking CI step, so it may only grow."
+  ],
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+
+    "strict": true,
+    "noImplicitAny": false,
+
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true,
+
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "types": ["vite/client"]
+  },
+  "include": [
+    "src/types.js",
+    "src/utils/finance.js",
+    "src/utils/instruments.js",
+    "src/services/api.js",
+    "src/store/useStore.js",
+    "src/config/apiBase.js"
+  ],
+  "exclude": ["node_modules", "build", "dist", "storybook-static"]
+}

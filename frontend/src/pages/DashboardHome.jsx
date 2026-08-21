@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
 import api from '../services/api'
 import { PageWrapper } from '../App'
 import Card from '../components/ui/Card'
 import ProgressBar from '../components/ui/ProgressBar'
 import { SkeletonStats, SkeletonCard, SkeletonTable } from '../components/ui/Skeleton'
+import useNow from '../hooks/useNow'
 
 // recharts-based — lazy so DashboardHome's own first paint (stat cards,
 // header) isn't blocked behind parsing the ~400KB chart chunk, even though
@@ -260,7 +261,40 @@ function ConsistencyRiskBlock({ consistency, dailyDrawdown, totalDrawdownUsedPct
 }
 
 // ── Open Positions table ────────────────────────────────────────────────────
+// Keyboard-accessible equivalent of drag-and-drop reordering: each block only
+// ever swaps with its fixed row partner (equity<->risk, positions<->heat), so a
+// single "Swap position" button per block is a complete, unambiguous
+// alternative to dragging.
+//
+// Module scope, not inside DashboardHome: a component declared in a render body
+// is a new component type on every render, so React unmounts and remounts the
+// subtree each time rather than updating it — losing DOM identity and focus.
+const BLOCK_PARTNERS = { equity: 'risk', risk: 'equity', positions: 'heat', heat: 'positions' }
+const BLOCK_LABELS = { equity: 'Balance & Equity', risk: 'Consistency & Risk', positions: 'Open Positions', heat: 'Session Heat' }
+
+function SwapBlockButton({ blockKey, onSwap }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSwap(blockKey, BLOCK_PARTNERS[blockKey])}
+      aria-label={`Swap position of ${BLOCK_LABELS[blockKey]} with ${BLOCK_LABELS[BLOCK_PARTNERS[blockKey]]}`}
+      title="Swap block position"
+      style={{
+        position: 'absolute', top: '10px', right: '10px', zIndex: 2,
+        width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)',
+        color: 'var(--muted)', cursor: 'pointer',
+      }}
+    >
+      {renderIcon('repeat', { size: 13 })}
+    </button>
+  )
+}
+
 function OpenPositionsTable({ positions }) {
+  // Ages are computed from the clock, so without a ticker they freeze at
+  // whatever the first render happened to see.
+  const now = useNow()
   const openOnly = positions.filter((t) => t.status === 'open')
   const floatingTotal = openOnly.reduce((sum, t) => sumMoney([sum, t.floating_pnl || 0]), 0)
 
@@ -282,7 +316,7 @@ function OpenPositionsTable({ positions }) {
             {openOnly.length === 0 ? (
               <tr><td colSpan={7} className="lx-table__empty">No open positions</td></tr>
             ) : openOnly.map((t) => {
-              const ageMs = Date.now() - new Date(t.open_time).getTime()
+              const ageMs = now - new Date(t.open_time).getTime()
               const ageH = Math.floor(ageMs / 3600000)
               const ageM = Math.floor((ageMs % 3600000) / 60000)
               const ageLabel = ageH >= 24 ? `${Math.floor(ageH / 24)}d ${ageH % 24}h` : ageH > 0 ? `${ageH}h ${ageM.toString().padStart(2, '0')}m` : `${ageM}m`
@@ -364,11 +398,7 @@ function SessionHeat({ matrix, hours }) {
 
 // ── Payout cycle banner (funded accounts only) ──────────────────────────────
 function PayoutCycleBanner({ payoutCycle, onRequestPayout }) {
-  const [now, setNow] = useState(Date.now())
-  useEffect(() => {
-    const iv = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(iv)
-  }, [])
+  const now = useNow()
   const target = new Date(payoutCycle.next_date).getTime()
   const diff = Math.max(0, target - now)
   const d = Math.floor(diff / 86400000)
@@ -472,7 +502,7 @@ export default function DashboardHome({
     setActiveAccount,
     liveEquity: liveEquityMap,
   } = useStore()
-  const [nowTick, setNowTick] = useState(Date.now())
+  const nowTick = useNow()
 
   // Draggable block order (Modern Gazette handoff spec: the 4 big widgets —
   // equity chart / consistency+risk / open positions / session heat — are
@@ -486,11 +516,17 @@ export default function DashboardHome({
     } catch {}
     return { equity: 1, risk: 2, positions: 3, heat: 4 }
   })
-  const dragBlockRef = useRef(null)
-  const handleBlockDragStart = (key) => () => { dragBlockRef.current = key }
-  const handleBlockDrop = (key) => () => {
-    const from = dragBlockRef.current
-    dragBlockRef.current = null
+  // The dragged key travels on the drag event itself rather than in a ref.
+  // A ref meant the handler factories, which are called during render, wrote to
+  // it — indistinguishable to the compiler from a ref mutated in render — and
+  // it duplicated state the DnD API already carries.
+  const handleBlockDragStart = (key) => (event) => {
+    event.dataTransfer.setData('text/plain', key)
+    event.dataTransfer.effectAllowed = 'move'
+  }
+  const handleBlockDrop = (key) => (event) => {
+    event.preventDefault()
+    const from = event.dataTransfer.getData('text/plain')
     if (!from || from === key) return
     swapBlocks(from, key)
   }
@@ -501,32 +537,11 @@ export default function DashboardHome({
       return next
     })
   }
-  // Keyboard-accessible equivalent of drag-and-drop reordering: each block
-  // only ever swaps with its fixed row partner (equity<->risk,
-  // positions<->heat), so a single "Swap position" button per block is a
-  // complete, unambiguous alternative to dragging.
-  const BLOCK_PARTNERS = { equity: 'risk', risk: 'equity', positions: 'heat', heat: 'positions' }
-  const BLOCK_LABELS = { equity: 'Balance & Equity', risk: 'Consistency & Risk', positions: 'Open Positions', heat: 'Session Heat' }
-  function SwapBlockButton({ blockKey }) {
-    return (
-      <button
-        type="button"
-        onClick={() => swapBlocks(blockKey, BLOCK_PARTNERS[blockKey])}
-        aria-label={`Swap position of ${BLOCK_LABELS[blockKey]} with ${BLOCK_LABELS[BLOCK_PARTNERS[blockKey]]}`}
-        title="Swap block position"
-        style={{
-          position: 'absolute', top: '10px', right: '10px', zIndex: 2,
-          width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)',
-          color: 'var(--muted)', cursor: 'pointer',
-        }}
-      >
-        {renderIcon('repeat', { size: 13 })}
-      </button>
-    )
-  }
 
-  const rawAccounts = allAccounts.length > 0 ? allAccounts : (propAccounts || [])
+  const rawAccounts = useMemo(
+    () => (allAccounts.length > 0 ? allAccounts : (propAccounts || [])),
+    [allAccounts, propAccounts]
+  )
   const accounts = useMemo(() => filterVisibleTraderAccounts(rawAccounts, nowTick), [rawAccounts, nowTick])
   const selectedAccountCandidate = activeAccount || propSelectedAccount
   const selectedAccount = selectedAccountCandidate && isTraderAccountVisible(selectedAccountCandidate, nowTick)
@@ -545,11 +560,6 @@ export default function DashboardHome({
     if (!selectedAccountCandidate || isTraderAccountVisible(selectedAccountCandidate, nowTick)) return
     setSelectedAccount(accounts[0] || null)
   }, [accounts, nowTick, selectedAccountCandidate, setSelectedAccount])
-
-  useEffect(() => {
-    const iv = setInterval(() => setNowTick(Date.now()), 1000)
-    return () => clearInterval(iv)
-  }, [])
 
   // Single analytics fetch powers the equity curve (all 4 timeframe ranges
   // come back in one response), the Win Rate KPI, and Session Heat — same
@@ -696,7 +706,7 @@ export default function DashboardHome({
       role="group" aria-label={BLOCK_LABELS.equity}
       style={{ order: blockOrder.equity, cursor: 'grab', position: 'relative' }}
     >
-      <SwapBlockButton blockKey="equity" />
+      <SwapBlockButton blockKey="equity" onSwap={swapBlocks} />
       <Card
         ruled
         eyebrow={`Account ${selectedAccount.account_uid || selectedAccount.id} · equity curve`}
@@ -753,7 +763,7 @@ export default function DashboardHome({
       role="group" aria-label={BLOCK_LABELS.risk}
       style={{ order: blockOrder.risk, cursor: 'grab', position: 'relative' }}
     >
-      <SwapBlockButton blockKey="risk" />
+      <SwapBlockButton blockKey="risk" onSwap={swapBlocks} />
       <ConsistencyRiskBlock
         consistency={stats.stats.consistency}
         dailyDrawdown={liveDailyDrawdown}
@@ -773,7 +783,7 @@ export default function DashboardHome({
       role="group" aria-label={BLOCK_LABELS.positions}
       style={{ order: blockOrder.positions, cursor: 'grab', position: 'relative' }}
     >
-      <SwapBlockButton blockKey="positions" />
+      <SwapBlockButton blockKey="positions" onSwap={swapBlocks} />
       <OpenPositionsTable positions={openTrades} />
     </div>
   )
@@ -784,7 +794,7 @@ export default function DashboardHome({
       role="group" aria-label={BLOCK_LABELS.heat}
       style={{ order: blockOrder.heat, cursor: 'grab', position: 'relative' }}
     >
-      <SwapBlockButton blockKey="heat" />
+      <SwapBlockButton blockKey="heat" onSwap={swapBlocks} />
       <Card eyebrow="P&L by day × hour · 30d" title="Session Heat">
         <SessionHeat matrix={activityHeatmap.matrix || []} hours={activityHeatmap.hours || []} />
       </Card>

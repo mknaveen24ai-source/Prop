@@ -53,11 +53,22 @@ export default function RiskWarningBanner({ floating = false }) {
   return (
     <div
       ref={bannerRef}
+      // A named region rather than an anonymous div: it is a standing legal
+      // disclosure, so a screen-reader user needs to be able to find it in the
+      // landmark list and to know what they are dismissing.
+      role="region"
+      aria-label="Risk warning"
       className={`risk-warning-banner${floating ? ' risk-warning-banner-floating' : ''}`}
+      /*
+       * Padding lives in App.css, not here. It used to be inline, which meant
+       * the 48px horizontal gutter -- a quarter of a 320px phone screen on each
+       * side -- was unreachable by any media query, and the notch inset was
+       * spelled with a raw env() rather than the --safe-top token every other
+       * edge-pinned element uses.
+       */
       style={{
       background: 'color-mix(in srgb, var(--muted) 8%, transparent)',
       borderBottom: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)',
-      padding: floating ? 'calc(12px + env(safe-area-inset-top)) 48px 12px' : '12px 48px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -85,7 +96,9 @@ export default function RiskWarningBanner({ floating = false }) {
         </p>
       </div>
       <button
+        type="button"
         onClick={handleDismiss}
+        aria-label="Dismiss risk warning"
         style={{
           background: 'transparent',
           border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)',

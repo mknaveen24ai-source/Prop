@@ -5,7 +5,7 @@ import Pagination from '../components/Pagination'
 import Card from '../components/ui/Card'
 import Sparkline from '../components/ui/Sparkline'
 import EquityCurveChart from '../components/EquityCurveChart'
-import { formatCurrency, calculatePayoutPreview } from '../utils/finance'
+import { formatCurrency, calculatePayoutPreview, cumulativeSeries } from '../utils/finance'
 import { getStatusToneColor } from '../utils/statusTone'
 import { CRYPTO_CURRENCIES, USDT_NETWORKS } from '../utils/paymentMethods'
 
@@ -75,8 +75,7 @@ export default function DashboardPayoutsPage({
   )
   const paidSpark = useMemo(() => {
     const paid = [...payouts].filter((p) => p.status === 'paid' && p.paid_at).sort((a, b) => new Date(a.paid_at) - new Date(b.paid_at))
-    let running = 0
-    return paid.map((p) => { running += parseFloat(p.amount_payable || 0); return { value: running } })
+    return cumulativeSeries(paid, (p) => p.amount_payable)
   }, [payouts])
 
   if (!fundedAccount) {

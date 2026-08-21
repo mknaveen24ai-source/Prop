@@ -18,6 +18,17 @@
   --paper-2: #161412;
   --ink: #EDE9E0;
   --rule: #3A3733;
+  /* ── WCAG 1.4.11 control boundaries ──────────────────────────────────────
+     --rule is 1.66:1 (dark) / 1.62:1 (light) against --paper. That is well
+     under the 3:1 that 1.4.11 requires -- but 1.4.11 applies to boundaries
+     REQUIRED TO IDENTIFY A CONTROL, not to decorative rules, and the hairline
+     rule IS the Ledger Desk. Raising all of them would rewrite the design's
+     identity to fix a violation that mostly is not one.
+     So the hairline stays, and controls get their own token: input and select
+     borders, button outlines, checkbox and radio boxes, the focus ring. Same
+     hue, darkened/lightened until it clears 3:1 on BOTH --paper and --paper-2
+     with headroom. src/styles/tokens.contrast.test.js holds the line. */
+  --rule-control: #6B665E;   /* 3.45 on --paper, 3.23 on --paper-2 */
   --gain: #4FBE6E;
   --loss: #E05A5A;
   --muted: #8C8880;
@@ -63,7 +74,8 @@
   --color-text-primary: var(--ink);
   --color-text-secondary: var(--muted);
   --color-text-muted: var(--muted);
-  --color-text-faint: #6A655C;
+  /* was #6A655C -- 3.40 / 3.18, under the 4.5:1 AA floor for body text. */
+  --color-text-faint: #868074;   /* 5.01 on --paper, 4.68 on --paper-2 */
   --color-text-disabled: #454540;
 
   --color-success: var(--gain);
@@ -200,12 +212,39 @@
   --touch-min: 44px;
   --input-font-mobile: 16px;
 
+  /* Font size for form controls, as a token rather than a literal.
+     ─────────────────────────────────────────────────────────────────────────
+     The media queries in App.css and ui.css already raise .input-field and
+     .lx-field__control to 16px on mobile. They cannot help a control whose size
+     is set INLINE -- an inline style beats any media query -- and three of them
+     were: 15px in the command palette, 13.5px in the chat composer and the
+     dispute form. Each one re-armed the iOS zoom that those media queries exist
+     to prevent.
+
+     A custom property closes that hole without moving the styles: `var()` in an
+     inline style resolves against whatever :root says at computed-value time,
+     so the media query below reaches it after all. */
+  --fs-control: var(--fs-md);
+
   /* Safe-area passthroughs. These resolve to real values only because
      index.html sets viewport-fit=cover. */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
+
+  /* For bars that rest ON the bottom edge rather than merely near it.
+     The plain --safe-bottom resolves to 0 on every phone without a home
+     indicator, which leaves a fixed tab bar's labels sitting flush against the
+     glass. max() keeps a real gutter there and yields to the inset on hardware
+     that has one, so a single declaration covers both. */
+  --safe-bottom-min: max(var(--space-3), env(safe-area-inset-bottom, 0px));
+
+  /* Height of the trader mobile tab bar. Declared once because two elements
+     have to agree on it: the bar sets it as a floor, and anything else pinned
+     to the bottom edge offsets by it. A magic number in the second place is how
+     a status bar ends up hidden behind a nav bar on one breakpoint only. */
+  --mobile-tabbar-h: 64px;
 
   --bg-base: var(--color-bg-base);
   --bg-surface: var(--color-surface-glass);
@@ -284,10 +323,12 @@
   --paper-2: #EFEBDF;
   --ink: #1A1A18;
   --rule: #C9C2B0;
+  --rule-control: #8E8161;   /* 3.50 on --paper, 3.23 on --paper-2 */
   --gain: #2E6B3E;
   --loss: #8B1E1E;
   --muted: #6B6862;
-  --warn: #A5730A;
+  /* was #A5730A -- 3.78 / 3.48. Warning text has to be readable. */
+  --warn: #8A6008;               /* 5.09 on --paper, 4.69 on --paper-2 */
 
   /* Glass layer — frosted surfaces over the flat Ledger Desk base */
   --rule-soft: rgba(26, 26, 24, 0.10);
@@ -334,7 +375,8 @@
   --color-text-primary: var(--ink);
   --color-text-secondary: var(--muted);
   --color-text-muted: var(--muted);
-  --color-text-faint: #9C968C;
+  /* was #9C968C -- 2.67 / 2.46, the worst text contrast in either theme. */
+  --color-text-faint: #6D675E;   /* 5.09 on --paper, 4.70 on --paper-2 */
   --color-text-disabled: #C7C0B2;
 
   --color-success: var(--gain);
@@ -352,4 +394,13 @@
   --input-focus-bg: var(--paper-2);
   --scrollbar-track: var(--paper);
   --scrollbar-thumb: var(--rule);
+}
+
+/* bp: md (768px) — see src/styles/breakpoints.js
+   Kept in tokens.css beside the definition rather than in responsive.css: a
+   reader who finds --fs-control needs to see, in the same file, that it moves. */
+@media (max-width: 767px) {
+  :root {
+    --fs-control: var(--input-font-mobile);
+  }
 }

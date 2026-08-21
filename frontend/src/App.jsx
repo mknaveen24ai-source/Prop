@@ -12,6 +12,7 @@ import CookiePolicy from './pages/CookiePolicy'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import { useAuth } from './providers/AuthProvider'
 import './App.css'
+import ConnectionStatusBar from './components/ConnectionStatusBar'
 
 const Landing = lazy(() => import('./pages/Landing'))
 const Checkout = lazy(() => import('./pages/Checkout'))
@@ -123,6 +124,7 @@ function AnimatedRoutes({ user, login, logout }) {
 
   return (
     <Suspense fallback={<RouteFallback />}>
+      <main id="main-content" tabIndex={-1} style={{ outline: 'none' }}>
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
           <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Landing />} />
@@ -211,6 +213,7 @@ function AnimatedRoutes({ user, login, logout }) {
           />
         </Routes>
       </AnimatePresence>
+      </main>
     </Suspense>
   )
 }
@@ -224,6 +227,7 @@ function AppRoutes() {
 
   return (
     <ThemeProvider initialTheme={user?.theme_preference}>
+      <a className="skip-link" href="#main-content">Skip to main content</a>
       <Toaster
         position="top-right"
         gutter={8}
@@ -249,6 +253,9 @@ function AppRoutes() {
       <Router>
         <AnimatedRoutes user={user} login={login} logout={logout} />
       </Router>
+      {/* Outside the Router: a lost connection is not a property of the route,
+          and the bar must survive a navigation that cannot complete. */}
+      <ConnectionStatusBar />
     </ThemeProvider>
   )
 }

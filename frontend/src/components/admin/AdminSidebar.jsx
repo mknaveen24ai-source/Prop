@@ -175,7 +175,11 @@ export default function AdminSidebar({
         </div>
 
         <div className="admin-sidebar-footer">
-          <div className="admin-user-profile" onClick={() => navigate('/admin/settings')}>
+          <button
+            type="button"
+            className="admin-user-profile"
+            onClick={() => navigate('/admin/settings')}
+          >
             <div className="admin-avatar">{initials}</div>
             {!isCollapsed && (
               <div style={{ flex: 1, overflow: 'hidden' }}>
@@ -183,7 +187,7 @@ export default function AdminSidebar({
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-faint)' }}>{profileRole}</div>
               </div>
             )}
-          </div>
+          </button>
           <button className="admin-sidebar-toggle" onClick={onToggleCollapse}>
             {isCollapsed
               ? <ChevronRight size={14} color="var(--admin-text-faint)" />

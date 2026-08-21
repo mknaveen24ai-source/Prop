@@ -40,8 +40,6 @@ const ENERGIES = ['XTIUSD', 'XBRUSD', 'XNGUSD']
 const INDICES_SPOT = ['US30', 'USTEC', 'US500', 'UK100', 'AUS200', 'JP225', 'HK50']
 const INDICES_MAJOR = ['DE40', 'FRA40', 'EUSTX50']
 
-const COMMODITY_INSTRUMENTS = [...COMMODITY_METALS]
-const INDEX_INSTRUMENTS = [...INDICES_SPOT, ...INDICES_MAJOR]
 
 // Flat 1:100 leverage across every instrument (IC Markets demo default).
 const LEVERAGE_FLAT = 100

@@ -1,36 +1,24 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import React, { useState, useEffect, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import axios from 'axios'
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  LineElement,
-  PointElement,
-  Filler,
-  Tooltip,
+  Area,
+  Bar,
+  CartesianGrid,
+  ComposedChart,
   Legend,
-} from 'chart.js'
-import { Bar, Line } from 'react-chartjs-2'
+  Line,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 import { PageWrapper } from '../App'
 import { useBranding } from '../BrandingContext'
 import ThemeToggle from '../components/ThemeToggle'
 import { useTheme } from '../ThemeContext'
 import './Transparency.css'
 import { API_BASE_URL as API_URL } from '../config/apiBase'
-
-// Register Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  LineElement,
-  PointElement,
-  Filler,
-  Tooltip,
-  Legend
-)
 
 const REFRESH_INTERVAL_MS = 60 * 1000 // 60 seconds
 
@@ -81,55 +69,64 @@ function buildChartTheme() {
   }
 }
 
-function baseChartOptions(theme, yLabel = '') {
+// ── Chart primitives ─────────────────────────────────────────────────────────
+//
+// These four charts were the last thing in the app still using chart.js. The
+// other sixteen are recharts, so chart.js + react-chartjs-2 -- 178KB raw, 62KB
+// gzipped -- were a second charting engine kept alive by one page. They are now
+// out of the bundle entirely.
+//
+// The visual contract is unchanged: same mono tick labels, same token colours,
+// same hairline horizontal-only grid, same dual axes. What changed is that
+// styling is shared JSX instead of a nested options object, and each series is
+// declared where it renders rather than in a datasets array built above it.
+
+const AXIS_FONT = { fontFamily: 'IBM Plex Mono, monospace', fontSize: 10 }
+const LEGEND_FONT = { fontFamily: 'IBM Plex Mono, monospace', fontSize: 11 }
+
+/** Shared by every axis, so a change lands on all four charts at once. */
+function axisProps(theme) {
   return {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: { mode: 'index', intersect: false },
-    plugins: {
-      legend: {
-        display: true,
-        labels: {
-          color: theme.textSecondary,
-          font: { family: 'IBM Plex Mono, monospace', size: 11 },
-          boxWidth: 10,
-          padding: 16,
-        },
-      },
-      tooltip: {
-        backgroundColor: theme.paper,
-        borderColor: theme.rule,
-        borderWidth: 1,
-        titleColor: theme.textPrimary,
-        bodyColor: theme.textSecondary,
-        titleFont: { family: 'IBM Plex Mono, monospace', size: 11, weight: 'bold' },
-        bodyFont: { family: 'IBM Plex Mono, monospace', size: 11 },
-        padding: 12,
-      },
-    },
-    scales: {
-      x: {
-        ticks: {
-          color: theme.textSecondary,
-          font: { family: 'IBM Plex Mono, monospace', size: 10 },
-          maxTicksLimit: 12,
-        },
-        grid: { color: theme.rule, lineWidth: 0.5 },
-        border: { color: theme.rule },
-      },
-      y: {
-        position: 'left',
-        ticks: {
-          color: theme.textSecondary,
-          font: { family: 'IBM Plex Mono, monospace', size: 10 },
-          maxTicksLimit: 6,
-          callback: (val) => yLabel === '$' ? formatCurrency(val, true) : val,
-        },
-        grid: { color: theme.rule, lineWidth: 0.5 },
-        border: { color: theme.rule },
-      },
-    },
+    tick: { fill: theme.textSecondary, ...AXIS_FONT },
+    stroke: theme.rule,
+    tickLine: false,
   }
+}
+
+/** Tooltip styled as the Ledger Desk card it sits on. */
+function tooltipProps(theme, formatter) {
+  return {
+    contentStyle: {
+      background: theme.paper,
+      border: `1px solid ${theme.rule}`,
+      borderRadius: 0,
+      padding: 12,
+      ...LEGEND_FONT,
+    },
+    labelStyle: { color: theme.textPrimary, fontWeight: 700, ...LEGEND_FONT },
+    itemStyle: { color: theme.textSecondary, ...LEGEND_FONT },
+    cursor: { fill: 'transparent', stroke: theme.rule },
+    formatter,
+  }
+}
+
+const legendProps = (theme) => ({
+  wrapperStyle: { ...LEGEND_FONT, color: theme.textSecondary, paddingTop: 8 },
+  iconSize: 10,
+})
+
+/**
+ * Reshape the API's `{ date, ... }` rows for recharts.
+ *
+ * chart.js took parallel arrays (labels + one data array per series); recharts
+ * takes one row per point with a key per series, so the day label becomes a
+ * field on the row rather than a separate list.
+ */
+function withDayLabels(rows) {
+  return (rows || []).map((row) => {
+    const dt = new Date(row.date)
+    return { ...row, label: `${dt.getMonth() + 1}/${dt.getDate()}` }
+  })
 }
 
 // ── Sidebar Tab Config ─────────────────────────────────────────────────────────
@@ -166,7 +163,6 @@ function KpiCard({ label, value, sub, valueClass = '' }) {
 
 // ── Overview Section ──────────────────────────────────────────────────────────
 function OverviewSection({ overview, loading }) {
-  const theme = buildChartTheme()
   if (loading) {
     return (
       <div>
@@ -215,38 +211,7 @@ function RevenueSection() {
       .finally(() => setLoading(false))
   }, [range])
 
-  const labels = (data || []).map(d => {
-    const dt = new Date(d.date)
-    return `${dt.getMonth() + 1}/${dt.getDate()}`
-  })
-
-  const chartData = {
-    labels,
-    datasets: [
-      {
-        type: 'bar',
-        label: 'Daily Revenue',
-        data: (data || []).map(d => d.daily),
-        backgroundColor: `rgba(${getCssVar('--brand-primary-rgb') || '232,180,0'}, 0.35)`,
-        borderColor: theme.accent,
-        borderWidth: 1,
-        yAxisID: 'y',
-        order: 2,
-      },
-      {
-        type: 'line',
-        label: 'Cumulative',
-        data: (data || []).map(d => d.cumulative),
-        borderColor: theme.success,
-        backgroundColor: 'transparent',
-        borderWidth: 2,
-        pointRadius: 0,
-        tension: 0.4,
-        yAxisID: 'y2',
-        order: 1,
-      },
-    ],
-  }
+  const chartData = withDayLabels(data)
 
   const totalRevenue = data?.length ? data[data.length - 1]?.cumulative : null
 
@@ -275,26 +240,33 @@ function RevenueSection() {
           {loading ? (
             <Skeleton height={260} />
           ) : (
-            <Bar
-              data={chartData}
-              options={{
-                ...baseChartOptions(theme, '$'),
-                scales: {
-                  ...baseChartOptions(theme, '$').scales,
-                  y2: {
-                    position: 'right',
-                    grid: { drawOnChartArea: false },
-                    ticks: {
-                      color: theme.textSecondary,
-                      font: { family: 'IBM Plex Mono, monospace', size: 10 },
-                      maxTicksLimit: 6,
-                      callback: (val) => formatCurrency(val, true),
-                    },
-                    border: { color: theme.rule },
-                  },
-                },
-              }}
-            />
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                <CartesianGrid stroke={theme.rule} strokeWidth={0.5} vertical={false} />
+                <XAxis dataKey="label" interval="preserveStartEnd" minTickGap={24} {...axisProps(theme)} />
+                <YAxis yAxisId="y" tickFormatter={(v) => formatCurrency(v, true)} {...axisProps(theme)} />
+                <YAxis yAxisId="y2" orientation="right" tickFormatter={(v) => formatCurrency(v, true)} {...axisProps(theme)} />
+                <Tooltip {...tooltipProps(theme, (v) => formatCurrency(v, true))} />
+                <Legend {...legendProps(theme)} />
+                <Bar
+                  yAxisId="y"
+                  dataKey="daily"
+                  name="Daily Revenue"
+                  fill={`rgba(${getCssVar('--brand-primary-rgb') || '232,180,0'}, 0.35)`}
+                  stroke={theme.accent}
+                  strokeWidth={1}
+                />
+                <Line
+                  yAxisId="y2"
+                  type="monotone"
+                  dataKey="cumulative"
+                  name="Cumulative"
+                  stroke={theme.success}
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
           )}
         </div>
       </div>
@@ -320,18 +292,7 @@ function EvaluationsSection() {
   const { byModel = [], overallPassRate = 0, funnel = {} } = data || {}
   const funnelMax = funnel.total || 1
 
-  const passRateChart = {
-    labels: byModel.map(m => m.model),
-    datasets: [
-      {
-        label: 'Pass Rate %',
-        data: byModel.map(m => m.passRate),
-        backgroundColor: byModel.map(() => `rgba(${getCssVar('--brand-primary-rgb') || '232,180,0'}, 0.4)`),
-        borderColor: theme.accent,
-        borderWidth: 1,
-      },
-    ],
-  }
+  const passRateChart = byModel.map((m) => ({ label: m.model, passRate: m.passRate }))
 
   const funnelSteps = [
     { label: 'Started', count: funnel.total },
@@ -379,7 +340,22 @@ function EvaluationsSection() {
           <div className="tr-chart-title">Pass Rate by Challenge Model</div>
           <div className="tr-chart-subtitle">Percentage of traders passing each model type</div>
           <div className="tr-chart-wrap" style={{ height: 220 }}>
-            <Bar data={passRateChart} options={baseChartOptions(theme, '%')} />
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={passRateChart} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                <CartesianGrid stroke={theme.rule} strokeWidth={0.5} vertical={false} />
+                <XAxis dataKey="label" {...axisProps(theme)} />
+                <YAxis {...axisProps(theme)} />
+                <Tooltip {...tooltipProps(theme, (v) => `${v}%`)} />
+                <Legend {...legendProps(theme)} />
+                <Bar
+                  dataKey="passRate"
+                  name="Pass Rate %"
+                  fill={`rgba(${getCssVar('--brand-primary-rgb') || '232,180,0'}, 0.4)`}
+                  stroke={theme.accent}
+                  strokeWidth={1}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
@@ -412,38 +388,7 @@ function TradersSection() {
       .finally(() => setLoading(false))
   }, [range])
 
-  const labels = (data || []).map(d => {
-    const dt = new Date(d.date)
-    return `${dt.getMonth() + 1}/${dt.getDate()}`
-  })
-
-  const chartData = {
-    labels,
-    datasets: [
-      {
-        type: 'bar',
-        label: 'Daily New Traders',
-        data: (data || []).map(d => d.daily),
-        backgroundColor: `rgba(${getCssVar('--brand-primary-rgb') || '232,180,0'}, 0.3)`,
-        borderColor: theme.accent,
-        borderWidth: 1,
-        yAxisID: 'y',
-        order: 2,
-      },
-      {
-        type: 'line',
-        label: 'Cumulative Traders',
-        data: (data || []).map(d => d.cumulative),
-        borderColor: theme.success,
-        backgroundColor: 'transparent',
-        borderWidth: 2,
-        pointRadius: 0,
-        tension: 0.4,
-        yAxisID: 'y2',
-        order: 1,
-      },
-    ],
-  }
+  const chartData = withDayLabels(data)
 
   const latestCumulative = data?.length ? data[data.length - 1]?.cumulative : null
   const totalNew = data?.reduce((s, d) => s + d.daily, 0) ?? null
@@ -481,25 +426,33 @@ function TradersSection() {
           {loading ? (
             <Skeleton height={260} />
           ) : (
-            <Bar
-              data={chartData}
-              options={{
-                ...baseChartOptions(theme),
-                scales: {
-                  ...baseChartOptions(theme).scales,
-                  y2: {
-                    position: 'right',
-                    grid: { drawOnChartArea: false },
-                    ticks: {
-                      color: theme.textSecondary,
-                      font: { family: 'IBM Plex Mono, monospace', size: 10 },
-                      maxTicksLimit: 6,
-                    },
-                    border: { color: theme.rule },
-                  },
-                },
-              }}
-            />
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                <CartesianGrid stroke={theme.rule} strokeWidth={0.5} vertical={false} />
+                <XAxis dataKey="label" interval="preserveStartEnd" minTickGap={24} {...axisProps(theme)} />
+                <YAxis yAxisId="y" {...axisProps(theme)} />
+                <YAxis yAxisId="y2" orientation="right" {...axisProps(theme)} />
+                <Tooltip {...tooltipProps(theme, (v) => formatNum(v))} />
+                <Legend {...legendProps(theme)} />
+                <Bar
+                  yAxisId="y"
+                  dataKey="daily"
+                  name="Daily New Traders"
+                  fill={`rgba(${getCssVar('--brand-primary-rgb') || '232,180,0'}, 0.3)`}
+                  stroke={theme.accent}
+                  strokeWidth={1}
+                />
+                <Line
+                  yAxisId="y2"
+                  type="monotone"
+                  dataKey="cumulative"
+                  name="Cumulative Traders"
+                  stroke={theme.success}
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
           )}
         </div>
       </div>
@@ -522,38 +475,7 @@ function FundedSection() {
       .finally(() => setLoading(false))
   }, [range])
 
-  const labels = (data || []).map(d => {
-    const dt = new Date(d.date)
-    return `${dt.getMonth() + 1}/${dt.getDate()}`
-  })
-
-  const chartData = {
-    labels,
-    datasets: [
-      {
-        label: 'Funded Traders',
-        data: (data || []).map(d => d.fundedCount),
-        borderColor: theme.accent,
-        backgroundColor: `rgba(${getCssVar('--brand-primary-rgb') || '232,180,0'}, 0.1)`,
-        borderWidth: 2,
-        fill: true,
-        pointRadius: 0,
-        tension: 0.4,
-        yAxisID: 'y',
-      },
-      {
-        label: 'Capital AUM ($)',
-        data: (data || []).map(d => d.aum),
-        borderColor: theme.success,
-        backgroundColor: 'rgba(79,190,110,0.08)',
-        borderWidth: 2,
-        fill: true,
-        pointRadius: 0,
-        tension: 0.4,
-        yAxisID: 'y2',
-      },
-    ],
-  }
+  const chartData = withDayLabels(data)
 
   const latestFunded = data?.length ? data[data.length - 1]?.fundedCount : null
   const latestAum    = data?.length ? data[data.length - 1]?.aum : null
@@ -591,41 +513,46 @@ function FundedSection() {
           {loading ? (
             <Skeleton height={300} />
           ) : (
-            <Line
-              data={chartData}
-              options={{
-                ...baseChartOptions(theme, '$'),
-                scales: {
-                  ...baseChartOptions(theme).scales,
-                  y: {
-                    ...baseChartOptions(theme).scales.y,
-                    title: {
-                      display: true,
-                      text: 'Funded Traders',
-                      color: theme.textSecondary,
-                      font: { family: 'IBM Plex Mono, monospace', size: 10 },
-                    },
-                  },
-                  y2: {
-                    position: 'right',
-                    grid: { drawOnChartArea: false },
-                    ticks: {
-                      color: theme.textSecondary,
-                      font: { family: 'IBM Plex Mono, monospace', size: 10 },
-                      maxTicksLimit: 6,
-                      callback: (val) => formatCurrency(val, true),
-                    },
-                    border: { color: theme.rule },
-                    title: {
-                      display: true,
-                      text: 'AUM',
-                      color: theme.textSecondary,
-                      font: { family: 'IBM Plex Mono, monospace', size: 10 },
-                    },
-                  },
-                },
-              }}
-            />
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                <CartesianGrid stroke={theme.rule} strokeWidth={0.5} vertical={false} />
+                <XAxis dataKey="label" interval="preserveStartEnd" minTickGap={24} {...axisProps(theme)} />
+                <YAxis
+                  yAxisId="y"
+                  label={{ value: 'Funded Traders', angle: -90, position: 'insideLeft', fill: theme.textSecondary, style: AXIS_FONT }}
+                  {...axisProps(theme)}
+                />
+                <YAxis
+                  yAxisId="y2"
+                  orientation="right"
+                  tickFormatter={(v) => formatCurrency(v, true)}
+                  label={{ value: 'AUM', angle: 90, position: 'insideRight', fill: theme.textSecondary, style: AXIS_FONT }}
+                  {...axisProps(theme)}
+                />
+                <Tooltip {...tooltipProps(theme, (v, name) => (name === 'Capital AUM ($)' ? formatCurrency(v, true) : formatNum(v)))} />
+                <Legend {...legendProps(theme)} />
+                <Area
+                  yAxisId="y"
+                  type="monotone"
+                  dataKey="fundedCount"
+                  name="Funded Traders"
+                  stroke={theme.accent}
+                  strokeWidth={2}
+                  fill={`rgba(${getCssVar('--brand-primary-rgb') || '232,180,0'}, 0.1)`}
+                  dot={false}
+                />
+                <Area
+                  yAxisId="y2"
+                  type="monotone"
+                  dataKey="aum"
+                  name="Capital AUM ($)"
+                  stroke={theme.success}
+                  strokeWidth={2}
+                  fill="rgba(79,190,110,0.08)"
+                  dot={false}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
           )}
         </div>
       </div>
@@ -796,7 +723,6 @@ export default function Transparency() {
   const [overviewLoading, setOverviewLoading] = useState(true)
   const { tenant } = useBranding()
   const { theme } = useTheme()
-  const navigate = useNavigate()
   const [scrolled, setScrolled] = useState(false)
 
   // Fetch overview (auto-refreshes every 60s)
@@ -937,14 +863,14 @@ export default function Transparency() {
           </nav>
 
           {/* Content */}
-          <main className="tr-content">
+          <div className="tr-content">
             <div className="tr-section-header">
               <div className="tr-section-title">{current.title}</div>
               <div className="tr-section-desc">{current.desc}</div>
             </div>
 
             {renderSection()}
-          </main>
+          </div>
         </div>
 
         {/* ── Footer ── */}

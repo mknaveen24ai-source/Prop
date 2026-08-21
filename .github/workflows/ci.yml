@@ -52,7 +52,7 @@ jobs:
 
 
   visual:
-    name: Visual regression (design system)
+    name: Design system (viewport matrix + visual regression)
     runs-on: ubuntu-latest
     # The whole point of this job is that it runs somewhere with FIXED font
     # rasterisation. Baselines produced on a developer's Windows or macOS
@@ -91,6 +91,22 @@ jobs:
       - name: Wait for Storybook
         run: npx --yes wait-on http://localhost:6006 --timeout 60000
 
+      - name: Responsive viewport matrix
+        working-directory: e2e
+        env:
+          STORYBOOK_URL: http://localhost:6006
+        # Runs BEFORE the visual diff and without PLAYWRIGHT_PINNED_IMAGE,
+        # because it asserts geometry rather than pixels and so is not hostage
+        # to font rasterisation. Ordering it first means a layout regression is
+        # reported as a layout regression, rather than as a wall of screenshot
+        # diffs that someone has to interpret.
+        #
+        # This is the check the `mobile` project was supposed to be. That one
+        # needs a running stack -- backend, database, seeded account -- which
+        # this job does not have, which is why it sat in playwright.config.js
+        # for months without ever executing on a commit.
+        run: npm run test:responsive
+
       - name: Visual regression
         working-directory: e2e
         env:
@@ -127,6 +143,30 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Lint (correctness gate)
+        # Zero warnings, and unlike `lint:strict` it means it. The whole-ruleset
+        # strict run is unusable as a gate here because 547 of the 709 warnings
+        # are design-token drift, which is deliberately ratcheted rather than
+        # gated -- each one needs a per-surface design decision. Gating on the
+        # combined number forces either bulk-editing them unreviewed or turning
+        # the check off, and the second always wins.
+        #
+        # So the ruleset is split. This config is the base config with the three
+        # design-token rules and set-state-in-effect switched off; both of those
+        # have ratchets of their own below. Everything left -- react-hooks
+        # correctness, unused vars, prefer-const -- is at zero and stays there.
+        run: npm run lint:correctness
+
+      - name: set-state-in-effect (ratchet)
+        # The one react-hooks rule not in the gate above. Every remaining hit is
+        # `useEffect(() => { fetchThing() }, [])` where the fetcher sets a
+        # loading flag before its first await: correct external synchronisation
+        # that the compiler cannot see past. The derived-state cases the rule
+        # actually exists for were fixed rather than counted.
+        #
+        # Same contract as the drift ratchets: the number may only go down.
+        run: npm run effect:drift:ci
+
       - name: Design token drift (ratchet)
         # A ceiling, not a gate on zero. The cleanup that introduced this left
         # 609 values needing a per-surface design decision -- each moves type or
@@ -139,16 +179,208 @@ jobs:
         # rather than being noticed a year later.
         run: npm run design:drift:ci
 
+      - name: Responsive drift (ratchet)
+        # Sits at --max 0, unlike its design-token sibling, because every
+        # category it counts is a defect with one correct fix rather than a
+        # per-surface judgement: a table either has a mobile story or it does
+        # not, an edge-pinned bar either clears the notch or it does not.
+        #
+        # A deliberate exception uses the in-line `responsive-drift-allow:`
+        # marker with a stated reason -- the heatmap's irreducible width is the
+        # one that exists today -- so the ceiling stays at zero and the
+        # exceptions stay visible in the diff that adds them.
+        run: npm run responsive:drift:ci
+
       - name: npm audit (high/critical only)
         # No longer allowed to fail: the vite/esbuild advisories that forced
         # continue-on-error were cleared by the Vite 4 -> 8 upgrade.
         run: npm audit --audit-level=high
+
+      - name: Type check
+        # JSDoc + checkJs over the money-adjacent modules (see tsconfig.json for
+        # why the include list is narrow and how to widen it). Two ambiguous
+        # signatures in finance.js accounted for 36 of the 49 errors the first
+        # run reported -- toDecimal's return type genuinely depends on whether
+        # the caller opts into a null fallback, which the overloads now say.
+        run: npm run typecheck
 
       - name: Run tests
         run: npm test
 
       - name: Build
         run: npm run build
+
+      - name: Bundle budget
+        # Budgets the ENTRY PATH (index + vendor), not total output: a lazy
+        # route chunk growing is expected, an entry chunk growing is not, and a
+        # whole-output budget lets the second hide behind the first.
+        #
+        # Limits were seeded from a measured build with roughly 4% headroom, so
+        # a real regression trips this rather than ordinary churn. Runs after
+        # Build because it reads build/assets.
+        run: npm run size
+
+  a11y:
+    name: Accessibility (axe-core, real stack)
+    runs-on: ubuntu-latest
+    # ── Why this job boots the whole platform ──
+    #
+    # The `visual` job scans components via Storybook, which is genuinely
+    # useful and genuinely insufficient: page title, landmark structure,
+    # heading order and contrast between two components that are only ever
+    # adjacent at run time do not exist until a page is assembled. The trader
+    # dashboard, the trading terminal and the admin panel are also the surfaces
+    # this platform actually consists of, and all three are behind a login.
+    #
+    # So this reuses `fresh-deploy`'s recipe -- provision, mint an admin, start
+    # the synthetic feed, boot the server, seed -- then adds a frontend and
+    # points axe at it.
+    #
+    # Committed together with e2e/tests/a11y.spec.js, not before it. The
+    # `mobile` Playwright project sat in the config for months without ever
+    # executing because it needed a running stack that no job provided; a spec
+    # whose infrastructure does not exist is a spec that silently never runs.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: propfirm_ci
+          POSTGRES_USER: propfirm
+          POSTGRES_PASSWORD: ci_password_not_a_secret
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql://propfirm:ci_password_not_a_secret@localhost:5432/propfirm_ci
+      NODE_ENV: development
+      PORT: '5000'
+      DWX_PATH: /tmp/dwx-bridge
+      # Fixed, so Playwright can be handed the same credentials the API creates.
+      # launch-smoke.js --provision mints a RANDOM email per run, which is right
+      # for a smoke test and useless for handing to a browser.
+      E2E_TRADER_EMAIL: a11y-trader@example.com
+      E2E_TRADER_PASSWORD: A11yTrader!2026xyz
+      E2E_ADMIN_EMAIL_VALUE: a11y-admin@example.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Provision from empty
+        working-directory: backend
+        run: npm run db:provision
+
+      - name: Create the bootstrap admin
+        id: admin
+        working-directory: backend
+        run: |
+          mkdir -p /tmp/dwx-bridge
+          OUT=$(node scripts/harden-admin-runtime.js --email "$E2E_ADMIN_EMAIL_VALUE" --no-rotate-env)
+          PASS=$(echo "$OUT" | node -p "JSON.parse(require('fs').readFileSync(0,'utf8').match(/\{[\s\S]*\}/)[0]).bootstrap_password")
+          echo "::add-mask::$PASS"
+          echo "password=$PASS" >> "$GITHUB_OUTPUT"
+
+      - name: Start the synthetic price feed
+        working-directory: backend
+        # No MetaTrader in CI, so without this there are no prices and the
+        # trading terminal renders an empty shell -- which would scan clean for
+        # the wrong reason.
+        run: |
+          nohup node scripts/fake-dwx-feed.js             --file=/tmp/dwx-bridge/DWX_Market_Data.txt --hz=5 --symbols=6             > /tmp/feed.log 2>&1 &
+          sleep 3
+          test -s /tmp/dwx-bridge/DWX_Market_Data.txt
+
+      - name: Boot the backend
+        working-directory: backend
+        run: |
+          nohup node server.js > /tmp/server.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:5000/api/health > /dev/null; then
+              echo "backend is up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::backend never answered /api/health"
+          cat /tmp/server.log
+          exit 1
+
+      - name: Seed the platform
+        run: |
+          curl -sf -X POST http://127.0.0.1:5000/api/setup/init             -H 'Content-Type: application/json' -d '{}' | tee /tmp/setup.json
+          grep -q '"success"' /tmp/setup.json
+
+      - name: Register a trader and fund an account
+        # Same endpoints scripts/launch-smoke.js uses, with deterministic
+        # credentials so Playwright can log in as this trader. An account is
+        # required: without one the dashboard renders its empty state and the
+        # trading terminal never mounts, so the scan would cover neither.
+        run: |
+          set -e
+          REG=$(curl -sf -X POST http://127.0.0.1:5000/api/auth/register             -H 'Content-Type: application/json'             -d "{\"email\":\"$E2E_TRADER_EMAIL\",\"password\":\"$E2E_TRADER_PASSWORD\",\"full_name\":\"A11y Trader\",\"terms_accepted\":true}")
+          USER_ID=$(echo "$REG" | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).user.id")
+          test -n "$USER_ID" || { echo "::error::registration returned no user id: $REG"; exit 1; }
+
+          ADMIN_TOKEN=$(curl -sf -c /tmp/admin-cookies.txt -X POST http://127.0.0.1:5000/api/admin/login             -H 'Content-Type: application/json'             -d "{\"email\":\"$E2E_ADMIN_EMAIL_VALUE\",\"password\":\"${{ steps.admin.outputs.password }}\"}")
+          echo "admin session established"
+
+          curl -sf -b /tmp/admin-cookies.txt -X POST             "http://127.0.0.1:5000/api/admin/users/$USER_ID/manual-account"             -H 'Content-Type: application/json' -d '{"account_size":10000}'             | tee /tmp/account.json
+          echo "trader provisioned"
+
+      - name: Build the frontend
+        working-directory: frontend
+        run: npm ci && npm run build
+
+      - name: Serve the production build
+        working-directory: frontend
+        # `vite preview`, not the dev server: axe must see the built output. Its
+        # proxy block (vite.config.mjs) forwards /api and /socket.io to :5000,
+        # which keeps the app same-origin -- index.html's CSP has no
+        # cross-origin exception, by design.
+        run: |
+          nohup npx vite preview --port 3000 --strictPort > /tmp/preview.log 2>&1 &
+          npx --yes wait-on http://127.0.0.1:3000 --timeout 60000
+
+      - name: Install e2e dependencies
+        working-directory: e2e
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: e2e
+        run: npx playwright install --with-deps chromium
+
+      - name: Run axe over public, trader and admin surfaces
+        working-directory: e2e
+        env:
+          E2E_BASE_URL: http://127.0.0.1:3000
+          E2E_EMAIL: a11y-trader@example.com
+          E2E_PASSWORD: A11yTrader!2026xyz
+          E2E_ADMIN_EMAIL: a11y-admin@example.com
+          E2E_ADMIN_PASSWORD: ${{ steps.admin.outputs.password }}
+        run: npm run test:a11y
+
+      - name: Logs on failure
+        if: failure()
+        run: |
+          echo '── backend ──'; tail -100 /tmp/server.log || true
+          echo '── preview ──'; tail -50 /tmp/preview.log || true
+
+      - name: Upload axe report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-report
+          path: e2e/playwright-report/
+          retention-days: 7
 
   deploy-config:
     name: Deploy config validation

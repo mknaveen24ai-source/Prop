@@ -568,7 +568,8 @@ export default function AdminAccountLinking() {
 
               <div>
                 <h3 style={{ fontSize: 'var(--fs-base)', marginBottom: 'var(--space-2)' }}>Linked traders</h3>
-                <table className="admin-table" style={{ width: '100%' }}>
+                <div className="admin-table-scroll">
+                <table className="admin-table">
                   <thead>
                     <tr>
                       <th>Email</th><th>Name</th><th>Country</th><th>KYC</th><th>Accounts</th><th>Joined</th>
@@ -587,11 +588,13 @@ export default function AdminAccountLinking() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
 
               <div>
                 <h3 style={{ fontSize: 'var(--fs-base)', marginBottom: 'var(--space-2)' }}>Why these accounts were linked</h3>
-                <table className="admin-table" style={{ width: '100%' }}>
+                <div className="admin-table-scroll">
+                <table className="admin-table">
                   <thead>
                     <tr><th>Signal</th><th>Detail</th><th>Traders</th><th>Weight</th></tr>
                   </thead>
@@ -618,6 +621,7 @@ export default function AdminAccountLinking() {
                     ))}
                   </tbody>
                 </table>
+                </div>
                 <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', marginTop: 'var(--space-2)' }}>
                   Weights are reduced the more users share a value — a device or network seen across many
                   accounts is usually shared infrastructure (office, VPN, browser anti-fingerprinting),

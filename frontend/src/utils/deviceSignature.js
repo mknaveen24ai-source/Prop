@@ -92,7 +92,11 @@ function ent (n) { return n }
 function collectWebgl () {
   return safe(() => {
     const canvas = document.createElement('canvas')
-    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
+    // Cast: the `||` fallback widens the return to the RenderingContext union,
+    // which has no WebGL methods. The runtime guard below is the real check.
+    const gl = /** @type {WebGLRenderingContext|null} */ (
+      canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
+    )
     if (!gl) return null
 
     const debugInfo = gl.getExtension('WEBGL_debug_renderer_info')
@@ -106,7 +110,9 @@ function collectWebgl () {
 function collectWebglVendor () {
   return safe(() => {
     const canvas = document.createElement('canvas')
-    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
+    const gl = /** @type {WebGLRenderingContext|null} */ (
+      canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
+    )
     if (!gl) return null
 
     const debugInfo = gl.getExtension('WEBGL_debug_renderer_info')
@@ -126,7 +132,10 @@ function collectWebglVendor () {
 function collectAudio () {
   return new Promise((resolve) => {
     try {
-      const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext
+      // webkitOfflineAudioContext is the Safari prefix; lib.dom declares neither
+      // it nor a prefixed global, hence the cast.
+      const Ctx = window.OfflineAudioContext
+        || /** @type {any} */ (window).webkitOfflineAudioContext
       if (!Ctx) return resolve(null)
 
       const context = new Ctx(1, 5000, 44100)
@@ -223,7 +232,9 @@ async function collectComponents () {
     fonts: collectFonts(),
     platform: safe(() => navigator.platform),
     hardwareConcurrency: safe(() => navigator.hardwareConcurrency),
-    deviceMemory: safe(() => navigator.deviceMemory),
+    // Device Memory API: Chromium-only and not in lib.dom, so it is read
+    // through a cast. `safe()` already swallows its absence at runtime.
+    deviceMemory: safe(() => /** @type {any} */ (navigator).deviceMemory),
     colorDepth: safe(() => window.screen.colorDepth),
     // Physical screen, not the window — a resize must not change the signature.
     screen: safe(() => `${window.screen.width}x${window.screen.height}`),

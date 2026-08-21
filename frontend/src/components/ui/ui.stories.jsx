@@ -63,7 +63,7 @@ export const Buttons = () => (
       <Button variant="danger" disabled>Danger</Button>
     </Row>
     <Row label="Full width">
-      <div style={{ width: '320px' }}><Button full>Full width</Button></div>
+      <div style={{ maxWidth: '320px' }}><Button full>Full width</Button></div>
     </Row>
   </div>
 )

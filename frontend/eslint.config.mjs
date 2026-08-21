@@ -28,6 +28,16 @@ export default [{
     'storybook-static/**'
   ]
 }, js.configs.recommended, {
+  // The service-worker template. Not ignored -- it ships as executable code and
+  // deserves the same linting as anything else -- but it runs in a worker
+  // scope, and `__PRECACHE_MANIFEST__` is a placeholder that
+  // `offlineShellPlugin` substitutes at build time, so it is legitimately
+  // undefined in source.
+  files: ['sw-template.js'],
+  languageOptions: {
+    globals: { ...globals.serviceworker, __PRECACHE_MANIFEST__: 'readonly' }
+  }
+}, {
   // Node-side tooling: the drift counter, the codemods, the shared token
   // config and the local ESLint rules. These are CommonJS and run under Node,
   // so `require`, `module` and `__dirname` are defined -- linting them against
@@ -86,7 +96,11 @@ export default [{
     'no-var': 'error',
 
     // ── Hygiene: warn ───────────────────────────────────────────────────────
-    'no-unused-vars': ['warn', { args: 'none', caughtErrors: 'none', varsIgnorePattern: '^_' }],
+    // ignoreRestSiblings: `const { voucher, ...rest } = p` is the idiomatic
+    // way to omit a key, and the omitted binding is the whole point of
+    // writing it. Flagging it made the rule report a false positive on
+    // correct code, which is how a warning list stops being read.
+    'no-unused-vars': ['warn', { args: 'none', caughtErrors: 'none', varsIgnorePattern: '^_', ignoreRestSiblings: true }],
     'no-empty': ['warn', { allowEmptyCatch: true }],
     'react-hooks/exhaustive-deps': 'warn',
     'no-useless-escape': 'warn',

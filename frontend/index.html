@@ -1,5 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<!-- data-theme is stamped here, not left to ThemeContext's effect.
+     ThemeProvider defaults to "light" but the :root block in tokens.css is the
+     DARK palette, so every cold load painted a full dark frame and then flipped
+     to light once the effect ran. Besides the visible flash, that frame pairs
+     dark-theme text with the light background mid-transition -- 3.21:1 on the
+     legal pages' Back button, which is how the axe scan caught it.
+     ThemeContext still overrides this once the user's saved preference loads. -->
+<html lang="en" data-theme="light">
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="/favicon.ico" />

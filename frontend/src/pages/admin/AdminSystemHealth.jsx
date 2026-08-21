@@ -236,6 +236,7 @@ export default function AdminSystemHealth() {
                 <AdminBadge tone={statusTone(data.status)}>{data.status}</AdminBadge>
               </div>
 
+              <div className="admin-table-scroll">
               <table style={{ width: '100%', fontSize: 'var(--fs-base)', borderCollapse: 'collapse' }}>
                 <tbody>
                   {sectionRows(key, data).map(([label, value]) => (
@@ -246,6 +247,7 @@ export default function AdminSystemHealth() {
                   ))}
                 </tbody>
               </table>
+              </div>
 
               {trend && trend.length > 1 ? (
                 <div style={{ marginTop: 'var(--space-3)', color: 'var(--admin-accent, #6b7bff)' }}>

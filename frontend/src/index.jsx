@@ -11,6 +11,7 @@ import { BrandingProvider } from './BrandingContext';
 import { AuthProvider } from './providers/AuthProvider';
 import { AdminSessionProvider } from './providers/AdminSessionProvider';
 import reportWebVitals from './reportWebVitals';
+import { registerServiceWorker } from './utils/registerServiceWorker';
 
 initSentry();
 
@@ -32,7 +33,16 @@ root.render(
   </React.StrictMode>
 );
 
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
+// Offline shell only -- the worker never caches an API response. See
+// sw-template.js. Registered after render so it cannot delay first paint, and
+// it announces an available update through a window event rather than a
+// callback, so ConnectionStatusBar can be mounted anywhere in the tree.
+registerServiceWorker((registration) => {
+  window.dispatchEvent(new CustomEvent('propfirm:sw-update', { detail: registration }));
+});
+
+// Core Web Vitals -> Sentry. Called with no argument on purpose: the reporter
+// sends to Sentry regardless, and only takes a callback for local debugging
+// (`reportWebVitals(console.log)`). The CRA scaffold this replaced required the
+// argument to do anything at all, so this exact call measured nothing.
 reportWebVitals();

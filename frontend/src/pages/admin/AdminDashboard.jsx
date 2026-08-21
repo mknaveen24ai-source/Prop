@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { PageWrapper } from '../../App';
 import useAdminDashboardData from '../../components/admin/dashboard/useAdminDashboardData';
@@ -43,11 +43,15 @@ export default function AdminDashboard() {
     } catch { /* ignore malformed value */ }
     return { revenue: 1, pipeline: 2, exposure: 3 };
   });
-  const dragBlockRef = useRef(null);
-  const handleBlockDragStart = (key) => () => { dragBlockRef.current = key; };
-  const handleBlockDrop = (key) => () => {
-    const from = dragBlockRef.current;
-    dragBlockRef.current = null;
+  // See DashboardHome: the dragged key rides on the drag event, not a ref, so
+  // the handler factories called during render no longer write to one.
+  const handleBlockDragStart = (key) => (event) => {
+    event.dataTransfer.setData('text/plain', key);
+    event.dataTransfer.effectAllowed = 'move';
+  };
+  const handleBlockDrop = (key) => (event) => {
+    event.preventDefault();
+    const from = event.dataTransfer.getData('text/plain');
     if (!from || from === key) return;
     setBlockOrder((prev) => {
       const next = { ...prev, [from]: prev[key], [key]: prev[from] };

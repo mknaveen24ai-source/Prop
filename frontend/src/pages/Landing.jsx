@@ -380,7 +380,7 @@ export default function Landing() {
         </nav>
       </BottomSheet>
 
-      <main>
+      <div>
       {/* Sections */}
       <div data-mp-section="hero" id="mp-hero">
         <LandingHero
@@ -420,7 +420,7 @@ export default function Landing() {
           <LandingFooter onFooterCta={() => trackEvent('landing_cta_click', { placement: 'footer', action: 'register' })} />
         </div>
       </Suspense>
-      </main>
+      </div>
 
       </div>
     </>

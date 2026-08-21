@@ -324,7 +324,6 @@ export default function AdminLeaderboard() {
   }, [visibleColumnKeys]);
 
   const currentView = views.find((view) => String(view.id) === String(activeViewId));
-  const selectedRows = filteredTraders.filter((trader) => selectedIds.includes(String(trader.id)));
 
   const rowActions = (trader) => {
     const isSaving = !!savingIds[String(trader.id)];

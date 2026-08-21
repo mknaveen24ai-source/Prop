@@ -428,6 +428,9 @@ export default function AdminPlatformPnL() {
             )}
             style={{ marginBottom: 'var(--space-6)' }}
           >
+            {/* .lx-table has a min-width floor below md; unwrapped it scrolls
+                the page rather than itself. */}
+            <div className="lx-table-wrap">
             <table className="lx-table">
               <thead>
                 <tr>
@@ -450,6 +453,7 @@ export default function AdminPlatformPnL() {
                 ))}
               </tbody>
             </table>
+            </div>
           </Card>
 
           <h2 className="admin-h2" style={{ margin: '28px 0 16px' }}>B-Book Trading Edge</h2>

@@ -4,7 +4,7 @@ const path = require('path');
 const NUM_POINTS = 800;
 const outputFilePath = path.join(__dirname, '../src/pages/landing-sections/Landing3DEngine.js');
 
-let lines = [];
+const lines = [];
 lines.push("import React, { useEffect, useRef } from 'react';");
 lines.push("");
 lines.push("export default function Landing3DEngine() {");

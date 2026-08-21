@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import useNow from '../../hooks/useNow'
 import toast from 'react-hot-toast'
 import './admin.css'
 import AdminDataTable from '../../components/admin/AdminDataTable'
@@ -53,6 +54,7 @@ const TICKET_STATUSES = ['All', 'open', 'resolved', 'closed']
 const TICKET_STATUS_LABELS = { open: 'Open', resolved: 'Resolved', closed: 'Closed' }
 
 function SupportTicketsSection() {
+  const now = useNow()
   const { adminAxios } = useAdminSession()
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
@@ -65,7 +67,7 @@ function SupportTicketsSection() {
   const [saving, setSaving] = useState(false)
   const [replyDraft, setReplyDraft] = useState('')
 
-  const fetchTickets = async () => {
+  const fetchTickets = useCallback(async () => {
     setLoading(true)
     try {
       const res = await adminAxios.get('/api/admin/support-tickets')
@@ -75,15 +77,18 @@ function SupportTicketsSection() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [adminAxios])
 
-  useEffect(() => { fetchTickets() }, [])
+  useEffect(() => { fetchTickets() }, [fetchTickets])
 
   const selected = tickets.find((t) => t.id === selectedId) || null
 
+  // SLA risk is a comparison against the clock, so the filter needs a ticking
+  // `now` or a ticket entering the 2-hour window never appears until some
+  // unrelated state change happens to re-render the page.
   const filtered = tickets.filter((t) => {
     if (statusFilter !== 'All' && t.status !== statusFilter) return false
-    if (slaRiskOnly && t.sla_due_at && !formatCountdown(t.sla_due_at).breached && new Date(t.sla_due_at) - Date.now() > 1000 * 60 * 60 * 2) return false
+    if (slaRiskOnly && t.sla_due_at && !formatCountdown(t.sla_due_at).breached && new Date(t.sla_due_at) - now > 1000 * 60 * 60 * 2) return false
     if (search && !`${t.email || ''} ${t.name || ''} ${t.subject}`.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
@@ -227,7 +232,7 @@ function BreachAppealsSection() {
   const [reviewerNote, setReviewerNote] = useState('')
   const [deciding, setDeciding] = useState(false)
 
-  const fetchAppeals = async () => {
+  const fetchAppeals = useCallback(async () => {
     setLoading(true)
     try {
       // Fetches all violations (not just open) so per-trader appeal history
@@ -239,9 +244,9 @@ function BreachAppealsSection() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [adminAxios])
 
-  useEffect(() => { fetchAppeals() }, [])
+  useEffect(() => { fetchAppeals() }, [fetchAppeals])
 
   const selected = appeals.find((a) => a.id === selectedId) || null
   const openQueue = appeals.filter((a) => a.status === 'open')
@@ -394,7 +399,7 @@ function NotificationCenterSection() {
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
 
-  const fetchHistory = async () => {
+  const fetchHistory = useCallback(async () => {
     setLoading(true)
     try {
       const res = await adminAxios.get('/api/admin/notifications')
@@ -404,9 +409,9 @@ function NotificationCenterSection() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [adminAxios])
 
-  useEffect(() => { fetchHistory() }, [])
+  useEffect(() => { fetchHistory() }, [fetchHistory])
 
   const send = async () => {
     if (!message.trim()) return
@@ -526,7 +531,7 @@ function ComplianceLogSection() {
   const [dateTo, setDateTo] = useState('')
   const [knownTypes, setKnownTypes] = useState([])
 
-  const fetchLog = async () => {
+  const fetchLog = useCallback(async () => {
     setLoading(true)
     try {
       const params = { limit: 500 }
@@ -543,14 +548,16 @@ function ComplianceLogSection() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [adminAxios, search, actionType, dateFrom, dateTo])
 
-  useEffect(() => { fetchLog() }, [actionType, dateFrom, dateTo])
+  // Filter changes fetch immediately; typing in the search box is debounced.
+  // Both go through the same memoised fetcher, so `search` living in its deps
+  // is what makes the debounced run pick up the current text.
+  useEffect(() => { fetchLog() }, [actionType, dateFrom, dateTo]) // eslint-disable-line react-hooks/exhaustive-deps -- search is handled by the debounced effect below; including fetchLog here would fire an undebounced request on every keystroke
   useEffect(() => {
     const timer = setTimeout(fetchLog, 300)
     return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search])
+  }, [fetchLog])
 
   const exportCsv = () => {
     const blob = new Blob([toCsv(entries)], { type: 'text/csv;charset=utf-8;' })
@@ -617,7 +624,7 @@ function TosTrackingSection() {
         setLoading(false)
       }
     })()
-  }, [])
+  }, [adminAxios])
 
   const columns = [
     { header: 'Trader', render: (row) => row.full_name || row.email },
@@ -716,14 +723,14 @@ export default function SupportAppealsCenter() {
           </div>
         </header>
 
-        <main className="admin-content">
+        <div className="admin-content">
           <SectionHeader eyebrow="SUPPORT & APPEALS CENTER" title={meta.title} subtitle={meta.subtitle} />
           {activeSection === 'tickets' && <SupportTicketsSection />}
           {activeSection === 'appeals' && <BreachAppealsSection />}
           {activeSection === 'notifications' && <NotificationCenterSection />}
           {activeSection === 'compliance' && <ComplianceLogSection />}
           {activeSection === 'tos' && <TosTrackingSection />}
-        </main>
+        </div>
       </div>
     </div>
   )

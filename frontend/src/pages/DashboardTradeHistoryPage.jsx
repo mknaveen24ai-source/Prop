@@ -9,7 +9,7 @@ import Drawer from '../components/ui/Drawer'
 import Table from '../components/ui/Table'
 import Pagination from '../components/Pagination'
 import { renderIcon } from '../utils/iconMap'
-import { formatCurrency } from '../utils/finance'
+import { formatCurrency, cumulativeSeries } from '../utils/finance'
 import { getStatusColor } from '../utils/constants'
 import { formatPrice } from '../utils/instruments'
 import { exportRowsToCSV } from '../utils/exportCsv'
@@ -160,14 +160,14 @@ export default function DashboardTradeHistoryPage({ selectedAccount, accountHist
     const avgLoss = losingPnls.length ? losingPnls.reduce((sum, p) => sum + p, 0) / losingPnls.length : null
     // Cumulative P&L walk in close order, oldest first — powers both the
     // decorative KPI sparklines and the full equity curve chart below.
-    let running = 0
-    const cumulative = [...closedTrades].reverse().map((t) => {
-      running += parseFloat(t.demo_pnl || 0)
-      return {
-        value: running,
+    const cumulative = cumulativeSeries(
+      [...closedTrades].reverse(),
+      (t) => t.demo_pnl,
+      (t, total) => ({
+        value: total,
         label: t.close_time ? new Date(t.close_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '',
-      }
-    })
+      })
+    )
     const spark = cumulative.map((p) => ({ value: p.value }))
     return { total, winRate, totalPnl, avgR, spark, profitFactor, bestTrade, worstTrade, avgWin, avgLoss, cumulative }
   }, [closedTrades])

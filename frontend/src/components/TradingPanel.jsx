@@ -4,6 +4,7 @@ import Sparkline from './ui/Sparkline'
 import OrderPanel from './OrderPanel'
 import TradingViewWidget from './TradingViewWidget'
 import SimulatedTradingDisclaimer from './SimulatedTradingDisclaimer'
+import useNow from '../hooks/useNow'
 import RiskWarningBanner from './RiskWarningBanner'
 import api from '../services/api'
 import useStore from '../store/useStore'
@@ -40,13 +41,9 @@ export function symbolTickerCopyCount(containerWidth, copyWidth) {
 }
 import {
   calculateEquity,
-  calculatePercent,
-  calculateRealizedProfit,
-  calculateTargetRemaining,
   sumMoney,
 } from '../utils/finance'
 import { filterVisibleTraderAccounts, isTraderAccountVisible } from '../utils/accountVisibility'
-import Pagination from './Pagination'
 import PositionsPanel from './trading/PositionsPanel'
 import MobileTradingTerminal from './trading/MobileTradingTerminal'
 import useSplitPane from './trading/hooks/useSplitPane'
@@ -78,6 +75,7 @@ export default function TradingPanel({
     liveEquity: liveEquityMap,
   } = useStore()
   const { theme } = useTheme()
+  const nowTick = useNow()
   const [positionView, setPositionView] = useState('all')
   const [partialForm, setPartialForm] = useState(null)
   const [batchActionPending, setBatchActionPending] = useState('')
@@ -91,7 +89,12 @@ export default function TradingPanel({
   // away from the price, which is the thing that makes trading on a phone hard.
   const isMobile = useIsMobile()
 
-  const prices = Object.keys(storePrices || {}).length > 0 ? storePrices : (propPrices || {})
+  // Memoised because the `|| {}` fallback mints a new object each render,
+  // which made every memo keyed on `prices` re-run on every render.
+  const prices = useMemo(
+    () => (Object.keys(storePrices || {}).length > 0 ? storePrices : (propPrices || {})),
+    [storePrices, propPrices]
+  )
 
   const liveAvailableInstruments = useMemo(() => getAvailableInstrumentList(prices), [prices])
   const closingTradeSet = useMemo(() => new Set(closingTradeIds), [closingTradeIds])
@@ -103,7 +106,7 @@ export default function TradingPanel({
     togglePin,
     tickerCategory,
     setTickerCategory,
-    priceHistoryRef,
+    priceHistory,
     tickerInstruments
   } = useWatchlist(prices, availableInstruments)
 
@@ -234,7 +237,10 @@ export default function TradingPanel({
     }
   }, [])
   const openTrades = storeOpenPositions.length > 0 ? storeOpenPositions : (propOpenTrades || [])
-  const rawAccounts = storeAccounts.length > 0 ? storeAccounts : (propAccounts || [])
+  const rawAccounts = useMemo(
+    () => (storeAccounts.length > 0 ? storeAccounts : (propAccounts || [])),
+    [storeAccounts, propAccounts]
+  )
   const accounts = useMemo(() => filterVisibleTraderAccounts(rawAccounts), [rawAccounts])
   const selectedAccountCandidate = storeActiveAccount || propSelectedAccount
   const selectedAccount = selectedAccountCandidate && isTraderAccountVisible(selectedAccountCandidate)
@@ -393,7 +399,11 @@ export default function TradingPanel({
   // than only on refetch; falls back to the locally-derived values under
   // ENGINE_MODE=interval or if pushes stop arriving.
   const pushedEquity = selectedAccount ? liveEquityMap[selectedAccount.id] : null
-  const hasFreshPushedEquity = !!pushedEquity && (Date.now() - pushedEquity.received_at) < 5000
+  // Read off a ticking clock, not Date.now(): a raw read during render is
+  // evaluated once and never revisited, so a feed that stalls goes on looking
+  // fresh and the balance silently freezes at its last pushed value.
+  // DashboardHome does the same at its own staleness check.
+  const hasFreshPushedEquity = !!pushedEquity && (nowTick - pushedEquity.received_at) < 5000
 
   const currentBalance = hasFreshPushedEquity
     ? Number(pushedEquity.current_balance || 0)
@@ -407,16 +417,6 @@ export default function TradingPanel({
   const floatingBalance = hasFreshPushedEquity
     ? Number(pushedEquity.equity || 0)
     : calculateEquity(currentBalance, floatingProfit)
-  const startingBalance = stats ? Number(stats.account?.starting_balance || selectedAccount?.starting_balance || 0) : 0
-  const profitTargetAmount = stats ? Number(stats.account?.profit_target || 0) : 0
-  const realizedProfit = calculateRealizedProfit(currentBalance, startingBalance)
-  const equityProfit = calculateRealizedProfit(floatingBalance, startingBalance)
-  const targetProgressPct = calculatePercent(realizedProfit, profitTargetAmount, {
-    clampMin: 0,
-    clampMax: 100,
-    decimalPlaces: 1
-  })
-  const targetRemaining = calculateTargetRemaining(profitTargetAmount, realizedProfit)
   const openPositions = openTrades.filter(trade => trade.status === 'open')
   const pendingOrders = openTrades.filter(trade => trade.status === 'pending')
   // Closed-trade log moved to the dedicated Trade History screen
@@ -673,7 +673,7 @@ export default function TradingPanel({
           moveTradeToBreakeven={moveTradeToBreakeven}
           onCancelOrder={onCancelOrder}
           pinnedInstruments={pinnedInstruments}
-          priceHistory={priceHistoryRef.current}
+          priceHistory={priceHistory}
           isPinned={(symbol) => pinnedInstruments.includes(symbol)}
           togglePin={togglePin}
         />
@@ -696,7 +696,7 @@ export default function TradingPanel({
                 ) : pinnedInstruments.map((instrument) => {
                   const data = prices[instrument]
                   const isSelected = orderForm.instrument === instrument
-                  const history = priceHistoryRef.current[instrument] || []
+                  const history = priceHistory[instrument] || []
                   const first = history[0]?.value
                   const last = history[history.length - 1]?.value
                   const changePct = first ? ((last - first) / first) * 100 : 0
