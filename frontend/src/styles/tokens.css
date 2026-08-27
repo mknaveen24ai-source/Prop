@@ -106,6 +106,14 @@
   --space-8: 40px;
   --space-9: 48px;
   --space-10: 64px;
+  /* Editorial section rhythm. These are for page bands and hero spacing, not
+     compact controls; keeping them named prevents large one-off paddings from
+     drifting independently across public pages. */
+  --space-11: 80px;
+  --space-12: 96px;
+  --space-13: 120px;
+  --space-14: 160px;
+  --space-15: 240px;
 
   /* ── Half-steps ──────────────────────────────────────────────────────────
      Added 2026-08-20. 6, 10, 14 and 18px account for ~530 hardcoded spacing

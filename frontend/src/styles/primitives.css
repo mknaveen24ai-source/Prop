@@ -161,7 +161,7 @@
 .heatmap-grid {
   display: grid;
   grid-template-columns: 32px repeat(24, minmax(12px, 1fr));
-  gap: 2px;
+  gap: var(--space-1);
   min-width: 420px;
 }
 
@@ -197,7 +197,7 @@
 
 .ui-auth-card {
   width: min(100%, 420px);
-  padding: clamp(28px, 4vw, 40px);
+  padding: clamp(var(--space-7), 4vw, var(--space-8));
 }
 
 .ui-drawer-shell {

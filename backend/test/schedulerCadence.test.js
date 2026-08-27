@@ -2,6 +2,8 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 
 const schedulerService = require('../services/schedulerService')
+const fs = require('node:fs')
+const path = require('node:path')
 
 // The trading loops run at one of two cadences: the real ones (500/500/1000ms)
 // when they ARE the engine, and a slow safety net (5s/5s/10s) when the
@@ -25,7 +27,7 @@ function cadencesFor(options) {
   const originalSetInterval = global.setInterval
   global.setInterval = function (fn, ms) {
     registered.push(ms)
-    return originalSetInterval(function () {}, 1 << 30)
+    return originalSetInterval(function () {}, 2 ** 30)
   }
 
   const noop = () => {}
@@ -106,4 +108,13 @@ test('omitting the flag falls back to ENGINE_MODE so old callers are unchanged',
     if (previous === undefined) delete process.env.ENGINE_MODE
     else process.env.ENGINE_MODE = previous
   }
+})
+
+test('price-history maintenance has one recurring scheduler owner', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'services', 'priceBroadcast.js'), 'utf8')
+  assert.doesNotMatch(
+    source,
+    /registerTrackedInterval\(syncHourlyPriceHistory/,
+    'priceBroadcast must not duplicate schedulerService\'s hourly rollup timer'
+  )
 })

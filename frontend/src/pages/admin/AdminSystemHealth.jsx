@@ -241,8 +241,8 @@ export default function AdminSystemHealth() {
                 <tbody>
                   {sectionRows(key, data).map(([label, value]) => (
                     <tr key={label}>
-                      <td style={{ padding: '3px 0', color: 'var(--admin-text-faint)' }}>{label}</td>
-                      <td style={{ padding: '3px 0', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{String(value)}</td>
+                      <td style={{ padding: 'var(--space-1) 0', color: 'var(--admin-text-faint)' }}>{label}</td>
+                      <td style={{ padding: 'var(--space-1) 0', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{String(value)}</td>
                     </tr>
                   ))}
                 </tbody>

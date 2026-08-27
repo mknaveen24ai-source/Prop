@@ -64,8 +64,16 @@ function accountKind(account) {
 
 function accountPhaseText(account, isSelected, stats) {
   if (account.account_type === 'funded') {
-    const available = stats && isSelected ? Math.max(0, (stats.account.current_balance || 0) - (stats.account.starting_balance || 0)) : null
-    return available != null && available >= 50 ? 'Payout eligible' : 'Active'
+    // This used to read `realizedProfit >= 50 ? 'Payout eligible' : 'Active'`,
+    // which ignored KYC, open trades, the model's minimum net profit, the
+    // qualifying-trading-day rule and the consistency cap. On a $100k account
+    // the profit gate alone is $6,000 — 120x the $50 it tested — so a trader up
+    // $60 was told they were eligible and then refused at the request. The
+    // backend now resolves this through the same predicate the payout route and
+    // the admin approval use (domain/payoutEligibility.js).
+    const eligibility = isSelected ? stats?.stats?.payout_eligibility : null
+    if (!eligibility) return 'Active'
+    return eligibility.eligible ? 'Payout eligible' : 'Active'
   }
   if (isSelected && stats?.stats?.days_remaining != null && stats.rules?.time_limit_days) {
     const elapsed = Math.max(0, stats.rules.time_limit_days - stats.stats.days_remaining)
@@ -84,7 +92,7 @@ function AccountChipsRow({ accounts, selectedAccount, onSelect, stats, onOpenRul
             key={account.id}
             onClick={() => onSelect(account)}
             style={{
-              textAlign: 'left', padding: '11px 15px', minWidth: '160px',
+              textAlign: 'left', padding: 'var(--space-3) var(--space-4)', minWidth: '160px',
               border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--rule)'}`,
               borderRadius: 'var(--radius-sm)',
               background: isSelected ? 'var(--soft, color-mix(in srgb, var(--accent) 9%, transparent))' : 'var(--glass)',
@@ -93,13 +101,13 @@ function AccountChipsRow({ accounts, selectedAccount, onSelect, stats, onOpenRul
               transition: 'border-color .18s, background .18s', cursor: 'pointer',
             }}
           >
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', color: 'var(--muted)', textTransform: 'uppercase' }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.14em', color: 'var(--muted)', textTransform: 'uppercase' }}>
               {accountKind(account)}
             </div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px', marginTop: '3px' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-xl)', marginTop: 'var(--space-1)' }}>
               ${parseFloat(account.account_size || 0).toLocaleString('en-US')}
             </div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)', marginTop: '2px' }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', color: 'var(--muted)', marginTop: 'var(--space-1)' }}>
               {account.account_uid || account.id} · {accountPhaseText(account, isSelected, stats)}
             </div>
           </button>
@@ -109,14 +117,14 @@ function AccountChipsRow({ accounts, selectedAccount, onSelect, stats, onOpenRul
         <button
           onClick={onOpenRulesPage}
           className="lx-btn"
-          style={{ padding: '9px 16px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--glass)', color: 'var(--ink)' }}
+          style={{ padding: 'var(--space-2-5) var(--space-4)', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--glass)', color: 'var(--ink)' }}
         >
           Rules
         </button>
         <button
           onClick={onStartChallenge}
           className="lx-btn"
-          style={{ padding: '9px 16px', border: '1px solid var(--accent)', borderRadius: 'var(--radius-sm)', background: 'var(--soft, color-mix(in srgb, var(--accent) 9%, transparent))', color: 'var(--accent)' }}
+          style={{ padding: 'var(--space-2-5) var(--space-4)', border: '1px solid var(--accent)', borderRadius: 'var(--radius-sm)', background: 'var(--soft, color-mix(in srgb, var(--accent) 9%, transparent))', color: 'var(--accent)' }}
         >
           New Challenge
         </button>
@@ -129,11 +137,11 @@ function AccountChipsRow({ accounts, selectedAccount, onSelect, stats, onOpenRul
 function KpiCard({ icon, label, value, delta, sub, tone, sparkData }) {
   return (
     <Card stat tone={tone}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--muted)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.15em', textTransform: 'uppercase', color: 'var(--muted)' }}>
         <span style={{ display: 'inline-flex', color: tone }}>{renderIcon(icon, { size: 13, color: tone })}</span>
         {label}
       </div>
-      <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: 'clamp(20px,1.9vw,26px)', fontWeight: 600, marginTop: '9px', whiteSpace: 'nowrap', letterSpacing: '-.02em' }}>
+      <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: 'clamp(20px,1.9vw,26px)', fontWeight: 600, marginTop: 'var(--space-2-5)', whiteSpace: 'nowrap', letterSpacing: '-.02em' }}>
         {value}
       </div>
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 'var(--space-2-5)', marginTop: 'var(--space-1-5)' }}>
@@ -166,14 +174,14 @@ function ConsistencyDonut({ score }) {
       <text x="50%" y="47%" textAnchor="middle" dominantBaseline="central" style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 'var(--fs-3xl)', fill: 'var(--gain)' }}>
         {score != null ? Math.round(score) : '—'}
       </text>
-      <text x="50%" y="66%" textAnchor="middle" dominantBaseline="central" style={{ fontFamily: 'var(--font-mono)', fontSize: '8px', letterSpacing: '.1em', textTransform: 'uppercase', fill: 'var(--muted)' }}>
+      <text x="50%" y="66%" textAnchor="middle" dominantBaseline="central" style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.1em', textTransform: 'uppercase', fill: 'var(--muted)' }}>
         Consistency
       </text>
     </svg>
   )
 }
 
-function ConsistencyRiskBlock({ consistency, dailyDrawdown, totalDrawdownUsedPct, totalDrawdownRemainingPct, maxDrawdownPct, profitProgressPct, profitTargetAmount, realizedProfit }) {
+function ConsistencyRiskBlock({ consistency, dailyDrawdown, totalDrawdownUsedPct, totalDrawdownRemainingPct, maxDrawdownPct, profitProgressPct, profitTargetAmount, realizedProfit, drawdownFloor, tradingDays }) {
   const risks = [
     dailyDrawdown ? {
       label: 'Daily drawdown',
@@ -196,7 +204,20 @@ function ConsistencyRiskBlock({ consistency, dailyDrawdown, totalDrawdownUsedPct
       usedLabel: `${totalDrawdownUsedPct.toFixed(1)}% used`,
       pct: totalDrawdownUsedPct,
       tone: getDrawdownTone(totalDrawdownUsedPct),
-      foot: `${totalDrawdownRemainingPct.toFixed(2)}% remaining of ${maxDrawdownPct.toFixed(2)}% · static`,
+      // A percentage is not actionable mid-trade. The floor is the number that
+      // actually ends the account, so show it as a number.
+      foot: drawdownFloor != null
+        ? `Account fails below ${formatMoney(drawdownFloor)} · ${maxDrawdownPct.toFixed(2)}% trailing from peak equity`
+        : `${totalDrawdownRemainingPct.toFixed(2)}% remaining of ${maxDrawdownPct.toFixed(2)}% · trailing from peak equity`,
+    },
+    tradingDays && {
+      label: 'Qualifying days',
+      usedLabel: `${tradingDays.qualifying} of ${tradingDays.required}`,
+      pct: tradingDays.required > 0 ? Math.min(100, (tradingDays.qualifying / tradingDays.required) * 100) : 0,
+      tone: tradingDays.met ? 'var(--gain)' : 'var(--warn)',
+      foot: tradingDays.met
+        ? 'Requirement met'
+        : `${tradingDays.remaining} more day${tradingDays.remaining === 1 ? '' : 's'} up at least ${tradingDays.min_daily_profit_pct}% of starting balance`,
     },
     profitTargetAmount > 0 && {
       label: 'Profit target',
@@ -211,23 +232,23 @@ function ConsistencyRiskBlock({ consistency, dailyDrawdown, totalDrawdownUsedPct
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
       <Card>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--rule-soft)', paddingBottom: 'var(--space-2-5)', marginBottom: 'var(--space-3-5)' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px' }}>Consistency</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-xl)' }}>Consistency</div>
         </div>
         {consistency ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
             <div style={{ width: '110px', flex: '0 0 110px' }}>
               <ConsistencyDonut score={consistency.score} />
             </div>
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '9px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', fontSize: '12.5px', borderBottom: '1px solid var(--rule-soft)', paddingBottom: '7px' }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-2-5)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', fontSize: 'var(--fs-base)', borderBottom: '1px solid var(--rule-soft)', paddingBottom: 'var(--space-2)' }}>
                 <span style={{ color: 'var(--muted)' }}>Best day</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>{formatMoney(consistency.best_day_profit)}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', fontSize: '12.5px', borderBottom: '1px solid var(--rule-soft)', paddingBottom: '7px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', fontSize: 'var(--fs-base)', borderBottom: '1px solid var(--rule-soft)', paddingBottom: 'var(--space-2)' }}>
                 <span style={{ color: 'var(--muted)' }}>Share of profit</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--gain)' }}>{consistency.best_day_pct.toFixed(1)}%</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', fontSize: '12.5px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', fontSize: 'var(--fs-base)' }}>
                 <span style={{ color: 'var(--muted)' }}>Firm limit</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--muted)' }}>{consistency.threshold_pct.toFixed(1)}%</span>
               </div>
@@ -240,7 +261,7 @@ function ConsistencyRiskBlock({ consistency, dailyDrawdown, totalDrawdownUsedPct
 
       <Card>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--rule-soft)', paddingBottom: 'var(--space-2-5)', marginBottom: 'var(--space-1-5)' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px' }}>Risk Budget</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-xl)' }}>Risk Budget</div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)' }}>Live</div>
         </div>
         {risks.map((r) => (
@@ -249,10 +270,10 @@ function ConsistencyRiskBlock({ consistency, dailyDrawdown, totalDrawdownUsedPct
               <span style={{ fontSize: 'var(--fs-base)' }}>{r.label}</span>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', color: r.tone }}>{r.usedLabel}</span>
             </div>
-            <div style={{ height: '7px', marginTop: '9px', border: '1px solid var(--rule)', borderRadius: '99px', background: 'var(--paper)', overflow: 'hidden' }}>
+            <div style={{ height: '7px', marginTop: 'var(--space-2-5)', border: '1px solid var(--rule)', borderRadius: '99px', background: 'var(--paper)', overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${Math.min(100, Math.max(0, r.pct))}%`, background: r.tone, boxShadow: `0 0 12px ${r.tone}`, transition: 'width .5s cubic-bezier(.16,1,.3,1)' }} />
             </div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)', marginTop: '7px' }}>{r.foot}</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', color: 'var(--muted)', marginTop: 'var(--space-2)' }}>{r.foot}</div>
           </div>
         ))}
       </Card>
@@ -359,13 +380,13 @@ function SessionHeat({ matrix, hours }) {
       <div className="heatmap-grid" style={{ marginBottom: 'var(--space-1)' }}>
         <div />
         {hours.map((h) => (
-          <div key={h} style={{ fontSize: '8px', textAlign: 'center', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
+          <div key={h} style={{ fontSize: 'var(--fs-3xs)', textAlign: 'center', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
             {shownHours.includes(h) ? String(h).padStart(2, '0') : ''}
           </div>
         ))}
       </div>
       {matrix.map((row) => (
-        <div key={row.day_label} className="heatmap-grid" style={{ marginBottom: '2px', alignItems: 'center' }}>
+        <div key={row.day_label} className="heatmap-grid" style={{ marginBottom: 'var(--space-1)', alignItems: 'center' }}>
           <div style={{ fontSize: 'var(--fs-3xs)', color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>{row.day_label.slice(0, 3).toUpperCase()}</div>
           {(row.slots || []).map((slot) => (
             <div
@@ -381,7 +402,7 @@ function SessionHeat({ matrix, hours }) {
           ))}
         </div>
       ))}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-2-5)', borderTop: '1px solid var(--rule-soft)', paddingTop: 'var(--space-2)', fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-2-5)', borderTop: '1px solid var(--rule-soft)', paddingTop: 'var(--space-2)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', color: 'var(--muted)' }}>
         <span style={{ color: 'var(--loss)' }}>Loss</span>
         <span style={{ flex: '0 0 60px', height: '4px', background: 'linear-gradient(90deg, var(--loss), var(--rule-soft), var(--gain))', borderRadius: '2px' }} />
         <span style={{ color: 'var(--gain)' }}>Gain</span>
@@ -410,8 +431,8 @@ function PayoutCycleBanner({ payoutCycle, onRequestPayout }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-5)', flexWrap: 'wrap', background: 'var(--glass-2)', border: '1px solid var(--accent)', borderRadius: 'var(--radius-sm)', boxShadow: 'var(--elev)', padding: 'var(--space-4) var(--space-5)' }}>
       <div style={{ flex: 1, minWidth: '220px' }}>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--accent)' }}>Next payout window</div>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: '21px', marginTop: 'var(--space-1)' }}>Eligible for a profit share payout</div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--accent)' }}>Next payout window</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-3xl)', marginTop: 'var(--space-1)' }}>Eligible for a profit share payout</div>
         <div style={{ fontSize: 'var(--fs-base)', color: 'var(--muted)', marginTop: 'var(--space-1)' }}>
           Cycle closes {new Date(payoutCycle.next_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} · estimated share {formatMoney(payoutCycle.estimated_share)}
         </div>
@@ -425,7 +446,7 @@ function PayoutCycleBanner({ payoutCycle, onRequestPayout }) {
       <button
         onClick={onRequestPayout}
         className="lx-btn"
-        style={{ padding: '11px 20px', border: '1px solid var(--accent)', borderRadius: 'var(--radius-sm)', background: 'var(--accent)', color: 'var(--paper)', fontSize: '11.5px', letterSpacing: '.12em' }}
+        style={{ padding: 'var(--space-3) var(--space-5)', border: '1px solid var(--accent)', borderRadius: 'var(--radius-sm)', background: 'var(--accent)', color: 'var(--paper)', fontSize: 'var(--fs-sm)', letterSpacing: '.12em' }}
       >
         Request Payout
       </button>
@@ -445,23 +466,23 @@ function ScalingProgressCard({ scaling }) {
   return (
     <Card>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--rule-soft)', paddingBottom: 'var(--space-2-5)', marginBottom: 'var(--space-3-5)' }}>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px' }}>Scaling Plan</div>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-xl)' }}>Scaling Plan</div>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', color: 'var(--accent)' }}>{scaling.multiplier.toFixed(2)}x lot size</div>
       </div>
 
       <div style={{ display: 'flex', gap: 'var(--space-4-5)', marginBottom: 'var(--space-3-5)', flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Milestones Claimed</div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xl)', marginTop: '3px' }}>{scaling.milestones_claimed}</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xl)', marginTop: 'var(--space-1)' }}>{scaling.milestones_claimed}</div>
         </div>
         <div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Capital Added</div>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xl)', marginTop: '3px', color: 'var(--gain)' }}>{formatMoney(scaling.total_increased)}</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xl)', marginTop: 'var(--space-1)', color: 'var(--gain)' }}>{formatMoney(scaling.total_increased)}</div>
         </div>
       </div>
 
       {scaling.headroom_reached ? (
-        <div style={{ fontSize: '12.5px', color: 'var(--muted)' }}>
+        <div style={{ fontSize: 'var(--fs-base)', color: 'var(--muted)' }}>
           Maximum account size reached — no further capital increases, but your lot-size multiplier can still grow.
         </div>
       ) : (
@@ -472,7 +493,7 @@ function ScalingProgressCard({ scaling }) {
           </div>
           <ProgressBar value={scaling.progress_pct} label={`Progress to scaling milestone ${nextMilestone}`} />
           {scaling.per_milestone_amount > 0 && (
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)', marginTop: '9px' }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', color: 'var(--muted)', marginTop: 'var(--space-2-5)' }}>
               Every {scaling.target_pct}% net trading profit adds {formatMoney(scaling.per_milestone_amount)} to your balance
             </div>
           )}
@@ -712,13 +733,13 @@ export default function DashboardHome({
         eyebrow={`Account ${selectedAccount.account_uid || selectedAccount.id} · equity curve`}
         title="Balance & Equity"
         actions={(
-          <div style={{ display: 'flex', gap: '2px', padding: '3px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-1)', padding: 'var(--space-1)', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper-2)' }}>
             {TF_TABS.map((t) => (
               <button
                 key={t.label}
                 onClick={() => setTf(t.label)}
                 style={{
-                  padding: '5px 10px', border: 'none', borderRadius: '3px', fontFamily: 'var(--font-mono)', fontSize: '10.5px', letterSpacing: '.06em', cursor: 'pointer',
+                  padding: 'var(--space-1-5) var(--space-2-5)', border: 'none', borderRadius: '3px', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.06em', cursor: 'pointer',
                   background: tf === t.label ? 'var(--accent)' : 'transparent', color: tf === t.label ? 'var(--paper)' : 'var(--muted)',
                 }}
               >
@@ -738,7 +759,7 @@ export default function DashboardHome({
           </div>
         )}
         {equityCurve.length > 1 && (
-          <div style={{ display: 'flex', gap: '22px', borderTop: '1px solid var(--rule-soft)', marginTop: 'var(--space-2)', padding: '11px 2px 6px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-6)', borderTop: '1px solid var(--rule-soft)', marginTop: 'var(--space-2)', padding: 'var(--space-3) var(--space-1) var(--space-1-5)', flexWrap: 'wrap' }}>
             {[
               { label: 'Opening', value: formatMoney(equityCurve[0].value), tone: 'var(--muted)' },
               { label: 'Current', value: formatMoney(equityCurve[equityCurve.length - 1].value), tone: 'var(--ink)' },
@@ -747,8 +768,8 @@ export default function DashboardHome({
               { label: 'Max DD', value: `-${computeMaxDrawdownPct(equityCurve).toFixed(2)}%`, tone: 'var(--loss)' },
             ].map((l) => (
               <div key={l.label}>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--muted)' }}>{l.label}</div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-md)', color: l.tone, marginTop: '3px' }}>{l.value}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--muted)' }}>{l.label}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-md)', color: l.tone, marginTop: 'var(--space-1)' }}>{l.value}</div>
               </div>
             ))}
           </div>
@@ -773,6 +794,10 @@ export default function DashboardHome({
         profitProgressPct={stats.rules?.profit_target_amount > 0 ? Math.min(100, (realizedProfit / stats.rules.profit_target_amount) * 100) : 0}
         profitTargetAmount={stats.rules?.profit_target_amount || 0}
         realizedProfit={realizedProfit}
+        drawdownFloor={hasFreshPushedEquity && pushedEquity.drawdown_floor != null
+          ? pushedEquity.drawdown_floor
+          : stats.stats?.drawdown_floor}
+        tradingDays={stats.stats?.trading_days}
       />
     </div>
   )

@@ -978,11 +978,11 @@ export default function AdminKYC() {
                 { label: 'No quality flags raised', pass: (selectedUser.quality_flags || []).length === 0 },
                 { label: 'Within SLA window', pass: selectedUser.kyc_sla_status !== 'breach' },
               ].map((check) => (
-                <div key={check.label} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)', padding: '9px 0', borderBottom: '1px solid var(--rule-soft)' }}>
+                <div key={check.label} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)', padding: 'var(--space-2-5) 0', borderBottom: '1px solid var(--rule-soft)' }}>
                   <span style={{ color: check.pass == null ? 'var(--admin-text-faint)' : check.pass ? 'var(--gain)' : 'var(--loss)' }}>
                     {check.pass == null ? '—' : check.pass ? '✓' : '✕'}
                   </span>
-                  <span style={{ flex: 1, fontSize: '12.5px' }}>{check.label}</span>
+                  <span style={{ flex: 1, fontSize: 'var(--fs-base)' }}>{check.label}</span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: check.pass == null ? 'var(--admin-text-faint)' : check.pass ? 'var(--gain)' : 'var(--loss)' }}>
                     {check.pass == null ? 'Unknown' : check.pass ? 'Pass' : 'Fail'}
                   </span>
@@ -999,12 +999,12 @@ export default function AdminKYC() {
               <div style={{ color: 'var(--admin-text-muted)' }}>No reviewer notes yet for this trader.</div>
             ) : (
               historyNotes.map((note) => (
-                <div key={note.id} style={{ padding: '9px 0', borderBottom: '1px solid var(--rule-soft)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', fontSize: '12.5px' }}>
+                <div key={note.id} style={{ padding: 'var(--space-2-5) 0', borderBottom: '1px solid var(--rule-soft)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', fontSize: 'var(--fs-base)' }}>
                     <span>{note.created_by}</span>
-                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--admin-text-faint)' }}>{formatDate(note.created_at)}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', color: 'var(--admin-text-faint)' }}>{formatDate(note.created_at)}</span>
                   </div>
-                  <div style={{ fontSize: '11.5px', color: 'var(--admin-text-muted)', marginTop: '3px' }}>{note.note_text}</div>
+                  <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)', marginTop: 'var(--space-1)' }}>{note.note_text}</div>
                 </div>
               ))
             )}

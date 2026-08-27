@@ -34,7 +34,7 @@ export default function LegalPage({ eyebrow = 'LEGAL DOCUMENT', title, intro, se
       {/* Nav */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '20px clamp(16px, 4vw, 48px)', borderBottom: '1px solid var(--nav-border)',
+        padding: 'var(--space-5) clamp(var(--space-4), 4vw, var(--space-9))', borderBottom: '1px solid var(--nav-border)',
         position: 'sticky', top: 0, background: 'var(--nav-bg)',
         backdropFilter: 'blur(12px)', zIndex: 100
       }}>
@@ -58,14 +58,14 @@ export default function LegalPage({ eyebrow = 'LEGAL DOCUMENT', title, intro, se
 
       {/* Hero */}
       <div style={{
-        textAlign: 'center', padding: 'clamp(36px, 8vw, 64px) 24px clamp(28px, 6vw, 48px)',
+        textAlign: 'center', padding: 'clamp(var(--space-8), 8vw, var(--space-10)) var(--space-6) clamp(var(--space-7), 6vw, var(--space-9))',
         borderBottom: '1px solid var(--navy-border)',
         background: 'radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--muted) 5%, transparent) 0%, transparent 60%)'
       }}>
         <div style={{
           display: 'inline-block', background: 'color-mix(in srgb, var(--muted) 10%, transparent)',
           border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)', borderRadius: 'var(--radius-pill)',
-          padding: '5px 14px', fontSize: 'var(--fs-xs)', color: 'var(--cyan)',
+          padding: 'var(--space-1-5) var(--space-3-5)', fontSize: 'var(--fs-xs)', color: 'var(--cyan)',
           letterSpacing: '0.1em', marginBottom: 'var(--space-5)'
         }}>
           {eyebrow}
@@ -81,12 +81,12 @@ export default function LegalPage({ eyebrow = 'LEGAL DOCUMENT', title, intro, se
         </p>
       </div>
 
-      <div style={{ maxWidth: '860px', margin: '0 auto', padding: 'clamp(28px, 6vw, 48px) clamp(16px, 4vw, 24px)' }}>
+      <div style={{ maxWidth: '860px', margin: '0 auto', padding: 'clamp(var(--space-7), 6vw, var(--space-9)) clamp(var(--space-4), 4vw, var(--space-6))' }}>
         {intro && (
           <div style={{
             background: 'color-mix(in srgb, var(--muted) 5%, transparent)',
             border: '1px solid color-mix(in srgb, var(--muted) 15%, transparent)',
-            padding: '24px 28px', marginBottom: 'var(--space-8)'
+            padding: 'var(--space-6) var(--space-7)', marginBottom: 'var(--space-8)'
           }}>
             <p style={{ color: 'var(--text)', lineHeight: '1.8', fontSize: 'var(--fs-md)', margin: 0, whiteSpace: 'pre-line' }}>
               {intro}

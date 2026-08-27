@@ -47,13 +47,82 @@ function offlineShellPlugin() {
   };
 }
 
+
+/**
+ * Build-time SEO: absolute social images, a canonical origin, and a sitemap.
+ *
+ * Three defects, one cause — the public domain is not known at build time, so
+ * everything that needs an absolute URL was either relative or absent:
+ *
+ *   - og:image / twitter:image were "/logo512.png". Most scrapers will not
+ *     resolve a relative image, so every shared link had a broken preview.
+ *   - No <link rel="canonical"> at all.
+ *   - No sitemap.xml anywhere in the repo.
+ *
+ * VITE_PUBLIC_ORIGIN supplies the domain. When it is set, all three are filled
+ * in. When it is NOT set, the build still succeeds and simply omits them —
+ * exactly the previous behaviour — because a wrong canonical is considerably
+ * worse than a missing one, and a sitemap of relative URLs is invalid.
+ */
+function seoPlugin(publicOrigin) {
+  const origin = String(publicOrigin || '').trim().replace(/\/+$/, '');
+
+  return {
+    name: 'propfirm-seo',
+    transformIndexHtml(html) {
+      if (!origin) {
+        return html.replace(
+          '<meta name="site-origin" content="" />',
+          '<!-- VITE_PUBLIC_ORIGIN unset: canonical and absolute social images omitted -->'
+        );
+      }
+      return html
+        .replace('<meta name="site-origin" content="" />',
+          `<meta name="site-origin" content="${origin}" />\n    <link rel="canonical" href="${origin}/" />`)
+        .replace(/(<meta property="og:image" content=")\//, `$1${origin}/`)
+        .replace(/(<meta name="twitter:image" content=")\//, `$1${origin}/`)
+        .replace(/(<meta property="og:url" content=")\//, `$1${origin}/`);
+    },
+    async generateBundle() {
+      if (!origin) {
+        this.warn('VITE_PUBLIC_ORIGIN is not set — skipping sitemap.xml. Set it to emit one.');
+        return;
+      }
+
+      // Imported at build time so the sitemap and the in-app <title> tags can
+      // never list different pages.
+      const routesUrl = new URL('./src/config/publicRoutes.js', import.meta.url);
+      const { PUBLIC_ROUTES } = await import(routesUrl.href);
+      const today = new Date().toISOString().slice(0, 10);
+
+      const urls = PUBLIC_ROUTES.map((route) => [
+        '  <url>',
+        `    <loc>${origin}${route.path === '/' ? '/' : route.path}</loc>`,
+        `    <lastmod>${today}</lastmod>`,
+        `    <changefreq>${route.changefreq}</changefreq>`,
+        `    <priority>${route.priority}</priority>`,
+        '  </url>'
+      ].join('\n')).join('\n');
+
+      this.emitFile({
+        type: 'asset',
+        fileName: 'sitemap.xml',
+        source: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`
+      });
+
+      // robots.txt ships a static Sitemap: line pointing at /sitemap.xml, which
+      // is origin-relative and therefore correct without substitution.
+    }
+  };
+}
+
 // Note: this file is .mjs deliberately. package.json has no "type": "module",
 // so a .js config would be loaded as CommonJS and Vite 8's native config loader
 // rejects the ESM syntax below.
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
-  plugins: [react(), offlineShellPlugin()],
+  plugins: [react(), offlineShellPlugin(), seoPlugin(process.env.VITE_PUBLIC_ORIGIN)],
   server: {
     port: 3000,
     proxy: {

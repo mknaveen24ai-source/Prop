@@ -42,8 +42,12 @@ const WRITABLE_SETTINGS_KEYS = new Set([
   'passed_account_visibility_days', 'expired_account_visibility_days',
   'funded_max_drawdown_pct', 'profit_share_pct', 'payouts_enabled', 'min_payout_amount',
   'payout_request_cooldown_hours', 'payout_requires_kyc_approved', 'payout_requires_no_open_positions',
-  'min_hold_seconds', 'min_lot_size', 'forex_lots_per_1k', 'commodity_lots_per_1k',
-  'max_trades_per_1k', 'max_daily_trades', 'weekend_holding_enabled',
+  'min_hold_seconds', 'min_lot_size', 'weekend_holding_enabled',
+  // forex_lots_per_1k, commodity_lots_per_1k, max_trades_per_1k and
+  // max_daily_trades are deliberately NOT editable any more: leverage is
+  // unlimited and none of them is enforced. This file's own comment above says
+  // a control that silently has no effect is worse than an absent one.
+  'max_open_positions', 'max_notional_multiple',
   'dynamic_commission_per_lot', 'commission_per_lot_json',
   'slippage_simulator_enabled', 'slippage_max_pips_adverse', 'slippage_max_pips_adverse_json',
   'news_protection_enabled', 'news_protection_block_new_orders', 'news_protection_lookahead_minutes',

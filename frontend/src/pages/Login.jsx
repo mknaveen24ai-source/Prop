@@ -35,7 +35,7 @@ function TotpInput({ onSubmit, onBack, loading, error }) {
     <div>
       <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
         <div style={{
-          width: '48px', height: '48px', margin: '0 auto 16px',
+          width: '48px', height: '48px', margin: '0 auto var(--space-4)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: 'var(--glass-2)', border: '1px solid var(--rule-soft)',
           backdropFilter: 'blur(16px) saturate(140%)', WebkitBackdropFilter: 'blur(16px) saturate(140%)',
@@ -313,7 +313,7 @@ function Login({ onLogin, initialMode = 'login' }) {
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', marginTop: '-4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)', marginTop: '-var(--space-1)' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)', fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', cursor: 'pointer' }}>
                 <input
                   type="checkbox"
@@ -455,7 +455,7 @@ function Login({ onLogin, initialMode = 'login' }) {
                 </div>
                 <div className="ui-cols ui-cols--keep-2" style={{ '--cols-gap': '3px' }}>
                   {resetStrength.checks.map(c => (
-                    <div key={c.label} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <div key={c.label} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
                       <span style={{ fontSize: 'var(--fs-2xs)', color: c.pass ? 'var(--muted)' : 'var(--text-dim)' }}>
                         {c.pass ? '✓' : '○'}
                       </span>

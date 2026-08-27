@@ -43,7 +43,7 @@ export function TraderProfileContent({ userId, onBack }) {
 
   if (notFound || !profile) {
     return (
-      <div style={{ textAlign: 'center', padding: '80px 24px' }}>
+      <div style={{ textAlign: 'center', padding: 'var(--space-11) var(--space-6)' }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-4)' }}>
           {renderIcon('search', { size: 40, color: 'var(--accent)' })}
         </div>
@@ -106,7 +106,7 @@ export function TraderProfileContent({ userId, onBack }) {
               </span>
               {trader.is_funded && (
                 <span style={{
-                  padding: '2px 10px', borderRadius: 'var(--radius-pill)',
+                  padding: 'var(--space-1) var(--space-2-5)', borderRadius: 'var(--radius-pill)',
                   background: 'color-mix(in srgb, var(--muted) 12%, transparent)',
                   border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)',
                   fontSize: 'var(--fs-xs)', color: 'var(--cyan)', fontWeight: '600',
@@ -117,7 +117,7 @@ export function TraderProfileContent({ userId, onBack }) {
               )}
               {trader.total_phases_passed > 0 && (
                 <span style={{
-                  padding: '2px 10px', borderRadius: 'var(--radius-pill)',
+                  padding: 'var(--space-1) var(--space-2-5)', borderRadius: 'var(--radius-pill)',
                   background: 'color-mix(in srgb, var(--muted) 10%, transparent)',
                   border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)',
                   fontSize: 'var(--fs-xs)', color: 'var(--accent)', fontWeight: '600',
@@ -158,7 +158,7 @@ export function TraderProfileContent({ userId, onBack }) {
             {stats.favourite_instrument && (
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginBottom: 'var(--space-1)' }}>FAVOURITE INSTRUMENT</div>
-            <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
+            <div style={{ fontSize: 'var(--fs-lg)', fontWeight: '700', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
                   {stats.favourite_instrument}
                 </div>
               </div>
@@ -166,7 +166,7 @@ export function TraderProfileContent({ userId, onBack }) {
             {stats.avg_hold_mins && (
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginBottom: 'var(--space-1)' }}>AVG HOLD TIME</div>
-            <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>
+            <div style={{ fontSize: 'var(--fs-lg)', fontWeight: '700', color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>
                   {stats.avg_hold_mins < 60
                     ? `${Math.round(stats.avg_hold_mins)}m`
                     : `${(stats.avg_hold_mins / 60).toFixed(1)}h`}
@@ -176,7 +176,7 @@ export function TraderProfileContent({ userId, onBack }) {
             {stats.profit_factor && (
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginBottom: 'var(--space-1)' }}>PROFIT FACTOR</div>
-            <div style={{ fontSize: '15px', fontWeight: '700', color: parseFloat(stats.profit_factor) >= 1.5 ? 'var(--green)' : 'var(--text)', fontFamily: 'var(--font-mono)' }}>
+            <div style={{ fontSize: 'var(--fs-lg)', fontWeight: '700', color: parseFloat(stats.profit_factor) >= 1.5 ? 'var(--green)' : 'var(--text)', fontFamily: 'var(--font-mono)' }}>
                   {parseFloat(stats.profit_factor).toFixed(2)}
                 </div>
               </div>
@@ -209,7 +209,7 @@ export default function TraderProfile() {
           <Link className="nav-logo" to="/" style={{ cursor: 'pointer', textDecoration: 'none', color: 'inherit' }}>PROP FIRM</Link>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-          <button onClick={() => navigate('/leaderboard')} style={{ background: 'transparent', border: '1px solid var(--navy-border)', color: 'var(--text-muted)', padding: '7px 16px', cursor: 'pointer', fontSize: 'var(--fs-base)' }}>
+          <button onClick={() => navigate('/leaderboard')} style={{ background: 'transparent', border: '1px solid var(--navy-border)', color: 'var(--text-muted)', padding: 'var(--space-2) var(--space-4)', cursor: 'pointer', fontSize: 'var(--fs-base)' }}>
             ← Leaderboard
           </button>
           <ThemeToggle />

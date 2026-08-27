@@ -10,20 +10,8 @@ export function ThemeProvider({ children, initialTheme }) {
   // enhanced tracking protection, Safari ITP, and certain embedded webviews).
   // Without the guard the entire ThemeProvider — and therefore the whole app —
   // crashes before anything renders.
-  const [theme, setTheme] = useState(() => {
-    return initialTheme || 'light'
-  })
-
-  // Sync initialTheme when it arrives from the /me response in App.js.
-  // We intentionally do NOT list `theme` as a dependency here — if we did,
-  // any local toggle would immediately be overwritten by the prop value on
-  // the next render cycle. The goal is to apply the DB preference once on
-  // first load, then let the user toggle freely after that.
-  useEffect(() => {
-    if (initialTheme && initialTheme !== theme) {
-      setTheme(initialTheme)
-    }
-  }, [initialTheme]) // eslint-disable-line react-hooks/exhaustive-deps
+  const [localTheme, setLocalTheme] = useState(null)
+  const theme = localTheme || initialTheme || 'light'
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -31,7 +19,7 @@ export function ThemeProvider({ children, initialTheme }) {
 
   function toggleTheme() {
     const newTheme = theme === 'dark' ? 'light' : 'dark'
-    setTheme(newTheme)
+    setLocalTheme(newTheme)
 
     // Persist to DB; the current page already applied the theme locally.
     axios.patch(`${API_URL}/api/auth/theme`, { theme: newTheme }).catch(() => {})

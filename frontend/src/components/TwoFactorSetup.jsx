@@ -175,7 +175,9 @@ function TwoFactorSetup({ apiBase = '' }) {
     }
   }, [BASE])
 
-  useEffect(() => { fetchStatus() }, [fetchStatus])
+  useEffect(() => {
+    queueMicrotask(() => { void fetchStatus() })
+  }, [fetchStatus])
 
   // ── Setup: step 1 — get QR ─────────────────────────────────────────────────
   async function startSetup() {
@@ -315,7 +317,7 @@ function TwoFactorSetup({ apiBase = '' }) {
     return (
       <Card>
         <div style={{ textAlign: 'center', marginBottom: 'var(--space-5)' }}>
-          <div style={{ fontSize: '36px' }}>✅</div>
+          <div style={{ fontSize: 'var(--fs-6xl)' }}>✅</div>
           <h3 style={{ color: 'var(--text)', marginTop: 'var(--space-2)' }}>2FA Enabled Successfully!</h3>
         </div>
 
@@ -413,11 +415,11 @@ function TwoFactorSetup({ apiBase = '' }) {
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)', marginBottom: 'var(--space-1)' }}>
-            <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: '15px' }}>
+            <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: 'var(--fs-lg)' }}>
               Two-Factor Authentication
             </span>
             <span style={{
-              padding: '2px 8px', borderRadius: '0', fontSize: 'var(--fs-xs)', fontWeight: 600,
+              padding: 'var(--space-1) var(--space-2)', borderRadius: '0', fontSize: 'var(--fs-xs)', fontWeight: 600,
               background: is2faEnabled ? 'color-mix(in srgb, var(--gain) 12%, transparent)' : 'color-mix(in srgb, var(--loss) 8%, transparent)',
               color: is2faEnabled ? 'var(--gain)' : 'var(--loss)',
               border: `1px solid ${is2faEnabled ? 'color-mix(in srgb, var(--gain) 25%, transparent)' : 'color-mix(in srgb, var(--loss) 20%, transparent)'}`

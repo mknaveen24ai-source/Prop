@@ -24,9 +24,6 @@ const { initializeKafka, closeKafka } = require('./utils/kafka')
 const { performanceMonitor, wrapDatabaseQuery, getMetrics, resetMetrics, getHealthStatus } = require('./utils/performance')
 const { getFeedHealthForTenant, getLaunchHealthStatus } = require('./utils/launchReadiness')
 const { registerIO } = require('./utils/realtime')
-const {
-  ensureTenantSettingsInfrastructure
-} = require('./utils/tenantSettings')
 const { sanitizeString } = require('./utils/validation')
 const { requestContextMiddleware } = require('./utils/requestContext')
 const prometheusMetrics = require('./utils/prometheusMetrics')
@@ -544,16 +541,46 @@ app.get('/api/public/landing-stats', async function (req, res) {
 })
 
 // ── Marketing funnel tracking (public, unauthenticated) ───────────────────────
-// Fire-and-forget "visit" events from the public Landing page — the only
-// pre-registration funnel stage this platform ever tracked was none at all;
-// this is deliberately minimal (no PII, no fingerprinting), just a count.
+// Fire-and-forget funnel events from the public marketing pages. Still
+// deliberately minimal on PII: the campaign fields below are metadata the
+// visitor's own URL already carries. No IP, no user agent, no fingerprint.
+//
+// `user_id` is never written here — this route is unauthenticated, so there is
+// no identity to write. It is stitched in later by the register handler, which
+// stamps the signing-up user onto that session's earlier anonymous rows
+// (routes/auth.js). That is what turns a visit count into real attribution.
+//
+// The stage whitelist grew in migration 040 so the funnel has more than one
+// point on it: a visit, reaching the pricing/challenge selector, starting
+// checkout, and viewing the public leaderboard/transparency pages. Anything
+// not on the list degrades to 'visit' rather than being rejected, so a stale
+// frontend can never lose a datapoint.
+const FUNNEL_EVENT_TYPES = ['visit', 'view_pricing', 'start_checkout', 'view_leaderboard', 'view_transparency']
+
 app.post('/api/analytics/track', trackLimiter, async function (req, res) {
   try {
-    const eventType = ['visit'].includes(req.body?.event_type) ? req.body.event_type : 'visit'
-    const sessionId = req.body?.session_id ? sanitizeString(String(req.body.session_id), 100) : null
+    const body = req.body || {}
+    const eventType = FUNNEL_EVENT_TYPES.includes(body.event_type) ? body.event_type : 'visit'
+    const optional = (value, max) => (value ? sanitizeString(String(value), max) : null)
+
+    // Attribution is only meaningful on the first touch of a session, but
+    // storing it on every event keeps the write path stateless — the queries
+    // take the earliest non-null per session rather than the server having to
+    // remember anything.
     await pool.query(
-      `INSERT INTO marketing_funnel_events (event_type, session_id) VALUES ($1, $2)`,
-      [eventType, sessionId]
+      `INSERT INTO marketing_funnel_events
+         (event_type, session_id, utm_source, utm_medium, utm_campaign, referrer, landing_path, user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        eventType,
+        optional(body.session_id, 100),
+        optional(body.utm_source, 100),
+        optional(body.utm_medium, 100),
+        optional(body.utm_campaign, 150),
+        optional(body.referrer, 500),
+        optional(body.landing_path, 300),
+        null
+      ]
     )
     res.status(201).json({ ok: true })
   } catch (error) {
@@ -719,6 +746,9 @@ async function startServer() {
   try {
     await ensureStartupInfrastructure()
     await initializeRedis()
+    // In split-role mode API mutations must reach the one process that owns the
+    // synchronous trade index before the next price tick.
+    await require('./services/tradeIndexSync').start(require('./utils/tokenCache').getRedisClient())
     // FIX (H-08): must follow initializeRedis — the adapter duplicates that
     // client. Without it, Socket.IO rooms are per-process and any second
     // instance silently drops roughly half of all realtime events.
@@ -758,9 +788,10 @@ async function startServer() {
       // Before io.close(): the bridge's subscriber would otherwise keep pushing
       // frames at sockets that are being torn down.
       try { await require('./services/realtimeFanout').stopRedisBridge() } catch (error) { logger.warn('Failed to stop realtime fan-out cleanly', { error: error.message }) }
+      try { await require('./services/tradeIndexSync').stop() } catch (error) { logger.warn('Failed to stop trade index sync cleanly', { error: error.message }) }
       try { stopNewsService() } catch (error) { logger.warn('Failed to stop news service cleanly', { error: error.message }) }
       try { stopPriceFeedWatchers?.() } catch (error) { logger.warn('Failed to stop price feed watchers cleanly', { error: error.message }) }
-      try { await new Promise((resolve) => io.close(() => resolve())) } catch (error) { logger.warn('Socket.IO close error during shutdown', { error: error.message }) }
+      try { await new Promise((resolve) => { io.close(() => resolve()) }) } catch (error) { logger.warn('Socket.IO close error during shutdown', { error: error.message }) }
 
       for (const socket of activeHttpSockets) { try { socket.end() } catch {} }
 
@@ -769,11 +800,18 @@ async function startServer() {
       }, 2000)
       if (typeof destroyLingeringSocketsTimer.unref === 'function') destroyLingeringSocketsTimer.unref()
 
-      try {
-        await new Promise((resolve, reject) => {
-          httpServer.close((error) => { if (error) { reject(error); return } logger.info('Server closed'); resolve() })
-        })
-      } catch (error) { logger.warn('HTTP server close error during shutdown', { error: error.message }) }
+      // Socket.IO closes the HTTP server it is attached to. Avoid calling
+      // close() a second time on Node 24, which reports ERR_SERVER_NOT_RUNNING
+      // even though shutdown succeeded cleanly.
+      if (httpServer.listening) {
+        try {
+          await new Promise((resolve, reject) => {
+            httpServer.close((error) => { if (error) { reject(error); return } logger.info('Server closed'); resolve() })
+          })
+        } catch (error) { logger.warn('HTTP server close error during shutdown', { error: error.message }) }
+      } else {
+        logger.info('Server closed')
+      }
 
       clearTimeout(destroyLingeringSocketsTimer)
       await Promise.allSettled([closeRedis(), closeKafka(), pool.end(), flushSentry(3000)])

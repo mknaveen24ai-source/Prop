@@ -77,7 +77,7 @@ export default function RiskWarningBanner({ floating = false }) {
     }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)', flex: 1 }}>
-        <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, flexShrink: 0, marginTop: '2px', color: 'var(--muted)' }}>WARNING</span>
+        <span style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, flexShrink: 0, marginTop: 'var(--space-1)', color: 'var(--muted)' }}>WARNING</span>
         <p style={{
           color: 'var(--text-muted)',
           fontSize: 'var(--fs-sm)',

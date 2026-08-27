@@ -40,7 +40,7 @@ export default function ComplianceAuditTab({ dateRange }) {
     (async () => {
       setLoading(true);
       try {
-        // TODO: GET /api/admin/analytics/compliance-audit?from=&to= (backend/routes/adminAnalytics.js)
+        // Backed by GET /api/admin/analytics/compliance-audit?from=&to= (backend/routes/adminAnalytics.js)
         const res = await adminAxios.get('/api/admin/analytics/compliance-audit', {
           params: { from: dateRange?.from || undefined, to: dateRange?.to || undefined },
         });

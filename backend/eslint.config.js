@@ -1,5 +1,6 @@
 const js = require('@eslint/js')
 const globals = require('globals')
+const tseslint = require('typescript-eslint')
 
 // Deliberately conservative. The goal is to catch real defects — undeclared
 // variables, unreachable code, duplicate object keys, promise mistakes — not to
@@ -9,6 +10,8 @@ module.exports = [
   {
     ignores: [
       'node_modules/**',
+      'dist/**',
+      '.test-dist/**',
       'logs/**',
       'uploads/**',
       'coverage/**',
@@ -79,6 +82,51 @@ module.exports = [
       // Money math must never round via bitwise ops (silently truncates to
       // int32, which for a balance over ~2.1bn cents is catastrophic).
       'no-bitwise': 'warn'
+    }
+  },
+
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: __dirname
+      },
+      globals: {
+        ...globals.node
+      }
+    },
+    plugins: {
+      '@typescript-eslint': tseslint.plugin
+    },
+    rules: {
+      'no-undef': 'off',
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': ['warn', {
+        args: 'none',
+        caughtErrors: 'none',
+        varsIgnorePattern: '^_'
+      }],
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-unsafe-assignment': 'error',
+      '@typescript-eslint/no-unsafe-member-access': 'error',
+      '@typescript-eslint/no-unsafe-call': 'error',
+      '@typescript-eslint/no-unsafe-return': 'error',
+      '@typescript-eslint/consistent-type-imports': ['error', {
+        prefer: 'type-imports',
+        fixStyle: 'separate-type-imports'
+      }],
+      '@typescript-eslint/ban-ts-comment': ['error', {
+        'ts-ignore': true,
+        'ts-nocheck': true,
+        'ts-check': false,
+        'ts-expect-error': 'allow-with-description',
+        minimumDescriptionLength: 10
+      }],
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
+      '@typescript-eslint/only-throw-error': 'error'
     }
   },
 

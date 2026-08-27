@@ -48,14 +48,14 @@ Failure to meet phase requirements, breaching drawdown limits, or expiry of the 
       content: `Traders who reach the funded stage and generate profits are eligible to request payouts subject to the following conditions:
 
 — Minimum payout request is $50 USD equivalent.
-— Payouts are calculated at 75% of realized profits above the starting balance.
+— Payouts are calculated at 100% of realized profits above the starting balance. The Company takes no share of trader profits; its revenue is the one-off evaluation fee.
 — Before your first payout, the account must have at least 10 qualifying trading days and 6% net profit; there is no further lock-up period after that.
-— Payouts are available on a weekly basis, and only one pending payout request is permitted at a time.
+— Payouts are on demand: request one whenever you are eligible. One request per 24 hours, and only one pending request at a time. We review within 24 hours and pay within 48 hours of approval.
 — Payouts are discretionary performance bonuses paid from company capital and do not represent withdrawal of deposited funds.
-— Payouts are processed in USDT (TRC20 network). You are responsible for providing a valid wallet address and for any network fees.
+— Payouts are processed in USDT (TRC20, BEP20, ERC20 or Polygon), Bitcoin or Litecoin, on the network you select when requesting. You are responsible for providing a valid wallet address and for any network fees.
 — We reserve the right to delay, withhold, or deny payouts if we have reasonable grounds to suspect manipulation, abuse, or violation of these Terms.
 — KYC verification must be completed and approved before any payout is processed.
-— Payout processing time is up to 7 business days after admin approval.`
+— Payout processing time is up to 7 business days after admin approval, and typically within 48 hours.`
     },
     {
       id: 'kyc',
@@ -154,7 +154,7 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
         <div style={{
           display: 'inline-block', background: 'color-mix(in srgb, var(--muted) 10%, transparent)',
           border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)', borderRadius: 'var(--radius-pill)',
-          padding: '5px 14px', fontSize: 'var(--fs-xs)', color: 'var(--accent)',
+          padding: 'var(--space-1-5) var(--space-3-5)', fontSize: 'var(--fs-xs)', color: 'var(--accent)',
           letterSpacing: '0.1em', marginBottom: 'var(--space-5)'
         }}>
           LEGAL DOCUMENT
@@ -175,7 +175,7 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
         {/* Intro box */}
         <div style={{
           background: 'color-mix(in srgb, var(--muted) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--muted) 20%, transparent)',
-            padding: '24px 28px', marginBottom: 'var(--space-8)'
+            padding: 'var(--space-6) var(--space-7)', marginBottom: 'var(--space-8)'
         }}>
           <p style={{ color: 'var(--text)', lineHeight: '1.8', fontSize: 'var(--fs-md)', margin: 0 }}>
             Please read these Terms of Service carefully before using our platform. By registering an account or using any part of this service, you agree to be bound by these Terms. If you do not agree, do not use this platform.

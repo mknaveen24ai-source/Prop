@@ -70,6 +70,13 @@ function AdminRealtimeAlerts({ socket }) {
 export function AdminLoginScreen({ onLoginSuccess }) {
   const { adminAxios } = useAdminSession()
   const [step, setStep] = useState('password')
+  // Forced-enrolment flow: admin 2FA is mandatory, so an admin with no TOTP
+  // gets a short-lived enrolment token instead of a session (backend:
+  // routes/admin/auth.js POST /login -> requiresTotpEnrolment).
+  const [enrolmentToken, setEnrolmentToken] = useState('')
+  const [enrolQr, setEnrolQr] = useState('')
+  const [enrolSecret, setEnrolSecret] = useState('')
+  const [backupCodes, setBackupCodes] = useState(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -92,11 +99,46 @@ export function AdminLoginScreen({ onLoginSuccess }) {
       if (response.data.requires2FA) {
         setPre2faToken(response.data.pre2faToken)
         setStep('totp')
+      } else if (response.data.requiresTotpEnrolment) {
+        setEnrolmentToken(response.data.enrolmentToken)
+        const setupRes = await adminAxios.post(
+          '/api/admin/2fa/setup',
+          {},
+          { headers: { Authorization: `Bearer ${response.data.enrolmentToken}` } }
+        )
+        setEnrolQr(setupRes.data?.qr || setupRes.data?.qrDataUrl || '')
+        setEnrolSecret(setupRes.data?.secret || setupRes.data?.otpauth || '')
+        setStep('enrol')
       } else {
         await onLoginSuccess()
       }
     } catch (error) {
       setErrorMsg(error?.response?.data?.error || 'Could not log in')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleEnrolVerify = async (code) => {
+    setLoading(true)
+    setErrorMsg('')
+    try {
+      const res = await adminAxios.post(
+        '/api/admin/2fa/verify-setup',
+        { token: code },
+        { headers: { Authorization: `Bearer ${enrolmentToken}` } }
+      )
+      // The backend promotes a successful enrolment straight into a session, so
+      // there is no second login. Show the backup codes first — they are
+      // displayed exactly once.
+      if (Array.isArray(res.data?.backup_codes) && res.data.backup_codes.length > 0) {
+        setBackupCodes(res.data.backup_codes)
+        setStep('backup')
+      } else {
+        await onLoginSuccess()
+      }
+    } catch (error) {
+      setErrorMsg(error?.response?.data?.error || 'Invalid code')
     } finally {
       setLoading(false)
     }
@@ -140,14 +182,17 @@ export function AdminLoginScreen({ onLoginSuccess }) {
         <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
           <div style={{
             width: '48px', height: '48px', background: 'var(--admin-accent-bg)', color: 'var(--admin-accent)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto var(--space-4)',
             border: '1px solid var(--rule-soft)',
           }}>
-            {step === 'totp' ? <AdminLockIcon /> : <AdminShieldIcon />}
+            {step === 'totp' || step === 'enrol' ? <AdminLockIcon /> : <AdminShieldIcon />}
           </div>
           <h1 className="admin-h1">Admin Portal</h1>
           <p style={{ color: 'var(--admin-text-muted)' }}>
-            {step === 'totp' ? 'Enter your authenticator code' : 'DB-backed platform admin access'}
+            {step === 'totp' ? 'Enter your authenticator code'
+              : step === 'enrol' ? 'Two-factor authentication is required for admin accounts'
+              : step === 'backup' ? 'Save these backup codes now'
+              : 'DB-backed platform admin access'}
           </p>
         </div>
 
@@ -198,6 +243,64 @@ export function AdminLoginScreen({ onLoginSuccess }) {
               {loading ? 'Authenticating...' : 'Secure Login'}
             </button>
           </form>
+        )}
+
+        {step === 'enrol' && (
+          <div>
+            <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)', marginBottom: 'var(--space-4)', lineHeight: 1.6 }}>
+              Scan this with your authenticator app, then enter the six-digit code to finish. Admin accounts can approve
+              payouts and adjust balances, so a password alone is no longer enough.
+            </p>
+            {enrolQr && (
+              <img
+                src={enrolQr}
+                alt="Two-factor authentication setup QR code"
+                style={{
+                  display: 'block', margin: '0 auto var(--space-4)', width: '180px', height: '180px',
+                  // design-drift-allow: a QR code needs a true-white quiet zone to
+                  // scan reliably; a themed surface token breaks it in dark mode.
+                  background: '#fff',
+                  padding: 'var(--space-2)'
+                }}
+              />
+            )}
+            {enrolSecret && (
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', textAlign: 'center', wordBreak: 'break-all', color: 'var(--admin-text-muted)', marginBottom: 'var(--space-4)' }}>
+                {enrolSecret}
+              </div>
+            )}
+            <OtpInput idPrefix="admin-enrol-digit" onChange={setTotpCode} onComplete={handleEnrolVerify} disabled={loading} />
+            <button
+              className="admin-btn admin-btn-primary"
+              onClick={() => handleEnrolVerify(totpCode)}
+              disabled={loading || totpCode.length < 6}
+              style={{ width: '100%' }}
+            >
+              {loading ? 'Verifying...' : 'Enable two-factor authentication'}
+            </button>
+          </div>
+        )}
+
+        {step === 'backup' && (
+          <div>
+            <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)', marginBottom: 'var(--space-4)', lineHeight: 1.6 }}>
+              Store these somewhere safe. Each one works once if you lose your authenticator, and they are not shown again.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
+              {(backupCodes || []).map((code) => (
+                <code key={code} style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-base)', padding: 'var(--space-2)', border: '1px solid var(--admin-border)', textAlign: 'center' }}>
+                  {code}
+                </code>
+              ))}
+            </div>
+            <button
+              className="admin-btn admin-btn-primary"
+              onClick={() => onLoginSuccess()}
+              style={{ width: '100%' }}
+            >
+              I&apos;ve saved them — continue
+            </button>
+          </div>
         )}
 
         {step === 'totp' && (

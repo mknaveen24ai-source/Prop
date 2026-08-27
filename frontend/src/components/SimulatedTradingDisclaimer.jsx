@@ -22,7 +22,7 @@ export default function SimulatedTradingDisclaimer() {
           <span style={{
             background: 'color-mix(in srgb, var(--muted) 15%, transparent)',
             border: '1px solid color-mix(in srgb, var(--muted) 30%, transparent)',
-            padding: '2px 8px',
+            padding: 'var(--space-1) var(--space-2)',
             fontSize: 'var(--fs-2xs)',
             color: 'var(--accent)',
             fontWeight: '600',

@@ -13,7 +13,7 @@ const branding = {
   support_email: null,
   email_from_name: 'PropFirm',
   settings: {
-    max_accounts_per_user: '5',
+    max_accounts_per_user: '0',   // 0 = unlimited
     // Optional override for the "starting from $X" copy used across the
     // landing page. Leave blank to fall back to the default copy.
     challenge_fee_label: ''

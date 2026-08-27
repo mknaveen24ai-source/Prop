@@ -61,7 +61,7 @@ export default function TradeBehaviorTab() {
     (async () => {
       setLoading(true);
       try {
-        // TODO: GET /api/admin/analytics/trade-behavior (backend/routes/adminAnalytics.js)
+        // Backed by GET /api/admin/analytics/trade-behavior (backend/routes/adminAnalytics.js)
         const res = await adminAxios.get('/api/admin/analytics/trade-behavior');
         setData(res.data);
       } catch {
@@ -123,11 +123,11 @@ export default function TradeBehaviorTab() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 'var(--space-4)', marginTop: 'var(--space-6)', alignItems: 'stretch' }}>
         <Card>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--admin-text-muted)' }}>Avg R-Multiple</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--admin-text-muted)' }}>Avg R-Multiple</div>
           <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: 'var(--fs-5xl)', marginTop: 'var(--space-2-5)', color: avgRMultiple == null ? 'var(--admin-text-faint)' : avgRMultiple >= 0 ? 'var(--admin-success)' : 'var(--admin-danger)' }}>
             {avgRMultiple == null ? '—' : `${avgRMultiple.toFixed(2)}R`}
           </div>
-          <div style={{ fontSize: '11.5px', color: 'var(--admin-text-muted)', marginTop: 'var(--space-1-5)' }}>Platform-wide, last 5,000 closed trades. Only trades with a stop-loss count.</div>
+          <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)', marginTop: 'var(--space-1-5)' }}>Platform-wide, last 5,000 closed trades. Only trades with a stop-loss count.</div>
         </Card>
         <AdminChart title="R-Multiple Distribution">
           <BarChart data={rMultipleDistribution}>

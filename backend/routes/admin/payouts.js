@@ -18,7 +18,12 @@ const { createUserNotification } = require('../../utils/userNotifications')
 const { ensureDisputesInfrastructure } = require('../disputes')
 require('../../loadEnv')
 
+const { emitAdminEvent } = require('../../utils/realtime')
 const { ensureFeatureTables } = require('./shared/schema')
+
+// Approvals at or above this trigger an operator alert and an extra audit
+// entry. Not a block — see the approval-alerting note in the handler.
+const PAYOUT_ALERT_THRESHOLD = 2500
 const {
   getAdminActorLabel, buildAdminActorPayload, appendImmutableAudit
 } = require('./shared/audit')
@@ -83,10 +88,92 @@ router.post('/payouts/approve', authenticateAdmin, requireAdminCapability('payou
       transactionId: transaction_id,
       actor: getAdminActorLabel(req.admin)
     })
+
+    // Above the dual-approval threshold the first approval only records intent:
+    // no money has moved and the payout is still pending, so nothing below this
+    // point applies — the trader must not be told they have been paid, and no
+    // certificate is minted. A second, distinct admin completes it.
+    if (approval.awaitingSecondApproval) {
+      await client.query('COMMIT')
+
+      await appendImmutableAudit(pool, {
+        actor: buildAdminActorPayload(req.admin),
+        eventType: 'payout_first_approval_recorded',
+        entityType: 'payout',
+        entityId: String(payout_id),
+        payload: { threshold: approval.threshold, first_approver: approval.firstApprover }
+      }).catch((auditErr) => {
+        logger.error('[payouts] Could not audit first approval; approval stands', { error: auditErr.message })
+      })
+
+      emitAdminEvent('payout_awaiting_second_approval', {
+        payout_id: String(payout_id),
+        first_approver: approval.firstApprover,
+        threshold: approval.threshold
+      })
+
+      return res.json({
+        message: 'First approval recorded. A second admin must approve this payout before it is paid.',
+        awaiting_second_approval: true,
+        first_approver: approval.firstApprover,
+        threshold: approval.threshold
+      })
+    }
+
     const { recipient } = approval
     const { email, full_name, amountPayable: amount_payable, paymentMethod: payment_method, userId: user_id } = recipient
 
     await client.query('COMMIT')
+
+    // ── Approval alerting ───────────────────────────────────────────────────
+    //
+    // Dual control (migration 045) now covers approvals at or above
+    // payout_dual_approval_threshold. Alerting is the complement, not a
+    // substitute: it covers everything BELOW that threshold, where one admin
+    // still signs alone, and every flagged payout at any amount. Both the
+    // immutable audit trail and a live admin-channel event fire, so an abuse is
+    // noticed in minutes rather than at the next reconciliation.
+    //
+    // Best-effort and after COMMIT, for the same reason the notifications below
+    // are: alerting must never be able to fail a payout that has already moved
+    // money.
+    try {
+      const alertAmount = parseFloat(amount_payable) || 0
+      const isLarge = alertAmount >= PAYOUT_ALERT_THRESHOLD
+      const wasFlagged = approval.payout?.is_flagged === true
+      if (isLarge || wasFlagged) {
+        const reasons = []
+        if (isLarge) reasons.push(`amount $${alertAmount.toFixed(2)} at or above the $${PAYOUT_ALERT_THRESHOLD} alert threshold`)
+        if (wasFlagged) reasons.push(`payout was flagged: ${approval.payout?.flag_reason || 'no reason recorded'}`)
+
+        logger.warn('[payouts] High-attention payout approved', {
+          payoutId: String(payout_id),
+          amountPayable: alertAmount,
+          approvedBy: getAdminActorLabel(req.admin),
+          reasons
+        })
+
+        emitAdminEvent('payout_approved_alert', {
+          payout_id: String(payout_id),
+          amount_payable: alertAmount,
+          approved_by: getAdminActorLabel(req.admin),
+          is_flagged: wasFlagged,
+          reasons
+        })
+
+        await appendImmutableAudit(pool, {
+          actor: buildAdminActorPayload(req.admin),
+          eventType: 'payout_approved_high_attention',
+          entityType: 'payout',
+          entityId: String(payout_id),
+          payload: { amount_payable: alertAmount, is_flagged: wasFlagged, reasons }
+        })
+      }
+    } catch (alertErr) {
+      logger.error('[payouts] Approval alerting failed; payout stands', {
+        error: alertErr.message, payoutId: String(payout_id)
+      })
+    }
 
     // FIX (M-09): these ran outside any try/catch, so a mail or socket failure
     // hit the outer handler and returned HTTP 500 for a payout that had already

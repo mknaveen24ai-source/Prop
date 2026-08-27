@@ -18,12 +18,12 @@ export default function LandingFooter({ onFooterCta }) {
   }
 
   return (
-    <footer className="mp-section" style={{ background: 'var(--paper)', paddingTop: '100px', paddingBottom: 'var(--space-8)', borderTop: '1px solid var(--rule)' }}>
+    <footer className="mp-section" style={{ background: 'var(--paper)', paddingTop: 'var(--space-12)', paddingBottom: 'var(--space-8)', borderTop: '1px solid var(--rule)' }}>
       <div className="mp-container">
 
         {/* CTA Banner */}
         <div className="mp-glass-card mp-reveal" style={{
-          textAlign: 'center', padding: '80px 40px', marginBottom: '100px',
+          textAlign: 'center', padding: 'var(--space-11) var(--space-8)', marginBottom: 'var(--space-12)',
           background: 'var(--paper-2)',
           border: '1px solid var(--rule)',
           borderTop: '3px double var(--ink)',
@@ -32,8 +32,8 @@ export default function LandingFooter({ onFooterCta }) {
         }}>
           <div style={{ position: 'relative', zIndex: 1 }}>
             <h2 className="mp-h2" style={{ fontSize: 'clamp(32px, 4vw, 52px)' }}>{landingCopy.footerHeadline}</h2>
-            <p className="mp-p-lead" style={{ margin: '0 auto 40px' }}>{landingCopy.footerSubtitle}</p>
-            <Link to="/register" className="mp-btn-primary" style={{ padding: '22px 56px', fontSize: '17px', textDecoration: 'none' }} onClick={onFooterCta}>
+            <p className="mp-p-lead" style={{ margin: '0 auto var(--space-8)' }}>{landingCopy.footerSubtitle}</p>
+            <Link to="/register" className="mp-btn-primary" style={{ padding: 'var(--space-6) var(--space-10)', fontSize: 'var(--fs-xl)', textDecoration: 'none' }} onClick={onFooterCta}>
               {landingCopy.footerButton}
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12H19M19 12L12 5M19 12L12 19" />
@@ -44,7 +44,7 @@ export default function LandingFooter({ onFooterCta }) {
         </div>
 
         {/* Footer Grid */}
-        <div className="mp-footer-grid mp-reveal mp-delay-200" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '60px', marginBottom: '80px' }}>
+        <div className="mp-footer-grid mp-reveal mp-delay-200" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-10)', marginBottom: 'var(--space-11)' }}>
 
           {/* Brand */}
           <div className="mp-footer-brand" style={{ gridColumn: 'span 2' }}>
@@ -55,7 +55,7 @@ export default function LandingFooter({ onFooterCta }) {
             <p className="mp-p-body" style={{ color: 'var(--muted)', maxWidth: '300px', fontSize: 'var(--fs-md)' }}>
               {landingCopy.footerBrand}
             </p>
-            <div style={{ marginTop: '30px', display: 'flex', gap: 'var(--space-3)' }}>
+            <div style={{ marginTop: 'var(--space-7)', display: 'flex', gap: 'var(--space-3)' }}>
               {[
                 { name: 'Twitter', letter: '𝕏' },
                 { name: 'Discord', letter: 'D' },
@@ -123,6 +123,9 @@ export default function LandingFooter({ onFooterCta }) {
             <h4 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-md)', color: 'var(--muted)', marginBottom: 'var(--space-6)', textTransform: 'uppercase', letterSpacing: '0.15em' }}>Legal</h4>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-3-5)' }}>
               {[
+                // The rulebook is the single most-asked-for page before purchase
+                // and it used to be reachable only from inside a paid account.
+                { to: '/rules', label: 'Trading Rules' },
                 { to: '/terms', label: 'Terms of Service' },
                 { to: '/privacy', label: 'Privacy Policy' },
                 { to: '/refund-policy', label: 'Refund Policy' },
@@ -158,7 +161,7 @@ export default function LandingFooter({ onFooterCta }) {
               {['WEB PLATFORM', 'FOREX', 'GOLD', 'SILVER'].map(p => (
                 <div key={p} style={{
                   fontSize: 'var(--fs-2xs)', color: 'var(--muted)',
-                  border: '1px solid var(--rule)', padding: '5px 10px',
+                  border: '1px solid var(--rule)', padding: 'var(--space-1-5) var(--space-2-5)',
                 fontFamily: 'var(--font-mono)',
                   letterSpacing: '0.05em',
                 }}>{p}</div>

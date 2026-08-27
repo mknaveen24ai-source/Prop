@@ -114,10 +114,10 @@ export default function DashboardPayoutsPage({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: 'var(--space-3-5)' }}>
         {kpis.map((k) => (
           <Card key={k.label} stat tone={k.tone}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>{k.label}</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>{k.label}</div>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'clamp(20px,1.8vw,25px)', whiteSpace: 'nowrap', marginTop: 'var(--space-2)', color: k.tone }}>{k.value}</div>
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 'var(--space-2-5)', marginTop: 'var(--space-1-5)' }}>
-              <span style={{ fontSize: '11.5px', color: 'var(--muted)' }}>{k.sub}</span>
+              <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--muted)' }}>{k.sub}</span>
               {k.spark.length > 1 && <Sparkline data={k.spark} tone={k.tone} width={70} height={24} />}
             </div>
           </Card>
@@ -129,7 +129,7 @@ export default function DashboardPayoutsPage({
         <form onSubmit={requestPayout} style={{ background: 'var(--glass-2)', backdropFilter: 'blur(18px)', border: '1px solid var(--accent)', borderRadius: '4px', boxShadow: 'var(--elev)', padding: 'var(--space-4-5) var(--space-5)' }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-2xl)', borderBottom: '3px double var(--rule)', paddingBottom: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>Request a payout</div>
 
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 'var(--space-1-5)' }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 'var(--space-1-5)' }}>
             Amount available — {formatCurrency(availableProfit)}
           </div>
           <input
@@ -140,9 +140,9 @@ export default function DashboardPayoutsPage({
             min="50"
             max={availableProfit}
             step="0.01"
-            style={{ width: '100%', padding: 'var(--space-3) var(--space-3-5)', border: '1px solid var(--rule)', borderRadius: '4px', background: 'var(--paper)', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: '19px' }}
+            style={{ width: '100%', padding: 'var(--space-3) var(--space-3-5)', border: '1px solid var(--rule)', borderRadius: '4px', background: 'var(--paper)', color: 'var(--ink)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xl)' }}
           />
-          <div style={{ display: 'flex', gap: 'var(--space-1-5)', marginTop: '9px' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-1-5)', marginTop: 'var(--space-2-5)' }}>
             {PRESET_PCTS.map((pct) => (
               <button
                 key={pct}
@@ -155,7 +155,7 @@ export default function DashboardPayoutsPage({
             ))}
           </div>
 
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', margin: 'var(--space-4) 0 var(--space-2)' }}>Cryptocurrency</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', margin: 'var(--space-4) 0 var(--space-2)' }}>Cryptocurrency</div>
           {CRYPTO_CURRENCIES.map((m) => {
             const active = payoutCurrency === m.id
             return (
@@ -172,7 +172,7 @@ export default function DashboardPayoutsPage({
                 <span style={{ width: '8px', height: '8px', background: m.tone, flex: '0 0 auto' }} />
                 <span style={{ flex: 1 }}>
                   <span style={{ display: 'block', fontSize: 'var(--fs-base)', color: 'var(--ink)' }}>{m.label}</span>
-                  <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)', marginTop: '2px' }}>{m.meta}</span>
+                  <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', color: 'var(--muted)', marginTop: 'var(--space-1)' }}>{m.meta}</span>
                 </span>
               </button>
             )
@@ -180,7 +180,7 @@ export default function DashboardPayoutsPage({
 
           {payoutCurrency === 'usdt' && (
             <>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', margin: 'var(--space-3) 0 var(--space-2)' }}>Network</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', margin: 'var(--space-3) 0 var(--space-2)' }}>Network</div>
               {USDT_NETWORKS.map((n) => {
                 const active = payoutNetwork === n.id
                 return (
@@ -197,7 +197,7 @@ export default function DashboardPayoutsPage({
                     <span style={{ width: '8px', height: '8px', background: n.tone, flex: '0 0 auto' }} />
                     <span style={{ flex: 1 }}>
                       <span style={{ display: 'block', fontSize: 'var(--fs-base)', color: 'var(--ink)' }}>{n.label}</span>
-                      <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)', marginTop: '2px' }}>{n.meta}</span>
+                      <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', color: 'var(--muted)', marginTop: 'var(--space-1)' }}>{n.meta}</span>
                     </span>
                   </button>
                 )
@@ -206,7 +206,7 @@ export default function DashboardPayoutsPage({
           )}
 
           <div>
-            <label style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Payment Details</label>
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Payment Details</label>
             <textarea
               value={payoutForm.payment_details}
               onChange={(e) => setPayoutForm({ ...payoutForm, payment_details: e.target.value })}
@@ -221,15 +221,15 @@ export default function DashboardPayoutsPage({
           </div>
 
           <div style={{ borderTop: '1px solid var(--rule-soft)', marginTop: 'var(--space-3-5)', paddingTop: 'var(--space-3)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', padding: '5px 0', fontSize: '12.5px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', padding: 'var(--space-1-5) 0', fontSize: 'var(--fs-base)' }}>
               <span style={{ color: 'var(--muted)' }}>Requested amount</span>
               <span style={{ fontFamily: 'var(--font-mono)' }}>{formatCurrency(payoutForm.amount_requested || 0)}</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', padding: '5px 0', fontSize: '12.5px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', padding: 'var(--space-1-5) 0', fontSize: 'var(--fs-base)' }}>
               <span style={{ color: 'var(--muted)' }}>Your share</span>
               <span style={{ fontFamily: 'var(--font-mono)' }}>{profitSharePct}%</span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', padding: '5px 0', fontSize: '12.5px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', padding: 'var(--space-1-5) 0', fontSize: 'var(--fs-base)' }}>
               <span style={{ color: 'var(--muted)' }}>You receive</span>
               <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--gain)' }}>{formatCurrency(calculatePayoutPreview(payoutForm.amount_requested || 0, profitSharePct))}</span>
             </div>
@@ -238,7 +238,7 @@ export default function DashboardPayoutsPage({
           <button
             type="submit"
             disabled={availableProfit < 50}
-            style={{ width: '100%', marginTop: 'var(--space-4)', padding: '13px', border: '1px solid var(--accent)', borderRadius: '4px', background: availableProfit < 50 ? 'var(--rule)' : 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: '11.5px', letterSpacing: '.12em', textTransform: 'uppercase', cursor: availableProfit < 50 ? 'not-allowed' : 'pointer' }}
+            style={{ width: '100%', marginTop: 'var(--space-4)', padding: 'var(--space-3-5)', border: '1px solid var(--accent)', borderRadius: '4px', background: availableProfit < 50 ? 'var(--rule)' : 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', letterSpacing: '.12em', textTransform: 'uppercase', cursor: availableProfit < 50 ? 'not-allowed' : 'pointer' }}
           >
             {availableProfit < 50 ? 'Minimum $50 required' : 'Submit request'}
           </button>
@@ -249,21 +249,21 @@ export default function DashboardPayoutsPage({
           <Card>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3-5)', borderBottom: '1px solid var(--rule-soft)', paddingBottom: 'var(--space-3)', marginBottom: 'var(--space-3-5)' }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '19px' }}>Profit split accrual</div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: '3px' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-2xl)' }}>Profit split accrual</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: 'var(--space-1)' }}>
                   {payoutCycle ? `Cycle ends ${formatDate(payoutCycle.next_date)}` : 'Cycle'} · your {profitSharePct}% share
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '2px', padding: '3px', border: '1px solid var(--rule)', borderRadius: '4px', background: 'var(--paper-2)' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-1)', padding: 'var(--space-1)', border: '1px solid var(--rule)', borderRadius: '4px', background: 'var(--paper-2)' }}>
                 {CURVE_RANGES.map((r) => (
                   <button
                     key={r.id}
                     onClick={() => setCurveRange(r.id)}
                     style={{
-                      padding: '5px 10px', border: 'none', borderRadius: '3px', cursor: 'pointer',
+                      padding: 'var(--space-1-5) var(--space-2-5)', border: 'none', borderRadius: '3px', cursor: 'pointer',
                       background: curveRange === r.id ? 'var(--accent)' : 'transparent',
                       color: curveRange === r.id ? 'var(--paper)' : 'var(--muted)',
-                      fontFamily: 'var(--font-mono)', fontSize: '10.5px', letterSpacing: '.06em'
+                      fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.06em'
                     }}
                   >
                     {r.label}

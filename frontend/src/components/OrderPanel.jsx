@@ -98,7 +98,7 @@ export default function OrderPanel({
           </span>
           <div>
             <div style={{ fontSize: 'var(--fs-sm)', fontWeight: '700', color: 'var(--red)' }}>MARKET CLOSED</div>
-            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: '2px' }}>{marketStatus.reason}</div>
+            <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>{marketStatus.reason}</div>
           </div>
         </div>
       )}
@@ -136,7 +136,7 @@ export default function OrderPanel({
               type="button"
               onClick={() => setSymbolCategory(tab.key)}
               style={{
-                padding: '3px 9px',
+                padding: 'var(--space-1) var(--space-2-5)',
                 fontSize: 'var(--fs-2xs)',
                 fontWeight: 700,
                 borderRadius: 'var(--radius-pill)',
@@ -305,19 +305,19 @@ export default function OrderPanel({
               and a media query cannot widen an inline grid. */}
           <div className="order-panel-rr-grid">
             <div>
-              <div style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-2xs)', marginBottom: '2px' }}>RISK</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-2xs)', marginBottom: 'var(--space-1)' }}>RISK</div>
               <div style={{ color: 'var(--red)', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>
                 {rrSummary.riskUSD != null ? `-${formatCurrency(rrSummary.riskUSD)}` : '-'}
               </div>
             </div>
             <div>
-              <div style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-2xs)', marginBottom: '2px' }}>REWARD</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-2xs)', marginBottom: 'var(--space-1)' }}>REWARD</div>
               <div style={{ color: 'var(--green)', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>
                 {rrSummary.rewardUSD != null ? `+${formatCurrency(rrSummary.rewardUSD)}` : '-'}
               </div>
             </div>
             <div>
-              <div style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-2xs)', marginBottom: '2px' }}>R:R RATIO</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 'var(--fs-2xs)', marginBottom: 'var(--space-1)' }}>R:R RATIO</div>
               <div style={{ color: rrSummary.rr >= 2 ? 'var(--green)' : rrSummary.rr >= 1 ? 'var(--muted)' : 'var(--red)', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>
                 {rrSummary.rr != null ? `1:${rrSummary.rr}` : '-'}
               </div>
@@ -353,7 +353,7 @@ export default function OrderPanel({
                   }}
                 >
                   <div style={{ fontSize: 'var(--fs-sm)', fontWeight: '600', color: opt.color }}>{opt.label}</div>
-                  <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', marginTop: '2px' }}>{opt.desc}</div>
+                  <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', marginTop: 'var(--space-1)' }}>{opt.desc}</div>
                 </button>
               ))}
             </div>
@@ -477,13 +477,13 @@ export default function OrderPanel({
         <div className="order-panel-summary" style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>
           <div className="order-panel-summary-row">
             <span style={{ fontSize: 'var(--fs-sm)' }}>Balance</span>
-            <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: '15px', fontWeight: '700' }}>
+            <span style={{ color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-lg)', fontWeight: '700' }}>
               ${accountBalanceNum.toFixed(2)}
             </span>
           </div>
           <div className="order-panel-summary-row">
             <span style={{ fontSize: 'var(--fs-sm)' }}>Floating Balance</span>
-            <span style={{ color: floatingBalanceNum >= accountBalanceNum ? 'var(--green)' : 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: '15px', fontWeight: '700' }}>
+            <span style={{ color: floatingBalanceNum >= accountBalanceNum ? 'var(--green)' : 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-lg)', fontWeight: '700' }}>
               ${floatingBalanceNum.toFixed(2)}
             </span>
           </div>

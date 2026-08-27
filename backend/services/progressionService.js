@@ -9,7 +9,6 @@ const {
   markPromotionReviewApproved
 } = require('./tenantMonthlyQuotaService')
 
-let accountUidReady = false
 let bbookPnlConflictTargetReady = false
 
 async function ensureBbookPnlConflictTarget(db) {
@@ -60,17 +59,6 @@ async function ensureBbookPnlConflictTarget(db) {
   `)
   await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS bbook_pnl_date_uq ON bbook_pnl(date)`)
   bbookPnlConflictTargetReady = true
-}
-
-async function ensureAccountUidColumn(db) {
-  if (accountUidReady) return
-  try {
-    await db.query(`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS account_uid TEXT`)
-    await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS accounts_account_uid_uq ON accounts(account_uid)`)
-    accountUidReady = true
-  } catch (_) {
-    // Best-effort: if schema check fails, allow caller to handle DB error.
-  }
 }
 
 function normalizeProgressionSettings(input) {
@@ -300,9 +288,7 @@ async function awardPromotionCertificate(executor, acc, plan, newAccountId) {
   try {
     await executor.query('SAVEPOINT certificate_award')
     savepointHeld = true
-  } catch {
-    savepointHeld = false
-  }
+  } catch {}
 
   try {
     const recipient = await executor.query(
@@ -377,12 +363,36 @@ async function promotePassedAccount(db, acc, settings) {
 
     const award = await awardPromotionCertificate(executor, acc, plan, newAccount.rows[0].id)
 
+    // ── Funded-stage KYC notice ──────────────────────────────────────────────
+    //
+    // KYC no longer gates buying a challenge; it gates TRADING a funded account
+    // (routes/trades/open.js). A trader arriving at funded without approved KYC
+    // would otherwise discover that at the moment they try to place their first
+    // trade, which is the worst possible time to learn it. The promotion message
+    // carries the requirement instead, and `kyc_required` lets the dashboard
+    // surface it as a banner rather than an error.
+    //
+    // Read on `executor` — we are already inside this transaction; asking the
+    // pool for a second connection here is the deadlock shape documented in
+    // routes/payouts.js.
+    let kycRequired = false
+    if (plan.targetAccountType === 'funded') {
+      const kycResult = await executor.query(
+        `SELECT kyc_status FROM users WHERE id = $1`,
+        [acc.user_id]
+      )
+      kycRequired = String(kycResult.rows[0]?.kyc_status || '').toLowerCase() !== 'approved'
+    }
+
     if (client) await client.query('COMMIT')
 
     return {
       new_account_id: newAccount.rows[0].id,
       event: plan.socketEvent,
-      message: plan.socketMessage,
+      message: kycRequired
+        ? `${plan.socketMessage} One step left: verify your identity to unlock trading on your funded account.`
+        : plan.socketMessage,
+      kyc_required: kycRequired,
       certificate: award.certificate,
       certificate_created: award.created,
       recipient_email: award.email

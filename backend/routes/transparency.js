@@ -7,10 +7,60 @@ const { readPool: pool } = require('../db')
 const logger = require('../utils/logger')
 
 // ── Transparency API ──────────────────────────────────────────────────────────
-// All endpoints are fully public (no auth middleware).
-// No PII is ever returned — trader names are masked to "J****" format.
-// Data is read-only aggregations from existing tables.
+// Public by default. No PII is ever returned — trader names are masked to
+// "J****" format. Data is read-only aggregations from existing tables.
+//
+// ── The one exception: revenue ──
+//
+// Pass rates, payout totals, funded counts and AUM are the platform's single
+// best asset — no competitor publishes them, and publishing them is the whole
+// positioning. Firm REVENUE is a different question that had been answered the
+// same way by accident: /revenue served a daily and cumulative order-revenue
+// series to anonymous traffic, and /overview returned totalRevenue,
+// annualizedRunRate and todayRevenue alongside the trader-facing numbers.
+//
+// That is not transparency to traders, it is competitor intelligence — a rival
+// can quote the firm's own P&L back at it in a comparison page, and an
+// acquirer or a partner learns the run rate before any conversation starts.
+//
+// So revenue is admin-only and everything else stays exactly as public as it
+// was. /overview keeps its shape for anonymous callers with the three revenue
+// fields omitted, rather than 401-ing the whole endpoint, because the other
+// five KPIs on that page are the ones worth publishing.
 // ──────────────────────────────────────────────────────────────────────────────
+
+const { authenticateAdmin } = require('./middleware')
+
+/**
+ * Is this request from a signed-in admin? Answers without refusing anonymous ones.
+ *
+ * authenticateAdmin ends the response itself on failure, which is exactly right
+ * for /admin routes and wrong here — an anonymous caller must receive the public
+ * projection, not a 401. So it runs against a sink response that absorbs the
+ * rejection, and the answer is simply whether it reached next().
+ *
+ * Reusing the real middleware rather than re-verifying the JWT here is
+ * deliberate: it carries the admin_token_version revocation check and the
+ * platform_admins status lookup, and a second copy of that logic is precisely
+ * the drift this codebase keeps having to undo.
+ */
+async function isAdminRequest(req) {
+  const sink = {
+    status() { return sink },
+    json() { return sink },
+    send() { return sink },
+    clearCookie() { return sink },
+    cookie() { return sink },
+    set() { return sink }
+  }
+  let authorised = false
+  try {
+    await authenticateAdmin(req, sink, () => { authorised = true })
+  } catch {
+    return false
+  }
+  return authorised && !!req.admin
+}
 
 function round(value, decimals = 2) {
   const factor = 10 ** decimals
@@ -37,10 +87,136 @@ function buildDateFilter(rangeParam, column) {
   return '' // 'all'
 }
 
+// ── GET /api/transparency/pass-rates ─────────────────────────────────────────
+//
+// The published pass rate, per challenge model. This is a headline marketing
+// claim, so the definition has to be one the firm would defend in public:
+//
+//   numerator   evaluations that reached a FUNDED account
+//   denominator evaluations that have FINISHED
+//
+// "Evaluation" means a purchased root account — parent_account_id IS NULL — not
+// every account row, because a 3-step model creates three rows for one purchase
+// and counting each separately would triple the denominator.
+//
+// "Finished" means the chain is resolved: it either reached funded, or no
+// evaluation account in the chain is still active. A challenge bought yesterday
+// and still running is excluded from BOTH sides rather than counted as a
+// failure — including it would understate the rate for no honest reason.
+//
+// Deliberately NOT the shape used by /overview, which computes
+// funded_count / distinct users over a set that excludes failed accounts from
+// the denominator. That inflates the number, which is the one direction a
+// published pass rate must never be wrong in.
+//
+// Cached in-process: this is a recursive CTE over the whole accounts table,
+// served to unauthenticated traffic. Uncached, it is a free DB-load amplifier.
+const PASS_RATE_CACHE_MS = 5 * 60 * 1000
+let _passRateCache = { data: null, at: 0, inflight: null }
+
+async function computePassRates() {
+  const result = await pool.query(`
+    WITH RECURSIVE lineage AS (
+      SELECT a.id AS root_id, a.id, a.account_type, a.status
+        FROM accounts a
+       WHERE a.parent_account_id IS NULL
+         AND a.account_type <> 'funded'
+      UNION ALL
+      SELECT l.root_id, c.id, c.account_type, c.status
+        FROM accounts c
+        JOIN lineage l ON c.parent_account_id = l.id::text
+    ),
+    roots AS (
+      SELECT a.id, COALESCE(a.challenge_model_slug, 'legacy') AS slug
+        FROM accounts a
+       WHERE a.parent_account_id IS NULL
+         AND a.account_type <> 'funded'
+    ),
+    outcome AS (
+      SELECT r.id,
+             r.slug,
+             bool_or(l.account_type = 'funded') AS reached_funded,
+             bool_or(l.account_type <> 'funded' AND l.status = 'active') AS eval_still_active
+        FROM roots r
+        JOIN lineage l ON l.root_id = r.id
+       GROUP BY r.id, r.slug
+    )
+    SELECT slug,
+           COUNT(*) FILTER (WHERE reached_funded OR NOT eval_still_active)::int AS finished,
+           COUNT(*) FILTER (WHERE reached_funded)::int                          AS funded,
+           COUNT(*) FILTER (WHERE eval_still_active AND NOT reached_funded)::int AS in_progress
+      FROM outcome
+     GROUP BY slug
+     ORDER BY slug ASC
+  `)
+
+  const models = result.rows.map((row) => {
+    const finished = parseInt(row.finished, 10) || 0
+    const funded = parseInt(row.funded, 10) || 0
+    return {
+      slug: row.slug,
+      finished,
+      funded,
+      in_progress: parseInt(row.in_progress, 10) || 0,
+      // null rather than 0 when nothing has finished yet: "0%" is a claim,
+      // "no data yet" is the truth, and the UI must be able to tell them apart.
+      pass_rate: finished > 0 ? round((funded / finished) * 100, 1) : null
+    }
+  })
+
+  const totalFinished = models.reduce((sum, m) => sum + m.finished, 0)
+  const totalFunded = models.reduce((sum, m) => sum + m.funded, 0)
+
+  return {
+    models,
+    overall: {
+      finished: totalFinished,
+      funded: totalFunded,
+      in_progress: models.reduce((sum, m) => sum + m.in_progress, 0),
+      pass_rate: totalFinished > 0 ? round((totalFunded / totalFinished) * 100, 1) : null
+    },
+    methodology: 'Evaluations that reached a funded account, divided by evaluations that have finished. Challenges still in progress are excluded from both sides.',
+    updated_at: new Date().toISOString()
+  }
+}
+
+router.get('/pass-rates', async (req, res) => {
+  try {
+    const now = Date.now()
+    if (_passRateCache.data && (now - _passRateCache.at) < PASS_RATE_CACHE_MS) {
+      res.set('Cache-Control', 'public, max-age=300')
+      return res.json(_passRateCache.data)
+    }
+    if (!_passRateCache.inflight) {
+      _passRateCache.inflight = computePassRates()
+        .then((data) => {
+          _passRateCache = { data, at: Date.now(), inflight: null }
+          return data
+        })
+        .catch((err) => {
+          _passRateCache.inflight = null
+          throw err
+        })
+    }
+    const data = await _passRateCache.inflight
+    res.set('Cache-Control', 'public, max-age=300')
+    res.json(data)
+  } catch (error) {
+    logger.error('Transparency pass-rates error:', { error: error.message })
+    res.status(500).json({ error: 'Could not load pass rates' })
+  }
+})
+
 // ── GET /api/transparency/overview ───────────────────────────────────────────
 // Returns platform-wide KPI stats.
 router.get('/overview', async (req, res) => {
   try {
+    // Revenue fields are computed either way — they are three cheap aggregates
+    // in a batch that already runs — and withheld from the response for
+    // anonymous callers. Gating the whole endpoint would take the five KPIs
+    // worth publishing down with them.
+    const showRevenue = await isAdminRequest(req)
+
     const [
       revenueResult,
       payoutsResult,
@@ -91,15 +267,14 @@ router.get('/overview', async (req, res) => {
     const passRate = totalUsers > 0 ? round((fundedCount / totalUsers) * 100, 1) : 0
 
     res.json({
-      totalRevenue,
+      ...(showRevenue ? { totalRevenue, annualizedRunRate, todayRevenue: round(todayRevenueResult.rows[0]?.total) } : {}),
+      revenue_visible: showRevenue,
       totalPayouts,
-      annualizedRunRate,
       activeTraders: activeTraderResult.rows[0]?.count || 0,
       fundedTraders: fundedResult.rows[0]?.count || 0,
       passRate,
       aum: round(aumResult.rows[0]?.total),
       largestPayout: round(largestPayoutResult.rows[0]?.max),
-      todayRevenue: round(todayRevenueResult.rows[0]?.total),
     })
   } catch (err) {
     logger.error('Transparency overview error:', { error: err.message })
@@ -108,8 +283,10 @@ router.get('/overview', async (req, res) => {
 })
 
 // ── GET /api/transparency/revenue?range=30d ───────────────────────────────────
-// Daily and cumulative revenue data for charts.
-router.get('/revenue', async (req, res) => {
+// Daily and cumulative revenue data for charts. ADMIN ONLY — see the note at
+// the top of this file. This is the firm's P&L, not a trader-facing number, and
+// it was the one thing on the transparency surface a competitor wanted.
+router.get('/revenue', authenticateAdmin, async (req, res) => {
   try {
     const dateFilter = buildDateFilter(req.query.range, 'created_at')
     const result = await pool.query(`

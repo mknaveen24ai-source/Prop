@@ -116,7 +116,6 @@ async function listPromotionReviews(db, { status = 'pending', month = null } = {
   if (month) {
     params.push(getQuotaMonth(month))
     where.push(`r.created_at >= $${index}::date AND r.created_at < ($${index}::date + INTERVAL '1 month')`)
-    index += 1
   }
 
   const result = await db.query(

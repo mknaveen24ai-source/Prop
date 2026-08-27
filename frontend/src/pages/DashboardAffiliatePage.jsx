@@ -73,7 +73,7 @@ function AffiliateAnalysisTab({ summary }) {
   }, [])
 
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>Loading...</div>
+    return <div style={{ textAlign: 'center', padding: 'var(--space-10)', color: 'var(--text-muted)' }}>Loading...</div>
   }
   if (error || !data) {
     return <Card style={{ padding: 'var(--space-6)', color: 'var(--red)' }}>{error || 'Could not load affiliate analytics.'}</Card>
@@ -164,7 +164,7 @@ function ReferralSeasonTab() {
   }, [])
 
   if (season === undefined) {
-    return <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>Loading...</div>
+    return <div style={{ textAlign: 'center', padding: 'var(--space-10)', color: 'var(--text-muted)' }}>Loading...</div>
   }
   if (error) {
     return <Card style={{ padding: 'var(--space-6)', color: 'var(--red)' }}>{error}</Card>
@@ -348,7 +348,7 @@ export default function DashboardAffiliatePage() {
         <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: 'var(--space-6)', fontSize: 'var(--fs-3xl)' }}>
           Affiliate Program
         </h2>
-        <div style={{ textAlign: 'center', padding: '80px', color: 'var(--text-muted)' }}>Loading...</div>
+        <div style={{ textAlign: 'center', padding: 'var(--space-11)', color: 'var(--text-muted)' }}>Loading...</div>
       </div>
     )
   }
@@ -658,7 +658,7 @@ export default function DashboardAffiliatePage() {
                     required
                     style={{ resize: 'vertical' }}
                   />
-                  <p style={{ marginTop: 'var(--space-2)', fontSize: '11.5px', color: 'var(--warn, var(--text-muted))' }}>
+                  <p style={{ marginTop: 'var(--space-2)', fontSize: 'var(--fs-sm)', color: 'var(--warn, var(--text-muted))' }}>
                     Double-check before submitting — crypto payouts are final. Funds sent to an incorrect address or wrong network cannot be recovered.
                   </p>
                 </div>

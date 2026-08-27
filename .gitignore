@@ -9,14 +9,28 @@ node_modules/
 .env.*.local
 backend/.env
 frontend/.env
+# Accidentally committed once as "env" (missing the leading dot) with real
+# secrets in it (commit a7f610c) — Node's require('./env') also shadows
+# backend/env.js with this file if it exists, so it must never come back.
+backend/env
+# Same incident, second file: committed as "front env" in 9e236b3. The rule
+# above does not cover it because of the space.
+backend/front env
 
 # TLS private keys / certs (deploy/certs/.gitkeep documents how to issue them)
 deploy/certs/*.pem
 deploy/certs/*.key
 deploy/certs/*.crt
 
+# Incident runbook: names which secrets leaked and in which commits, i.e. an
+# attack map. Keep it local until rotation is complete.
+SECRET_ROTATION_RUNBOOK.md
+
 # Stray artifacts
 backend/image.png
+# Runtime files the MT5 bridge reads/writes in place; they are inputs to a
+# running deployment, never source.
+deploy/mt5-bridge/DWX_*.txt
 
 # Build output / runtime artifacts
 frontend/build/
@@ -24,6 +38,9 @@ frontend/dist/
 logs/
 backend/logs/
 backend/uploads/
+backend/dist/
+backend/.test-dist/
+*.tsbuildinfo
 backups/
 e2e/playwright-report/
 e2e/test-results/

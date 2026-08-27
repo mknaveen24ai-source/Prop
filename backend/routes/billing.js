@@ -9,7 +9,7 @@ const {
   getTenantSettingsMap,
   parseBooleanSetting
 } = require('../utils/tenantSettings')
-const { computeEffectiveTier } = require('../utils/affiliates')
+const { computeEffectiveTier, clawbackCommissionForOrder } = require('../utils/affiliates')
 const { enqueueAffiliateCommissionEarnedEmail } = require('../utils/emailQueue')
 const { issueGiftVoucherForOrder } = require('../utils/giftVouchers')
 
@@ -96,6 +96,22 @@ async function ensureBillingInfrastructure() {
       )
     `)
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_challenge_checkout_sessions_order ON challenge_checkout_sessions(order_id, status)`)
+
+    // Mirrors migration 043. Kept here as well because the webhook's replay
+    // protection depends on this table existing, and a webhook that arrives
+    // before the migration has run must not silently double-process.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS stripe_events (
+        event_id     TEXT PRIMARY KEY,
+        event_type   TEXT NOT NULL,
+        received_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        processed_at TIMESTAMPTZ,
+        payload_json JSONB NOT NULL DEFAULT '{}'::jsonb
+      )
+    `)
+    await pool.query(`ALTER TABLE challenge_orders ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMPTZ`)
+    await pool.query(`ALTER TABLE challenge_orders ADD COLUMN IF NOT EXISTS disputed_at TIMESTAMPTZ`)
+    await pool.query(`ALTER TABLE challenge_orders ADD COLUMN IF NOT EXISTS refund_amount NUMERIC`)
   })().catch((error) => {
     billingInfrastructurePromise = null
     logger.error('[billing] Failed to ensure infrastructure:', { error: error.message })
@@ -231,6 +247,11 @@ async function createChallengePaymentSession({ req, orderId, userId = null }) {
 }
 
 async function markChallengeOrderPaid(client, { orderId, providerPaymentId, payload = {} }) {
+  // The status guard is load-bearing. Without it a Stripe redelivery of
+  // checkout.session.completed — which can arrive days later, and always
+  // arrives after a manual dashboard refund — flipped a refunded or disputed
+  // order straight back to 'paid', at which point POST /accounts/create would
+  // happily issue the account it had just been refunded for.
   const orderResult = await client.query(
     `UPDATE challenge_orders
         SET status = 'paid',
@@ -239,10 +260,14 @@ async function markChallengeOrderPaid(client, { orderId, providerPaymentId, payl
             provider_reference = COALESCE($2, provider_reference),
             updated_at = NOW()
       WHERE id = $1
+        AND status NOT IN ('refunded', 'disputed', 'cancelled')
       RETURNING *`,
     [orderId, providerPaymentId || null]
   )
-  if (orderResult.rows.length === 0) return null
+  if (orderResult.rows.length === 0) {
+    logger.warn('[billing] Ignoring paid webhook for an order that is not payable', { orderId: String(orderId) })
+    return null
+  }
   const order = orderResult.rows[0]
 
   const amount = parseFloat(order.amount || 0)
@@ -285,12 +310,24 @@ async function markChallengeOrderPaid(client, { orderId, providerPaymentId, payl
   // the lifetime of the referral relationship, not just their first purchase
   // (that first-purchase-only rule applies to the referred user's own discount,
   // applied earlier in accounts.js, and is intentionally independent of this).
+  // The referrer's own email must be confirmed before commission accrues.
+  // Paid checkout already requires the BUYER to be verified (requireVerifiedEmail
+  // on POST /accounts/orders), so this closes the other half: an unverified
+  // account cannot be used as a commission sink for self-referred orders.
   const referralResult = await client.query(
-    `SELECT id, referrer_user_id FROM affiliate_referrals WHERE referred_user_id = $1::uuid`,
+    `SELECT r.id, r.referrer_user_id, u.email_verified AS referrer_email_verified
+       FROM affiliate_referrals r
+       JOIN users u ON u.id = r.referrer_user_id
+      WHERE r.referred_user_id = $1::uuid`,
     [order.user_id]
   )
   const referral = referralResult.rows[0]
-  if (referral) {
+  if (referral && referral.referrer_email_verified !== true) {
+    logger.warn('[billing] Skipping affiliate commission — referrer email not verified', {
+      referrer_user_id: String(referral.referrer_user_id), order_id: String(order.id)
+    })
+  }
+  if (referral && referral.referrer_email_verified === true) {
     // Advisory-locked per referrer so concurrent webhook deliveries for two
     // different orders from the same referred user can't race on tier computation.
     await client.query(`SELECT pg_advisory_xact_lock(hashtext('affiliate_commission'), hashtext($1))`, [String(referral.referrer_user_id)])
@@ -332,16 +369,193 @@ async function markChallengeOrderPaid(client, { orderId, providerPaymentId, payl
   return order
 }
 
+/**
+ * Locate the challenge order a charge-level event refers to.
+ *
+ * Charge and dispute events carry no metadata of ours — that only rides on the
+ * checkout session — so the payment intent recorded at capture time is the link
+ * back. markChallengeOrderPaid stores it in provider_reference, and migration
+ * 043 added the partial index that keeps this lookup off a sequential scan.
+ *
+ * Falls back to metadata when it is present (some flows do echo it) so a manual
+ * refund raised against the session rather than the charge still resolves.
+ */
+async function findOrderForChargeEvent(client, dataObject) {
+  const metadata = dataObject.metadata || {}
+  if (metadata.flow === 'challenge_checkout' && metadata.order_id) {
+    const byMetadata = await client.query(
+      `SELECT * FROM challenge_orders WHERE id = $1`,
+      [parseInt(metadata.order_id, 10)]
+    )
+    if (byMetadata.rows.length > 0) return byMetadata.rows[0]
+  }
+
+  const reference = dataObject.payment_intent || dataObject.charge || dataObject.id
+  if (!reference) return null
+
+  const byReference = await client.query(
+    `SELECT * FROM challenge_orders WHERE provider_reference = $1 ORDER BY id DESC LIMIT 1`,
+    [String(reference)]
+  )
+  return byReference.rows[0] || null
+}
+
+/**
+ * Freeze every account issued from an order whose money has gone away.
+ *
+ * 'locked' rather than a new 'disputed' status, deliberately: it already exists
+ * in the accounts status CHECK (migration 017), already blocks opening a trade
+ * (routes/trades/open.js requires 'active'), and is already refused by
+ * evaluatePayoutEligibility's NOT_ACTIVE blocker — so the freeze stops both
+ * trading and withdrawal with no new state for the engine, the analytics and
+ * every admin list filter to learn.
+ *
+ * Passed and failed accounts are left alone: the evaluation is over, and
+ * reopening a settled outcome on a payment event would be worse than the
+ * chargeback. Only a live account can still cost the firm money.
+ */
+async function freezeAccountsForOrder(client, order, reason) {
+  // There is no accounts.challenge_order_id — the link runs the other way, from
+  // the order's metadata_json, stamped by POST /accounts/create once the account
+  // exists. An order whose account was never created has nothing to freeze,
+  // which is the ordinary case for a refund before activation.
+  const metadata = order.metadata_json || {}
+  const accountId = metadata.account_id ? String(metadata.account_id) : null
+  if (!accountId) return 0
+
+  const result = await client.query(
+    `UPDATE accounts
+        SET status = 'locked', updated_at = NOW()
+      WHERE id = $1::uuid
+        AND status = 'active'
+      RETURNING id`,
+    [accountId]
+  )
+  if (result.rows.length > 0) {
+    logger.warn('[billing] Froze account on a reversed order', {
+      orderId: String(order.id), accountId, reason
+    })
+  }
+  return result.rows.length
+}
+
+async function handleChargeReversal(client, event, { status, timestampColumn, reason }) {
+  const dataObject = event?.data?.object || {}
+  const order = await findOrderForChargeEvent(client, dataObject)
+  if (!order) {
+    logger.warn('[billing] Reversal event did not resolve to a challenge order', {
+      type: event?.type, reference: dataObject.payment_intent || dataObject.id || null
+    })
+    return
+  }
+
+  // Terminal states stay terminal — a refund on an order already disputed must
+  // not downgrade it, and neither should overwrite the timestamp already set.
+  const updated = await client.query(
+    `UPDATE challenge_orders
+        SET status = $2,
+            ${timestampColumn} = COALESCE(${timestampColumn}, NOW()),
+            refund_amount = COALESCE($3, refund_amount),
+            updated_at = NOW()
+      WHERE id = $1
+        AND status NOT IN ('refunded', 'disputed')
+      RETURNING id`,
+    [
+      order.id,
+      status,
+      dataObject.amount_refunded != null
+        ? Math.round(Number(dataObject.amount_refunded)) / 100
+        : null
+    ]
+  )
+  if (updated.rows.length === 0) {
+    logger.info('[billing] Reversal already recorded for this order', { orderId: String(order.id), status })
+    return
+  }
+
+  await client.query(
+    `UPDATE challenge_payments SET status = $2, updated_at = NOW() WHERE order_id = $1`,
+    [order.id, status]
+  )
+
+  await freezeAccountsForOrder(client, order, reason)
+
+  const clawedBack = await clawbackCommissionForOrder(client, order.id, reason)
+  if (clawedBack > 0) {
+    logger.warn('[billing] Clawed back affiliate commission on a reversed order', {
+      orderId: String(order.id), amount: clawedBack
+    })
+  }
+
+  logger.warn(`[billing] Order ${status}`, { orderId: String(order.id), reason, type: event?.type })
+}
+
+async function handleSessionAbandoned(client, event) {
+  const dataObject = event?.data?.object || {}
+  const metadata = dataObject.metadata || {}
+  if (metadata.flow !== 'challenge_checkout' || !metadata.order_id) return
+
+  const orderId = parseInt(metadata.order_id, 10)
+
+  // Only an order that never got paid can be abandoned. The guard matters for
+  // async_payment_failed in particular: the session can complete, the order be
+  // paid and the account created, and only then can the payment method fail.
+  await client.query(
+    `UPDATE challenge_orders
+        SET status = 'cancelled', updated_at = NOW()
+      WHERE id = $1
+        AND status IN ('pending', 'processing')`,
+    [orderId]
+  )
+  await client.query(
+    `UPDATE challenge_checkout_sessions
+        SET status = 'expired', updated_at = NOW()
+      WHERE order_id = $1 AND status NOT IN ('paid')`,
+    [orderId]
+  )
+}
+
+/**
+ * Stripe webhook fan-out.
+ *
+ * ── Why the event id is claimed first ──
+ *
+ * Replay protection used to ride entirely on `ON CONFLICT DO NOTHING` in
+ * whichever downstream INSERT happened to run. That worked for the single event
+ * type this handled, but it was a property of each statement rather than of the
+ * handler, so every new event type was a fresh opportunity to double-process.
+ *
+ * The claim is the first statement inside the transaction, so it commits with
+ * the work and rolls back with it: a handler that throws leaves no claim behind
+ * and Stripe's retry is processed normally, while a handler that succeeds can
+ * never run twice. See migration 043.
+ */
 async function processStripeWebhookEvent(event) {
   return (async () => {
     await ensureBillingInfrastructure()
     const type = String(event?.type || '')
+    const eventId = String(event?.id || '')
     const dataObject = event?.data?.object || {}
     const metadata = dataObject.metadata || {}
 
     const client = await pool.connect()
     try {
       await client.query('BEGIN')
+
+      if (eventId) {
+        const claim = await client.query(
+          `INSERT INTO stripe_events (event_id, event_type, payload_json)
+           VALUES ($1, $2, $3::jsonb)
+           ON CONFLICT (event_id) DO NOTHING
+           RETURNING event_id`,
+          [eventId, type, JSON.stringify(event)]
+        )
+        if (claim.rows.length === 0) {
+          logger.info('[billing] Ignoring replayed Stripe event', { eventId, type })
+          await client.query('COMMIT')
+          return
+        }
+      }
 
       if (type === 'checkout.session.completed') {
         if (metadata.flow === 'challenge_checkout' && metadata.order_id) {
@@ -351,6 +565,29 @@ async function processStripeWebhookEvent(event) {
             payload: event
           })
         }
+      } else if (type === 'charge.refunded') {
+        await handleChargeReversal(client, event, {
+          status: 'refunded',
+          timestampColumn: 'refunded_at',
+          reason: 'Payment refunded'
+        })
+      } else if (type === 'charge.dispute.created' || type === 'charge.dispute.funds_withdrawn') {
+        await handleChargeReversal(client, event, {
+          status: 'disputed',
+          timestampColumn: 'disputed_at',
+          reason: 'Payment disputed by the cardholder'
+        })
+      } else if (type === 'checkout.session.expired' || type === 'checkout.session.async_payment_failed') {
+        await handleSessionAbandoned(client, event)
+      } else {
+        logger.debug('[billing] Unhandled Stripe event type', { eventId, type })
+      }
+
+      if (eventId) {
+        await client.query(
+          `UPDATE stripe_events SET processed_at = NOW() WHERE event_id = $1`,
+          [eventId]
+        )
       }
 
       await client.query('COMMIT')

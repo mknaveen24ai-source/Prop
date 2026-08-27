@@ -37,7 +37,7 @@ export default function RiskViolationTab() {
     (async () => {
       setAccountsLoading(true);
       try {
-        // TODO: GET /api/admin/analytics/risk-overview (backend/routes/adminAnalytics.js)
+        // Backed by GET /api/admin/analytics/risk-overview (backend/routes/adminAnalytics.js)
         const res = await adminAxios.get('/api/admin/analytics/risk-overview');
         setStatusCounts(res.data?.statusCounts || { clean: 0, warned: 0, breached: 0 });
         setAccounts(res.data?.accounts || []);

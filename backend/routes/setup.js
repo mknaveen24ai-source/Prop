@@ -15,7 +15,6 @@
 const express  = require('express')
 const router   = express.Router()
 const pool     = require('../db')
-const bcrypt   = require('bcryptjs')
 const logger   = require('../utils/logger')
 const { createLimiter } = require('../utils/security')
 const { resolveMailTransportConfig } = require('../mailer')
@@ -78,7 +77,7 @@ router.get('/status', async function(req, res) {
 //   "phase2_profit_target_pct": 5,
 //   "phase2_max_drawdown_pct": 5,
 //   "funded_max_drawdown_pct": 4,
-//   "profit_share_pct": 75,
+//   "profit_share_pct": 100,
 //   "min_payout_amount": 50
 // }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -111,8 +110,8 @@ router.post('/init', setupLimiter, async function(req, res) {
       phase2_max_drawdown_pct   = 5,
       phase2_day_limit          = 30,
       funded_max_drawdown_pct   = 4,
-      profit_share_pct          = 75,
-      max_accounts_per_user     = 5,
+      profit_share_pct          = 100,
+      max_accounts_per_user     = 0,
       min_payout_amount         = 50,
       min_hold_seconds          = 60,
       forex_lots_per_1k         = 0.10,

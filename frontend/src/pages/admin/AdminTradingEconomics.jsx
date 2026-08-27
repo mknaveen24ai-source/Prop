@@ -115,7 +115,8 @@ export default function AdminTradingEconomics() {
           <h1 className="admin-h1">Trading Economics</h1>
           <p style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-base)' }}>
             Per-symbol commission and execution slippage, configurable per account tier. Leave a field blank to fall back
-            to the tier's "Default" row, then to the platform-wide default (${defaultCommission}/lot commission, {defaultSlippage} pips max adverse slippage).
+            to the tier's "Default" row, then to the platform-wide default (${defaultCommission}/lot commission, ±{defaultSlippage} pips slippage).
+            Slippage is symmetric: each fill draws uniformly from −max to +max, so it favours the trader as often as it costs them.
             Changes take effect within 30 seconds.
           </p>
         </div>
@@ -143,7 +144,7 @@ export default function AdminTradingEconomics() {
               <tr>
                 <th>Symbol</th>
                 <th>Commission ($/lot)</th>
-                <th>Max Adverse Slippage (pips)</th>
+                <th>Max Slippage ± (pips)</th>
               </tr>
             </thead>
             <tbody>

@@ -367,9 +367,9 @@ router.get('/affiliates/:userId', authenticateAdmin, requireSuperAdmin, async fu
   }
 })
 
-// POST /admin/affiliates/:userId/adjust-balance — manual correction (no automatic
-// refund/chargeback clawback exists; this is the only way a balance changes
-// outside of normal commission-earning).
+// POST /admin/affiliates/:userId/adjust-balance — manual correction. Refund and
+// chargeback clawback is automatic (clawbackCommissionForOrder, fired from the
+// Stripe webhook handlers); this covers everything else.
 router.post('/affiliates/:userId/adjust-balance', authenticateAdmin, requireSuperAdmin, async function(req, res) {
   try {
     const amount = parseFloat(req.body?.amount)

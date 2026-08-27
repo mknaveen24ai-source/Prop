@@ -180,7 +180,7 @@ h1, h2, h3, h4, h5, h6 {
 .auth-shell {
   isolation: isolate;
   position: relative;
-  padding: clamp(18px, 4vw, 40px);
+  padding: clamp(var(--space-4-5), 4vw, var(--space-8));
   background-color: var(--paper);
   background-image:
     radial-gradient(ellipse 600px 400px at 20% 40%, var(--glow-primary), transparent),
@@ -356,7 +356,7 @@ h1, h2, h3, h4, h5, h6 {
 /* ── Auth masthead — broadsheet header above the login/register card ── */
 .auth-masthead {
   width: 100%;
-  margin: 0 auto clamp(16px, 3vw, 28px);
+  margin: 0 auto clamp(var(--space-4), 3vw, var(--space-7));
   position: relative;
   z-index: 10;
 }
@@ -392,7 +392,7 @@ h1, h2, h3, h4, h5, h6 {
 .auth-masthead-item {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--space-1-5);
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
   color: var(--text-muted);
@@ -441,7 +441,7 @@ h1, h2, h3, h4, h5, h6 {
   padding: var(--space-3-5) var(--space-4);
   color: var(--text-primary);
   font-family: var(--font-ui);
-  font-size: 15px;
+  font-size: var(--fs-lg);
   transition: border-color 0.2s ease;
   outline: none;
 }
@@ -487,14 +487,14 @@ h1, h2, h3, h4, h5, h6 {
 .trader-service-subtitle {
   color: var(--text-muted);
   font-size: var(--fs-md);
-  margin-bottom: 28px;
+  margin-bottom: var(--space-7);
   max-width: 980px;
 }
 
 .trader-service-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
-  gap: clamp(18px, 2vw, 28px);
+  gap: clamp(var(--space-4-5), 2vw, var(--space-7));
   align-items: start;
 }
 
@@ -567,7 +567,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .service-tab {
   min-height: 40px;
-  padding: 9px 18px;
+  padding: var(--space-2-5) var(--space-4-5);
   background: var(--bg-elevated);
   color: var(--text-muted);
   border: 1px solid transparent;
@@ -618,7 +618,7 @@ h1, h2, h3, h4, h5, h6 {
 @media (max-width: 640px) {
   .kyc-upload-box {
     min-height: 132px !important;
-    padding: 16px !important;
+    padding: var(--space-4) !important;
   }
 }
 .password-field-shell {
@@ -626,7 +626,7 @@ h1, h2, h3, h4, h5, h6 {
   width: 100%;
 }
 .password-input-field {
-  padding-right: 48px !important;
+  padding-right: var(--space-9) !important;
 }
 .password-visibility-toggle {
   position: absolute;
@@ -657,7 +657,7 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 .input-error { border-color: var(--danger) !important; background: rgba(239, 68, 68, 0.05); }
-.input-hint { font-size: var(--fs-sm); color: var(--text-muted); margin-top: 6px; display: block; }
+.input-hint { font-size: var(--fs-sm); color: var(--text-muted); margin-top: var(--space-1-5); display: block; }
 
 /* Tables */
 .table-wrapper { width: 100%; overflow-x: auto; background: var(--bg-surface); border-radius: var(--radius-lg); border: 1px solid var(--border); }
@@ -692,7 +692,7 @@ h1, h2, h3, h4, h5, h6 {
      of this flex row), so main content needs an explicit left offset
      matching the sidebar's own width/collapsed states instead of relying
      on flex to push it over. */
-  margin-left: 220px;
+  margin-left: var(--space-15);
   transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .dashboard-main.sidebar-collapsed { margin-left: var(--space-10); }
@@ -703,7 +703,7 @@ h1, h2, h3, h4, h5, h6 {
      in the prototype and was leaving visible empty space on wide
      screens instead of stretching to the right edge. */
   width: 100%;
-  padding: 22px 24px 32px;
+  padding: var(--space-6) var(--space-6) var(--space-7);
 }
 
 .dashboard-page-stack {
@@ -735,7 +735,7 @@ h1, h2, h3, h4, h5, h6 {
      wide children scroll inside their own wrapper instead. */
   grid-template-columns: minmax(0, 1fr);
   align-content: start;
-  gap: 22px;
+  gap: var(--space-6);
 }
 
 /* Bar strips (P&L by weekday, R-multiple distribution). Each column is
@@ -792,7 +792,7 @@ h1, h2, h3, h4, h5, h6 {
   overflow: hidden;
 }
 
-.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6); padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-6); padding-bottom: var(--space-4); border-bottom: 1px solid var(--border); }
 .page-title { font-size: var(--fs-4xl); font-weight: 700; color: var(--text-primary); }
 
 .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-4); }
@@ -849,8 +849,8 @@ h1, h2, h3, h4, h5, h6 {
 .pnl-positive { color: var(--success) !important; font-weight: 700; }
 .pnl-negative { color: var(--danger) !important; font-weight: 700; }
 
-.direction-buy { color: var(--success); background: var(--success-bg); padding: 2px 6px; border-radius: 4px; font-size: var(--fs-xs); font-weight: 700; }
-.direction-sell { color: var(--danger); background: var(--danger-bg); padding: 2px 6px; border-radius: 4px; font-size: var(--fs-xs); font-weight: 700; }
+.direction-buy { color: var(--success); background: var(--success-bg); padding: var(--space-1) var(--space-1-5); border-radius: 4px; font-size: var(--fs-xs); font-weight: 700; }
+.direction-sell { color: var(--danger); background: var(--danger-bg); padding: var(--space-1) var(--space-1-5); border-radius: 4px; font-size: var(--fs-xs); font-weight: 700; }
 
 /* ── 6. CSS Animations ── */
 /* Keyframe definitions moved to styles/animations.css (imported at the top
@@ -882,7 +882,7 @@ h1, h2, h3, h4, h5, h6 {
 /* Shared OTP digit boxes (components/common/OtpInput.jsx) */
 .otp-input-group {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   justify-content: center;
   margin: var(--space-5) 0;
 }
@@ -932,13 +932,13 @@ h1, h2, h3, h4, h5, h6 {
 .sidebar-header { padding: var(--space-5); display: flex; align-items: center; border-bottom: 1px solid var(--border); }
 .sidebar-nav { flex: 1; padding: var(--space-4) var(--space-3); overflow-y: auto; }
 .sidebar-item {
-  display: flex; align-items: center; gap: 11px;
+  display: flex; align-items: center; gap: var(--space-3);
   padding: var(--space-2) var(--space-2-5); border-radius: var(--radius-sm);
   border: 1px solid transparent;
   background: transparent;
   color: var(--muted); cursor: pointer;
   transition: background .16s ease, color .16s ease, border-color .16s ease;
-  margin-bottom: 2px; font-weight: 400; font-size: 13.5px;
+  margin-bottom: var(--space-1); font-weight: 400; font-size: var(--fs-md);
   font-family: var(--font-ui);
 }
 .sidebar-item:hover { background: var(--accent-dim); color: var(--ink); }
@@ -1005,7 +1005,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .nav-transparent {
   position: fixed; top: var(--risk-warning-height, 0px); left: 0; right: 0;
-  height: 72px; padding: 0 32px; display: flex;
+  height: 72px; padding: 0 var(--space-7); display: flex;
   align-items: center; justify-content: space-between;
   z-index: 1000; transition: var(--transition);
 }
@@ -1081,7 +1081,7 @@ h1, h2, h3, h4, h5, h6 {
 .sidebar-more-item {
   display: flex; align-items: center; gap: var(--space-3); width: 100%;
   min-height: var(--touch-min);
-  padding: 11px 4px; border: none; background: transparent;
+  padding: var(--space-3) var(--space-1); border: none; background: transparent;
   border-bottom: 1px solid var(--rule-soft); cursor: pointer; text-align: left;
   color: var(--ink);
 }
@@ -1251,7 +1251,7 @@ h1, h2, h3, h4, h5, h6 {
     justify-content: center;
     min-width: var(--touch-min);
     min-height: var(--touch-min);
-    margin-left: -10px;
+    margin-left: -var(--space-2-5);
     background: transparent;
     border: none;
     color: var(--ink);
@@ -1304,7 +1304,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .order-panel-mode-btn {
   border: none;
-  padding: 10px 12px;
+  padding: var(--space-2-5) var(--space-3);
   font-size: var(--fs-sm);
   font-weight: 700;
   cursor: pointer;
@@ -1316,7 +1316,7 @@ h1, h2, h3, h4, h5, h6 {
   padding-top: var(--space-4-5);
   border-top: 1px solid var(--border);
   display: grid;
-  gap: 10px;
+  gap: var(--space-2-5);
 }
 
 .order-panel-summary-row {
@@ -1333,7 +1333,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .terminal-section-card {
-  padding: 22px;
+  padding: var(--space-6);
 }
 
 .terminal-section-header {
@@ -1348,7 +1348,7 @@ h1, h2, h3, h4, h5, h6 {
 .terminal-header-title {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-2-5);
   flex-wrap: wrap;
 }
 
@@ -1380,7 +1380,7 @@ h1, h2, h3, h4, h5, h6 {
   display: inline-flex;
   flex-wrap: wrap;
   gap: var(--space-1-5);
-  padding: 4px;
+  padding: var(--space-1);
   border: 1px solid var(--border);
   background: var(--glass);
 }
@@ -1423,7 +1423,7 @@ h1, h2, h3, h4, h5, h6 {
 .trade-symbol {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -1433,7 +1433,7 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   justify-content: center;
   min-width: 78px;
-  padding: 5px 10px;
+  padding: var(--space-1-5) var(--space-2-5);
   border-radius: var(--radius-pill);
   font-family: var(--font-mono);
   font-size: var(--fs-2xs);
@@ -1469,7 +1469,7 @@ h1, h2, h3, h4, h5, h6 {
 .trade-desk-stack {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 26px;
+  gap: var(--space-6);
   margin-top: var(--space-6);
 }
 
@@ -1479,7 +1479,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .trade-history-card {
-  margin-top: 2px;
+  margin-top: var(--space-1);
 }
 
 .trade-section-pills {
@@ -1491,7 +1491,7 @@ h1, h2, h3, h4, h5, h6 {
 .trade-summary-pill {
   display: inline-flex;
   align-items: center;
-  padding: 7px 12px;
+  padding: var(--space-2) var(--space-3);
   border-radius: 999px;
   font-size: var(--fs-xs);
   font-weight: 700;
@@ -1550,7 +1550,7 @@ h1, h2, h3, h4, h5, h6 {
   background: transparent;
   color: var(--text-secondary);
   border-radius: var(--radius-md);
-  padding: 6px 10px;
+  padding: var(--space-1-5) var(--space-2-5);
   cursor: pointer;
   font-size: var(--fs-xs);
   font-weight: 700;
@@ -1597,7 +1597,7 @@ h1, h2, h3, h4, h5, h6 {
   background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 5px 8px;
+  padding: var(--space-1-5) var(--space-2);
   cursor: pointer;
   font-size: var(--fs-xs);
   color: var(--text-secondary);
@@ -1619,7 +1619,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @media (max-width: 1024px) {
-  .dashboard-main, .dashboard-main.sidebar-collapsed { margin-left: 0; padding: 80px 16px 88px; }
+  .dashboard-main, .dashboard-main.sidebar-collapsed { margin-left: 0; padding: var(--space-11) var(--space-4) var(--space-12); }
   .dashboard-page-content { padding: 0 var(--space-1) var(--space-6); }
   /* Below 1024px the trader sidebar is replaced by the bottom tab bar plus the
      "More" sheet (Sidebar.jsx), so it stays off-screen. There used to be a
@@ -1629,7 +1629,7 @@ h1, h2, h3, h4, h5, h6 {
   .grid-4 { grid-template-columns: repeat(2, 1fr); }
   .grid-6 { grid-template-columns: repeat(3, 1fr); }
   .dashboard-topbar {
-    margin: 8px 4px 16px !important;
+    margin: var(--space-2) var(--space-1) var(--space-4) !important;
     border-radius: var(--radius-lg) !important;
   }
   .dashboard-topbar-right {
@@ -1641,7 +1641,7 @@ h1, h2, h3, h4, h5, h6 {
 
 @media (max-width: 768px) {
   .dashboard-main {
-    padding: 76px 12px 92px;
+    padding: var(--space-11) var(--space-3) var(--space-12);
   }
 
   .dashboard-page-content {
@@ -1698,7 +1698,7 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .risk-warning-banner {
-    padding: 14px 16px !important;
+    padding: var(--space-3-5) var(--space-4) !important;
   }
 }
 

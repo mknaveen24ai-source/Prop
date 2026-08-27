@@ -433,7 +433,13 @@ router.post('/command-center/bulk-action', authenticateAdmin, adminBulkLimiter, 
               actor: getAdminActorLabel(req.admin)
             })
             updatedPayout = approval.payout
-            message = 'Payout approved'
+            // Dual control (migration 045) applies here too, and it matters more
+            // in bulk: approving fifty payouts at once is exactly the shape a
+            // compromised finance_ops session takes. Above the threshold the
+            // first approval only records intent and the payout stays pending.
+            message = approval.awaitingSecondApproval
+              ? 'First approval recorded — a second admin must approve this payout'
+              : 'Payout approved'
             // Delivered after COMMIT below, not here — the same rule the
             // single-approval route follows. Only a fresh mint is delivered, so
             // re-running a bulk action cannot email a trader twice.

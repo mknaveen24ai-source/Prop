@@ -1,10 +1,12 @@
 const express = require('express')
 const router = express.Router()
 const pool = require('../db')
-const { authenticateToken } = require('./middleware')
+const { authenticateToken, requireVerifiedEmail } = require('./middleware')
 const { createLimiter } = require('../utils/security')
 const { ipKeyGenerator } = require('express-rate-limit')
 const logger = require('../utils/logger')
+const { resolveEffectiveFloor } = require('../services/drawdownService')
+const { evaluatePayoutEligibility } = require('../domain/payoutEligibility')
 const { calculatePnL } = require('../utils/pnlCalculator')
 const {
   abandonIdempotentRequest,
@@ -15,7 +17,9 @@ const {
 const {
   ensureTenantSettingsInfrastructure,
   getTenantSettingsMap,
-  parseBooleanSetting: parseTenantBoolean
+  parseBooleanSetting: parseTenantBoolean,
+  resolveProfitSharePct,
+  PROFIT_SHARE_FALLBACK_PCT
 } = require('../utils/tenantSettings')
 const { createChallengePaymentSession } = require('./billing')
 const tradingDaysService = require('../services/tradingDaysService')
@@ -120,6 +124,11 @@ function buildResolvedRules(account, settings = {}) {
     time_limit_days: accountType === 'funded'
       ? null
       : parseInt(settings[`${phaseKey}_day_limit`] || 30, 10),
+    // Retired controls (not enforced anywhere) are still echoed for backward
+    // compatibility with older clients, but the rules pages no longer render
+    // them. These two ARE enforced and ARE displayed.
+    max_open_positions: parseInt(settings.max_open_positions || 10, 10),
+    max_notional_multiple: parseFloat(settings.max_notional_multiple || 500),
     max_daily_trades: parseInt(settings.max_daily_trades || 20, 10),
     min_hold_seconds: parseInt(settings.min_hold_seconds || 60, 10),
     min_lot_size: parseFloat(settings.min_lot_size || 0.01),
@@ -127,7 +136,10 @@ function buildResolvedRules(account, settings = {}) {
     commodity_lots_per_1k: parseFloat(settings.commodity_lots_per_1k || 0.02),
     max_trades_per_1k: parseFloat(settings.max_trades_per_1k || 1),
     weekend_holding_enabled: parseBooleanSetting(settings.weekend_holding_enabled, true),
-    profit_share_pct: parseFloat(settings.profit_share_pct || 80),
+    // FIX (F-02): was a hardcoded 80 on a platform seeded at 75. Resolves
+    // through the shared helper so this display value cannot drift from the
+    // number the payout calculation actually uses.
+    profit_share_pct: resolveProfitSharePct(settings.profit_share_pct) ?? PROFIT_SHARE_FALLBACK_PCT,
     inactivity_auto_fail_enabled: parseBooleanSetting(settings.inactivity_auto_fail_enabled, true),
     inactivity_fail_days: parseInt(settings.inactivity_fail_days || 30, 10),
     leverage: {
@@ -166,6 +178,7 @@ router.get('/rules/:account_id', authenticateToken, async function(req, res) {
       'phase2_profit_target_pct', 'phase2_max_drawdown_pct', 'phase2_day_limit',
       'funded_max_drawdown_pct', 'profit_share_pct',
       'max_daily_trades', 'min_hold_seconds', 'min_lot_size',
+      'max_open_positions', 'max_notional_multiple',
       'forex_lots_per_1k', 'commodity_lots_per_1k', 'max_trades_per_1k',
       'weekend_holding_enabled', 'inactivity_auto_fail_enabled', 'inactivity_fail_days'
     ])
@@ -218,6 +231,7 @@ router.get('/platform-rules', authenticateToken, async function(req, res) {
     const settings = await loadTenantSettings([
       'profit_share_pct',
       'max_daily_trades', 'min_hold_seconds', 'min_lot_size',
+      'max_open_positions', 'max_notional_multiple',
       'forex_lots_per_1k', 'commodity_lots_per_1k', 'max_trades_per_1k',
       'weekend_holding_enabled', 'inactivity_auto_fail_enabled', 'inactivity_fail_days'
     ])
@@ -289,11 +303,38 @@ router.get('/step-models', authenticateToken, async function(req, res) {
 router.get('/step-models-public', async function(req, res) {
   try {
     const models = await fetchStepModels({ onlyEnabled: true })
+
+    // Platform-wide trading settings, served alongside the models so the PUBLIC
+    // rulebook page can render every rule before a visitor pays. These were
+    // previously reachable only through the authenticated, account-scoped
+    // /rules endpoint, which meant the full rulebook could not be read until
+    // after purchase — while the hero badge advertised "no hidden rules".
+    //
+    // Only display-safe operational settings are exposed. Nothing here reveals
+    // anything an account holder could not already see on their own rules page.
+    const platformSettings = await loadTenantSettings([
+      'min_hold_seconds', 'min_lot_size', 'forex_lots_per_1k', 'commodity_lots_per_1k',
+      'max_open_positions', 'max_notional_multiple', 'weekend_holding_enabled',
+      'inactivity_auto_fail_enabled', 'inactivity_fail_days', 'profit_share_pct'
+    ])
+
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
     res.set('Pragma', 'no-cache')
     res.set('Expires', '0')
     res.json({
       account_sizes: STEP_MODEL_ACCOUNT_SIZES,
+      platform: {
+        min_hold_seconds: parseInt(platformSettings.min_hold_seconds || 60, 10),
+        min_lot_size: parseFloat(platformSettings.min_lot_size || 0.01),
+        forex_lots_per_1k: parseFloat(platformSettings.forex_lots_per_1k || 0.20),
+        commodity_lots_per_1k: parseFloat(platformSettings.commodity_lots_per_1k || 0.02),
+        max_open_positions: parseInt(platformSettings.max_open_positions || 10, 10),
+        max_notional_multiple: parseFloat(platformSettings.max_notional_multiple || 500),
+        weekend_holding_enabled: parseBooleanSetting(platformSettings.weekend_holding_enabled, true),
+        inactivity_auto_fail_enabled: parseBooleanSetting(platformSettings.inactivity_auto_fail_enabled, true),
+        inactivity_fail_days: parseInt(platformSettings.inactivity_fail_days || 30, 10),
+        profit_share_pct: resolveProfitSharePct(platformSettings.profit_share_pct) ?? PROFIT_SHARE_FALLBACK_PCT
+      },
       models: models.map((m) => ({
         slug: m.slug,
         name: m.name,
@@ -386,14 +427,33 @@ router.post('/create', authenticateToken, createAccountLimiter, async function(r
       await client.query('ROLLBACK')
       return res.status(404).json({ error: 'User not found' })
     }
-    if (userResult.rows[0].kyc_status !== 'approved') {
-      await client.query('ROLLBACK')
-      return res.status(403).json({ error: 'KYC approval required before starting a challenge' })
-    }
+
+    // NOTE: KYC is deliberately NOT checked here any more.
+    //
+    // This used to require kyc_status === 'approved' before an evaluation account
+    // could be created. Three things were wrong with that. It spent manual review
+    // hours on visitors who had paid nothing (and left the review queue open to
+    // being flooded by anyone). It gated the funnel behind a government ID upload
+    // for a $4-$99 product, which no competitor does. And because order creation
+    // was never gated the same way, a trader could pay for a challenge_order and
+    // THEN be rejected at KYC — permanently 403'd here, with no refund path
+    // anywhere in the platform to make them whole.
+    //
+    // Verification now happens where real capital is actually at stake: a funded
+    // account is created normally on a pass, but no position can be opened on it
+    // until KYC clears. See the funded-stage gate in routes/trades/open.js.
 
     const settings = await loadTenantSettings()
 
-    const maxPerUser = parseInt(settings.max_accounts_per_user || '999999')
+    // 0 (or unset/unparseable) means UNLIMITED concurrent challenges, which is
+    // the platform's current policy. This used to fall back to the magic number
+    // 999999, which is unlimited in practice but reads as a forgotten default —
+    // and disagreed with the 3 in constants.js and the 5 in branding.js. One
+    // sentinel, stated once.
+    const parsedMaxPerUser = parseInt(settings.max_accounts_per_user, 10)
+    const maxPerUser = Number.isFinite(parsedMaxPerUser) && parsedMaxPerUser > 0
+      ? parsedMaxPerUser
+      : null
 
     // â”€â”€ Per-user active account limit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // This check is now inside the transaction + advisory lock, so two
@@ -405,7 +465,7 @@ router.post('/create', authenticateToken, createAccountLimiter, async function(r
          AND account_type IN ('phase1', 'phase2', 'phase3', 'funded')`,
       [req.user.userId]
     )
-    if (parseInt(userActiveResult.rows[0].count) >= maxPerUser) {
+    if (maxPerUser !== null && parseInt(userActiveResult.rows[0].count) >= maxPerUser) {
       await client.query('ROLLBACK')
       return res.status(403).json({
         error: 'You already have an active challenge running. Complete or wait for it to finish before starting a new one.'
@@ -614,7 +674,8 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
       `SELECT id, user_id, account_type, account_size, current_balance, starting_balance,
               peak_balance, status, profit_target, max_drawdown_pct, phase_end_date,
               consistency_max_day_pct, daily_drawdown_pct, challenge_model_slug, created_at,
-              scaling_multiplier, scaling_milestones_claimed
+              scaling_multiplier, scaling_milestones_claimed,
+              eod_peak_equity, eod_trailing_floor
        FROM accounts WHERE id = $1 AND user_id = $2`,
       [accountIdStr, req.user.userId]
     )
@@ -629,6 +690,7 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
       'phase2_profit_target_pct', 'phase2_max_drawdown_pct', 'phase2_day_limit',
       'funded_max_drawdown_pct', 'profit_share_pct',
       'max_daily_trades', 'min_hold_seconds', 'min_lot_size',
+      'max_open_positions', 'max_notional_multiple',
       'forex_lots_per_1k', 'commodity_lots_per_1k', 'max_trades_per_1k',
       'weekend_holding_enabled', 'inactivity_auto_fail_enabled', 'inactivity_fail_days',
       'payout_cycle_days'
@@ -636,6 +698,47 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
 
     const rules = buildResolvedRules(account, settings)
     const { startIso, endIso } = getUtcDayBounds()
+
+    // Funded accounts get their max drawdown and the one-time floor lock from the
+    // challenge model, exactly as services/tradeEngine.js resolves them — the
+    // dashboard must not describe a different rule from the one being enforced.
+    let fundedDrawdownLocksAtPct = null
+    let fundedMinTradingDaysForPayout = 0
+    let fundedPayoutMinNetProfitPct = 0
+    let fundedConsistencyMaxDayPct = 0
+    if (account.account_type === 'funded' && account.challenge_model_slug) {
+      const fundedModel = await fetchStepModelBySlug(account.challenge_model_slug)
+      if (fundedModel) {
+        if (Number.isFinite(parseFloat(fundedModel.funded_max_drawdown_pct))) {
+          rules.max_drawdown_pct = parseFloat(fundedModel.funded_max_drawdown_pct)
+        }
+        fundedDrawdownLocksAtPct = fundedModel.funded_drawdown_locks_at_pct != null
+          ? parseFloat(fundedModel.funded_drawdown_locks_at_pct)
+          : null
+        fundedMinTradingDaysForPayout = parseInt(fundedModel.funded_min_trading_days_for_payout || 0, 10)
+        fundedPayoutMinNetProfitPct = parseFloat(fundedModel.funded_payout_min_net_profit_pct || 0)
+        fundedConsistencyMaxDayPct = parseFloat(fundedModel.funded_consistency_max_day_pct || 0)
+      }
+    }
+
+    // Only funded accounts render a payout chip, so this extra read is scoped to
+    // them. One statement rather than three round-trips.
+    let payoutKycStatus = null
+    let pendingOrderCount = 0
+    let pendingPayoutCount = 0
+    if (account.account_type === 'funded') {
+      const eligibilityContext = await pool.query(
+        `SELECT
+           (SELECT kyc_status FROM users WHERE id = $2)                                              AS kyc_status,
+           (SELECT COUNT(*)::int FROM trades WHERE account_id = $1 AND status = 'pending')           AS pending_orders,
+           (SELECT COUNT(*)::int FROM payouts WHERE account_id = $1 AND status = 'pending')          AS pending_payouts`,
+        [accountIdStr, req.user.userId]
+      )
+      const ctx = eligibilityContext.rows[0] || {}
+      payoutKycStatus = ctx.kyc_status || null
+      pendingOrderCount = parseInt(ctx.pending_orders || 0, 10)
+      pendingPayoutCount = parseInt(ctx.pending_payouts || 0, 10)
+    }
 
     const openTradesResult = await pool.query(
       `SELECT t.direction, t.open_price, t.lot_size, t.instrument, t.commission, p.bid, p.ask
@@ -678,8 +781,36 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
     const drawdown_pct = peak > 0
       ? parseFloat((((peak - current) / peak) * 100).toFixed(2))
       : 0
-    const total_drawdown_pct = starting > 0
-      ? parseFloat((Math.max(0, ((starting - equity) / starting) * 100)).toFixed(2))
+    // ── Overall drawdown, measured against the floor that actually fails you ──
+    //
+    // This used to be (starting_balance - equity) / starting_balance, which is a
+    // STATIC drawdown from the opening balance. The engine does not fail accounts
+    // on that: services/drawdownService.js computes a TRAILING floor from peak
+    // equity (peak * (1 - maxDrawdownPct/100)), and services/tradeEngine.js fails
+    // the account when equity drops below it.
+    //
+    // The two disagree the moment an account goes into profit. A trader up 3% on
+    // a 4% limit saw "25% used" while the real remaining buffer was still 4% of a
+    // peak that had moved up with them — and, worse, a trader up 10% could be
+    // failed by the engine while this gauge showed plenty of room, because a
+    // static reading from the starting balance never registers a pullback from a
+    // high. Reading the floor from the shared resolver is what makes the number
+    // on screen the number that ends the account.
+    //
+    // resolveEffectiveFloor is the pure half of drawdownService — no writes, so
+    // rendering a dashboard cannot advance a trader's peak-equity anchor.
+    const floorResolution = resolveEffectiveFloor(account, {
+      equity,
+      maxDrawdownPct: rules.max_drawdown_pct,
+      drawdownLocksAtPct: fundedDrawdownLocksAtPct
+    })
+    const drawdown_floor = parseFloat(floorResolution.floor.toFixed(2))
+    const drawdown_headroom = parseFloat(Math.max(0, equity - drawdown_floor).toFixed(2))
+    const peakForDrawdown = floorResolution.nextPeak > 0 ? floorResolution.nextPeak : starting
+
+    // "% of the allowance consumed", on the same basis the engine uses.
+    const total_drawdown_pct = peakForDrawdown > 0
+      ? parseFloat((Math.max(0, ((peakForDrawdown - equity) / peakForDrawdown) * 100)).toFixed(2))
       : 0
     const total_drawdown_used_pct = rules.max_drawdown_pct > 0
       ? parseFloat(Math.min((total_drawdown_pct / rules.max_drawdown_pct) * 100, 100).toFixed(2))
@@ -823,6 +954,84 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
       }
     }
 
+    // ── Qualifying trading days ─────────────────────────────────────────────
+    //
+    // The engine silently refuses to pass an account that has hit its profit
+    // target but not traded enough QUALIFYING days (challengeEngine.js — it just
+    // `return`s), and routes/payouts.js refuses a payout for the same reason on
+    // funded accounts. Neither was surfaced anywhere in the UI, so a trader at
+    // target simply watched nothing happen. A "qualifying" day is not a day you
+    // traded: it is a day you finished up at least min_daily_profit_pct of
+    // starting balance.
+    const minDaysRequired = account.account_type === 'funded'
+      ? parseInt(fundedMinTradingDaysForPayout || 0, 10)
+      : parseInt(account.min_trading_days || 0, 10)
+
+    let trading_days = null
+    if (minDaysRequired > 0) {
+      const qualifying = await tradingDaysService.countQualifyingTradingDays(
+        pool, accountIdStr, account.starting_balance, account.min_daily_profit_pct
+      )
+      trading_days = {
+        qualifying,
+        required: minDaysRequired,
+        remaining: Math.max(0, minDaysRequired - qualifying),
+        min_daily_profit_pct: parseFloat(account.min_daily_profit_pct || 0),
+        met: qualifying >= minDaysRequired
+      }
+    }
+
+    // ── Payout eligibility ──────────────────────────────────────────────────
+    //
+    // Resolved through the shared predicate in domain/payoutEligibility.js — the
+    // same one routes/admin approval re-runs — rather than the frontend guessing.
+    // The dashboard chip used to read `realizedProfit >= 50 ? 'Payout eligible'`,
+    // which ignored KYC, open trades, the 6% minimum net profit, the 10
+    // qualifying-day rule and the consistency cap, and told traders they were
+    // eligible when the request would be refused.
+    let payout_eligibility = null
+    if (account.account_type === 'funded') {
+      const blockers = evaluatePayoutEligibility({
+        account,
+        kycStatus: payoutKycStatus,
+        openTradeCount: openTradesResult.rows.length,
+        pendingOrderCount: pendingOrderCount,
+        pendingPayoutCount: pendingPayoutCount,
+        minRequestAmount: 50,
+        profitSharePct: rules.profit_share_pct
+      }).blockers
+
+      // Model-level funded gates live in routes/payouts.js, not in the shared
+      // predicate. Mirror them here so the chip reflects the real answer.
+      if (trading_days && !trading_days.met) {
+        blockers.push({
+          code: 'trading_days',
+          message: `${trading_days.remaining} more qualifying trading day${trading_days.remaining === 1 ? '' : 's'} needed.`
+        })
+      }
+      if (fundedPayoutMinNetProfitPct > 0) {
+        const required = starting * (fundedPayoutMinNetProfitPct / 100)
+        if (realizedProfit < required) {
+          blockers.push({
+            code: 'min_net_profit',
+            message: `$${(required - realizedProfit).toFixed(2)} more profit needed to reach the ${fundedPayoutMinNetProfitPct}% minimum.`
+          })
+        }
+      }
+      if (consistency && fundedConsistencyMaxDayPct > 0 && consistency.best_day_pct > fundedConsistencyMaxDayPct) {
+        blockers.push({
+          code: 'consistency',
+          message: `Your best day is ${consistency.best_day_pct}% of total profit, above the ${fundedConsistencyMaxDayPct}% limit.`
+        })
+      }
+
+      payout_eligibility = {
+        eligible: blockers.length === 0,
+        blockers: blockers.map((b) => ({ code: b.code, message: b.message })),
+        next_blocker: blockers.length > 0 ? blockers[0].message : null
+      }
+    }
+
     res.json({
       account,
       rules,
@@ -842,6 +1051,10 @@ router.get('/stats/:account_id', authenticateToken, async function(req, res) {
         trades_today,
         last_trade_at,
         consistency,
+        trading_days,
+        payout_eligibility,
+        drawdown_floor,
+        drawdown_headroom,
         payout_cycle,
         scaling
       }
@@ -891,7 +1104,7 @@ async function redeemUserScopedVoucherRow(client, { table, voucher, userId, paid
   return { ok: true, order: orderInsert.rows[0] }
 }
 
-router.post('/orders', authenticateToken, async function(req, res) {
+router.post('/orders', authenticateToken, requireVerifiedEmail, async function(req, res) {
   const client = await pool.connect()
   try {
     await ensureChallengeOrderInfrastructure()

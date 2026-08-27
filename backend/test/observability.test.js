@@ -62,7 +62,7 @@ test('normalizeIncomingId caps length and rejects unsafe characters', () => {
 test('the id survives an await, which is the whole point of the async store', async () => {
   await runWithContext({ requestId: 'ctx-1' }, async () => {
     assert.equal(getRequestId(), 'ctx-1')
-    await new Promise((resolve) => setTimeout(resolve, 5))
+    await new Promise((resolve) => { setTimeout(resolve, 5) })
     assert.equal(getRequestId(), 'ctx-1', 'lost across an await')
   })
 })
@@ -75,6 +75,12 @@ test('reading the id outside a request returns undefined instead of throwing', (
 test('the logger stamps the active request id onto its metadata', () => {
   const seen = []
   const original = logger.transports[0].log
+  // utils/logger.js sets `silent: true` under test so a failing suite is not
+  // buried in log output. winston short-circuits on silent BEFORE reaching any
+  // transport, so this capture saw nothing and the assertion below could never
+  // pass. Lift it for exactly this test, and put it back in the finally.
+  const wasSilent = logger.silent
+  logger.silent = false
   logger.transports[0].log = function (info, next) { seen.push(info); if (next) next() }
 
   try {
@@ -84,6 +90,7 @@ test('the logger stamps the active request id onto its metadata', () => {
     logger.info('hello from outside a request')
   } finally {
     logger.transports[0].log = original
+    logger.silent = wasSilent
   }
 
   const inside = seen.find((i) => String(i.message).includes('from a request'))

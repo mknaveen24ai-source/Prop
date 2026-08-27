@@ -15,7 +15,13 @@ services:
 
   # ── PostgreSQL ───────────────────────────────────────────────────────────────
   postgres:
-    image: postgres:16-alpine
+    # Major version and mount layout are a single compatibility contract. The
+    # official PostgreSQL 18 image stores its cluster below
+    # /var/lib/postgresql/18/docker; mounting only /var/lib/postgresql/data
+    # makes an existing v18 volume look non-empty but uninitialised and the
+    # container never becomes healthy. Never change this major version without
+    # a verified dump/restore or pg_upgrade into a new volume.
+    image: postgres:18-alpine
     container_name: propfirm_postgres
     restart: unless-stopped
     # The image default is max_connections=100, which the backend pool (60) plus
@@ -30,7 +36,7 @@ services:
       POSTGRES_USER:     ${DB_USER:-propfirm}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-propfirm} -d ${DB_NAME:-propfirm}"]
       interval: 10s
@@ -114,8 +120,8 @@ services:
   # migrates an existing one, and verifies the result either way.
   migrate:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: propfirm_migrate
     restart: "no"
     env_file: .env
@@ -136,11 +142,14 @@ services:
   # ── Backend API ──────────────────────────────────────────────────────────────
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     # container_name is deliberately absent: Docker refuses duplicate
     # names, so setting it makes `docker compose up --scale` fail outright.
     # (audit finding H-08 — this service is horizontally scalable.)
+    # The all-in-one deployment. It is deliberately mutually exclusive with
+    # the scaleout profile: running both would create two trade engines.
+    profiles: ["monolith"]
     restart: unless-stopped
     env_file: .env
     environment:
@@ -200,8 +209,8 @@ services:
   # ── Frontend ─────────────────────────────────────────────────────────────────
   email-worker:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     # container_name is deliberately absent: Docker refuses duplicate
     # names, so setting it makes `docker compose up --scale` fail outright.
     # (audit finding H-08 — this service is horizontally scalable.)
@@ -214,7 +223,7 @@ services:
       DIRECT_DATABASE_URL: postgresql://${DB_USER:-propfirm}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-propfirm}
       EMAIL_WORKER_POLL_MS: ${EMAIL_WORKER_POLL_MS:-5000}
       EMAIL_WORKER_BATCH_SIZE: ${EMAIL_WORKER_BATCH_SIZE:-10}
-    command: ["node", "workers/emailWorker.js"]
+    command: ["npm", "run", "email:worker"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -225,8 +234,8 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: frontend/Dockerfile
       args:
         # MUST stay empty. services/api.js uses VITE_API_URL as the axios
         # baseURL, and every call path already starts with /api/... — so behind
@@ -246,7 +255,7 @@ services:
     # (audit finding H-08 — this service is horizontally scalable.)
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/ >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -272,8 +281,8 @@ services:
   #     docker compose --profile demo stop dwx-demo
   dwx-demo:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: propfirm_dwx_demo
     profiles: ["demo"]
     restart: unless-stopped
@@ -284,7 +293,7 @@ services:
       NODE_ENV: development
       DWX_MARKET_DATA_FILE: /app/mt5-bridge/DWX_Market_Data.txt
     entrypoint: ["dumb-init", "--"]
-    command: ["node", "scripts/fake-dwx-feed.js", "--hz=5", "--symbols=6"]
+    command: ["node", "--enable-source-maps", "dist/scripts/fake-dwx-feed.js", "--hz=5", "--symbols=6"]
     volumes:
       - ${MT5_BRIDGE_PATH:-./deploy/mt5-bridge}:/app/mt5-bridge
     networks:
@@ -295,7 +304,7 @@ services:
   # ═══════════════════════════════════════════════════════════════════════════
   # Start with:
   #     docker compose --profile scaleout up -d --scale gateway=3 --scale api=2
-  #     # and swap the nginx vhost for deploy/nginx/propfirm.scaleout.conf
+  # The profile starts nginx-scaleout with the matching vhost automatically.
   #
   # OPT-IN, like pgbouncer above. Without the profile none of this starts and
   # `backend` (ROLE unset → 'all') runs exactly as it always has.
@@ -317,8 +326,8 @@ services:
 
   engine:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     profiles: ["scaleout"]
     container_name: propfirm_engine   # exactly one — naming it makes that literal
     restart: unless-stopped
@@ -363,8 +372,8 @@ services:
   # batched equity over Redis and writes them to its own connections.
   gateway:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     profiles: ["scaleout"]
     restart: unless-stopped
     env_file: .env
@@ -400,8 +409,8 @@ services:
   # HTTP tier. Stateless — scale it on CPU like any other web tier.
   api:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     profiles: ["scaleout"]
     restart: unless-stopped
     env_file: .env
@@ -436,6 +445,7 @@ services:
   nginx:
     image: nginx:1.25-alpine
     container_name: propfirm_nginx
+    profiles: ["monolith"]
     restart: unless-stopped
     ports:
       - "80:80"
@@ -461,6 +471,36 @@ services:
         hard: 131072
     depends_on:
       backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    networks:
+      - external
+
+  # Public proxy for the split-role topology. This is a separate service rather
+  # than an override of `nginx` so Compose cannot accidentally retain the
+  # monolith's backend dependency or vhost when --profile scaleout is selected.
+  nginx-scaleout:
+    image: nginx:1.25-alpine
+    container_name: propfirm_nginx_scaleout
+    profiles: ["scaleout"]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/nginx/propfirm.scaleout.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/certs:/etc/nginx/certs:ro
+      - nginx_logs:/var/log/nginx
+    ulimits:
+      nofile:
+        soft: 131072
+        hard: 131072
+    depends_on:
+      gateway:
+        condition: service_healthy
+      api:
         condition: service_healthy
       frontend:
         condition: service_healthy

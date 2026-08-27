@@ -80,6 +80,10 @@ export default function AdminDisputes() {
   const [metaPriority, setMetaPriority] = useState('normal');
   const [metaSlaHours, setMetaSlaHours] = useState('48');
   const [metaNotes, setMetaNotes] = useState('');
+  const [evidenceUrl, setEvidenceUrl] = useState('');
+  const [evidenceType, setEvidenceType] = useState('');
+  const [evidenceError, setEvidenceError] = useState('');
+  const [loadingEvidence, setLoadingEvidence] = useState(false);
 
   const filters = useMemo(() => ({
     status: statusFilter,
@@ -127,6 +131,43 @@ export default function AdminDisputes() {
     return () => socket.off('admin_command_center_updated', refresh);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socket]);
+
+  // The trader's uploaded evidence — the screenshot or broker statement the
+  // whole appeal rests on. It was previously unreachable from the admin side:
+  // /api/disputes/:id/evidence filters on the owner's user_id, so an admin got
+  // a 404 for it, and dispute-workflow never mentioned the attachment existed.
+  // Fetched as a blob because the file needs the admin Authorization header,
+  // which a plain <img src> cannot send (same pattern as AdminKYC.jsx).
+  useEffect(() => {
+    if (!showModal || !selected?.has_evidence || !adminAxios) return undefined;
+    let objectUrl = '';
+    let cancelled = false;
+
+    (async () => {
+      setLoadingEvidence(true);
+      setEvidenceError('');
+      try {
+        const res = await adminAxios.get(`/api/disputes/admin/${selected.id}/evidence`, {
+          responseType: 'blob'
+        });
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(res.data);
+        setEvidenceUrl(objectUrl);
+        setEvidenceType(String(res.headers?.['content-type'] || res.data?.type || ''));
+      } catch (err) {
+        if (!cancelled) setEvidenceError(err?.response?.data?.error || 'Evidence is not available.');
+      } finally {
+        if (!cancelled) setLoadingEvidence(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      setEvidenceUrl('');
+      setEvidenceType('');
+    };
+  }, [adminAxios, selected?.has_evidence, selected?.id, showModal]);
 
   const saveView = async () => {
     const name = window.prompt('Name this disputes view', 'Open Escalated Disputes');
@@ -481,6 +522,43 @@ export default function AdminDisputes() {
                 }}>
                   {selected.description || selected.message}
                 </div>
+              </div>
+            )}
+
+            {selected.has_evidence && (
+              <div className="admin-form-group">
+                <label className="admin-label">Trader Evidence</label>
+                {loadingEvidence && (
+                  <div style={{ color: 'var(--admin-text-muted)', fontSize: 'var(--fs-sm)' }}>Loading evidence…</div>
+                )}
+                {evidenceError && (
+                  <div style={{ color: 'var(--admin-danger)', fontSize: 'var(--fs-sm)' }}>{evidenceError}</div>
+                )}
+                {evidenceUrl && !evidenceError && (
+                  <div style={{ display: 'grid', gap: 'var(--space-2)' }}>
+                    {evidenceType.includes('pdf') ? (
+                      <iframe
+                        src={evidenceUrl}
+                        title="Dispute evidence"
+                        style={{ width: '100%', height: '480px', border: '1px solid var(--admin-border)' }}
+                      />
+                    ) : (
+                      <img
+                        src={evidenceUrl}
+                        alt="Evidence submitted by the trader for this dispute"
+                        style={{ maxWidth: '100%', border: '1px solid var(--admin-border)' }}
+                      />
+                    )}
+                    <a
+                      className="admin-btn admin-btn-ghost"
+                      href={evidenceUrl}
+                      download={`dispute-${selected.id}-evidence`}
+                      style={{ justifySelf: 'start' }}
+                    >
+                      Download evidence
+                    </a>
+                  </div>
+                )}
               </div>
             )}
 

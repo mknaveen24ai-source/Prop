@@ -309,7 +309,7 @@ export default function AdminAccountLinking() {
               className="admin-filter-chip"
               style={{
                 fontSize: 'var(--fs-xs)',
-                padding: '2px 8px',
+                padding: 'var(--space-1) var(--space-2)',
                 cursor: 'default',
                 borderColor: STRONG_SIGNALS.has(type) ? 'var(--admin-danger, #e5484d)' : undefined,
                 color: STRONG_SIGNALS.has(type) ? 'var(--admin-danger, #e5484d)' : undefined
@@ -327,7 +327,7 @@ export default function AdminAccountLinking() {
       sortKey: 'score',
       render: (row) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-          <strong style={{ fontSize: '15px' }}>{row.score}</strong>
+          <strong style={{ fontSize: 'var(--fs-lg)' }}>{row.score}</strong>
           <AdminBadge status={confidenceTone(row.confidence)} label={row.confidence} />
         </div>
       )

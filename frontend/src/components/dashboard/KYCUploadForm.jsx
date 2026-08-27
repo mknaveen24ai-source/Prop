@@ -123,9 +123,9 @@ function WebcamCapture({ onCapture, onCancel }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: 'var(--glass-2)', border: '1px solid var(--rule-soft)', borderTop: '3px double var(--ink)', padding: '28px', width: '600px', maxWidth: '95vw', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', backdropFilter: 'blur(20px) saturate(140%)', WebkitBackdropFilter: 'blur(20px) saturate(140%)' }}>
+      <div style={{ background: 'var(--glass-2)', border: '1px solid var(--rule-soft)', borderTop: '3px double var(--ink)', padding: 'var(--space-7)', width: '600px', maxWidth: '95vw', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', backdropFilter: 'blur(20px) saturate(140%)', WebkitBackdropFilter: 'blur(20px) saturate(140%)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ margin: 0, color: 'var(--text, #fff)', fontSize: '17px', fontWeight: 700 }}>Live Photo Capture</h3>
+          <h3 style={{ margin: 0, color: 'var(--text, #fff)', fontSize: 'var(--fs-xl)', fontWeight: 700 }}>Live Photo Capture</h3>
           <button type="button" onClick={handleCancel} style={{ background: 'none', border: 'none', color: 'var(--text-muted, #888)', fontSize: 'var(--fs-3xl)', cursor: 'pointer', lineHeight: 1 }}>x</button>
         </div>
 
@@ -164,7 +164,7 @@ function WebcamCapture({ onCapture, onCancel }) {
             <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
               {!captured ? (
                 <>
-                  <button type="button" onClick={takeSnapshot} disabled={!ready} style={{ flex: 1, padding: 'var(--space-3-5)', fontSize: '15px', fontWeight: 700, cursor: ready ? 'pointer' : 'not-allowed', background: ready ? 'var(--ink)' : 'var(--rule)', border: 'none', color: 'var(--paper)', opacity: ready ? 1 : 0.5 }}>
+                  <button type="button" onClick={takeSnapshot} disabled={!ready} style={{ flex: 1, padding: 'var(--space-3-5)', fontSize: 'var(--fs-lg)', fontWeight: 700, cursor: ready ? 'pointer' : 'not-allowed', background: ready ? 'var(--ink)' : 'var(--rule)', border: 'none', color: 'var(--paper)', opacity: ready ? 1 : 0.5 }}>
                     Capture Photo
                   </button>
                   <button type="button" onClick={handleCancel} style={{ padding: 'var(--space-3-5) var(--space-5)', background: 'transparent', border: '1px solid var(--navy-border, rgba(255,255,255,0.1))', color: 'var(--text-muted, #888)', cursor: 'pointer', fontSize: 'var(--fs-md)' }}>
@@ -173,7 +173,7 @@ function WebcamCapture({ onCapture, onCancel }) {
                 </>
               ) : (
                 <>
-                  <button type="button" onClick={usePhoto} style={{ flex: 1, padding: 'var(--space-3-5)', fontSize: '15px', fontWeight: 700, cursor: 'pointer', background: 'var(--gain)', border: 'none', color: 'var(--paper)' }}>
+                  <button type="button" onClick={usePhoto} style={{ flex: 1, padding: 'var(--space-3-5)', fontSize: 'var(--fs-lg)', fontWeight: 700, cursor: 'pointer', background: 'var(--gain)', border: 'none', color: 'var(--paper)' }}>
                     Use This Photo
                   </button>
                   <button type="button" onClick={() => setCaptured(null)} style={{ padding: 'var(--space-3-5) var(--space-5)', background: 'transparent', border: '1px solid var(--navy-border, rgba(255,255,255,0.1))', color: 'var(--text-muted, #888)', cursor: 'pointer', fontSize: 'var(--fs-md)' }}>
@@ -335,7 +335,7 @@ export default function KYCUploadForm({
         </p>
 
         <form onSubmit={onSubmit}>
-          <div style={{ display: 'grid', gap: 'var(--space-3-5)', marginBottom: '22px' }}>
+          <div style={{ display: 'grid', gap: 'var(--space-3-5)', marginBottom: 'var(--space-6)' }}>
             <div>
               <label htmlFor="kyc_country">Country of Residence</label>
               <select

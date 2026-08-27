@@ -74,8 +74,12 @@ const FUNDED_STAGE = {
   funded_min_trading_days_for_payout: 10,
   funded_payout_min_net_profit_pct: 6,
   funded_consistency_max_day_pct: 15,
-  payout_frequency: 'weekly',
-  profit_split_pct: 75
+  // 'weekly' was marketing, not mechanism: nothing read this field, no cycle
+  // ran, and the hero advertised "Weekly Payout Cycles" over an on-demand
+  // queue. On-demand is the better offer — see PAYOUT_SLA in constants.js for
+  // the commitment that replaced the cadence.
+  payout_frequency: 'on_demand',
+  profit_split_pct: 100
 }
 
 const PRICING_SEED = {
@@ -124,6 +128,24 @@ async function ensureStepModelInfrastructure() {
         profit_split_pct NUMERIC NOT NULL DEFAULT 100.0,
         scaling_enabled BOOLEAN NOT NULL DEFAULT TRUE,
         scaling_target_pct NUMERIC NOT NULL DEFAULT 10.0,
+        -- LEGACY / DISPLAY ONLY. Nothing reads this to size a scaling grant.
+        --
+        -- The rows here carry BOTH this column and
+        -- scaling_increase_per_milestone_pct (added below), which are two
+        -- incompatible scaling semantics — doubling vs a linear step — sitting
+        -- on the same row. Only the LINEAR one governs: routes/accounts.js and
+        -- challengeEngine.js's evaluateScalingPlan both grant
+        --   starting_balance * scaling_increase_per_milestone_pct / 100
+        --
+        -- services/analytics/traderEdge.js used to surface this one to traders
+        -- as "next tier multiplier", so the admin panel promised a doubling the
+        -- engine was never going to grant. That display now reads the linear
+        -- figure. Do not reintroduce a reader for this column without deleting
+        -- the other semantic first — whichever the code happens to read is the
+        -- one that governs real money.
+        --
+        -- accounts.scaling_multiplier is unrelated and still live: it is the
+        -- per-account "how many times has this grown" tracker, default 1.
         scaling_multiplier NUMERIC NOT NULL DEFAULT 2.0,
         scaling_max_account_size INTEGER NOT NULL DEFAULT 200000,
         free_retries INTEGER NOT NULL DEFAULT 1,

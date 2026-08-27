@@ -33,7 +33,7 @@ export default function LandingAffiliate() {
   return (
     <section className="mp-section" style={{ position: 'relative' }}>
       <div className="mp-container">
-        <div style={{ textAlign: 'center', marginBottom: '60px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 'var(--space-10)' }}>
           <div className="mp-badge mp-reveal" style={{ marginBottom: 'var(--space-5)' }}>
             <span className="mp-badge-dot"></span>
             Affiliate Program
@@ -52,9 +52,9 @@ export default function LandingAffiliate() {
               <div className="mp-timeline-marker" style={{ borderColor: 'var(--gain)', color: 'var(--gain)' }}>
                 {step.num}
               </div>
-              <div className="mp-timeline-content mp-glass-card" style={{ padding: '30px' }}>
+              <div className="mp-timeline-content mp-glass-card" style={{ padding: 'var(--space-7)' }}>
                 <div style={{
-                  display: 'inline-block', padding: '5px 14px',
+                  display: 'inline-block', padding: 'var(--space-1-5) var(--space-3-5)',
                   background: 'transparent', fontSize: 'var(--fs-xs)',
                   textTransform: 'uppercase', letterSpacing: '0.15em',
                   color: 'var(--gain)', marginBottom: 'var(--space-4)',

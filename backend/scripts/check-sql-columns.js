@@ -57,7 +57,7 @@ const { Client } = require('pg')
 
 const ROOT = path.join(__dirname, '..')
 const SCAN_DIRS = ['routes', 'services', 'domain', 'utils', 'workers', 'jobs', 'middleware']
-const SCAN_FILES = ['server.js', 'challengeEngine.js']
+const SCAN_FILES = ['server.js', 'challengeEngine.ts']
 
 // Postgres system columns exist on every table but are absent from
 // information_schema.columns.

@@ -7,9 +7,11 @@ const crypto   = require('crypto')
 const qrcode   = require('qrcode')
 const pool     = require('../db')
 const { authenticateToken, authenticatePre2FA } = require('./middleware')
-const { enqueuePasswordResetEmail, enqueueWelcomeOnboardingEmail } = require('../utils/emailQueue')
+const { enqueuePasswordResetEmail, enqueueWelcomeOnboardingEmail, enqueueEmailVerificationEmail } = require('../utils/emailQueue')
 const { passwordResetLimiter, createLimiter } = require('../utils/security')
-const { isValidEmail, isValidPassword, sanitizeString, isValidUUID } = require('../utils/validation')
+const { isValidEmail, sanitizeString, isValidUUID } = require('../utils/validation')
+const { getRequestCountry } = require('../utils/requestGeo')
+const { screenJurisdiction } = require('../utils/jurisdiction')
 const logger   = require('../utils/logger')
 const totp     = require('../utils/totp')
 const { invalidateTokenCache } = require('../utils/tokenCache')
@@ -21,7 +23,6 @@ const { recordRequestSignals } = require('../services/identitySignals')
 require('../loadEnv')
 
 
-const BLOCKED_COUNTRIES = ['United States', 'Canada', 'Iran', 'North Korea', 'Cuba', 'Syria']
 
 // FIX (BUG-M3): isValidCountry() accepted ISO codes (US, GB) but the frontend
 // select sends full names (India, United Kingdom). Explicit allowed-list
@@ -37,7 +38,9 @@ const ALLOWED_COUNTRIES = new Set([
   'Japan', 'South Korea', 'Hong Kong', 'New Zealand', 'Saudi Arabia',
   'Israel', 'Brazil', 'Mexico', 'Argentina', 'Chile', 'Colombia', 'Peru',
   'Indonesia', 'Thailand', 'Vietnam', 'Egypt', 'Morocco', 'Tunisia',
-  'Ghana', 'Tanzania', 'Uganda', 'Zimbabwe', 'Other'
+  'Ghana', 'Tanzania', 'Uganda', 'Zimbabwe'
+  // 'Other' deliberately removed: it was an opt-out from jurisdiction
+  // screening. A user in a restricted country selected it and was admitted.
 ])
 
 const COOKIE_BASE = {
@@ -53,6 +56,34 @@ function setAuthCookie(res, token) {
 
 function clearAuthCookie(res) {
   res.clearCookie('token', COOKIE_BASE)
+}
+
+// ── Email verification ───────────────────────────────────────────────────────
+//
+// Replaces the phone-OTP flow the frontend used to attempt against endpoints
+// that were never implemented (see migration 042). The raw token goes in the
+// email; only its SHA-256 hash is stored, so a database read cannot be replayed
+// into an account takeover.
+const EMAIL_VERIFICATION_TTL_HOURS = 48
+
+function generateEmailVerificationToken() {
+  const raw = crypto.randomBytes(32).toString('hex')
+  return { raw, hash: crypto.createHash('sha256').update(raw).digest('hex') }
+}
+
+function hashEmailVerificationToken(rawToken) {
+  return crypto.createHash('sha256').update(String(rawToken)).digest('hex')
+}
+
+function buildVerifyLink(rawToken) {
+  const base = process.env.FRONTEND_URL || 'http://localhost:3000'
+  try {
+    const url = new URL('/verify-email', base)
+    url.searchParams.set('token', rawToken)
+    return url.toString()
+  } catch {
+    return `${base}/verify-email?token=${encodeURIComponent(rawToken)}`
+  }
 }
 
 function buildResetLink() {
@@ -110,7 +141,7 @@ function checkPasswordStrength(password) {
 
 router.post('/register', registerLimiter, async function(req, res) {
   try {
-    const { email, password, full_name, country, phone, referred_by, device_fingerprint, terms_accepted, signup_source } = req.body
+    const { email, password, full_name, country, phone, referred_by, device_fingerprint, terms_accepted, signup_source, funnel_session_id } = req.body
 
     if (!email || !password || !full_name || !country || !phone) {
       return res.status(400).json({ error: 'All fields are required' })
@@ -129,10 +160,18 @@ router.post('/register', registerLimiter, async function(req, res) {
       return res.status(400).json({ error: 'Please select a valid country from the list' })
     }
 
-    const countryKey = countryTrimmed.toLowerCase()
-    const blockedCountrySet = new Set(BLOCKED_COUNTRIES.map(c => c.toLowerCase()))
-    if (blockedCountrySet.has(countryKey)) {
-      return res.status(403).json({ error: 'Sorry this country is not supported' })
+    // Screens the network origin AND the declared country. The declared value is
+    // user-controlled, so on its own it only ever caught the honest. See
+    // utils/jurisdiction.js for why an unknown origin is not a refusal.
+    const jurisdiction = screenJurisdiction(req, countryTrimmed)
+    if (!jurisdiction.allowed) {
+      logger.warn('[register] Blocked signup from a restricted jurisdiction', {
+        matchedOn: jurisdiction.matchedOn,
+        detectedCountry: jurisdiction.detectedCountry,
+        declaredCountry: jurisdiction.declaredCountry,
+        geoAvailable: jurisdiction.geoAvailable
+      })
+      return res.status(403).json({ error: jurisdiction.reason })
     }
 
     const emailDomain = email.split('@')[1]?.toLowerCase()
@@ -181,6 +220,7 @@ router.post('/register', registerLimiter, async function(req, res) {
     }
 
     const password_hash = await bcrypt.hash(password, 12)
+    const verificationToken = generateEmailVerificationToken()
     const affiliate_code = uuidv4().substring(0, 8).toUpperCase()
     const trader_uid = await generateTraderUid(pool)
 
@@ -193,9 +233,10 @@ router.post('/register', registerLimiter, async function(req, res) {
     // FIX: DDL moved to server.js startup (ensureUniqueIds). No inline ALTER TABLE.
     const newUser = await pool.query(
       `INSERT INTO users
-       (email, password_hash, full_name, country, phone, referred_by, device_fingerprint, affiliate_code, trader_uid, signup_source)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       RETURNING id, email, full_name, country, kyc_status, affiliate_code, trader_uid, token_version`,
+       (email, password_hash, full_name, country, phone, referred_by, device_fingerprint, affiliate_code, trader_uid, signup_source,
+        email_verification_token, email_verification_sent_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+       RETURNING id, email, full_name, country, kyc_status, affiliate_code, trader_uid, token_version, email_verified`,
       [
         email.toLowerCase(),
         password_hash,
@@ -206,7 +247,8 @@ router.post('/register', registerLimiter, async function(req, res) {
         deviceHash,
         affiliate_code,
         trader_uid,
-        sanitizeString(String(signup_source || 'direct'), 100)
+        sanitizeString(String(signup_source || 'direct'), 100),
+        verificationToken.hash
       ]
     )
 
@@ -223,6 +265,37 @@ router.post('/register', registerLimiter, async function(req, res) {
       } catch (referralErr) {
         logger.warn('Failed to record affiliate referral:', { error: referralErr.message, userId: user.id })
       }
+    }
+
+    // Funnel stitching (migration 040). The public /api/analytics/track route is
+    // unauthenticated, so every event this visitor fired before this moment has
+    // user_id NULL. Stamping the new user onto that session's rows is what makes
+    // "which campaign produced this signup" answerable at all — without it the
+    // attribution columns would only ever describe anonymous traffic that can
+    // never be joined to revenue.
+    //
+    // Fire-and-forget and best-effort: a signup must never fail because a
+    // marketing row could not be updated.
+    if (funnel_session_id) {
+      const sessionId = sanitizeString(String(funnel_session_id), 100)
+      pool.query(
+        `UPDATE marketing_funnel_events
+            SET user_id = $1
+          WHERE session_id = $2
+            AND user_id IS NULL`,
+        [user.id, sessionId]
+      ).then(() => pool.query(
+        `INSERT INTO marketing_funnel_events
+           (event_type, session_id, utm_source, utm_medium, utm_campaign, referrer, landing_path, user_id)
+         SELECT 'register', $2, utm_source, utm_medium, utm_campaign, referrer, landing_path, $1
+           FROM marketing_funnel_events
+          WHERE session_id = $2
+          ORDER BY created_at ASC
+          LIMIT 1`,
+        [user.id, sessionId]
+      )).catch((funnelErr) => {
+        logger.warn('Failed to stitch funnel session to user:', { error: funnelErr.message, userId: user.id })
+      })
     }
 
     if (terms_accepted) {
@@ -249,6 +322,21 @@ router.post('/register', registerLimiter, async function(req, res) {
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     )
+
+    try {
+      await enqueueEmailVerificationEmail(
+        user.email,
+        user.full_name,
+        buildVerifyLink(verificationToken.raw),
+        { userId: user.id }
+      )
+    } catch (verifyErr) {
+      // Never fail a signup because mail could not be queued — the user can
+      // request a fresh link from /api/auth/resend-verification.
+      logger.error('[verify_email] Failed to enqueue verification email', {
+        error: verifyErr.message, userId: user.id
+      })
+    }
 
     try {
       await enqueueWelcomeOnboardingEmail(
@@ -278,13 +366,95 @@ router.post('/register', registerLimiter, async function(req, res) {
         full_name: user.full_name,
         country: user.country,
         kyc_status: user.kyc_status,
-        affiliate_code: user.affiliate_code
+        affiliate_code: user.affiliate_code,
+        email_verified: user.email_verified === true
       }
     })
 
   } catch (error) {
     logger.error('Register error:', { error: error.message, email: req.body?.email || null })
     res.status(500).json({ error: 'Server error during registration' })
+  }
+})
+
+const resendVerificationLimiter = createLimiter('resend-verification', {
+  windowMs: 15 * 60 * 1000,
+  max: 3,
+  message: { error: 'Too many verification emails requested. Please wait 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/auth/verify-email  { token }
+//
+// Deliberately unauthenticated: the link is clicked from an inbox, which may
+// well be a different browser from the one that registered.
+//
+// Always returns 200 for an unknown or expired token rather than distinguishing
+// the two — the token IS the credential, and a distinguishing error turns this
+// into an oracle for which tokens exist. An expired token is recoverable via
+// /resend-verification, which requires a session.
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/verify-email', forgotLimiter, async function (req, res) {
+  try {
+    const rawToken = String(req.body?.token || '').trim()
+    if (!rawToken || rawToken.length > 200) {
+      return res.status(400).json({ error: 'A verification token is required' })
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+          SET email_verified = TRUE,
+              email_verification_token = NULL,
+              email_verification_sent_at = NULL
+        WHERE email_verification_token = $1
+          AND email_verification_sent_at > NOW() - ($2 || ' hours')::interval
+        RETURNING id, email`,
+      [hashEmailVerificationToken(rawToken), String(EMAIL_VERIFICATION_TTL_HOURS)]
+    )
+
+    if (result.rows.length === 0) {
+      // Either already used, expired, or never existed. A user who clicks an
+      // already-consumed link is verified, so telling them so is correct.
+      return res.json({
+        verified: false,
+        message: 'This link is no longer valid. If your email is already confirmed you can ignore this; otherwise request a new link from your dashboard.'
+      })
+    }
+
+    logger.info('[verify_email] Email confirmed', { userId: result.rows[0].id })
+    res.json({ verified: true, message: 'Email confirmed. Thanks!' })
+  } catch (error) {
+    logger.error('[verify_email] Verification failed:', { error: error.message })
+    res.status(500).json({ error: 'Could not verify this link' })
+  }
+})
+
+// POST /api/auth/resend-verification — authenticated, rate limited.
+router.post('/resend-verification', authenticateToken, resendVerificationLimiter, async function (req, res) {
+  try {
+    const userResult = await pool.query(
+      `SELECT id, email, full_name, email_verified FROM users WHERE id = $1`,
+      [req.user.userId]
+    )
+    const user = userResult.rows[0]
+    if (!user) return res.status(404).json({ error: 'User not found' })
+    if (user.email_verified) {
+      return res.json({ message: 'Your email is already confirmed.', email_verified: true })
+    }
+
+    const token = generateEmailVerificationToken()
+    await pool.query(
+      `UPDATE users SET email_verification_token = $2, email_verification_sent_at = NOW() WHERE id = $1`,
+      [user.id, token.hash]
+    )
+    await enqueueEmailVerificationEmail(user.email, user.full_name, buildVerifyLink(token.raw), { userId: user.id })
+
+    res.json({ message: 'Verification email sent.', email_verified: false })
+  } catch (error) {
+    logger.error('[verify_email] Resend failed:', { error: error.message })
+    res.status(500).json({ error: 'Could not send a verification email' })
   }
 })
 
@@ -302,7 +472,7 @@ router.post('/login', loginLimiter, async function(req, res) {
 
     const result = await pool.query(
       'SELECT id, email, password_hash, full_name, country, kyc_status, is_banned, is_bot,' +
-      ' affiliate_code, trader_uid, token_version, totp_enabled FROM users' +
+      ' affiliate_code, trader_uid, token_version, totp_enabled, email_verified FROM users' +
       ' WHERE email = $1',
       [email.toLowerCase()]
     )
@@ -356,8 +526,8 @@ router.post('/login', loginLimiter, async function(req, res) {
     const loginIp = getRequestIp(req)
     try {
       await pool.query(
-        `INSERT INTO login_logs (user_id, ip_address, logged_in_at) VALUES ($1, $2, NOW())`,
-        [user.id, loginIp]
+        `INSERT INTO login_logs (user_id, ip_address, country, logged_in_at) VALUES ($1, $2, $3, NOW())`,
+        [user.id, loginIp, getRequestCountry(req)]
       )
     } catch (logErr) {
       logger.error('[login_log] Failed to log login IP:', { error: logErr.message })
@@ -379,7 +549,8 @@ router.post('/login', loginLimiter, async function(req, res) {
         full_name: user.full_name,
         country: user.country,
         kyc_status: user.kyc_status,
-        affiliate_code: user.affiliate_code
+        affiliate_code: user.affiliate_code,
+        email_verified: user.email_verified === true
       }
     })
 
@@ -393,7 +564,7 @@ router.get('/me', authenticateToken, async function(req, res) {
   try {
     const result = await pool.query(
       `SELECT id, email, full_name, country, kyc_status, kyc_rejection_reason,
-              affiliate_code, is_banned, theme_preference, trader_uid
+              affiliate_code, is_banned, theme_preference, trader_uid, email_verified
        FROM users WHERE id = $1`,
       [req.user.userId]
     )
@@ -418,7 +589,8 @@ router.get('/me', authenticateToken, async function(req, res) {
       kyc_status: user.kyc_status,
       kyc_rejection_reason: user.kyc_rejection_reason || null,
       affiliate_code: user.affiliate_code,
-      theme_preference: user.theme_preference || 'dark'
+      theme_preference: user.theme_preference || 'dark',
+      email_verified: user.email_verified === true
     })
   } catch (error) {
     logger.error('Get me error:', { error: error.message })
@@ -987,8 +1159,8 @@ router.post('/2fa/validate', twoFaValidateLimiter, authenticatePre2FA, async fun
     // was blind to exactly the accounts with the strongest security posture.
     try {
       await pool.query(
-        `INSERT INTO login_logs (user_id, ip_address, logged_in_at) VALUES ($1, $2, NOW())`,
-        [user.id, ip]
+        `INSERT INTO login_logs (user_id, ip_address, country, logged_in_at) VALUES ($1, $2, $3, NOW())`,
+        [user.id, ip, getRequestCountry(req)]
       )
     } catch (logErr) {
       logger.error('[login_log] Failed to log 2FA login IP:', { error: logErr.message })

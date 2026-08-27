@@ -162,7 +162,10 @@ function collectAudio () {
         try {
           const channel = event.renderedBuffer.getChannelData(0)
           let sum = 0
-          for (let i = 4500; i < 5000; i += 1) sum += Math.abs(channel[i])
+          for (let i = 4500; i < 5000; i += 1) {
+            const sample = channel[i]
+            if (sample !== undefined) sum += Math.abs(sample)
+          }
           resolve(fastHash(sum.toString()))
         } catch {
           resolve(null)

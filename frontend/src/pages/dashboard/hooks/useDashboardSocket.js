@@ -22,6 +22,7 @@ export default function useDashboardSocket({
   selectedAccountRef,
   setError,
   setSuccess,
+  announceExecution,
   setKycStatus,
   setSelectedAccount,
   pushNotification,
@@ -58,6 +59,7 @@ export default function useDashboardSocket({
     handlersRef.current = {
       setError,
       setSuccess,
+      announceExecution,
       setKycStatus,
       setSelectedAccount,
       pushNotification,
@@ -130,6 +132,9 @@ export default function useDashboardSocket({
           }
         }
       )
+      handlersRef.current.announceExecution?.(
+        `${instrument} closed, profit and loss ${formatCurrency(pnl, { signed: true })}`
+      )
       removePosition(tradeId)
     })
     socket.on('trade_opened', (data) => {
@@ -140,6 +145,9 @@ export default function useDashboardSocket({
         icon: renderIcon('trade', { size: 16, color: 'var(--accent)' }),
         style: { borderLeft: '3px solid var(--accent)' }
       })
+      handlersRef.current.announceExecution?.(
+        `Trade opened: ${openedPosition.instrument} ${openedPosition.direction}`
+      )
     })
     socket.on('account_passed', (data) => {
       toast.success(`Congratulations! You passed ${data?.phase || 'your challenge'}!`, {
@@ -186,19 +194,30 @@ export default function useDashboardSocket({
       }
     })
     socket.on('sl_triggered', (data) => {
-      const slipMsg = Number(data?.slippage_pips || 0) > 0
-        ? ` (${data.slippage_pips} pip slippage)`
-        : ''
+      // slippage_pips is signed since the draw became symmetric: positive is
+      // against the trader, negative is in their favour. Both are worth showing.
+      const slipPips = Number(data?.slippage_pips || 0)
+      const slipMsg = slipPips === 0
+        ? ''
+        : slipPips > 0
+          ? ` (${slipPips} pip slippage)`
+          : ` (${Math.abs(slipPips)} pip positive slippage)`
       toast(`SL triggered on ${data?.instrument || 'trade'}${slipMsg}`, {
         icon: renderIcon('warning', { size: 16, color: 'var(--accent-red)' }),
         style: { borderLeft: '3px solid var(--loss)' }
       })
+      handlersRef.current.announceExecution?.(
+        `Stop loss triggered on ${data?.instrument || 'your trade'}${slipMsg}`
+      )
     })
     socket.on('tp_triggered', (data) => {
       toast.success(`TP hit on ${data?.instrument || 'trade'}! ${formatCurrency(data?.pnl, { signed: true })}`, {
         icon: renderIcon('target', { size: 16, color: 'var(--accent-green)' }),
         style: { borderLeft: '3px solid var(--gain)' }
       })
+      handlersRef.current.announceExecution?.(
+        `Take profit hit on ${data?.instrument || 'your trade'}, ${formatCurrency(data?.pnl, { signed: true })}`
+      )
     })
     // ── Live equity (ENGINE_MODE=event) ──────────────────────────────────────
     // The backend pushes a snapshot on every engine tick for accounts whose

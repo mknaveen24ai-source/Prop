@@ -35,21 +35,38 @@ function RuleRow({ label, value, accent = false }) {
 // copy verbatim. No "latency arbitrage" / "copy trading" / "one free
 // reset" claims — none of that is actually enforced or offered by this
 // platform today, and this page shouldn't promise rules that don't exist.
-function buildRuleColumns(rules, { isFundedAccount, currentModel, currentStepNumber } = {}) {
+export function buildRuleColumns(rules, { isFundedAccount, currentModel, currentStepNumber } = {}) {
   const allowedItems = [
+    // Overnight and weekend are TWO rules with two different enforcers, and
+    // showing them as one told traders the wrong thing. weekendCloseService
+    // reads the platform setting weekend_holding_enabled; flatByCloseService
+    // reads challenge_models.allow_overnight, which the three seeded models set
+    // to FALSE. A trader reading a single "permitted" line was being force-closed
+    // daily by a rule the page never mentioned. Each card now renders the value
+    // its own enforcer actually reads.
     {
-      title: 'Holding overnight and over weekends',
-      body: rules.weekend_holding_enabled ? 'Permitted — positions may be held through the weekend close. This applies platform-wide, evaluation and funded accounts alike.' : 'Currently disabled platform-wide — positions are force-closed before the weekend on every account, evaluation and funded alike.',
-      tone: 'var(--gain)', icon: 'approve',
+      title: 'Holding over the weekend',
+      body: rules.weekend_holding_enabled
+        ? 'Permitted — positions may be held through the weekend close. This applies platform-wide, evaluation and funded accounts alike.'
+        : 'Not permitted — open positions are force-closed and pending orders cancelled before the weekend, on every account, evaluation and funded alike.',
+      tone: rules.weekend_holding_enabled ? 'var(--gain)' : 'var(--warn)', icon: rules.weekend_holding_enabled ? 'approve' : 'warning',
+    },
+    {
+      title: 'Holding overnight',
+      body: currentModel && currentModel.allow_overnight === false
+        ? 'Not permitted on this model — open positions are flattened at the daily close. Size and time your trades so nothing needs to survive the session end.'
+        : 'Permitted — positions may be carried through the daily close.',
+      tone: (currentModel && currentModel.allow_overnight === false) ? 'var(--warn)' : 'var(--gain)',
+      icon: (currentModel && currentModel.allow_overnight === false) ? 'warning' : 'approve',
     },
     {
       title: 'Any hold time above the minimum',
-      body: `No maximum hold time. Minimum hold is ${rules.min_hold_seconds} seconds, to discourage latency-only scalps.`,
+      body: `No maximum hold time — hold a position for as long as you like. See "How the minimum hold window works" for the one thing it does affect.`,
       tone: 'var(--gain)', icon: 'approve',
     },
     {
-      title: 'Trading every instrument on the desk',
-      body: `Up to ${parseFloat(rules.forex_lots_per_1k || 0).toFixed(2)} forex lots and ${parseFloat(rules.commodity_lots_per_1k || 0).toFixed(2)} commodity lots per $1k of account size, minimum lot size ${parseFloat(rules.min_lot_size || 0).toFixed(2)}.`,
+      title: 'Unlimited leverage, no position-size cap',
+      body: `There is no margin requirement and no limit on how large a position can be relative to your account. Minimum lot size is ${parseFloat(rules.min_lot_size || 0).toFixed(2)}, and you may hold up to ${rules.max_open_positions || 10} positions at once. Your risk is governed by the drawdown rules on the left, not by position size — size accordingly.`,
       tone: 'var(--gain)', icon: 'approve',
     },
   ]
@@ -87,6 +104,26 @@ function buildRuleColumns(rules, { isFundedAccount, currentModel, currentStepNum
     {
       title: 'What is expressly allowed',
       items: allowedItems,
+    },
+    {
+      title: 'Execution you should know about',
+      items: [
+        {
+          title: 'How the minimum hold window works',
+          body: `Every position must stay open for at least ${rules.min_hold_seconds} seconds — you cannot close one by hand before then. Your stop loss and take profit still protect you throughout: if price crosses your level inside the window, we record the crossing and fill you at your level the moment the window ends, even if price has moved back the other way since. You get the level you set, not the price ${rules.min_hold_seconds} seconds later.`,
+          tone: 'var(--accent)', icon: 'timer',
+        },
+        {
+          title: 'Slippage is simulated, and it is symmetric',
+          body: 'Fills carry a small random slippage drawn evenly from either side of the quoted price, so it moves in your favour as often as it moves against you. It is never biased towards the house. Execution is simulated against live institutional pricing — no order is routed to an external venue.',
+          tone: 'var(--accent)', icon: 'repeat',
+        },
+        {
+          title: 'No swap or overnight financing',
+          body: 'Positions carry no financing cost. Holding overnight or over a weekend costs you nothing beyond spread and commission — there is no swap charge on this platform, in either direction.',
+          tone: 'var(--accent)', icon: 'moon',
+        },
+      ],
     },
   ]
 
@@ -152,7 +189,7 @@ function buildRuleColumns(rules, { isFundedAccount, currentModel, currentStepNum
   return columns
 }
 
-function PhaseTable({ model, currentStepNumber, isFundedAccount, isCurrentModel }) {
+export function PhaseTable({ model, currentStepNumber, isFundedAccount, isCurrentModel }) {
   const stepCount = model.steps || (Array.isArray(model.profit_targets_pct) ? model.profit_targets_pct.length : 1)
   const columns = []
   for (let i = 0; i < stepCount; i++) {
@@ -288,22 +325,34 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
       : `Phase ${currentStepNumber || 1}`
   const kicker = `$${parseFloat(selectedAccount.account_size || 0).toLocaleString('en-US')} · Account ${selectedAccount.account_uid || selectedAccount.id} · ${phaseLabel}`
 
+  const currentModel = currentModelSlug ? stepModels.find((m) => m.slug === currentModelSlug) || null : null
+  // Funded accounts gate the payout on funded_min_trading_days_for_payout;
+  // evaluation phases gate the pass on min_trading_days. Same rule, two fields.
+  const minDaysForStage = parseInt(
+    (isFundedAccount ? currentModel?.funded_min_trading_days_for_payout : currentModel?.min_trading_days) || 0,
+    10
+  )
   const ruleLimits = rules ? [
     { label: 'Profit target', value: rules.profit_target_amount > 0 ? formatMoney(rules.profit_target_amount) : 'No target', tone: 'var(--accent)', note: rules.profit_target_pct > 0 ? `${rules.profit_target_pct.toFixed(2)}% of starting balance` : 'Funded stage — no target' },
-    { label: 'Daily loss cap', value: rules.daily_drawdown_pct > 0 ? formatMoney((selectedAccount.starting_balance || selectedAccount.account_size) * (rules.daily_drawdown_pct / 100)) : 'Not set', tone: 'var(--warn)', note: rules.daily_drawdown_pct > 0 ? `${rules.daily_drawdown_pct}% from 00:00 UTC equity` : 'No daily limit on this account' },
+    { label: 'Daily loss cap', value: rules.daily_drawdown_pct > 0 ? formatMoney((selectedAccount.starting_balance || selectedAccount.account_size) * (rules.daily_drawdown_pct / 100)) : 'Not set', tone: 'var(--warn)', note: rules.daily_drawdown_pct > 0 ? `${rules.daily_drawdown_pct}% of starting balance · resets 00:00 UTC` : 'No daily limit on this account' },
     { label: 'Overall loss cap', value: formatMoney((selectedAccount.starting_balance || selectedAccount.account_size) * (rules.max_drawdown_pct / 100)), tone: 'var(--loss)', note: `${rules.max_drawdown_pct}% trailing from peak equity` },
-    { label: 'Time limit', value: rules.time_limit_days ? `${rules.time_limit_days} days` : 'No expiry', tone: 'var(--gain)', note: 'No minimum trading days' },
+    { label: 'Time limit', value: rules.time_limit_days ? `${rules.time_limit_days} days` : 'No expiry', tone: 'var(--gain)',
+      // The old flat 'No minimum trading days' note contradicted the requirement
+      // card on this very page, which states the qualifying-day rule. Read it from
+      // the model so the two can never disagree again.
+      note: minDaysForStage > 0
+        ? `${minDaysForStage} qualifying trading day${minDaysForStage === 1 ? '' : 's'} required`
+        : 'No minimum trading days' },
   ] : []
 
-  const currentModel = currentModelSlug ? stepModels.find((m) => m.slug === currentModelSlug) || null : null
   const ruleColumns = rules ? buildRuleColumns(rules, { isFundedAccount, currentModel, currentStepNumber }) : []
 
   return (
     <div style={{ maxWidth: '1080px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
       <div style={{ borderBottom: '3px double var(--ink)', paddingBottom: 'var(--space-4)', display: 'flex', alignItems: 'flex-end', gap: 'var(--space-5)', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 'min(280px, 100%)' }}>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--accent)' }}>{kicker}</div>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '38px', fontWeight: 400, margin: 'var(--space-2-5) 0 0' }}>The Rulebook, in full</h2>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--accent)' }}>{kicker}</div>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-6xl)', fontWeight: 400, margin: 'var(--space-2-5) 0 0' }}>The Rulebook, in full</h2>
           <p style={{ fontSize: 'var(--fs-md)', lineHeight: 1.7, color: 'var(--muted)', maxWidth: '64ch', margin: 'var(--space-2-5) 0 0' }}>
             Everything that can end this account is printed on this page. Nothing is held in a separate schedule, and nothing changes while a challenge is running.
           </p>
@@ -312,11 +361,11 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
           <button
             onClick={() => window.print()}
             className="lx-btn"
-            style={{ padding: '11px 18px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--glass)', color: 'var(--ink)' }}
+            style={{ padding: 'var(--space-3) var(--space-4-5)', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--glass)', color: 'var(--ink)' }}
           >
             Download PDF
           </button>
-          <button className="btn btn-primary" onClick={onTradeNow} style={{ padding: '11px 18px' }}>
+          <button className="btn btn-primary" onClick={onTradeNow} style={{ padding: 'var(--space-3) var(--space-4-5)' }}>
             Open Trading Desk
           </button>
         </div>
@@ -331,9 +380,9 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-3-5)' }}>
             {ruleLimits.map((r) => (
               <Card key={r.label} stat tone={r.tone}>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>{r.label}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>{r.label}</div>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'clamp(19px,1.7vw,24px)', whiteSpace: 'nowrap', marginTop: 'var(--space-2)', color: r.tone }}>{r.value}</div>
-                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--muted)', marginTop: '5px', lineHeight: 1.5 }}>{r.note}</div>
+                <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--muted)', marginTop: 'var(--space-1-5)', lineHeight: 1.5 }}>{r.note}</div>
               </Card>
             ))}
           </div>
@@ -341,15 +390,15 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--glass)', boxShadow: 'var(--elev)' }}>
             {ruleColumns.map((col, colIndex) => (
               <div key={col.title} style={{ padding: 'var(--space-4-5) var(--space-5) var(--space-2)', borderRight: colIndex < ruleColumns.length - 1 ? '1px solid var(--rule)' : 'none' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: '21px', borderBottom: '1px solid var(--rule)', paddingBottom: '11px', marginBottom: 'var(--space-1)' }}>{col.title}</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-3xl)', borderBottom: '1px solid var(--rule)', paddingBottom: 'var(--space-3)', marginBottom: 'var(--space-1)' }}>{col.title}</div>
                 {col.items.map((item) => (
-                  <div key={item.title} style={{ display: 'flex', gap: 'var(--space-3)', padding: '13px 0', borderBottom: '1px solid var(--rule-soft)' }}>
-                    <span style={{ display: 'inline-flex', color: item.tone, marginTop: '3px' }}>
+                  <div key={item.title} style={{ display: 'flex', gap: 'var(--space-3)', padding: 'var(--space-3-5) 0', borderBottom: '1px solid var(--rule-soft)' }}>
+                    <span style={{ display: 'inline-flex', color: item.tone, marginTop: 'var(--space-1)' }}>
                       {renderIcon(item.icon, { size: 15, color: item.tone })}
                     </span>
                     <div>
-                      <div style={{ fontSize: '13.5px' }}>{item.title}</div>
-                      <div style={{ fontSize: '12.5px', lineHeight: 1.62, color: 'var(--muted)', marginTop: 'var(--space-1)' }}>{item.body}</div>
+                      <div style={{ fontSize: 'var(--fs-md)' }}>{item.title}</div>
+                      <div style={{ fontSize: 'var(--fs-base)', lineHeight: 1.62, color: 'var(--muted)', marginTop: 'var(--space-1)' }}>{item.body}</div>
                     </div>
                   </div>
                 ))}
@@ -359,7 +408,7 @@ export default function ChallengeRules({ selectedAccount, accountRules, stats, o
 
           {sortedModels.length > 0 && (
             <div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '19px', borderBottom: '3px double var(--rule)', paddingBottom: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-2xl)', borderBottom: '3px double var(--rule)', paddingBottom: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
                 Targets by phase
               </div>
               {sortedModels.map((model) => (

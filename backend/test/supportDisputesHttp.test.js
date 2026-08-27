@@ -25,11 +25,19 @@ app.use('/api/support', supportRoutes.router)
 app.use('/api/admin', supportRoutes.adminRouter)
 app.use('/api/disputes', disputesRouter)
 
-const USER_ID = 'user-support-1'
-const userToken = `Bearer ${jwt.sign({ userId: USER_ID, tv: 0 }, process.env.JWT_SECRET)}`
+const USER_ID = '11111111-1111-4111-8111-111111111113'
+const userToken = `Bearer ${jwt.sign(
+  { userId: USER_ID, email: 'support-user@example.com', tv: 1 },
+  process.env.JWT_SECRET,
+  { expiresIn: '1h' }
+)}`
 const adminToken = `Bearer ${jwt.sign(
-  { role: 'super_admin', atv: 999, email: 'admin@test.local' },
-  process.env.ADMIN_JWT_SECRET
+  {
+    role: 'super_admin', adminId: null, atv: 999,
+    email: 'admin@test.local', full_name: null, src: 'env_fallback'
+  },
+  process.env.ADMIN_JWT_SECRET,
+  { expiresIn: '1h' }
 )}`
 
 function installPoolMock(queryHandlers = []) {
@@ -40,7 +48,7 @@ function installPoolMock(queryHandlers = []) {
       if (pattern.test(sql)) return handler(sql, values)
     }
     if (/SELECT token_version, is_banned FROM users/.test(sql)) {
-      return { rows: [{ token_version: 0, is_banned: false }] }
+      return { rows: [{ token_version: 1, is_banned: false }] }
     }
     // FIX (H-07): admin_token_version must resolve. authenticateAdmin used to
     // skip revocation entirely when this row was absent, so returning [] here

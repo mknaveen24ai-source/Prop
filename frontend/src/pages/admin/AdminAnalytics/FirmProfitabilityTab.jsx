@@ -24,7 +24,7 @@ export default function FirmProfitabilityTab({ dateRange }) {
     (async () => {
       setLoading(true);
       try {
-        // TODO: GET /api/admin/analytics/firm-profitability?from=&to= (backend/routes/adminAnalytics.js)
+        // Backed by GET /api/admin/analytics/firm-profitability?from=&to= (backend/routes/adminAnalytics.js)
         const res = await adminAxios.get('/api/admin/analytics/firm-profitability', {
           params: { from: dateRange?.from || undefined, to: dateRange?.to || undefined },
         });

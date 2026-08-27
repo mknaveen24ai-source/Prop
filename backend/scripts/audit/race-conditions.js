@@ -325,7 +325,7 @@ async function main() {
         data: { account_id: accountId, instrument: 'EURUSD', direction: 'buy', lots: 0.05 }
       })
       if (r.status < 400) opened = r.data?.trade_id || r.data?.trade?.id
-      else await new Promise((resolve) => setTimeout(resolve, 2500))
+      else await new Promise((resolve) => { setTimeout(resolve, 2500) })
     }
 
     if (!opened) {
@@ -346,7 +346,7 @@ async function main() {
       const openedAt = Date.now()
       const HOLD_MS = 65000
       while (Date.now() - openedAt < HOLD_MS) {
-        await new Promise((resolve) => setTimeout(resolve, 2000))
+        await new Promise((resolve) => { setTimeout(resolve, 2000) })
       }
 
       // Confirm the position is STILL OPEN immediately before the stampede.

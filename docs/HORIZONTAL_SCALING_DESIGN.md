@@ -1,7 +1,7 @@
 # Horizontal Scaling — Trade Index Design
 
-**Status:** design, not implemented. Read this before writing code against it.
-**Date:** 2026-08-15
+**Status:** implemented for the split-role topology; validate on staging before
+enabling it for production. Updated 2026-08-25.
 
 ---
 
@@ -9,10 +9,17 @@
 
 `backend/utils/tradeIndex.js` keeps every open trade, pending order and account
 in process memory. It is why the engine reaches p99 ~11.5ms on a 100K-trade
-run: the hot path does no I/O at all. It is also the single reason only one
-backend instance can run.
+run: the hot path does no I/O at all. It is also the reason exactly one
+`ROLE=engine` process owns that index.
 
-Run two instances against the same database today and:
+The unsafe historical setup was running two all-in-one instances against the
+same database. That must still never be done. The supported topology is one
+engine, one or more `ROLE=api` nodes, and one or more `ROLE=gateway` nodes.
+API-originated opens, pending orders, modifications and closes are now published
+on Redis channel `propfirm:trade-index:v1`; the engine applies them immediately.
+The 30-second reconcile remains the recovery path for a missed Pub/Sub message.
+
+Run two `ROLE=all` instances against the same database and:
 
 - Both build a full index, so each holds a **stale** view of trades the other
   opened or closed.

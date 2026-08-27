@@ -6,7 +6,8 @@ const pool = require('../db')
 const logger = require('../utils/logger')
 const {
   authenticateAdmin,
-  authenticateToken
+  authenticateToken,
+  requireAdminCapability
 } = require('./middleware')
 const {
   normalizeSupportReplyPayload,
@@ -163,7 +164,7 @@ router.post('/ticket/:id/reply', authenticateToken, async function(req, res) {
 // `status` and had no detail or reply route, which would have broken the
 // admin inbox on mount.
 
-adminRouter.get('/support-tickets', authenticateAdmin, async function(req, res) {
+adminRouter.get('/support-tickets', authenticateAdmin, requireAdminCapability('chat:read:scoped'), async function(req, res) {
   try {
     const result = await pool.query(
       `SELECT * FROM support_tickets
@@ -176,7 +177,7 @@ adminRouter.get('/support-tickets', authenticateAdmin, async function(req, res) 
   }
 })
 
-adminRouter.patch('/support-tickets/:id', authenticateAdmin, async function(req, res) {
+adminRouter.patch('/support-tickets/:id', authenticateAdmin, requireAdminCapability('chat:reply:scoped'), async function(req, res) {
   try {
     const { status, assigned_agent, internal_notes } = req.body
     const sets = []
@@ -211,7 +212,7 @@ adminRouter.patch('/support-tickets/:id', authenticateAdmin, async function(req,
   }
 })
 
-adminRouter.get('/support-tickets/:id', authenticateAdmin, async function(req, res) {
+adminRouter.get('/support-tickets/:id', authenticateAdmin, requireAdminCapability('chat:read:scoped'), async function(req, res) {
   try {
     const ticketId = parseInt(req.params.id, 10)
     if (!Number.isFinite(ticketId)) {
@@ -239,7 +240,7 @@ adminRouter.get('/support-tickets/:id', authenticateAdmin, async function(req, r
   }
 })
 
-adminRouter.post('/support-tickets/:id/reply', authenticateAdmin, async function(req, res) {
+adminRouter.post('/support-tickets/:id/reply', authenticateAdmin, requireAdminCapability('chat:reply:scoped'), async function(req, res) {
   try {
     const ticketId = parseInt(req.params.id, 10)
     if (!Number.isFinite(ticketId)) {

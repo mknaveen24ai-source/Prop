@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../../services/api';
 import { getTenantLandingCopy } from '../../utils/tenantMarketing';
 
@@ -119,9 +120,9 @@ function TerminalIllustration() {
         />
       </svg>
 
-      <div style={{ marginTop: 'var(--space-3-5)', fontFamily: 'var(--font-mono)', fontSize: '10.5px' }}>
+      <div style={{ marginTop: 'var(--space-3-5)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)' }}>
         {HERO_ORDERBOOK.map((row, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2.5px 0', borderBottom: i === 2 ? '1px solid var(--rule-soft)' : 'none' }}>
+          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-1) 0', borderBottom: i === 2 ? '1px solid var(--rule-soft)' : 'none' }}>
             <span style={{ color: row.side === 'bid' ? 'var(--gain)' : 'var(--loss)' }}>{row.price}</span>
             <span style={{ color: 'var(--muted)' }}>{row.size}</span>
           </div>
@@ -139,6 +140,7 @@ function TerminalIllustration() {
    ══════════════════════════════════════════════════════════════ */
 export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
   const landingCopy = getTenantLandingCopy();
+  const navigate = useNavigate();
   const heroRef = useRef(null);
   const platePar = useRef(null);
   // Same public endpoint LandingLiveStats reads from — real figure instead
@@ -184,7 +186,7 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
   }
 
   return (
-    <section className="mp-section mp-hero" ref={heroRef} style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', paddingTop: '120px', position: 'relative' }}>
+    <section className="mp-section mp-hero" ref={heroRef} style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', paddingTop: 'var(--space-13)', position: 'relative' }}>
 
       <div className="mp-container" style={{ position: 'relative', zIndex: 2 }}>
         <div
@@ -210,10 +212,10 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
                 to the single lead paragraph below on narrow viewports. */}
             <div
               className="mp-hero-intro mp-reveal mp-delay-200 mp-active"
-              style={{ display: 'flex', gap: '22px', maxWidth: '640px', marginBottom: 'var(--space-8)' }}
+              style={{ display: 'flex', gap: 'var(--space-6)', maxWidth: '640px', marginBottom: 'var(--space-8)' }}
             >
               <p style={{
-                flex: 1, fontSize: '15px', lineHeight: 1.72, color: 'var(--mp-text-secondary)',
+                flex: 1, fontSize: 'var(--fs-lg)', lineHeight: 1.72, color: 'var(--mp-text-secondary)',
                 textAlign: 'justify', hyphens: 'auto', margin: 0,
               }}>
                 {landingCopy.heroSubtitle}
@@ -225,9 +227,9 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
                 className="mp-btn-primary"
                 onClick={() => {
                   if (onPrimaryCta) onPrimaryCta();
-                  scrollToCalculator();
+                  navigate('/register');
                 }}
-                style={{ padding: '22px 54px', fontSize: 'var(--fs-xl)' }}
+                style={{ padding: 'var(--space-6) var(--space-9)', fontSize: 'var(--fs-xl)' }}
               >
                 {landingCopy.heroPrimaryCta}
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -258,8 +260,12 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
               </div>
               <div className="mp-stat-divider" />
               <div className="mp-stat-item">
-                <span className="mp-stat-number" style={{ color: 'var(--warn)' }}>Weekly</span>
-                <span className="mp-stat-number">&nbsp;Payout Cycles</span>
+                {/* Was "Weekly Payout Cycles" — nothing in the platform runs a
+                    weekly cycle (payouts are on-demand, one request per 24h), so
+                    that was advertising a cadence we don't operate. The profit
+                    split is the stronger claim and it is now literally true. */}
+                <span className="mp-stat-number" style={{ color: 'var(--warn)' }}>100%</span>
+                <span className="mp-stat-number">&nbsp;Profit Split</span>
               </div>
             </div>
           </div>
@@ -287,7 +293,7 @@ export default function LandingHero({ onPrimaryCta, onSecondaryCta }) {
                   aspectRatio: '4 / 5', border: '1px solid var(--rule-soft)',
                   background: 'var(--paper-2)',
                   display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                  padding: '28px 22px',
+                  padding: 'var(--space-7) var(--space-6)',
                 }}>
                   <TerminalIllustration />
                 </div>

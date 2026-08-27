@@ -21,8 +21,8 @@
 
 .mode-public .mp-container {
   width: min(100%, var(--content-wide));
-  padding-left: clamp(20px, 3vw, 32px);
-  padding-right: clamp(20px, 3vw, 32px);
+  padding-left: clamp(var(--space-5), 3vw, var(--space-7));
+  padding-right: clamp(var(--space-5), 3vw, var(--space-7));
 }
 
 .mode-public .nav-transparent.scrolled {
@@ -38,7 +38,7 @@
    bp: lg (1024px) — see src/styles/breakpoints.js */
 .mode-public .mp-nav-links {
   display: flex;
-  gap: 28px;
+  gap: var(--space-7);
   align-items: center;
 }
 
@@ -76,7 +76,7 @@
   color: var(--text-primary);
   text-decoration: none;
   font-family: var(--font-ui);
-  font-size: 15px;
+  font-size: var(--fs-lg);
 }
 .mp-menu__actions {
   display: grid;

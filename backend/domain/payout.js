@@ -46,6 +46,7 @@ async function approvePayout(client, payoutId, {
   const payoutResult = await client.query(
     `SELECT p.id, p.user_id, p.account_id, p.amount_requested, p.amount_payable,
             p.payment_method, p.status, p.is_flagged, p.flag_reason, p.admin_notes,
+            p.first_approver_admin_id, p.first_approved_at,
             u.email, u.full_name, u.kyc_status
        FROM payouts p
        JOIN users u ON p.user_id = u.id
@@ -83,6 +84,64 @@ async function approvePayout(client, payoutId, {
   })
   if (blockers.length > 0) {
     throw new InvariantViolation(blockers[0].message, 400)
+  }
+
+  // ── Dual control above the threshold (migration 045) ───────────────────────
+  //
+  // Everything above this point establishes that the payout SHOULD be paid.
+  // This establishes that more than one person says so, which is the only
+  // control that survives a stolen finance_ops session — to RBAC and the audit
+  // trail, an attacker approving every pending payout is an authorised action
+  // correctly performed.
+  //
+  // The first approval is recorded and the payout stays pending; no money moves
+  // until a DIFFERENT admin approves. Comparison is on the audit label, which is
+  // `role:identity` — stable per admin and available on the bootstrap path too,
+  // where there is no platform_admins row to key on.
+  const threshold = await resolveDualApprovalThreshold(client)
+  const amount = new Decimal(payout.amount_requested)
+  if (threshold != null && amount.gte(threshold)) {
+    const firstApprover = payout.first_approver_admin_id
+
+    if (!firstApprover) {
+      await client.query(
+        `UPDATE payouts
+            SET first_approver_admin_id = $2,
+                first_approved_at = NOW(),
+                updated_at = NOW()
+          WHERE id = $1`,
+        [payout.id, String(actor)]
+      )
+      logger.warn('[payout] First approval recorded — awaiting a second approver', {
+        payoutId: String(payout.id), amount: amount.toString(), threshold, actor: String(actor)
+      })
+      return {
+        payout: { ...payout, status: 'pending', first_approver_admin_id: String(actor) },
+        awaitingSecondApproval: true,
+        firstApprover: String(actor),
+        threshold,
+        certificate: null,
+        certificateCreated: false,
+        recipient: null
+      }
+    }
+
+    if (String(firstApprover) === String(actor)) {
+      throw new InvariantViolation(
+        `Payouts of ${threshold} or more need a second approver. You recorded the first approval on this request; ` +
+        'another admin must complete it.',
+        409
+      )
+    }
+
+    await client.query(
+      `UPDATE payouts
+          SET second_approver_admin_id = $2,
+              second_approved_at = NOW(),
+              updated_at = NOW()
+        WHERE id = $1`,
+      [payout.id, String(actor)]
+    )
   }
 
   // Decimal throughout — the trader path used parseFloat while the admin path
@@ -126,6 +185,35 @@ async function approvePayout(client, payoutId, {
 }
 
 /**
+ * The amount at or above which a payout needs two distinct approvers.
+ *
+ * Read per approval rather than cached: this is a security control, and an
+ * operator who lowers the threshold during an incident must not have to wait
+ * for a cache to expire or a process to restart. A missing or unparseable
+ * setting disables dual control rather than blocking every payout — the same
+ * fail-open direction the setting had before it existed, so a bad value cannot
+ * freeze the payout queue. It is logged loudly when that happens.
+ */
+async function resolveDualApprovalThreshold(client) {
+  try {
+    const result = await client.query(
+      `SELECT value FROM platform_settings WHERE key = 'payout_dual_approval_threshold'`
+    )
+    const raw = result.rows[0]?.value
+    if (raw == null || String(raw).trim() === '') return null
+    const parsed = new Decimal(String(raw).trim())
+    if (!parsed.isFinite() || parsed.lte(0)) {
+      logger.error('[payout] payout_dual_approval_threshold is not a positive number — dual control is OFF', { raw })
+      return null
+    }
+    return parsed.toNumber()
+  } catch (error) {
+    logger.error('[payout] Could not read payout_dual_approval_threshold — dual control is OFF', { error: error.message })
+    return null
+  }
+}
+
+/**
  * Mint the payout reward certificate inside the approval transaction.
  *
  * SAVEPOINT-wrapped for the same reason as the promotion award: the
@@ -144,9 +232,7 @@ async function awardPayoutCertificate(client, payout) {
   try {
     await client.query('SAVEPOINT payout_certificate')
     savepointHeld = true
-  } catch {
-    savepointHeld = false
-  }
+  } catch {}
 
   try {
     const { certificate, created } = await issueCertificate(client, {

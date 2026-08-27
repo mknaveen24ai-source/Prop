@@ -91,7 +91,7 @@ export default function AdminTopBar({ adminAxios, onMobileMenuClick, onLogout, s
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'flex-end',
-          gap: '2px',
+          gap: 'var(--space-1)',
           padding: 'var(--space-2) var(--space-3)',
           border: '1px solid var(--admin-border)',
           background: 'var(--glass)'
@@ -128,7 +128,7 @@ export default function AdminTopBar({ adminAxios, onMobileMenuClick, onLogout, s
               <span
                 style={{
                   position: 'absolute', top: '2px', right: '2px',
-                  minWidth: '14px', height: '14px', padding: '0 3px',
+                  minWidth: '14px', height: '14px', padding: '0 var(--space-1)',
                   borderRadius: '999px', background: 'var(--admin-danger)',
                   color: 'var(--paper)', fontSize: 'var(--fs-3xs)', lineHeight: '14px',
                   textAlign: 'center', fontFamily: 'var(--font-mono)',

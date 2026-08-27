@@ -94,12 +94,62 @@ function checkEnvironment(failures) {
   }
 }
 
+/**
+ * Report challenge models carrying two scaling semantics at once.
+ *
+ * challenge_models has both scaling_multiplier (doubling) and
+ * scaling_increase_per_milestone_pct (a linear step). Only the linear one
+ * governs — routes/accounts.js and challengeEngine.js both grant
+ * starting_balance * increase_pct / 100 — but the doubling column is seeded on
+ * every row, so a future reader picking the wrong one silently changes what a
+ * funded trader is entitled to.
+ *
+ * A WARN rather than a FAIL, deliberately: the seeded values are a product
+ * decision and preflight must not block a deploy over one. The point is that
+ * the ambiguity is visible on every deploy rather than discovered from a payout
+ * dispute. It also prints the ceiling, which is the number the firm has to be
+ * able to honour.
+ */
+async function checkScalingConfiguration() {
+  if (!await tableExists('challenge_models')) return
+
+  const result = await pool.query(
+    `SELECT slug, scaling_multiplier, scaling_increase_per_milestone_pct, scaling_max_account_size
+       FROM challenge_models
+      WHERE scaling_enabled = TRUE
+        AND scaling_multiplier IS NOT NULL
+        AND scaling_multiplier <> 1
+        AND scaling_increase_per_milestone_pct IS NOT NULL
+      ORDER BY slug`
+  )
+
+  if (result.rows.length === 0) {
+    pass('Scaling models carry a single scaling formula')
+    return
+  }
+
+  warn(
+    `${result.rows.length} scaling model(s) carry BOTH scaling_multiplier and ` +
+    'scaling_increase_per_milestone_pct. Only the linear increase governs; the multiplier is display-legacy.'
+  )
+  for (const row of result.rows) {
+    const ceiling = row.scaling_max_account_size != null
+      ? `$${Number(row.scaling_max_account_size).toLocaleString('en-US')}`
+      : 'none'
+    console.warn(
+      `      ${row.slug}: governs +${row.scaling_increase_per_milestone_pct}% per milestone · ` +
+      `ignored multiplier ${row.scaling_multiplier}x · ceiling ${ceiling}`
+    )
+  }
+}
+
 async function main() {
   const failures = []
 
   checkEnvironment(failures)
   await checkMigrations(failures)
   await checkAdminState(failures)
+  await checkScalingConfiguration()
 
   if (failures.length > 0) {
     console.error(`\nDeployment preflight failed with ${failures.length} blocker(s).`)

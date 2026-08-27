@@ -1,12 +1,13 @@
 # ── Stage 1: Build ────────────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:24.19.0-alpine3.24@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43 AS builder
 
-WORKDIR /app
+WORKDIR /build/frontend
 
-COPY package*.json ./
+COPY contracts /build/contracts
+COPY frontend/package*.json ./
 RUN npm ci
 
-COPY . .
+COPY frontend/ ./
 
 # Build-time config. Vite inlines import.meta.env.VITE_* at build time, so these
 # must be present here — they cannot be injected at container runtime.
@@ -38,10 +39,10 @@ RUN npm run build
 FROM nginx:1.25-alpine
 
 # Copy built React app
-COPY --from=builder /app/build /usr/share/nginx/html
+COPY --from=builder /build/frontend/build /usr/share/nginx/html
 
 # Copy nginx config for SPA routing
-COPY nginx-spa.conf /etc/nginx/conf.d/default.conf
+COPY frontend/nginx-spa.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 

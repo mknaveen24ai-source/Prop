@@ -125,7 +125,7 @@ function SectionHeader({ title, subtitle, action }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
       <div>
-        <h3 style={{ color: 'var(--accent)', marginBottom: 'var(--space-1)', fontSize: '15px' }}>{title}</h3>
+        <h3 style={{ color: 'var(--accent)', marginBottom: 'var(--space-1)', fontSize: 'var(--fs-lg)' }}>{title}</h3>
         {subtitle && <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)', margin: 0 }}>{subtitle}</p>}
       </div>
       {action || null}
@@ -167,7 +167,7 @@ function BreakdownCard({ title, subtitle, rows }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-3)', flexWrap: 'wrap', alignItems: 'center' }}>
                 <div>
                   <div style={{ color: 'var(--text)', fontWeight: '700', fontSize: 'var(--fs-base)' }}>{formatStrategyLabel(row.label)}</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', marginTop: '3px' }}>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', marginTop: 'var(--space-1)' }}>
                     {row.trades} trades | {row.wins} wins | {row.losses} losses
                   </div>
                 </div>
@@ -175,7 +175,7 @@ function BreakdownCard({ title, subtitle, rows }) {
                   <div style={{ color: Number(row.total_pnl || 0) >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>
                     {formatSignedCurrency(row.total_pnl || 0)}
                   </div>
-                  <div style={{ color: Number(row.win_rate || 0) >= 50 ? 'var(--green)' : 'var(--red)', fontSize: 'var(--fs-xs)', marginTop: '3px' }}>
+                  <div style={{ color: Number(row.win_rate || 0) >= 50 ? 'var(--green)' : 'var(--red)', fontSize: 'var(--fs-xs)', marginTop: 'var(--space-1)' }}>
                     {formatPercent(row.win_rate || 0)} win rate
                   </div>
                 </div>
@@ -219,7 +219,7 @@ function ScorePanel({ title, score, grade, summary, components, metrics }) {
       <div style={{ display: 'grid', gap: 'var(--space-2-5)', marginBottom: metricRows.length > 0 ? '14px' : 0 }}>
         {componentRows.map(([key, value]) => (
           <div key={key}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', marginBottom: '5px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', marginBottom: 'var(--space-1-5)' }}>
               <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{formatStrategyLabel(key)}</span>
               <span style={{ fontSize: 'var(--fs-sm)', color: getScoreColor(value), fontWeight: '700' }}>{value}/100</span>
             </div>
@@ -240,7 +240,7 @@ function ScorePanel({ title, score, grade, summary, components, metrics }) {
               <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                 {formatStrategyLabel(key)}
               </div>
-              <div style={{ marginTop: '5px', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontWeight: '700' }}>
+              <div style={{ marginTop: 'var(--space-1-5)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontWeight: '700' }}>
                 {typeof value === 'number' ? value.toFixed(1).replace(/\.0$/, '') : String(value)}
               </div>
             </div>
@@ -523,9 +523,9 @@ export default function Analytics({ selectedAccount }) {
             { label: 'Best streak', value: `${analytics.best_win_streak || 0} wins`, tone: 'var(--warn)', sub: 'Consecutive closed trades' },
           ].map((k) => (
             <Card key={k.label} stat tone={k.tone}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>{k.label}</div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: '23px', marginTop: 'var(--space-2)', color: k.tone }}>{k.value}</div>
-              <div style={{ fontSize: '11.5px', color: 'var(--muted)', marginTop: 'var(--space-1)' }}>{k.sub}</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>{k.label}</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: 'var(--fs-4xl)', marginTop: 'var(--space-2)', color: k.tone }}>{k.value}</div>
+              <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--muted)', marginTop: 'var(--space-1)' }}>{k.sub}</div>
             </Card>
           ))}
         </div>
@@ -546,7 +546,7 @@ export default function Analytics({ selectedAccount }) {
                         <div key={r.key} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
                           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', color: tone, marginBottom: 'var(--space-1-5)' }}>{formatSignedCurrency(pnl)}</div>
                           <div style={{ width: '100%', height: `${heightPct}%`, background: tone, borderRadius: '2px 2px 0 0', minHeight: '3px' }} />
-                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: 'var(--space-2)' }}>{r.label.slice(0, 3)}</div>
+                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: 'var(--space-2)' }}>{r.label.slice(0, 3)}</div>
                         </div>
                       )
                     })}
@@ -566,9 +566,9 @@ export default function Analytics({ selectedAccount }) {
                       const share = (r.trades / total) * 100
                       const tone = tones[i % tones.length]
                       return (
-                        <div key={r.key} style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 0', borderBottom: '1px solid var(--rule-soft)' }}>
+                        <div key={r.key} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)', padding: 'var(--space-2) 0', borderBottom: '1px solid var(--rule-soft)' }}>
                           <span style={{ width: '9px', height: '9px', background: tone, flex: '0 0 auto' }} />
-                          <span style={{ flex: 1, fontSize: '12.5px' }}>{r.label}</span>
+                          <span style={{ flex: 1, fontSize: 'var(--fs-base)' }}>{r.label}</span>
                           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', color: 'var(--muted)' }}>{share.toFixed(0)}%</span>
                           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', color: (r.total_pnl || 0) >= 0 ? 'var(--gain)' : 'var(--loss)', minWidth: '64px', textAlign: 'right' }}>{formatSignedCurrency(r.total_pnl || 0)}</span>
                         </div>
@@ -660,7 +660,7 @@ export default function Analytics({ selectedAccount }) {
                       <td style={{ fontFamily: 'var(--font-mono)' }}>{parseFloat(t.lot_size).toFixed(2)}</td>
                       <td style={{ fontFamily: 'var(--font-mono)' }}>{t.open_price ? formatPrice(t.open_price, t.instrument) : '—'}</td>
                       <td style={{ fontFamily: 'var(--font-mono)' }}>{t.close_price ? formatPrice(t.close_price, t.instrument) : '—'}</td>
-                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '11.5px', color: 'var(--muted)' }}>{formatHistoryDate(t.close_time)}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', color: 'var(--muted)' }}>{formatHistoryDate(t.close_time)}</td>
                       <td style={{ fontFamily: 'var(--font-mono)' }}>{t.r_multiple != null ? `${t.r_multiple.toFixed(2)}R` : '—'}</td>
                       <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--gain)' }}>{formatSignedCurrency(t.demo_pnl)}</td>
                     </tr>
@@ -672,7 +672,7 @@ export default function Analytics({ selectedAccount }) {
                       <td style={{ fontFamily: 'var(--font-mono)' }}>{parseFloat(t.lot_size).toFixed(2)}</td>
                       <td style={{ fontFamily: 'var(--font-mono)' }}>{t.open_price ? formatPrice(t.open_price, t.instrument) : '—'}</td>
                       <td style={{ fontFamily: 'var(--font-mono)' }}>{t.close_price ? formatPrice(t.close_price, t.instrument) : '—'}</td>
-                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '11.5px', color: 'var(--muted)' }}>{formatHistoryDate(t.close_time)}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', color: 'var(--muted)' }}>{formatHistoryDate(t.close_time)}</td>
                       <td style={{ fontFamily: 'var(--font-mono)' }}>{t.r_multiple != null ? `${t.r_multiple.toFixed(2)}R` : '—'}</td>
                       <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--loss)' }}>{formatSignedCurrency(t.demo_pnl)}</td>
                     </tr>
@@ -734,7 +734,7 @@ export default function Analytics({ selectedAccount }) {
                     key={range.id}
                     onClick={() => setCurveRange(range.id)}
                     style={{
-                      padding: '7px 12px',
+                      padding: 'var(--space-2) var(--space-3)',
                       borderRadius: 'var(--radius-pill)',
                       border: curveRange === range.id ? '1px solid var(--accent)' : '1px solid var(--navy-border)',
                       background: curveRange === range.id ? 'rgba(var(--brand-primary-rgb),0.16)' : 'transparent',
@@ -852,11 +852,11 @@ export default function Analytics({ selectedAccount }) {
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', alignItems: 'center' }}>
                         <div>
                           <div style={{ color: 'var(--text)', fontSize: 'var(--fs-base)', fontWeight: '700' }}>{formatStrategyLabel(entry.label)}</div>
-                          <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', marginTop: '3px' }}>{entry.setup_type} | {entry.trades} trades</div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', marginTop: 'var(--space-1)' }}>{entry.setup_type} | {entry.trades} trades</div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           <div style={{ color: 'var(--green)', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>{formatSignedCurrency(entry.total_pnl)}</div>
-                          <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', marginTop: '3px' }}>{formatPercent(entry.win_rate)} win</div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', marginTop: 'var(--space-1)' }}>{formatPercent(entry.win_rate)} win</div>
                         </div>
                       </div>
                     </div>
@@ -872,11 +872,11 @@ export default function Analytics({ selectedAccount }) {
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', alignItems: 'center' }}>
                         <div>
                           <div style={{ color: 'var(--text)', fontSize: 'var(--fs-base)', fontWeight: '700' }}>{formatStrategyLabel(entry.label)}</div>
-                          <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', marginTop: '3px' }}>{entry.setup_type} | {entry.trades} trades</div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', marginTop: 'var(--space-1)' }}>{entry.setup_type} | {entry.trades} trades</div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           <div style={{ color: 'var(--red)', fontWeight: '700', fontFamily: 'var(--font-mono)' }}>{formatSignedCurrency(entry.total_pnl)}</div>
-                          <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', marginTop: '3px' }}>{formatPercent(entry.win_rate)} win</div>
+                          <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-xs)', marginTop: 'var(--space-1)' }}>{formatPercent(entry.win_rate)} win</div>
                         </div>
                       </div>
                     </div>
@@ -897,7 +897,7 @@ export default function Analytics({ selectedAccount }) {
             {Array.isArray(activityHeatmap.weekday_summary) && activityHeatmap.weekday_summary.slice(0, 3).map((row) => (
               <div key={`weekday-${row.label}`} style={{ padding: 'var(--space-3) var(--space-3-5)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
                 <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Best Weekday Pocket</div>
-                <div style={{ marginTop: '5px', color: 'var(--text)', fontWeight: '700' }}>{row.label}</div>
+                <div style={{ marginTop: 'var(--space-1-5)', color: 'var(--text)', fontWeight: '700' }}>{row.label}</div>
                 <div style={{ marginTop: 'var(--space-1)', color: Number(row.total_pnl || 0) >= 0 ? 'var(--green)' : 'var(--red)', fontFamily: 'var(--font-mono)' }}>
                   {formatSignedCurrency(row.total_pnl || 0)}
                 </div>
@@ -1011,7 +1011,7 @@ export default function Analytics({ selectedAccount }) {
             <div style={{ display: 'grid', gap: 'var(--space-3)', marginBottom: 'var(--space-3-5)' }}>
               <div style={{ padding: 'var(--space-3) var(--space-3-5)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
                 <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Primary Cause</div>
-                <div style={{ marginTop: '5px', fontSize: 'var(--fs-lg)', color: 'var(--text)', fontWeight: '700' }}>
+                <div style={{ marginTop: 'var(--space-1-5)', fontSize: 'var(--fs-lg)', color: 'var(--text)', fontWeight: '700' }}>
                   {formatStrategyLabel(breachAnalysis.primary_cause)}
                 </div>
               </div>
@@ -1019,17 +1019,17 @@ export default function Analytics({ selectedAccount }) {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 'var(--space-2-5)' }}>
                 <div style={{ padding: 'var(--space-2-5) var(--space-3)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
                   <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Target Progress</div>
-                  <div style={{ marginTop: '5px', fontWeight: '700', color: 'var(--accent)' }}>{formatPercent(breachAnalysis.target_progress_pct || 0)}</div>
+                  <div style={{ marginTop: 'var(--space-1-5)', fontWeight: '700', color: 'var(--accent)' }}>{formatPercent(breachAnalysis.target_progress_pct || 0)}</div>
                 </div>
                 <div style={{ padding: 'var(--space-2-5) var(--space-3)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
                   <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Drawdown Usage</div>
-                  <div style={{ marginTop: '5px', fontWeight: '700', color: Number(breachAnalysis.drawdown_usage_pct || 0) >= 70 ? 'var(--red)' : 'var(--green)' }}>
+                  <div style={{ marginTop: 'var(--space-1-5)', fontWeight: '700', color: Number(breachAnalysis.drawdown_usage_pct || 0) >= 70 ? 'var(--red)' : 'var(--green)' }}>
                     {formatPercent(breachAnalysis.drawdown_usage_pct || 0)}
                   </div>
                 </div>
                 <div style={{ padding: 'var(--space-2-5) var(--space-3)', borderRadius: '0', border: '1px solid var(--navy-border)', background: 'var(--glass)' }}>
                   <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Days Remaining</div>
-                  <div style={{ marginTop: '5px', fontWeight: '700', color: 'var(--text)' }}>
+                  <div style={{ marginTop: 'var(--space-1-5)', fontWeight: '700', color: 'var(--text)' }}>
                     {breachAnalysis.days_remaining == null ? '-' : breachAnalysis.days_remaining}
                   </div>
                 </div>
@@ -1152,12 +1152,12 @@ export default function Analytics({ selectedAccount }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-3)', alignItems: 'center', flexWrap: 'wrap' }}>
                   <div>
                     <div style={{ color: 'var(--text)', fontSize: 'var(--fs-md)', fontWeight: '700' }}>{suggestion.title}</div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)', marginTop: '5px', lineHeight: 1.6 }}>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-sm)', marginTop: 'var(--space-1-5)', lineHeight: 1.6 }}>
                       {suggestion.detail}
                     </div>
                   </div>
                   <span style={{
-                    padding: '5px 10px',
+                    padding: 'var(--space-1-5) var(--space-2-5)',
                     borderRadius: 'var(--radius-pill)',
                     border: `1px solid ${suggestion.priority === 'high' ? 'var(--red)' : suggestion.priority === 'medium' ? 'var(--accent)' : 'var(--navy-border)'}`,
                     background: suggestion.priority === 'high'

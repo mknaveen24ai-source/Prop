@@ -3,7 +3,7 @@
 // Pure functions over already-fetched rows — no database or request access — so
 // they are directly unit-testable. Moved verbatim out of routes/trades.js, where
 // they were ~660 lines serving the single GET /api/trades/analytics endpoint.
-const { CONTRACT_SIZES } = require('../constants')
+const { CONTRACT_SIZES, resolveProfitSharePct, PROFIT_SHARE_FALLBACK_PCT } = require('../constants')
 const { evaluatePayoutEligibility } = require('../domain/payoutEligibility')
 
 const ANALYTICS_WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -536,7 +536,12 @@ function buildBreachAnalysis(account, trades, violations) {
 }
 
 function buildPayoutForecast(account, userProfile, payoutRows, openTradeSummary, tenantSettings, recentTrades) {
-  const sharePct = toFiniteNumber(tenantSettings.profit_share_pct, 80)
+  // FIX (F-02): was a hardcoded 80 fallback on a platform seeded at 75, so the
+  // forecast promised five points more than routes/payouts.js would actually
+  // pay. Not display-only: sharePct also sets nextMilestoneProfit and is passed
+  // to evaluatePayoutEligibility, so an overstated share told traders they were
+  // eligible sooner than the write path agreed.
+  const sharePct = resolveProfitSharePct(tenantSettings.profit_share_pct) ?? PROFIT_SHARE_FALLBACK_PCT
   const shareRatio = sharePct / 100
   const minRequestAmount = toFiniteNumber(tenantSettings.min_payout_amount, 50)
   const processingDays = Math.max(1, parseInt(tenantSettings.payout_processing_days || 3, 10))

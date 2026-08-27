@@ -27,8 +27,14 @@ const ACCOUNT_ID = 'a3f1c2d4-5e6b-4a7c-8d9e-0f1a2b3c4d5e'
 // needs its own identity or the second one onwards would just see a 429.
 let userSeq = 0
 function freshUser() {
-  const id = `user-payout-${++userSeq}`
-  return { id, header: `Bearer ${jwt.sign({ userId: id, tv: 0 }, process.env.JWT_SECRET)}` }
+  const suffix = String(++userSeq).padStart(12, '0')
+  const id = `00000000-0000-4000-8000-${suffix}`
+  const token = jwt.sign(
+    { userId: id, email: `payout-${userSeq}@example.com`, tv: 1 },
+    process.env.JWT_SECRET,
+    { expiresIn: '1h' }
+  )
+  return { id, header: `Bearer ${token}` }
 }
 
 function fundedAccount(overrides = {}) {
@@ -112,7 +118,7 @@ function installPoolMock({
   pool.query = async (sql, values) => {
     calls.push({ sql, values })
     if (/SELECT token_version, is_banned FROM users/.test(sql)) {
-      return { rows: [{ token_version: 0, is_banned: false }] }
+      return { rows: [{ token_version: 1, is_banned: false }] }
     }
     // FIX (H-03): payouts:request now always takes an idempotency claim. It did
     // not before, because a request without the header skipped the guard

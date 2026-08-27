@@ -100,6 +100,11 @@ router.get('/dispute-workflow', authenticateAdmin, async (req, res) => {
            d.admin_response,
            d.created_at,
            d.updated_at,
+           -- Presence only. The stored path is an internal filename and the
+           -- client never needs it: the file is fetched by dispute id through
+           -- GET /api/disputes/admin/:id/evidence, which re-reads the path
+           -- server-side and applies its own containment guard.
+           (d.evidence_path IS NOT NULL AND d.evidence_path <> '') AS has_evidence,
            u.full_name,
            u.email,
            u.trader_uid,

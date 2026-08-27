@@ -15,7 +15,7 @@ export default function ModelOptimizationTab() {
     (async () => {
       setLoading(true);
       try {
-        // TODO: GET /api/admin/analytics/model-optimization (backend/routes/adminAnalytics.js)
+        // Backed by GET /api/admin/analytics/model-optimization (backend/routes/adminAnalytics.js)
         const res = await adminAxios.get('/api/admin/analytics/model-optimization');
         setData(res.data);
       } catch {

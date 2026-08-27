@@ -28,7 +28,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24.19.0'
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
 
@@ -66,7 +66,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24.19.0'
 
       - name: Install frontend dependencies
         working-directory: frontend
@@ -133,7 +133,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24.19.0'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
@@ -270,11 +270,15 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24.19.0'
 
       - name: Install backend dependencies
         working-directory: backend
         run: npm ci
+
+      - name: Build the compiled backend
+        working-directory: backend
+        run: npm run build
 
       - name: Provision from empty
         working-directory: backend
@@ -285,7 +289,7 @@ jobs:
         working-directory: backend
         run: |
           mkdir -p /tmp/dwx-bridge
-          OUT=$(node scripts/harden-admin-runtime.js --email "$E2E_ADMIN_EMAIL_VALUE" --no-rotate-env)
+          OUT=$(node dist/scripts/harden-admin-runtime.js --email "$E2E_ADMIN_EMAIL_VALUE" --no-rotate-env)
           PASS=$(echo "$OUT" | node -p "JSON.parse(require('fs').readFileSync(0,'utf8').match(/\{[\s\S]*\}/)[0]).bootstrap_password")
           echo "::add-mask::$PASS"
           echo "password=$PASS" >> "$GITHUB_OUTPUT"
@@ -296,14 +300,14 @@ jobs:
         # trading terminal renders an empty shell -- which would scan clean for
         # the wrong reason.
         run: |
-          nohup node scripts/fake-dwx-feed.js             --file=/tmp/dwx-bridge/DWX_Market_Data.txt --hz=5 --symbols=6             > /tmp/feed.log 2>&1 &
+          nohup node --enable-source-maps dist/scripts/fake-dwx-feed.js             --file=/tmp/dwx-bridge/DWX_Market_Data.txt --hz=5 --symbols=6             > /tmp/feed.log 2>&1 &
           sleep 3
           test -s /tmp/dwx-bridge/DWX_Market_Data.txt
 
       - name: Boot the backend
         working-directory: backend
         run: |
-          nohup node server.js > /tmp/server.log 2>&1 &
+          nohup npm start > /tmp/server.log 2>&1 &
           for i in $(seq 1 60); do
             if curl -sf http://127.0.0.1:5000/api/health > /dev/null; then
               echo "backend is up after ${i}s"; exit 0
@@ -475,12 +479,15 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24.19.0'
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Build the compiled backend
+        run: npm run build
 
       # ── Audit finding C-02 ──────────────────────────────────────────────────
       # Nothing in the repo ever created users/accounts/trades/payouts — 001
@@ -535,8 +542,8 @@ jobs:
         # Guards against a migration file being written but never committed —
         # the failure mode that made a clean clone unbootable.
         run: |
-          npx knex migrate:status
-          PENDING=$(npx knex migrate:list 2>/dev/null | grep -ci 'pending' || true)
+          npx knex --knexfile dist/knexfile.js migrate:status
+          PENDING=$(npx knex --knexfile dist/knexfile.js migrate:list 2>/dev/null | grep -ci 'pending' || true)
           if [ "$PENDING" != "0" ]; then
             echo "::error::Migrations still pending after migrate:latest"
             exit 1
@@ -614,12 +621,15 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24.19.0'
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Build the compiled backend
+        run: npm run build
 
       - name: Provision from empty
         run: npm run db:provision
@@ -630,7 +640,7 @@ jobs:
         # pointless and would make the printed summary claim something untrue.
         run: |
           mkdir -p /tmp/dwx-bridge
-          OUT=$(node scripts/harden-admin-runtime.js --email ci-admin@example.com --no-rotate-env)
+          OUT=$(node dist/scripts/harden-admin-runtime.js --email ci-admin@example.com --no-rotate-env)
           echo "$OUT"
           PASS=$(echo "$OUT" | sed -nE 's/.*"bootstrap_password": "([^"]*)".*/\1/p' | head -1)
           echo "::add-mask::$PASS"
@@ -640,7 +650,7 @@ jobs:
         # The feed is file-based and there is no MetaTrader in CI, so without
         # this there are no prices and no trade can be opened at all.
         run: |
-          nohup node scripts/fake-dwx-feed.js \
+          nohup node --enable-source-maps dist/scripts/fake-dwx-feed.js \
             --file=/tmp/dwx-bridge/DWX_Market_Data.txt --hz=5 --symbols=6 \
             > /tmp/feed.log 2>&1 &
           sleep 3
@@ -648,7 +658,7 @@ jobs:
 
       - name: Boot the server
         run: |
-          nohup node server.js > /tmp/server.log 2>&1 &
+          nohup npm start > /tmp/server.log 2>&1 &
           for i in $(seq 1 60); do
             if curl -sf http://127.0.0.1:5000/api/health > /dev/null; then
               echo "backend is up after ${i}s"; exit 0
@@ -669,10 +679,45 @@ jobs:
         env:
           SMOKE_SUPER_ADMIN_EMAIL: ci-admin@example.com
           SMOKE_SUPER_ADMIN_PASSWORD: ${{ steps.admin.outputs.password }}
-        run: node scripts/launch-smoke.js --provision
+        run: npm run launch:smoke -- --provision
 
       - name: Engine equivalence (event is the default — this is its gate)
-        run: node scripts/engine-equivalence.js --ticks=60
+        run: npm run engine:equivalence -- --ticks=60
+
+      - name: Build and smoke the final production image
+        run: |
+          docker build -f backend/Dockerfile -t propfirm-backend-ci ..
+          docker run --rm --network host \
+            -e DATABASE_URL -e NODE_ENV=development \
+            --entrypoint dumb-init propfirm-backend-ci \
+            -- npm run db:provision
+          docker run -d --name propfirm-backend-ci-smoke --network host \
+            -e DATABASE_URL -e NODE_ENV=development -e ROLE=api -e PORT=5001 \
+            -e DWX_PATH=/tmp/dwx-bridge \
+            -v /tmp/dwx-bridge:/tmp/dwx-bridge \
+            propfirm-backend-ci
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:5001/api/health > /dev/null; then
+              echo "production image is up after ${i}s"; break
+            fi
+            if [ "$i" = 60 ]; then
+              docker logs propfirm-backend-ci-smoke
+              exit 1
+            fi
+            sleep 1
+          done
+          docker stop --time 15 propfirm-backend-ci-smoke
+          test "$(docker inspect --format '{{.State.ExitCode}}' propfirm-backend-ci-smoke)" = 0
+          test -z "$(docker inspect --format '{{.State.Error}}' propfirm-backend-ci-smoke)"
+          docker rm propfirm-backend-ci-smoke
+
+      - name: Production image logs on failure
+        if: failure()
+        run: docker logs propfirm-backend-ci-smoke 2>/dev/null || true
+
+      - name: Remove production smoke container
+        if: always()
+        run: docker rm -f propfirm-backend-ci-smoke 2>/dev/null || true
 
       - name: Server log on failure
         if: failure()

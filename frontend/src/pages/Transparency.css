@@ -17,7 +17,7 @@
 /* ── Hero ── */
 .tr-hero {
   text-align: center;
-  padding: clamp(80px, 10vw, 120px) clamp(20px, 5vw, 80px) clamp(48px, 6vw, 72px);
+  padding: clamp(var(--space-11), 10vw, var(--space-13)) clamp(var(--space-5), 5vw, var(--space-11)) clamp(var(--space-9), 6vw, var(--space-11));
   border-bottom: 1px solid var(--rule);
   position: relative;
   overflow: hidden;
@@ -75,7 +75,7 @@
   font-size: clamp(14px, 1.8vw, 17px);
   color: var(--text-secondary);
   max-width: 600px;
-  margin: 0 auto 32px;
+  margin: 0 auto var(--space-7);
   line-height: 1.7;
 }
 
@@ -142,7 +142,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2-5);
-  padding: 11px 24px;
+  padding: var(--space-3) var(--space-6);
   font-family: var(--font-ui);
   font-size: var(--fs-md);
   color: var(--text-secondary);
@@ -185,7 +185,7 @@
 .tr-content {
   flex: 1;
   min-width: 0;
-  padding: clamp(24px, 3vw, 48px);
+  padding: clamp(var(--space-6), 3vw, var(--space-9));
 }
 
 /* ── Section Header ── */
@@ -290,7 +290,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-4);
-  margin-bottom: 24px;
+  margin-bottom: var(--space-6);
 }
 
 .tr-chart-card {
@@ -306,7 +306,7 @@
 
 .tr-chart-title {
   font-family: var(--font-display);
-  font-size: 17px;
+  font-size: var(--fs-xl);
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: var(--space-1);
@@ -330,7 +330,7 @@
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
   letter-spacing: 0.06em;
-  padding: 5px 12px;
+  padding: var(--space-1-5) var(--space-3);
   border: 1px solid var(--rule);
   background: none;
   color: var(--text-secondary);
@@ -361,7 +361,7 @@
 .tr-chart-stats {
   display: flex;
   gap: var(--space-7);
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .tr-chart-stat-val {
@@ -449,7 +449,7 @@
 .tr-models-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 12px;
+  gap: var(--space-3);
   margin-top: var(--space-5);
 }
 
@@ -466,12 +466,12 @@
   font-family: var(--font-mono);
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  margin-bottom: 10px;
+  margin-bottom: var(--space-2-5);
 }
 
 .tr-model-rate {
   font-family: var(--font-mono);
-  font-size: 26px;
+  font-size: var(--fs-5xl);
   font-weight: 700;
   color: var(--accent);
   margin-bottom: var(--space-1);
@@ -509,7 +509,7 @@
 }
 
 .tr-table td {
-  padding: 13px 14px;
+  padding: var(--space-3-5) var(--space-3-5);
   border-bottom: 1px solid var(--rule-soft);
   color: var(--text-primary);
 }
@@ -530,7 +530,7 @@
 .tr-table .method-badge {
   background: var(--bg-hover);
   border: 1px solid var(--rule-soft);
-  padding: 2px 8px;
+  padding: var(--space-1) var(--space-2);
   font-size: var(--fs-2xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -542,14 +542,14 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-top: 20px;
+  margin-top: var(--space-5);
   justify-content: center;
 }
 
 .tr-page-btn {
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
-  padding: 7px 14px;
+  padding: var(--space-2) var(--space-3-5);
   border: 1px solid var(--rule);
   background: none;
   color: var(--text-secondary);
@@ -599,7 +599,7 @@
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
-  margin-top: 5px;
+  margin-top: var(--space-1-5);
 }
 
 .tr-activity-dot.pass   { background: var(--success); }
@@ -616,7 +616,7 @@
   font-size: var(--fs-xs);
   color: var(--text-secondary);
   font-family: var(--font-mono);
-  margin-top: 2px;
+  margin-top: var(--space-1);
 }
 
 .tr-activity-time {
@@ -638,7 +638,7 @@
 .tr-performer-row {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-4);
   padding: var(--space-4) 0;
   border-bottom: 1px solid var(--rule-soft);
   transition: background var(--motion-fast);
@@ -750,7 +750,7 @@
     flex-direction: row;
     overflow-x: auto;
     scrollbar-width: none;
-    gap: 2px;
+    gap: var(--space-1);
   }
 
   .tr-sidebar::-webkit-scrollbar { display: none; }
@@ -798,7 +798,7 @@
   }
 
   .tr-hero h1 {
-    font-size: 36px;
+    font-size: var(--fs-6xl);
   }
 }
 
@@ -812,13 +812,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 clamp(16px, 3vw, 40px);
+  padding: 0 clamp(var(--space-4), 3vw, var(--space-8));
   height: 60px;
 }
 
 .tr-nav-logo {
   font-family: var(--font-ui);
-  font-size: 17px;
+  font-size: var(--fs-xl);
   font-weight: 800;
   letter-spacing: 0.08em;
   color: var(--text-primary);
@@ -837,7 +837,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 28px;
+  gap: var(--space-7);
 }
 
 /* Logo + centre links + theme toggle + two buttons need ~430px of nav; a 375px
@@ -857,7 +857,7 @@
   /* Without this the logo is the only shrinkable item and collapses to 0. */
   .tr-nav-logo {
     flex: 0 0 auto;
-    font-size: 15px;
+    font-size: var(--fs-lg);
     letter-spacing: 0.04em;
   }
   .tr-nav-links {

@@ -1,0 +1,33 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": ".",
+    "outDir": ".test-dist"
+  },
+  "include": [
+    "*.js",
+    "*.ts",
+    "config/**/*",
+    "domain/**/*",
+    "migrations/**/*",
+    "routes/**/*",
+    "scripts/**/*",
+    "services/**/*",
+    "test/**/*",
+    "type-tests/**/*",
+    "types/**/*",
+    "utils/**/*",
+    "validation/**/*",
+    "workers/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".test-dist",
+    "tools",
+    "generate_audit_pdf.js",
+    "scripts/v2_migrate.js",
+    "scripts/v2_upgrade_db.js"
+  ]
+}

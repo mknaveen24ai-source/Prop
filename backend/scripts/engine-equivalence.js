@@ -52,6 +52,8 @@
  *   --verbose       print every differing column, not just the first few
  *   --keep          skip the final teardown
  *   --force         run despite pre-existing active accounts (see Safety)
+ *   --mode=PATH     replay only interval or event for JS-vs-TS comparison
+ *   --snapshot=FILE write that single implementation snapshot as JSON
  *
  * ── Safety ──
  *
@@ -68,6 +70,7 @@
 
 require('../loadEnv')
 
+const fs = require('node:fs')
 const pool = require('../db')
 const logger = require('../utils/logger')
 const priceCache = require('../utils/priceCache')
@@ -88,6 +91,8 @@ function parseArgs(argv) {
 const args = parseArgs(process.argv)
 const TICK_COUNT = args.ticks || 80
 const TOLERANCE = args.tolerance || 0
+const SINGLE_MODE = args.mode === 'interval' || args.mode === 'event' ? args.mode : null
+const SNAPSHOT_FILE = typeof args.snapshot === 'string' ? args.snapshot : null
 const RUN_TAG = 'equivalence-run'
 
 // Tables the engine and everything it calls can write. Derived tables get their
@@ -696,6 +701,24 @@ async function main() {
 
   let seeded = false
   try {
+    if (SINGLE_MODE) {
+      process.stdout.write(`Replaying ${TICK_COUNT} ticks through the ${SINGLE_MODE.toUpperCase()} path for an implementation snapshot...\n`)
+      const scenarios = await seed()
+      seeded = true
+      resetInMemoryState()
+      if (SINGLE_MODE === 'interval') await replayInterval()
+      else await replayEvent()
+      const implementationSnapshot = await snapshot()
+
+      if (SNAPSHOT_FILE) {
+        fs.writeFileSync(SNAPSHOT_FILE, `${JSON.stringify(implementationSnapshot, null, 2)}\n`)
+        process.stdout.write(`Snapshot written to ${SNAPSHOT_FILE} (${scenarios.length} scenarios).\n`)
+      } else {
+        process.stdout.write(`${JSON.stringify(implementationSnapshot)}\n`)
+      }
+      return
+    }
+
     process.stdout.write(`Replaying ${TICK_COUNT} ticks through the INTERVAL path...\n`)
     const scenarios = await seed()
     seeded = true

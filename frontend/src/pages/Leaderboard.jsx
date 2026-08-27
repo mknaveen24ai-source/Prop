@@ -28,7 +28,7 @@ export default function Leaderboard() {
           <ThemeToggle />
         </div>
 
-        <div style={{ maxWidth: '800px', margin: '48px auto 0', padding: '0 var(--space-6)' }}>
+        <div style={{ maxWidth: '800px', margin: 'var(--space-9) auto 0', padding: '0 var(--space-6)' }}>
         <div style={{ textAlign: 'center', marginBottom: 'var(--space-8)' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)' }}>
             {renderIcon('leaderboard', { size: 48, color: 'var(--accent-gold)' })}
@@ -42,7 +42,7 @@ export default function Leaderboard() {
         </div>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '80px', color: 'var(--text-muted)' }}>Loading...</div>
+          <div style={{ textAlign: 'center', padding: 'var(--space-11)', color: 'var(--text-muted)' }}>Loading...</div>
         ) : leaders.length === 0 ? (
           <Card style={{ textAlign: 'center', padding: 'var(--space-10)' }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-4)' }}>
@@ -84,7 +84,7 @@ export default function Leaderboard() {
 
                 {/* Name & Country */}
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: '700', fontSize: '15px', color: 'var(--accent)', marginBottom: '3px' }}>
+                  <div style={{ fontWeight: '700', fontSize: 'var(--fs-lg)', color: 'var(--accent)', marginBottom: 'var(--space-1)' }}>
                     {row.full_name}
                     <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', fontWeight: '400', marginLeft: 'var(--space-2)' }}>View Profile →</span>
                   </div>

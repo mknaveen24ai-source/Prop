@@ -79,7 +79,7 @@ export const DEFAULT_PLATFORM_SETTINGS = {
   phase2_profit_target_pct: 5,
   phase2_max_drawdown_pct: 5,
   phase2_day_limit: 60,
-  funded_profit_split: 80,
+  funded_profit_split: 100,
   funded_max_drawdown_pct: 5
 }
 

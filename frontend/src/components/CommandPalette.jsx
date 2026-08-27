@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useId } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useId, useCallback } from 'react'
 import { Search } from 'lucide-react'
 import useFocusTrap from '../hooks/useFocusTrap'
 
@@ -25,14 +25,26 @@ export default function CommandPalette({ results, placeholder = 'Jump to a pageâ
   const listId = useId()
   const optionId = (index) => `${listId}-option-${index}`
 
-  const panelRef = useFocusTrap(open, () => setOpen(false), { initialFocusRef: inputRef })
+  const closePalette = useCallback(() => {
+    setOpen(false)
+    setQuery('')
+    setHighlighted(0)
+  }, [])
+  const openPalette = useCallback(() => {
+    setQuery('')
+    setHighlighted(0)
+    setOpen(true)
+  }, [])
+
+  const panelRef = useFocusTrap(open, closePalette, { initialFocusRef: inputRef })
 
   useEffect(() => {
     function onKey(e) {
       const key = (e.key || '').toLowerCase()
       if ((e.metaKey || e.ctrlKey) && key === 'k') {
         e.preventDefault()
-        setOpen((o) => !o)
+        if (open) closePalette()
+        else openPalette()
       }
       // Escape is handled by the focus trap while open, so it is not repeated
       // here â€” two handlers closing the same overlay is how a nested dialog
@@ -40,20 +52,14 @@ export default function CommandPalette({ results, placeholder = 'Jump to a pageâ
     }
     // Lets a visible header "âŒ˜K" keycap button open the palette too, not
     // just the keyboard shortcut â€” dispatch this event from anywhere.
-    function onExternalOpen() { setOpen(true) }
+    function onExternalOpen() { openPalette() }
     window.addEventListener('keydown', onKey)
     window.addEventListener('gazette:open-command-palette', onExternalOpen)
     return () => {
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('gazette:open-command-palette', onExternalOpen)
     }
-  }, [])
-
-  useEffect(() => {
-    if (!open) return
-    setQuery('')
-    setHighlighted(0)
-  }, [open])
+  }, [closePalette, open, openPalette])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -79,7 +85,7 @@ export default function CommandPalette({ results, placeholder = 'Jump to a pageâ
   }, [open, activeIndex])
 
   function go(result) {
-    setOpen(false)
+    closePalette()
     result.action()
   }
 
@@ -109,7 +115,7 @@ export default function CommandPalette({ results, placeholder = 'Jump to a pageâ
 
   return (
     <div
-      onClick={() => setOpen(false)}
+      onClick={closePalette}
       style={{
         position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(6px)',
         WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: 'flex-start',
@@ -133,7 +139,7 @@ export default function CommandPalette({ results, placeholder = 'Jump to a pageâ
           overflow: 'hidden',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '11px', padding: 'var(--space-3-5) var(--space-4)', borderBottom: '1px solid var(--rule)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3-5) var(--space-4)', borderBottom: '1px solid var(--rule)' }}>
           <Search size={16} color="var(--accent)" aria-hidden="true" />
           <input
             ref={inputRef}
@@ -149,7 +155,7 @@ export default function CommandPalette({ results, placeholder = 'Jump to a pageâ
             onKeyDown={onInputKeyDown}
             style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 'var(--fs-control)', color: 'var(--ink)' }}
           />
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', color: 'var(--muted)', border: '1px solid var(--rule)', borderRadius: '3px', padding: '2px 6px' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', color: 'var(--muted)', border: '1px solid var(--rule)', borderRadius: '3px', padding: 'var(--space-1) var(--space-1-5)' }}>
             ESC
           </span>
         </div>
@@ -183,9 +189,9 @@ export default function CommandPalette({ results, placeholder = 'Jump to a pageâ
                 color: 'var(--ink)', textAlign: 'left', cursor: 'pointer', transition: 'background 0.12s',
               }}
             >
-              <span style={{ flex: 1, fontSize: '13.5px' }}>{r.label}</span>
+              <span style={{ flex: 1, fontSize: 'var(--fs-md)' }}>{r.label}</span>
               <span style={{
-                fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.13em',
+                fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.13em',
                 textTransform: 'uppercase', color: 'var(--muted)',
               }}>
                 {r.group}

@@ -1,10 +1,22 @@
 # Trading rule disclosures
 
+> **STATUS: both findings below are RESOLVED — by changing the behaviour, not by
+> disclosing it.** See "How this was resolved" under each. This document is kept
+> rather than deleted because it is the audit trail: it records what the engine
+> used to do, why, and what was decided instead. If either behaviour is ever
+> reintroduced, the disclosure obligation described here comes back with it.
+
 Behaviours the engine implements that a trader would not infer from the platform
 UI, and that must therefore appear in the published trading rules. Both were
 raised by the 2026-08-15 audit (M-06, M-08). Neither is a bug — each is a
 deliberate house rule. The finding is that they are **undisclosed**, and an
 undisclosed rule discovered from a fill is a dispute the firm loses.
+
+The 2026-08-24 examination escalated both: the second was not merely undisclosed
+but publicly *denied* ("zero artificial latency or slippage"), and it concluded
+that "your stop loss does not work for the first minute" is not a sentence that
+can be disclosed into acceptability — a trader who reads it and signs up anyway
+still disputes the first time it costs them an account, and is right to.
 
 ---
 
@@ -36,6 +48,26 @@ them immediately after entry.
 stop price once the window expires, by recording that the level was crossed and
 filling at the recorded level. That is a behaviour change, not a doc change, and
 it costs the firm money in exactly the scalping case the rule exists to prevent.
+
+### How this was resolved
+
+The alternative was taken. Migration `044_deferred_sl_tp_trigger.js` adds
+`trades.pending_close_price` / `pending_close_reason` / `pending_close_at`. A
+level crossed inside the hold window is now recorded (`checkSLTP`'s recording
+branch, and `recordDeferredTriggers` on the event path) and filled **at the
+recorded level** once the window expires — regardless of where price has gone
+since, including all the way back through it.
+
+The columns live on the row rather than in an engine-local map so a restart
+cannot evaporate a trader's stop. First crossing wins: the
+`pending_close_price IS NULL` guard makes the write idempotent across ticks.
+Moving or clearing a level (`routes/trades/modify.js`) discards the recorded
+crossing, so a stale trigger cannot fire against a level that no longer exists.
+
+The minimum-hold window still prevents a position being *closed by hand* inside
+it, which is the anti-scalping rule it exists for. It no longer means the
+protective order is absent. Covered by four tests in
+`backend/test/tradeEngine.test.js`, including the examination's scenario T5.
 
 ---
 
@@ -69,6 +101,21 @@ price will otherwise conclude the platform is misquoting them.
 `0 … max`. That models real execution more honestly and removes the disclosure
 burden, at the cost of a small expected-value giveaway versus the current model.
 
+### How this was resolved
+
+The alternative was taken. Both draws are now `(Math.random() * 2 - 1) * max`
+(`routes/trades/open.js`, `routes/trades/close.js`), so slippage moves in the
+trader's favour as often as it moves against them.
+
+The stored setting keeps its `slippage_max_pips_adverse` name to avoid a
+settings migration — it is now the **half-width of a symmetric band**, not a
+direction. The admin screen labels it `Max Slippage ± (pips)` accordingly.
+
+`trades.slippage_pips` is therefore **signed**: positive is against the trader,
+negative in their favour. Anything aggregating it must not assume `>= 0`;
+`services/analytics/risk.js` already wraps it in `ABS()`, and the trader's fill
+toast reports a negative draw as "positive slippage".
+
 ---
 
 ## Where these need to appear
@@ -80,3 +127,8 @@ burden, at the cost of a small expected-value giveaway versus the current model.
 Keep the numbers here in step with `platform_settings`: `min_hold_seconds`,
 `slippage_simulator_enabled`, `slippage_max_pips_adverse`. If an admin changes
 those, this document and the published rules are both stale.
+
+The published rules are rendered from live settings by `buildRuleColumns()` in
+`frontend/src/pages/ChallengeRules.jsx`, which `PublicRules.jsx` imports rather
+than reimplements — so the public `/rules` page and the in-app rulebook cannot
+drift into describing the same rule two different ways.

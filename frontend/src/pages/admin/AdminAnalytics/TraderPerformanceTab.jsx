@@ -26,7 +26,7 @@ export default function TraderPerformanceTab() {
     (async () => {
       setLoading(true);
       try {
-        // TODO: GET /api/admin/analytics/trader-performance (backend/routes/adminAnalytics.js)
+        // Backed by GET /api/admin/analytics/trader-performance (backend/routes/adminAnalytics.js)
         const res = await adminAxios.get('/api/admin/analytics/trader-performance');
         const rows = res.data?.rows || [];
         setTraders(rows);

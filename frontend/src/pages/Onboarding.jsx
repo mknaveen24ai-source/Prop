@@ -12,16 +12,16 @@ const STEPS = [
     highlight: null
   },
   {
-    icon: '🪪',
-    title: 'Step 1 — Complete KYC',
-    body: `Before you can trade, verify your identity. Go to the KYC tab in the sidebar and upload your government-issued ID and a selfie. Admin reviews within 24 hours.`,
-    highlight: 'kyc'
+    icon: '📈',
+    title: 'Step 1 — Choose a Challenge',
+    body: `Pick a 1-step, 2-step, or 3-step model and an account size from the New Challenge tab, then complete checkout. Your challenge begins as soon as payment clears — there is nothing to wait for. Hit each phase's profit target within its time limit without breaching the drawdown limit.`,
+    highlight: 'dashboard'
   },
   {
-    icon: '📈',
-    title: 'Step 2 — Choose a Challenge',
-    body: `Pick a 1-step, 2-step, or 3-step model and an account size from the New Challenge tab, then complete checkout. Your challenge begins as soon as payment clears. Hit each phase's profit target within its time limit without breaching the drawdown limit.`,
-    highlight: 'dashboard'
+    icon: '🪪',
+    title: 'Step 2 — Verify Before You Get Funded',
+    body: `You can trade an evaluation straight away. Identity verification is only required once you pass and your funded account is issued — and before any payout. Upload your government-issued ID and a selfie in the KYC tab whenever you like; doing it early means nothing to wait for at the finish line. Admin reviews within 24 hours.`,
+    highlight: 'kyc'
   },
   {
     icon: '⚖️',
@@ -36,8 +36,8 @@ const STEPS = [
             ['Min Trading Days', '5 days'],
             ['Consistency Rule', '15% max/day'],
             ['Min Trade Time',   '60 seconds'],
-            ['Forex Leverage',   '1:30'],
-            ['Gold/Silver Lev.', '1:10'],
+            ['Leverage',         'Unlimited'],
+            ['Position Cap',     'None'],
             ['Min Lot Size',     '0.01'],
             ['Instruments',      TRADABLE_INSTRUMENTS_SUMMARY],
           ].map(([label, val]) => (
@@ -46,7 +46,7 @@ const STEPS = [
               border: '1px solid color-mix(in srgb, var(--muted) 15%, transparent)',
               padding: 'var(--space-2) var(--space-2-5)'
             }}>
-              <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-dim)', marginBottom: '2px' }}>{label}</div>
+              <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-dim)', marginBottom: 'var(--space-1)' }}>{label}</div>
             <div style={{ fontSize: 'var(--fs-base)', color: 'var(--accent)', fontWeight: '600', fontFamily: 'var(--font-mono)' }}>{val}</div>
             </div>
           ))}
@@ -64,13 +64,13 @@ const STEPS = [
   {
     icon: '💰',
     title: 'Step 4 — Request Payouts',
-    body: `Once funded, request a payout weekly. Minimum $50. You keep 75% of profits. Your first payout needs 10 qualifying trading days and 6% net profit — no lock-up after that. Processed within 7 business days via USDT or your chosen method.`,
+    body: `Once funded, request a payout weekly. Minimum $50. You keep 100% of profits. Your first payout needs 10 qualifying trading days and 6% net profit — no lock-up after that. Processed within 7 business days via USDT or your chosen method.`,
     highlight: 'payouts'
   },
   {
     icon: '🚀',
     title: "You're Ready!",
-    body: `Start by completing KYC and creating your first challenge. Good luck, and trade well.`,
+    body: `Pick your challenge and start trading — verification can wait until you pass. Good luck, and trade well.`,
     highlight: null
   }
 ]
@@ -149,7 +149,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
         background: 'var(--glass-2)',
         border: '1px solid var(--rule-soft)',
         borderTop: '3px double var(--ink)',
-        padding: '36px 32px',
+        padding: 'var(--space-8) var(--space-7)',
         width: '100%',
         maxWidth: '480px',
         backdropFilter: 'blur(20px) saturate(140%)',
@@ -171,7 +171,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
         </button>
 
         {/* Step dots */}
-        <div style={{ display: 'flex', gap: 'var(--space-1-5)', marginBottom: '28px' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-1-5)', marginBottom: 'var(--space-7)' }}>
           {effectiveSteps.map((_, i) => (
             <button
               key={i}
@@ -209,7 +209,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
           color: 'var(--text-muted)',
           fontSize: 'var(--fs-md)',
           lineHeight: '1.7',
-          marginBottom: '28px',
+          marginBottom: 'var(--space-7)',
           minHeight: '80px'
         }}>
           {typeof current.body === 'string' ? current.body : current.body}
@@ -257,7 +257,7 @@ export default function Onboarding({ onComplete, onNavigate }) {
               background: 'var(--accent)',
               color: 'var(--navy)',
               border: 'none',
-              padding: '11px 28px',
+              padding: 'var(--space-3) var(--space-7)',
               fontSize: 'var(--fs-md)',
               fontWeight: '700',
               cursor: 'pointer',

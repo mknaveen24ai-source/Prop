@@ -19,7 +19,11 @@ export default function useDashboardData({ setError }) {
   const [tradeHistory, setTradeHistory] = useState([])
   const [payouts, setPayouts] = useState([])
   const [accountHistory, setAccountHistory] = useState([])
-  const [profitSharePct, setProfitSharePct] = useState(80)
+  // Seeded at the real platform default (100). This used to be 80, which is a
+  // number the platform has never paid — for the first render, and for any
+  // render where /api/payouts/settings fails, the trader was shown a share
+  // that did not exist. See PROFIT_SHARE_FALLBACK_PCT in backend/constants.js.
+  const [profitSharePct, setProfitSharePct] = useState(100)
   const [accountLoading, setAccountLoading] = useState(false)
 
   const {
@@ -137,10 +141,19 @@ export default function useDashboardData({ setError }) {
     } catch {}
   }, [])
 
-  useEffect(() => { fetchAccounts(); fetchPrices(); fetchPayouts(); fetchPayoutSettings(); fetchAccountHistory() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    queueMicrotask(() => {
+      void fetchAccounts()
+      void fetchPrices()
+      void fetchPayouts()
+      void fetchPayoutSettings()
+      void fetchAccountHistory()
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (selectedAccount) {
+    if (!selectedAccount) return
+    queueMicrotask(() => {
       setAccountLoading(true)
       setOpenPositions([])
       setStats(null)
@@ -152,7 +165,7 @@ export default function useDashboardData({ setError }) {
         fetchOpenTrades(selectedAccount.id),
         fetchTradeHistory(selectedAccount.id)
       ]).finally(() => setAccountLoading(false))
-    }
+    })
   }, [selectedAccount?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {

@@ -318,7 +318,7 @@ export default function AdminPlatformPnL() {
 
       {ledger && (
         <>
-          <h2 className="admin-h2" style={{ margin: '28px 0 16px' }}>Firm Ledger</h2>
+          <h2 className="admin-h2" style={{ margin: 'var(--space-7) 0 var(--space-4)' }}>Firm Ledger</h2>
           <AdminStatGrid minColumnWidth={190} style={{ marginBottom: 'var(--space-5)' }}>
             <AdminStatCard icon="pnl" label="Gross Fees (90d)" value={formatMoney(ledger.gross_fees_90d)} />
             <AdminStatCard icon="payouts" label="Trader Payouts (90d)" value={formatMoney(ledger.cost_breakdown.find((b) => b.label === 'Trader Payouts')?.amount || 0)} />
@@ -390,9 +390,9 @@ export default function AdminPlatformPnL() {
                     </PieChart>
                   </ResponsiveContainer>
                   {ledger.cost_breakdown.map((b, index) => (
-                    <div key={b.label} style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '7px 0', borderBottom: '1px solid var(--rule-soft)' }}>
+                    <div key={b.label} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)', padding: 'var(--space-2) 0', borderBottom: '1px solid var(--rule-soft)' }}>
                       <span style={{ width: '9px', height: '9px', background: ['var(--loss)', 'var(--warn)', 'var(--gain)'][index % 3], flex: '0 0 auto' }} />
-                      <span style={{ flex: 1, fontSize: '12.5px' }}>{b.label}</span>
+                      <span style={{ flex: 1, fontSize: 'var(--fs-base)' }}>{b.label}</span>
                       <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)' }}>{formatMoney(b.amount)}</span>
                     </div>
                   ))}
@@ -456,7 +456,7 @@ export default function AdminPlatformPnL() {
             </div>
           </Card>
 
-          <h2 className="admin-h2" style={{ margin: '28px 0 16px' }}>B-Book Trading Edge</h2>
+          <h2 className="admin-h2" style={{ margin: 'var(--space-7) 0 var(--space-4)' }}>B-Book Trading Edge</h2>
         </>
       )}
 

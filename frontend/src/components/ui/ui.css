@@ -97,7 +97,7 @@
   box-shadow: var(--elev);
   /* Fluid so a card keeps usable interior width on a 375px viewport: 40px of
      fixed padding out of ~335px of content was a sixth of the card. */
-  padding: clamp(14px, 3.4vw, 20px) clamp(12px, 3vw, 18px);
+  padding: clamp(var(--space-3-5), 3.4vw, var(--space-5)) clamp(var(--space-3), 3vw, var(--space-4-5));
   transition: border-color 0.16s ease;
 }
 /* Hover-only affordance — on touch there is no hover, and an un-guarded :hover
@@ -114,7 +114,7 @@
 /* Stat variant: tighter density + a 2px tone bar along the top edge. Pass
    --tone (a color) via inline style on the element to set the bar color. */
 .lx-card--stat {
-  padding: 15px 16px;
+  padding: var(--space-4) var(--space-4);
 }
 .lx-card--stat::before {
   content: '';
@@ -209,7 +209,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  padding: 15px 16px;
+  padding: var(--space-4) var(--space-4);
   border: 1px solid var(--rule);
   border-radius: var(--radius-sm);
   background: var(--glass);
@@ -386,7 +386,7 @@ button.lx-card-row:focus-visible { outline: 2px solid var(--ink); outline-offset
 }
 .lx-card-row__fields dt {
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
@@ -394,7 +394,7 @@ button.lx-card-row:focus-visible { outline: 2px solid var(--ink); outline-offset
 }
 .lx-card-row__fields dd {
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--fs-base);
   color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -453,7 +453,7 @@ button.lx-card-row:focus-visible { outline: 2px solid var(--ink); outline-offset
 }
 .lx-sheet__title {
   font-family: var(--font-display);
-  font-size: 17px;
+  font-size: var(--fs-xl);
   font-weight: 700;
   color: var(--ink);
 }
@@ -534,12 +534,12 @@ button.lx-card-row:focus-visible { outline: 2px solid var(--ink); outline-offset
   display: inline-flex;
   align-items: center;
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   border: 1px solid currentColor;
   border-radius: 2px;
-  padding: 2px 7px;
+  padding: var(--space-1) var(--space-2);
   white-space: nowrap;
   line-height: 1.5;
 }

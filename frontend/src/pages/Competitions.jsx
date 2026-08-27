@@ -60,7 +60,7 @@ export function CompetitionsListContent({ onSelectSlug }) {
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '80px', color: 'var(--muted)' }}>Loading...</div>
+        <div style={{ textAlign: 'center', padding: 'var(--space-11)', color: 'var(--muted)' }}>Loading...</div>
       ) : loadError ? (
         <Card style={{ textAlign: 'center', padding: 'var(--space-10)', border: '1px solid var(--warn)' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-4)' }}>
@@ -122,7 +122,7 @@ export default function Competitions() {
           <ThemeToggle />
         </div>
 
-        <div style={{ maxWidth: '800px', margin: '48px auto 0', padding: '0 var(--space-6)' }}>
+        <div style={{ maxWidth: '800px', margin: 'var(--space-9) auto 0', padding: '0 var(--space-6)' }}>
           <CompetitionsListContent />
         </div>
       </div>

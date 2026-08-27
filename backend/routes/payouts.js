@@ -6,10 +6,14 @@ const { createLimiter } = require('../utils/security')
 const { ipKeyGenerator } = require('express-rate-limit')
 const logger = require('../utils/logger')
 const { getTenantSettings } = require('../services/tenantPolicyService')
+const { resolveProfitSharePct, PROFIT_SHARE_FALLBACK_PCT } = require('../utils/tenantSettings')
 const { enqueuePayoutRequestedEmail } = require('../utils/emailQueue')
 const tradingDaysService = require('../services/tradingDaysService')
 const { fetchStepModelBySlug } = require('../utils/stepModels')
 const { isValidUUID } = require('../utils/validation')
+const { screenJurisdiction } = require('../utils/jurisdiction')
+const { consistentWithdrawableProfit } = require('../domain/payoutEligibility')
+const { PAYOUT_METHODS, PAYOUT_METHOD_IDS, PAYOUT_SLA } = require('../constants')
 const {
   recordSignals,
   normalizePayoutDestination,
@@ -41,8 +45,8 @@ const payoutRequestLimiter = createLimiter('payout-request', {
     return req.user?.userId ? `user:${req.user.userId}` : ipKeyGenerator(req.ip)
   }
 })
-// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-// POST /api/payouts/request Ã¢â‚¬â€ funded traders only
+// ────────────────────────────────────────────────────────────────────────────
+// POST /api/payouts/request — funded traders only
 //
 // FIX 1: Floating P&L is now factored into profit eligibility. Previously a
 // trader with a large open losing position could have current_balance >
@@ -52,7 +56,7 @@ const payoutRequestLimiter = createLimiter('payout-request', {
 //
 // FIX 2: All four flag-check queries are now batched into a single SQL query
 // instead of four sequential round-trips.
-// Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+// ────────────────────────────────────────────────────────────────────────────
 router.post('/request', authenticateToken, payoutRequestLimiter, async function(req, res) {
   try {
     const { account_id, amount_requested, payment_method, payment_details } = req.body
@@ -62,9 +66,11 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
     }
 
     // Must match the options actually offered in the payout request form.
-    const ALLOWED_PAYMENT_METHODS = ['usdt_trc20', 'usdt_bep20', 'usdt_erc20', 'usdt_polygon', 'btc', 'ltc']
-    if (!ALLOWED_PAYMENT_METHODS.includes(String(payment_method))) {
-      return res.status(400).json({ error: `Invalid payment method. Must be one of: ${ALLOWED_PAYMENT_METHODS.join(', ')}` })
+    // One list, shared with the public settings response and the published
+    // Terms — see PAYOUT_METHODS in constants.js. This used to be a local array
+    // that had drifted from the Terms, which named USDT (TRC20) only.
+    if (!PAYOUT_METHOD_IDS.includes(String(payment_method))) {
+      return res.status(400).json({ error: `Invalid payment method. Must be one of: ${PAYOUT_METHOD_IDS.join(', ')}` })
     }
 
     // Account ids are UUIDs — the earlier numeric guard here rejected any id
@@ -77,6 +83,31 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
     const amountNum = parseFloat(amount_requested)
     if (isNaN(amountNum) || amountNum <= 0) {
       return res.status(400).json({ error: 'Invalid amount requested' })
+    }
+
+    // ── Jurisdiction screening at the point money leaves ────────────────────
+    //
+    // Registration screening establishes where someone was when they signed up.
+    // This establishes where they are when they ask to be paid, which is the
+    // question that actually matters for sanctions exposure — and it is the
+    // only one of the two that a user cannot satisfy once and forget.
+    //
+    // Declared country is read from the user row rather than the request body:
+    // nothing in this endpoint's payload should be able to influence its own
+    // screening.
+    const payoutUser = await pool.query('SELECT country FROM users WHERE id = $1', [req.user.userId])
+    const jurisdiction = screenJurisdiction(req, payoutUser.rows[0]?.country || null)
+    if (!jurisdiction.allowed) {
+      logger.warn('[payouts] Blocked payout request from a restricted jurisdiction', {
+        userId: req.user.userId,
+        matchedOn: jurisdiction.matchedOn,
+        detectedCountry: jurisdiction.detectedCountry,
+        declaredCountry: jurisdiction.declaredCountry,
+        geoAvailable: jurisdiction.geoAvailable
+      })
+      return res.status(403).json({
+        error: 'Payouts are not available in your jurisdiction. Please contact support.'
+      })
     }
 
     const paymentDetailsStr = typeof payment_details === 'object'
@@ -103,17 +134,28 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
     // discard the result -- getTenantSettings() already resolves the same key,
     // and its value won. One wasted round-trip per payout request, and two
     // apparent sources of truth for the same number.
+    // FIX (F-02): this used to fall back to a hardcoded 80% when the stored
+    // setting was unparseable, on a platform setup.js seeds at 75% — silently
+    // overpaying every payout by five points and recording it as a warning
+    // nobody reads. A money-critical setting that cannot be read is an error
+    // condition, not a guess: fail closed and let an operator fix the setting.
     const payoutSettings = await getTenantSettings(['profit_share_pct'])
-    const rawProfitShare = parseFloat(payoutSettings.profit_share_pct)
-    if (!Number.isFinite(rawProfitShare) || rawProfitShare <= 0) {
-      logger.warn('[PAYOUTS] profit_share_pct missing or invalid - defaulting to 80%.')
+    const resolvedProfitShare = resolveProfitSharePct(payoutSettings.profit_share_pct)
+    if (resolvedProfitShare === null) {
+      logger.error('[PAYOUTS] profit_share_pct is missing or invalid — refusing to compute a payout', {
+        storedValue: payoutSettings.profit_share_pct,
+        userId: req.user.userId
+      })
+      return res.status(503).json({
+        error: 'Payouts are temporarily unavailable. Our team has been notified.'
+      })
     }
-    const effectiveProfitSharePct = (Number.isFinite(rawProfitShare) && rawProfitShare > 0 ? rawProfitShare : 80) / 100
+    const effectiveProfitSharePct = resolvedProfitShare / 100
     const amount_payable = parseFloat((amountNum * effectiveProfitSharePct).toFixed(2))
 
     // FIX (Bug 3): Wrap the entire payout request in a transaction with
     // FOR UPDATE on the account row to prevent double-payout race condition.
-    // Two concurrent requests will serialise at the lock Ã¢â‚¬â€ the second will
+    // ── Two concurrent requests will serialise at the lock the second will ────
     // see the first's INSERT when it runs its pending-payout check.
     const client = await pool.connect()
     try {
@@ -223,20 +265,37 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
             }
           }
 
+          // The consistency remedy lives in domain/payoutEligibility.js —
+          // consistentWithdrawableProfit — so the trader UI, this route and the
+          // admin approval path all quote the same withdrawable figure. This
+          // used to refuse outright and tell the trader to "keep trading to
+          // bring that ratio down", i.e. to take more risk with the firm's
+          // capital to reach money they had already earned.
           const consistencyPct = parseFloat(fundedModel.funded_consistency_max_day_pct || 0)
           if (consistencyPct > 0) {
             const consistency = await tradingDaysService.checkConsistencyRule(client, accountIdStr, realizedProfit, consistencyPct)
-            if (!consistency.ok) {
+            const withdrawableNow = consistentWithdrawableProfit(realizedProfit, consistency.bestDayProfit, consistencyPct)
+            if (amountNum > withdrawableNow) {
               await client.query('ROLLBACK')
+              const held = parseFloat(Math.max(0, realizedProfit - withdrawableNow).toFixed(2))
               return res.status(400).json({
-                error: `Your best single trading day represents ${consistency.bestDayPct.toFixed(1)}% of your total profit, exceeding this model's ${consistencyPct}% consistency limit. Keep trading to bring that ratio down, then request your payout.`
+                error: withdrawableNow > 0
+                  ? `You can withdraw $${withdrawableNow.toFixed(2)} right now. Your best single day is ` +
+                    `${consistency.bestDayPct.toFixed(1)}% of your total profit against this model's ${consistencyPct}% limit, ` +
+                    `so $${held.toFixed(2)} stays in your account and unlocks as your profit spreads across more days.`
+                  : `Your best single day is ${consistency.bestDayPct.toFixed(1)}% of your total profit, above this ` +
+                    `model's ${consistencyPct}% limit. It unlocks as your profit spreads across more days.`,
+                withdrawable_now: withdrawableNow,
+                held_amount: held,
+                best_day_pct: parseFloat(consistency.bestDayPct.toFixed(1)),
+                consistency_limit_pct: consistencyPct
               })
             }
           }
         }
       }
 
-      // Check no pending payout already exists (inside transaction Ã¢â‚¬â€ serialised)
+      // ── Check no pending payout already exists inside transaction serialised ────
       const existing = await client.query(
         `SELECT id FROM payouts WHERE account_id = $1 AND status = 'pending'`,
         [accountIdStr]
@@ -250,7 +309,7 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
       // profit_share_pct and amount_payable are resolved before BEGIN — see the
       // note above pool.connect().
 
-      // Ã¢â€â‚¬Ã¢â€â‚¬ Flag checks Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+      // ── Flag checks ────────────────────────────────────────────────────
       let is_flagged = false
       const flagReasons = []
 
@@ -320,7 +379,18 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
           logger.warn(`[payouts] Flagged payout from user ${req.user.userId}: ${flagReasons.join(' | ')}`)
         }
       } catch (flagErr) {
-        logger.error('[payouts] Flag check error:', { error: flagErr.message })
+        // FAIL CLOSED. This used to log and continue, leaving is_flagged = false
+        // — so a transient database error during the fraud screen presented an
+        // unscreened payout to an admin as clean. The screen silently not
+        // running is indistinguishable, on the admin's screen, from the screen
+        // running and finding nothing.
+        //
+        // A payout that could not be screened is flagged for review rather than
+        // refused: the trader keeps their request and their place, and a human
+        // decides. That is the safe direction on a money path.
+        logger.error('[payouts] Flag check failed — flagging for manual review', { error: flagErr.message })
+        is_flagged = true
+        flagReasons.push('Automated fraud screening could not complete — manual review required')
       }
 
       // `client`, not `pool` — two separate reasons, both load-bearing.
@@ -435,14 +505,28 @@ router.post('/request', authenticateToken, payoutRequestLimiter, async function(
 // GET /api/payouts/my-payouts
 router.get('/my-payouts', authenticateToken, async function(req, res) {
   try {
+    // queue_position and the SLA come back with the rows because the platform
+    // now publishes a payout commitment instead of the "weekly cycles" it never
+    // ran. A trader waiting on money should be able to see where they are in the
+    // queue rather than guess — and the number is computed from the same
+    // pending set that schedulerService's SLA watch alerts on.
     const result = await pool.query(
-      `SELECT p.*, a.account_type, a.account_size, a.account_uid
+      `SELECT p.*, a.account_type, a.account_size, a.account_uid,
+              CASE WHEN p.status = 'pending' THEN (
+                SELECT COUNT(*) + 1
+                  FROM payouts q
+                 WHERE q.status = 'pending'
+                   AND q.requested_at < p.requested_at
+              ) END AS queue_position,
+              EXTRACT(EPOCH FROM (NOW() - p.requested_at)) / 3600 AS age_hours
        FROM payouts p
        JOIN accounts a ON p.account_id = a.id
        WHERE p.user_id = $1
        ORDER BY p.requested_at DESC`,
       [req.user.userId]
     )
+    // Array, not an envelope: two callers already consume this shape, and the
+    // SLA belongs with the other published payout settings anyway (GET /settings).
     res.json(result.rows)
   } catch (error) {
     logger.error('Get payouts error:', { error: error.message })
@@ -562,8 +646,18 @@ router.get('/statement', authenticateToken, async function(req, res) {
 router.get('/settings', authenticateToken, async function(req, res) {
   try {
     const settings = await getTenantSettings(['profit_share_pct'])
-    const profit_share_pct = parseFloat(settings.profit_share_pct || 80)
-    res.json({ profit_share_pct })
+    // Display path: unlike the payout calculation above, showing the seeded
+    // default is harmless where paying it is not. Both now resolve through the
+    // same helper, so they cannot disagree on what the number is.
+    const profit_share_pct = resolveProfitSharePct(settings.profit_share_pct) ?? PROFIT_SHARE_FALLBACK_PCT
+    // The rails and the SLA are published from constants.js so the payout form,
+    // the Terms and the enforcement in POST /request cannot describe three
+    // different products. See PAYOUT_METHODS / PAYOUT_SLA.
+    res.json({
+      profit_share_pct,
+      payout_methods: PAYOUT_METHODS,
+      sla: { review_hours: PAYOUT_SLA.REVIEW_HOURS, paid_hours: PAYOUT_SLA.PAID_HOURS }
+    })
   } catch (error) {
     logger.error('Payout settings error:', { error: error.message })
     res.status(500).json({ error: 'Could not fetch payout settings' })

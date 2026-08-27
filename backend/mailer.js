@@ -5,6 +5,7 @@ require('./loadEnv')
 
 const EMAIL_TEMPLATE_KEYS = Object.freeze([
   'password_reset',
+  'email_verification',
   'welcome_onboarding',
   'challenge_expiry_reminder',
   'challenge_inactivity_reminder',
@@ -234,6 +235,30 @@ function buildPasswordResetEmail(payload) {
     subject,
     html,
     text: `Reset your password: ${resetLink}${resetToken ? ` (Code: ${resetToken})` : ''}`
+  }
+}
+
+function buildEmailVerificationEmail(payload) {
+  const to = String(payload?.toEmail || '').trim()
+  const fullName = String(payload?.fullName || 'Trader').trim()
+  const verifyLink = String(payload?.verifyLink || '').trim()
+  const context = resolveMailContext()
+  const subject = `${context.firmName} - Confirm your email address`
+  const html = htmlWrap('Confirm your email address', `
+    <p>Welcome, ${fullName}. Confirm this address to finish setting up your account.</p>
+    <p style="margin:28px 0;">
+      <a href="${verifyLink}" style="background:#c9a84c;color:#0d1b2a;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;">
+        Confirm Email
+      </a>
+    </p>
+    <p style="color:#888;font-size:13px;">This link expires in <strong>48 hours</strong>. If you did not create an account, ignore this email and nothing will happen.</p>
+  `)
+
+  return {
+    to,
+    subject,
+    html,
+    text: `Confirm your email address: ${verifyLink}`
   }
 }
 
@@ -765,6 +790,8 @@ async function buildEmailMessage(templateKey, payload = {}) {
   switch (normalizedKey) {
     case 'password_reset':
       return buildPasswordResetEmail(payload)
+    case 'email_verification':
+      return buildEmailVerificationEmail(payload)
     case 'welcome_onboarding':
       return buildWelcomeOnboardingEmail(payload)
     case 'challenge_expiry_reminder':

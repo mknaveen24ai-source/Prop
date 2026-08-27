@@ -67,15 +67,10 @@ export default function LandingCalculator({ onStartAssessment }) {
     return () => clearInterval(iv);
   }, []);
 
-  // Default to the first (fastest) model once models arrive, so the size
-  // cards are visible immediately — matches the always-an-active-tab reference layout.
-  useEffect(() => {
-    if (!selectedModelSlug && models.length > 0) {
-      setSelectedModelSlug(models[0].slug);
-    }
-  }, [models, selectedModelSlug]);
-
-  const selectedModel = models.find(m => m.slug === selectedModelSlug) || null;
+  // A fetched first model is the visual default without a state-sync render.
+  // User selection still wins as soon as a tab is chosen.
+  const effectiveModelSlug = selectedModelSlug || models[0]?.slug || null;
+  const selectedModel = models.find(m => m.slug === effectiveModelSlug) || null;
   const activePricing = (selectedModel?.pricing || []).filter(p => p.is_active);
   const totalEnabled = activePricing.filter(p => !p.locked).length;
   const hasUnlimitedAvailability = activePricing.some(p => !p.locked && p.is_unlimited);
@@ -111,7 +106,7 @@ export default function LandingCalculator({ onStartAssessment }) {
           </p>
 
           {availabilitySource !== 'live' && (
-            <p className="mp-reveal mp-delay-250" style={{ margin: '14px auto 0', color: 'var(--muted)', maxWidth: '740px', fontSize: 'var(--fs-base)' }}>
+            <p className="mp-reveal mp-delay-250" style={{ margin: 'var(--space-3-5) auto 0', color: 'var(--muted)', maxWidth: '740px', fontSize: 'var(--fs-base)' }}>
               {availabilitySource === 'config'
                 ? 'Tier availability on this page follows admin-configured quotas and refreshes automatically.'
                 : 'Live availability is temporarily unavailable. You can still register and claim the next open tier.'}
@@ -141,7 +136,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                     textAlign: 'center',
                     background: active ? 'var(--ink)' : 'var(--paper)',
                     border: `1px solid ${active ? 'var(--ink)' : 'var(--rule)'}`,
-                    padding: '10px 22px',
+                    padding: 'var(--space-2-5) var(--space-6)',
                     minWidth: '160px',
                     transition: 'all 0.15s ease',
                   }}
@@ -172,8 +167,8 @@ export default function LandingCalculator({ onStartAssessment }) {
         )}
 
         {selectedModel && (
-          <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-            <div className="mp-availability-pill mp-reveal mp-delay-300" style={{ display: 'inline-flex', gap: 'var(--space-6)', padding: '12px 28px', background: 'transparent', border: '1px solid var(--rule)' }}>
+          <div style={{ textAlign: 'center', marginBottom: 'var(--space-7)' }}>
+            <div className="mp-availability-pill mp-reveal mp-delay-300" style={{ display: 'inline-flex', gap: 'var(--space-6)', padding: 'var(--space-3) var(--space-7)', background: 'transparent', border: '1px solid var(--rule)' }}>
               <span style={{ fontSize: 'var(--fs-base)', color: 'var(--muted)' }}>
                 Sizes Available: <span style={{ color: 'var(--ink)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{totalEnabled}</span>
               </span>
@@ -192,7 +187,7 @@ export default function LandingCalculator({ onStartAssessment }) {
             gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
             gap: 'var(--space-4)',
             maxWidth: '1300px',
-            margin: '0 auto 60px',
+            margin: '0 auto var(--space-10)',
             alignItems: 'stretch',
           }}>
             {accountSizes.map((size) => {
@@ -242,7 +237,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                   )}
 
                   {/* Header row: ACCOUNT SIZE / PRICE */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
                     <span style={{ fontSize: 'var(--fs-2xs)', color: mutedColor, textTransform: 'uppercase', letterSpacing: '0.1em', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
                       Account Size
                     </span>
@@ -260,7 +255,7 @@ export default function LandingCalculator({ onStartAssessment }) {
                   </div>
                   <div style={{ marginBottom: 'var(--space-3-5)' }}>
                     <span style={{
-                      display: 'inline-block', padding: '2px 8px', fontSize: 'var(--fs-3xs)', fontWeight: 800, fontFamily: 'var(--font-mono)',
+                      display: 'inline-block', padding: 'var(--space-1) var(--space-2)', fontSize: 'var(--fs-3xs)', fontWeight: 800, fontFamily: 'var(--font-mono)',
                       textTransform: 'uppercase', letterSpacing: '0.08em',
                       border: `1px solid ${isSoldOut ? 'var(--loss)' : pct > 50 ? 'var(--gain)' : 'var(--warn)'}`,
                       color: isSoldOut ? 'var(--loss)' : pct > 50 ? 'var(--gain)' : 'var(--warn)',

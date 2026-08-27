@@ -74,7 +74,7 @@ test('the open path refuses rather than skipping an unvaluable position', () => 
 
 test('the close path returns a retryable 503, not a generic 500', () => {
   const handler = CLOSE.slice(CLOSE.indexOf('Close trade error'), CLOSE.indexOf('Close trade error') + 200)
-  assert.match(CLOSE, /error\.name === 'FxRateUnavailableError'/,
+  assert.match(CLOSE, /isNamedError\(error, 'FxRateUnavailableError'\)/,
     'routes/trades/close.js must distinguish a dark rate from an unexpected failure')
   assert.match(CLOSE, /status\(503\)[\s\S]{0,200}try again shortly/,
     'the trader must be told the position is unchanged and to retry')

@@ -121,27 +121,27 @@ export default function DashboardProfilePage({
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px,1fr))', gap: 'var(--space-3-5)' }}>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', letterSpacing: '.06em', textTransform: 'uppercase' }}>Profit Share</div>
-                <div style={{ fontSize: '15px', marginTop: 'var(--space-1)' }}>{platformRules.profit_share_pct}%</div>
+                <div style={{ fontSize: 'var(--fs-lg)', marginTop: 'var(--space-1)' }}>{platformRules.profit_share_pct}%</div>
               </div>
               <div>
-                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', letterSpacing: '.06em', textTransform: 'uppercase' }}>Max Daily Trades</div>
-                <div style={{ fontSize: '15px', marginTop: 'var(--space-1)' }}>{platformRules.max_daily_trades ?? 'Unlimited'}</div>
+                <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', letterSpacing: '.06em', textTransform: 'uppercase' }}>Max Open Positions</div>
+                <div style={{ fontSize: 'var(--fs-lg)', marginTop: 'var(--space-1)' }}>{platformRules.max_open_positions ?? 10}</div>
               </div>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', letterSpacing: '.06em', textTransform: 'uppercase' }}>Minimum Hold Time</div>
-                <div style={{ fontSize: '15px', marginTop: 'var(--space-1)' }}>{platformRules.min_hold_seconds}s</div>
+                <div style={{ fontSize: 'var(--fs-lg)', marginTop: 'var(--space-1)' }}>{platformRules.min_hold_seconds}s</div>
               </div>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', letterSpacing: '.06em', textTransform: 'uppercase' }}>Minimum Lot Size</div>
-                <div style={{ fontSize: '15px', marginTop: 'var(--space-1)' }}>{parseFloat(platformRules.min_lot_size || 0).toFixed(2)}</div>
+                <div style={{ fontSize: 'var(--fs-lg)', marginTop: 'var(--space-1)' }}>{parseFloat(platformRules.min_lot_size || 0).toFixed(2)}</div>
               </div>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', letterSpacing: '.06em', textTransform: 'uppercase' }}>Weekend Holding</div>
-                <div style={{ fontSize: '15px', marginTop: 'var(--space-1)' }}>{platformRules.weekend_holding_enabled ? 'Allowed' : 'Not allowed'}</div>
+                <div style={{ fontSize: 'var(--fs-lg)', marginTop: 'var(--space-1)' }}>{platformRules.weekend_holding_enabled ? 'Allowed' : 'Not allowed'}</div>
               </div>
               <div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-muted)', letterSpacing: '.06em', textTransform: 'uppercase' }}>Inactivity Policy</div>
-                <div style={{ fontSize: '15px', marginTop: 'var(--space-1)' }}>
+                <div style={{ fontSize: 'var(--fs-lg)', marginTop: 'var(--space-1)' }}>
                   {platformRules.inactivity_auto_fail_enabled ? `Auto-fail after ${platformRules.inactivity_fail_days} days idle` : 'No auto-fail'}
                 </div>
               </div>

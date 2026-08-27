@@ -22,8 +22,8 @@ export default function CommandPaletteTrigger({ label = 'Search…' }) {
       <Search size={14} />
       <span>{label}</span>
       <span style={{
-        fontFamily: 'var(--font-mono)', fontSize: '9.5px', color: 'var(--muted)',
-        border: '1px solid var(--rule)', borderRadius: '2px', padding: '1px 5px', marginLeft: 'var(--space-1)',
+        fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', color: 'var(--muted)',
+        border: '1px solid var(--rule)', borderRadius: '2px', padding: '1px var(--space-1-5)', marginLeft: 'var(--space-1)',
       }}>
         ⌘K
       </span>

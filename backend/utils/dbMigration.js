@@ -71,7 +71,7 @@ async function rollback() {
 
   try {
     logger.warn('⚠️  Rolling back last migration...')
-    const [batchNumber, rolledBackMigrations] = await db.migrate.rollback()
+    const [, rolledBackMigrations] = await db.migrate.rollback()
     
     logger.warn(`✓ Rolled back ${rolledBackMigrations.length} migration(s)`)
     rolledBackMigrations.forEach(m => logger.warn(`  ↩️  ${m}`))

@@ -218,8 +218,8 @@ export default function Checkout() {
       <div className="auth-ambient auth-ambient-secondary" />
 
       <div className="lx-card auth-glass-card" style={{ width: 'min(100%, 520px)', zIndex: 10, padding: 'var(--space-8) var(--space-7)' }}>
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <div className="auth-logo-mark" style={{ margin: '0 auto 16px' }}>⚡</div>
+        <div style={{ textAlign: 'center', marginBottom: 'var(--space-7)' }}>
+          <div className="auth-logo-mark" style={{ margin: '0 auto var(--space-4)' }}>⚡</div>
           <h1 style={{ fontSize: 'var(--fs-4xl)', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: 'var(--space-2)' }}>
             Review Your Challenge
           </h1>
@@ -390,7 +390,7 @@ export default function Checkout() {
                   {price != null ? (
                     finalPrice != null && finalPrice < price ? (
                       <>
-                        <span style={{ textDecoration: 'line-through', color: 'var(--text-dim)', fontSize: '15px', marginRight: 'var(--space-2)' }}>${price}</span>
+                        <span style={{ textDecoration: 'line-through', color: 'var(--text-dim)', fontSize: 'var(--fs-lg)', marginRight: 'var(--space-2)' }}>${price}</span>
                         <span style={{ color: 'var(--gain)' }}>${finalPrice.toFixed(2)}</span>
                       </>
                     ) : `$${price}`

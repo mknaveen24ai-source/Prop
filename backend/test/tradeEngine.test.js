@@ -43,6 +43,15 @@ function installPoolMock({ queryHandlers = [], connectClient = null } = {}) {
   const calls = []
   pool.query = async (sql, values) => {
     calls.push({ sql, values })
+    // services/feedHealth.js asks for MAX(updated_at) before the engine will
+    // enforce anything, and treats an unanswerable feed as UNHEALTHY — which is
+    // the correct fail-safe in production and a silent "0 assertions ran" here.
+    // Answered before the per-test handlers because every test in this file is
+    // about what the engine does with a WORKING feed; the breaker itself is
+    // covered separately.
+    if (/MAX\(updated_at\)/i.test(sql)) {
+      return { rows: [{ newest: new Date() }] }
+    }
     for (const [pattern, handler] of queryHandlers) {
       if (pattern.test(sql)) return handler(sql, values)
     }
@@ -136,7 +145,7 @@ test('checkSLTP concurrency guard: a second call while one is running issues no 
 
   const firstCall = checkSLTP(null)
   // Give the first call a tick to reach (and block on) the openTrades query.
-  await new Promise((resolve) => setTimeout(resolve, 20))
+  await new Promise((resolve) => { setTimeout(resolve, 20) })
   assert.equal(sltpQueryCount, 1, 'first call should have reached its main query')
 
   await checkSLTP(null) // should return immediately — guard is active
@@ -183,7 +192,9 @@ test('checkPendingOrders fills a buy_limit order once the ask price reaches the 
     account_type: 'phase1', scaling_multiplier: null, oco_group_id: null
   }
   const client = makeMockClient([
-    [/SELECT current_balance FROM accounts/, () => ({ rows: [{ current_balance: '10000' }] })],
+    // validatePendingTrigger now only checks the account still exists — the
+    // balance was read for a margin check that no longer exists (unlimited leverage).
+    [/SELECT 1 FROM accounts/, () => ({ rows: [{ '?column?': 1 }] })],
     [/COALESCE\(SUM\(lot_size\), 0\) as total_lots/, () => ({ rows: [{ total_lots: '0' }] })],
     [/SELECT COUNT\(\*\) FROM trades WHERE account_id/, () => ({ rows: [{ count: '0' }] })]
   ])
@@ -250,4 +261,126 @@ test('checkFloatingDrawdown leaves an account untouched while equity stays above
 
   const failCall = client.calls.find(c => /UPDATE accounts SET status = 'failed'/.test(c.sql))
   assert.equal(failCall, undefined, 'account should not be failed while equity is above the floor')
+})
+
+// ─── Deferred SL/TP fills inside the minimum-hold window (migration 044) ─────
+//
+// These cover the behaviour change that retired docs/TRADING_RULES_DISCLOSURES
+// §1. The old rule was: a level crossed before minHoldSeconds is discarded, so
+// the stop either fills at whatever the price is when the window expires or —
+// if price came back — never fills at all. The report's scenario T5 is exactly
+// that case, and its expected result is now the opposite of what it was.
+
+const YOUNG_TRADE_OPEN_TIME = () => new Date(Date.now() - 5 * 1000)   // 5s old — inside the 60s window
+const OLD_TRADE_OPEN_TIME   = () => new Date(Date.now() - 10 * 60 * 1000)
+
+test('checkSLTP records, rather than discards, a stop crossed inside the minimum-hold window', async () => {
+  const trade = {
+    id: 'trade-defer-1', account_id: 'acc-d1', instrument: 'EURUSD', direction: 'buy',
+    lot_size: '1', open_price: '1.10500', stop_loss: '1.10100', take_profit: null,
+    status: 'open', open_time: YOUNG_TRADE_OPEN_TIME(), demo_trade_id: null,
+    commission: '0', user_id: 'user-d1',
+    pending_close_price: null, pending_close_reason: null
+  }
+  const client = makeMockClient()
+  const calls = installPoolMock({
+    queryHandlers: [
+      [OPEN_TRADES_QUERY, () => ({ rows: [trade] })],
+      [/FROM price_feed\b/i, () => ({ rows: [{ instrument: 'EURUSD', bid: '1.10000', ask: '1.10020', updated_at: new Date() }] })]
+    ],
+    connectClient: client
+  })
+
+  await checkSLTP(null)
+
+  const record = calls.find(c => /pending_close_price\s*=\s*\$2/.test(c.sql))
+  assert.ok(record, 'expected the crossing to be recorded against the trade')
+  assert.equal(record.values[1], 1.10100, 'must record the STOP LEVEL, not the market price')
+  assert.equal(record.values[2], 'Stop Loss')
+
+  const closeCall = client.calls.find(c => /status = 'closed'/.test(c.sql))
+  assert.equal(closeCall, undefined, 'the position must not close inside the hold window')
+})
+
+test('checkSLTP fills a recorded stop AT THE LEVEL once the window expires, even after price retraced (report T5)', async () => {
+  // The crossing happened at second 15 at 1.10100. By the time the window
+  // expires price is back at 1.10400 — well clear of the stop. Under the old
+  // rule this position stayed open and the stop never filled at all.
+  const trade = {
+    id: 'trade-defer-2', account_id: 'acc-d2', instrument: 'EURUSD', direction: 'buy',
+    lot_size: '1', open_price: '1.10500', stop_loss: '1.10100', take_profit: null,
+    status: 'open', open_time: OLD_TRADE_OPEN_TIME(), demo_trade_id: null,
+    commission: '0', user_id: 'user-d2',
+    pending_close_price: '1.10100', pending_close_reason: 'Stop Loss'
+  }
+  const client = makeMockClient()
+  installPoolMock({
+    queryHandlers: [
+      [OPEN_TRADES_QUERY, () => ({ rows: [trade] })],
+      [/FROM price_feed\b/i, () => ({ rows: [{ instrument: 'EURUSD', bid: '1.10400', ask: '1.10420', updated_at: new Date() }] })]
+    ],
+    connectClient: client
+  })
+
+  await checkSLTP(null)
+
+  const closeCall = client.calls.find(c => /UPDATE trades SET/.test(c.sql) && /status = 'closed'/.test(c.sql))
+  assert.ok(closeCall, 'expected the recorded stop to fill once the hold window expired')
+  assert.equal(closeCall.values[0], 1.10100, 'must fill at the recorded LEVEL, not the retraced market price')
+  assert.equal(closeCall.values[2], 'Stop Loss')
+  // (1.10100 - 1.10500) * 1 lot * 100,000 = -400. The trader gets the loss they
+  // asked for, not the one the market handed them 45 seconds later.
+  assert.equal(closeCall.values[1], -400)
+  assert.ok(/pending_close_price\s*=\s*NULL/.test(closeCall.sql), 'the trigger must be cleared by the close')
+})
+
+test('checkSLTP leaves a young trade alone when no level was crossed', async () => {
+  const trade = {
+    id: 'trade-defer-3', account_id: 'acc-d3', instrument: 'EURUSD', direction: 'buy',
+    lot_size: '1', open_price: '1.10500', stop_loss: '1.09000', take_profit: null,
+    status: 'open', open_time: YOUNG_TRADE_OPEN_TIME(), demo_trade_id: null,
+    commission: '0', user_id: 'user-d3',
+    pending_close_price: null, pending_close_reason: null
+  }
+  const client = makeMockClient()
+  const calls = installPoolMock({
+    queryHandlers: [
+      [OPEN_TRADES_QUERY, () => ({ rows: [trade] })],
+      [/FROM price_feed\b/i, () => ({ rows: [{ instrument: 'EURUSD', bid: '1.10000', ask: '1.10020', updated_at: new Date() }] })]
+    ],
+    connectClient: client
+  })
+
+  await checkSLTP(null)
+
+  assert.equal(calls.find(c => /pending_close_price\s*=\s*\$2/.test(c.sql)), undefined,
+    'nothing to record when the level was never reached')
+  assert.equal(client.calls.find(c => /status = 'closed'/.test(c.sql)), undefined)
+})
+
+test('checkSLTP: a recorded trigger outranks a live crossing of the other level', async () => {
+  // Stop recorded at second 10; by second 61 price has run the other way and is
+  // through the take profit. First crossing wins — the trader is stopped out.
+  const trade = {
+    id: 'trade-defer-4', account_id: 'acc-d4', instrument: 'EURUSD', direction: 'buy',
+    lot_size: '1', open_price: '1.10500', stop_loss: '1.10100', take_profit: '1.10900',
+    status: 'open', open_time: OLD_TRADE_OPEN_TIME(), demo_trade_id: null,
+    commission: '0', user_id: 'user-d4',
+    pending_close_price: '1.10100', pending_close_reason: 'Stop Loss'
+  }
+  const client = makeMockClient()
+  installPoolMock({
+    queryHandlers: [
+      [OPEN_TRADES_QUERY, () => ({ rows: [trade] })],
+      [/FROM price_feed\b/i, () => ({ rows: [{ instrument: 'EURUSD', bid: '1.11000', ask: '1.11020', updated_at: new Date() }] })]
+    ],
+    connectClient: client
+  })
+
+  await checkSLTP(null)
+
+  const closeCall = client.calls.find(c => /status = 'closed'/.test(c.sql))
+  assert.ok(closeCall)
+  assert.equal(closeCall.values[2], 'Stop Loss', 'the earlier recorded crossing must win')
+  assert.equal(closeCall.values[0], 1.10100)
 })

@@ -6,7 +6,6 @@
  */
 
 const fs = require('fs')
-const path = require('path')
 
 console.log('\n╔══════════════════════════════════════════════════════════════╗')
 console.log('║       DATABASE MIGRATION FRAMEWORK - SETUP CHECK             ║')

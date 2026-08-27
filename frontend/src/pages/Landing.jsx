@@ -292,6 +292,17 @@ export default function Landing() {
                 >{link.label}</a>
               ))}
               <Link
+                to="/rules"
+                style={{
+                  color: 'var(--text-secondary)', textDecoration: 'none', fontSize: 'var(--fs-md)',
+                  fontFamily: 'var(--font-ui)', fontWeight: '500',
+                  transition: 'color 0.2s',
+                }}
+                onMouseOver={e => { e.currentTarget.style.color = 'var(--text-primary)' }}
+                onMouseOut={e => { e.currentTarget.style.color = 'var(--text-secondary)' }}
+                onClick={() => trackEvent('landing_nav_click', { label: 'Rules', href: '/rules' })}
+              >Rules</Link>
+              <Link
                 to="/transparency"
                 style={{
                   color: 'var(--text-secondary)', textDecoration: 'none', fontSize: 'var(--fs-md)',

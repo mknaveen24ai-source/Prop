@@ -19,12 +19,18 @@ const { execFileSync } = require('node:child_process')
 // These tests guard the guard. A detector that silently stops detecting is
 // worse than no detector, because the check still reports success.
 
-const SCRIPT = path.join(__dirname, '..', 'scripts', 'check-param-type-collisions.js')
+const BACKEND = process.env.BACKEND_SOURCE_ROOT
+  ? path.resolve(process.env.BACKEND_SOURCE_ROOT)
+  : path.join(__dirname, '..')
+const SCRIPT = process.env.BACKEND_SOURCE_ROOT
+  ? path.join(__dirname, '..', 'scripts', 'check-param-type-collisions.js')
+  : path.join(BACKEND, 'scripts', 'check-param-type-collisions.js')
 
 function runCheck() {
   try {
     const stdout = execFileSync('node', [SCRIPT], {
-      cwd: path.join(__dirname, '..'),
+      cwd: BACKEND,
+      env: { ...process.env, BACKEND_SOURCE_ROOT: BACKEND },
       encoding: 'utf8'
     })
     return { code: 0, stdout }
@@ -42,7 +48,7 @@ test('the repository is currently free of uuid/text parameter collisions', () =>
 test('the detector still catches the exact query that broke every trade open', (t) => {
   // The real pre-fix snippet: $1 compared to trades.account_id (uuid) and
   // trade_logs.account_id (text) inside one statement.
-  const backend = path.join(__dirname, '..')
+  const backend = BACKEND
   const decoy = path.join(backend, 'utils', `__sqlparam_probe_${process.pid}.js`)
 
   fs.writeFileSync(decoy, `
@@ -79,7 +85,7 @@ test('the detector still catches the exact query that broke every trade open', (
 })
 
 test('an explicit cast on the parameter is accepted as deliberate', (t) => {
-  const backend = path.join(__dirname, '..')
+  const backend = BACKEND
   const decoy = path.join(backend, 'utils', `__sqlparam_ok_${process.pid}.js`)
 
   // Identical to the failing query except for `$1::text` — which is the fix, and

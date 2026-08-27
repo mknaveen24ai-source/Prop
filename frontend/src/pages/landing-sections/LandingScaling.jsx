@@ -6,12 +6,12 @@ export default function LandingScaling() {
   const steps = [
     {
       num: "01", title: "Choose Your Challenge", diff: "Sign Up",
-      text: "Pick a 1-step, 2-step, or 3-step model and your preferred account size, then complete checkout to activate — accounts are released in limited monthly batches based on available liquidity.",
+      text: "Pick a 1-step, 2-step, or 3-step model and your preferred account size, then complete checkout. Your evaluation account is issued as soon as payment clears.",
       color: 'var(--muted)'
     },
     {
       num: "02", title: "Phase 1 — Prove Your Skill", diff: "Evaluate",
-      text: "Hit the profit target within the phase time limit. Trade Forex at 1:30 leverage and Gold/Silver at 1:10. Stay within the drawdown limits — the same rules apply at every phase, no surprises.",
+      text: "Hit the profit target within the phase time limit. Leverage is unlimited and there is no position-size cap — stay inside the daily loss cap and the trailing drawdown floor. The same rules apply at every phase, no surprises.",
       color: 'var(--muted)'
     },
     {
@@ -29,7 +29,7 @@ export default function LandingScaling() {
   return (
     <section className="mp-section" style={{ position: 'relative' }}>
       <div className="mp-container">
-        <div style={{ textAlign: 'center', marginBottom: '80px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 'var(--space-11)' }}>
           <div className="mp-badge mp-reveal" style={{ marginBottom: 'var(--space-5)' }}>
             <span className="mp-badge-dot"></span>
             How It Works
@@ -51,9 +51,9 @@ export default function LandingScaling() {
               }}>
                 {step.num}
               </div>
-              <div className="mp-timeline-content mp-glass-card" style={{ padding: '30px' }}>
+              <div className="mp-timeline-content mp-glass-card" style={{ padding: 'var(--space-7)' }}>
                 <div style={{
-                  display: 'inline-block', padding: '5px 14px',
+                  display: 'inline-block', padding: 'var(--space-1-5) var(--space-3-5)',
                   background: 'transparent',
                   fontSize: 'var(--fs-xs)',
                   textTransform: 'uppercase', letterSpacing: '0.15em',

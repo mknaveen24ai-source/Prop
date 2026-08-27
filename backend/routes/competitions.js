@@ -3,8 +3,7 @@ const router = express.Router()
 const jwt = require('jsonwebtoken')
 const pool = require('../db')
 const logger = require('../utils/logger')
-const { authenticateToken } = require('./middleware')
-const { sanitizeString } = require('../utils/validation')
+const { authenticateToken, requireVerifiedEmail } = require('./middleware')
 const { fetchCompetitionBySlugOrId, fetchCompetitionLeaderboard, fetchCompetitionPodiumSparklines, createCompetitionEntry } = require('../utils/competitions')
 
 // Best-effort auth: populates req.user if a valid token is present, but never
@@ -145,7 +144,7 @@ router.get('/:slug/leaderboard', async function (req, res) {
 })
 
 // POST /api/competitions/:slug/join
-router.post('/:slug/join', authenticateToken, async function (req, res) {
+router.post('/:slug/join', authenticateToken, requireVerifiedEmail, async function (req, res) {
   const client = await pool.connect()
   try {
     const competition = await fetchCompetitionBySlugOrId(req.params.slug)

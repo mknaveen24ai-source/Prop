@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { useToast } from '../../components/admin/AdminToast'
 import AdminStatCard from '../../components/admin/AdminStatCard'
+import AdminModal from '../../components/admin/AdminModal'
 
 function formatMoney(value) {
   return `$${(parseFloat(value) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -34,6 +35,9 @@ export default function AdminAffiliatePayouts() {
   const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState('pending')
   const [data, setData] = useState({ rows: [], total: 0, page: 1, pageSize: 25 })
+  const [approveTarget, setApproveTarget] = useState(null)
+  const [transactionId, setTransactionId] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const fetchPayouts = useCallback(async (page = 1, statusValue = status) => {
     setLoading(true)
@@ -52,15 +56,29 @@ export default function AdminAffiliatePayouts() {
 
   useEffect(() => { fetchPayouts(1, status) }, [status, fetchPayouts])
 
-  async function approve(row) {
-    if (!window.confirm(`Mark payout of ${formatMoney(row.amount_requested)} for ${row.full_name} as paid?`)) return
+  // This was window.confirm() followed by window.prompt() for the transaction
+  // reference — on the screen that sends an affiliate their money. Two native
+  // dialogs in sequence means the operator can dismiss the second one and still
+  // have settled the payout, the amount is only visible in the first, and
+  // neither is keyboard-trapped, escapable or announced as a dialog. AdminModal
+  // gives all of that, and it is the same confirm affordance every other
+  // money-moving admin screen uses.
+  async function confirmApprove() {
+    if (!approveTarget || submitting) return
+    setSubmitting(true)
     try {
-      const transactionId = window.prompt('Transaction ID / reference (optional)', '') || null
-      const res = await adminAxios.post('/api/admin/affiliates/payouts/approve', { payout_id: row.id, transaction_id: transactionId })
+      const res = await adminAxios.post('/api/admin/affiliates/payouts/approve', {
+        payout_id: approveTarget.id,
+        transaction_id: transactionId.trim() || null
+      })
       toast.success(`Payout marked as paid (settled ${formatMoney(res.data.settled_amount)})`)
+      setApproveTarget(null)
+      setTransactionId('')
       fetchPayouts(data.page, status)
     } catch (err) {
       toast.error(err?.response?.data?.error || 'Failed to approve payout')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -133,7 +151,7 @@ export default function AdminAffiliatePayouts() {
                 <td className="admin-td">
                   {row.status === 'pending' ? (
                     <div style={{ display: 'flex', gap: 'var(--space-1-5)' }}>
-                      <button className="admin-btn admin-btn-sm" onClick={() => approve(row)}>Approve</button>
+                      <button className="admin-btn admin-btn-sm" onClick={() => { setApproveTarget(row); setTransactionId('') }}>Approve</button>
                       <RejectButton onReject={(reason) => reject(row, reason)} />
                     </div>
                   ) : '—'}
@@ -151,6 +169,43 @@ export default function AdminAffiliatePayouts() {
           <button className="admin-btn admin-btn-sm" disabled={data.page >= totalPages} onClick={() => fetchPayouts(data.page + 1, status)}>Next</button>
         </div>
       )}
+
+      <AdminModal
+        isOpen={!!approveTarget}
+        onClose={() => { if (!submitting) setApproveTarget(null) }}
+        title="Mark affiliate payout as paid"
+        size="sm"
+        footer={(
+          <>
+            <button className="admin-btn admin-btn-ghost" onClick={() => setApproveTarget(null)} disabled={submitting}>
+              Cancel
+            </button>
+            <button className="admin-btn admin-btn-primary" onClick={confirmApprove} disabled={submitting}>
+              {submitting ? 'Settling…' : 'Mark as paid'}
+            </button>
+          </>
+        )}
+      >
+        {approveTarget && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+            <p style={{ margin: 0, fontSize: 'var(--fs-base)' }}>
+              Settling <strong>{approveTarget.full_name}</strong>&apos;s entire current available balance.
+              The request was for <strong>{formatMoney(approveTarget.amount_requested)}</strong>; if the
+              balance has grown since, the larger figure is what settles.
+            </p>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1-5)', fontSize: 'var(--fs-sm)' }}>
+              <span style={{ color: 'var(--admin-text-muted)' }}>Transaction ID / reference (optional)</span>
+              <input
+                value={transactionId}
+                onChange={(e) => setTransactionId(e.target.value)}
+                placeholder="e.g. TRC20 tx hash"
+                disabled={submitting}
+                style={{ padding: 'var(--space-2)', border: '1px solid var(--admin-border)', background: 'transparent', color: 'inherit' }}
+              />
+            </label>
+          </div>
+        )}
+      </AdminModal>
     </div>
   )
 }

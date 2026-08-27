@@ -31,7 +31,7 @@ export default function LandingFeatures() {
     {
       colSpan: 'span 6',
       title: 'No Artificial Rush',
-      desc: 'Each phase gives you 45 calendar days — enough room to trade your edge, not the clock. High-performance execution with zero artificial latency or slippage.',
+      desc: 'Each phase gives you 45 calendar days — enough room to trade your edge, not the clock. No minimum time to pass and no penalty for taking the full window.',
       iconColor: 'var(--muted)',
       icon: (
         <svg viewBox="0 0 24 24" width="44" height="44" stroke="var(--muted)" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -42,8 +42,8 @@ export default function LandingFeatures() {
     },
     {
       colSpan: 'span 4',
-      title: 'Liquidity Backed',
-      desc: 'Funded accounts are deployed on real liquidity bridges. We execute where it matters, putting institutional weight behind your strategy.',
+      title: 'We Don\'t Take a Cut',
+      desc: 'You keep 100% of what you make, and we refund your entry fee with your first payout. We take no share of your profits — passing costs you nothing.',
       iconColor: 'var(--warn)',
       icon: (
         <svg viewBox="0 0 24 24" width="44" height="44" stroke="var(--warn)" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -54,8 +54,8 @@ export default function LandingFeatures() {
     },
     {
       colSpan: 'span 4',
-      title: '1:30 Execution Leverage',
-      desc: 'Standard institutional leverage across Forex and Commodities. Optimized for risk-adjusted returns and capital preservation.',
+      title: 'Unlimited Leverage',
+      desc: 'No margin requirement and no cap on position size relative to your account. Your drawdown limits are the risk control — not an arbitrary lot ceiling.',
       iconColor: 'var(--muted)',
       icon: (
         <svg viewBox="0 0 24 24" width="44" height="44" stroke="var(--muted)" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -67,7 +67,7 @@ export default function LandingFeatures() {
     {
       colSpan: 'span 4',
       title: 'Curated Batch Releases',
-      desc: 'Each account size has a limited monthly allocation to protect liquidity integrity. Once a tier fills, it reopens automatically the following month — check the live counter above before it does.',
+      desc: 'Each account size has its own allocation. When a tier is full it stops accepting new evaluations until capacity is released — the counter above is read live from the platform, not a countdown.',
       iconColor: 'var(--loss)',
       icon: (
         <svg viewBox="0 0 24 24" width="44" height="44" stroke="var(--loss)" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
@@ -82,7 +82,7 @@ export default function LandingFeatures() {
   return (
     <section className="mp-section" style={{ position: 'relative' }}>
       <div className="mp-container">
-        <div style={{ textAlign: 'center', marginBottom: '100px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 'var(--space-12)' }}>
           <div className="mp-badge mp-reveal" style={{ marginBottom: 'var(--space-6)' }}>
             <span className="mp-badge-dot"></span>
             The Standard
@@ -96,7 +96,7 @@ export default function LandingFeatures() {
         <div className="mp-feature-grid" style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(12, 1fr)',
-          gap: '28px',
+          gap: 'var(--space-7)',
           position: 'relative',
         }}>
           {bentoItems.map((item, i) => (

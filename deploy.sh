@@ -180,6 +180,17 @@ docker compose version >/dev/null 2>&1 || die "docker compose v2 is not availabl
 docker info >/dev/null 2>&1 || die "cannot talk to the Docker daemon. Is it running, and is your user in the 'docker' group?"
 ok "docker $(docker version --format '{{.Server.Version}}' 2>/dev/null || echo 'ok'), compose v2"
 
+# A PostgreSQL major-version change is never an in-place Compose refresh. The
+# official image changed its data-directory layout in v18, so recreating an old
+# container with this stack's pinned v16 image can leave the real cluster
+# unmounted and initialise an empty database. Stop before *any* compose command
+# gets a chance to recreate it. The operator must perform the documented
+# dump/restore or pg_upgrade procedure deliberately.
+EXISTING_POSTGRES_IMAGE="$(docker inspect -f '{{.Config.Image}}' propfirm_postgres 2>/dev/null || true)"
+if [ -n "$EXISTING_POSTGRES_IMAGE" ] && [ "$EXISTING_POSTGRES_IMAGE" != "postgres:16-alpine" ]; then
+  die "existing propfirm_postgres uses $EXISTING_POSTGRES_IMAGE, but this release pins postgres:16-alpine. Do NOT run compose up or recreate it in place. First take a verified pg_dump and perform the documented PostgreSQL major-version migration."
+fi
+
 if [ "$SELF_SIGNED" = "0" ] && [ -z "$DOMAIN" ] && [ ! -f "$CERT_DIR/fullchain.pem" ]; then
   if [ "$ASSUME_YES" = "1" ]; then
     die "no TLS option given. Pass --domain <host> or --self-signed."
@@ -323,8 +334,8 @@ ok "schema provisioned and verified"
 # ═════════════════════════════════════════════════════════════════════════════
 step "Starting the stack"
 
-COMPOSE_PROFILES=""
-[ "$WITH_DEMO" = "1" ] && COMPOSE_PROFILES="--profile demo"
+COMPOSE_PROFILES="--profile monolith"
+[ "$WITH_DEMO" = "1" ] && COMPOSE_PROFILES="$COMPOSE_PROFILES --profile demo"
 
 # shellcheck disable=SC2086
 docker compose $COMPOSE_PROFILES up -d || die "docker compose up failed"

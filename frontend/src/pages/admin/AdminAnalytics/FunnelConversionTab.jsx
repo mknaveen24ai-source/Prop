@@ -77,7 +77,7 @@ export default function FunnelConversionTab() {
     (async () => {
       setLoading(true);
       try {
-        // TODO: GET /api/admin/analytics/funnel (backend/routes/adminAnalytics.js)
+        // Backed by GET /api/admin/analytics/funnel (backend/routes/adminAnalytics.js)
         const res = await adminAxios.get('/api/admin/analytics/funnel');
         setAcquisitionFunnel(withDropoff(res.data?.acquisitionFunnel || []));
         setChallengeFunnel(withDropoff(res.data?.challengeFunnel || []));

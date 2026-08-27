@@ -26,7 +26,14 @@ export function buildAdminNavResults({ isSuperAdmin, navigate }) {
         ['/admin/competitions', 'Competitions'],
       ],
     },
-    { label: 'Analytics', items: [['/admin/analytics', 'Analytics']] },
+    {
+      label: 'Analytics',
+      items: [
+        ['/admin/analytics', 'Analytics'],
+        ['/admin/intelligence', 'Firm Intelligence'],
+        ['/admin/trader-intelligence', 'Trader & Risk Intelligence'],
+      ],
+    },
     {
       label: 'Support',
       items: [

@@ -331,12 +331,20 @@ app.use(express.json())
 app.use('/api/admin', adminRoutes)
 
 const superAdminToken = `Bearer ${jwt.sign(
-  { role: 'super_admin', atv: 1, email: 'admin@test.local' },
-  process.env.ADMIN_JWT_SECRET
+  {
+    role: 'super_admin', adminId: null, atv: 1,
+    email: 'admin@test.local', full_name: 'Platform Admin', src: 'env_fallback'
+  },
+  process.env.ADMIN_JWT_SECRET,
+  { expiresIn: '1h' }
 )}`
 const financeToken = `Bearer ${jwt.sign(
-  { role: 'finance_ops', atv: 1, email: 'finance@test.local' },
-  process.env.ADMIN_JWT_SECRET
+  {
+    role: 'finance_ops', adminId: null, atv: 1,
+    email: 'finance@test.local', full_name: 'Finance Admin', src: 'env_fallback'
+  },
+  process.env.ADMIN_JWT_SECRET,
+  { expiresIn: '1h' }
 )}`
 
 const CLUSTER_ROW = {

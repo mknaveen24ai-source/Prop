@@ -20,7 +20,7 @@ export default function LandingFAQ() {
     {
       category: "General",
       q: "How many accounts are available?",
-      a: "Accounts are released in limited monthly batches based on our available liquidity. The exact number varies by account size. Once all spots for a given tier are claimed, you need to wait for the next monthly release."
+      a: "Most account sizes are open continuously. Where a size has a capacity limit, the counter on the pricing table is read live from the platform and shows exactly how many places remain — when it says a tier is open, it is open."
     },
     {
       category: "General",
@@ -60,7 +60,7 @@ export default function LandingFAQ() {
     {
       category: "Rules",
       q: "What leverage do you offer?",
-      a: "Forex pairs have 1:30 leverage. Commodities (Gold and Silver) have 1:10 leverage. These are conservative levels designed to encourage proper risk management."
+      a: "Leverage is unlimited and positions reserve no margin, so there is no cap on trade size relative to your account. The only structural limit is the number of positions you can hold at once. What actually governs your risk is the daily loss cap and the trailing drawdown floor \u2014 both published in full on the rules page, and both visible live on your dashboard."
     },
     {
       category: "Rules",
@@ -90,7 +90,7 @@ export default function LandingFAQ() {
     {
       category: "Funded",
       q: "How do payouts work?",
-      a: "Payouts are available on a weekly basis. You keep 75% of your profits, with a $50 minimum payout request. Before your first payout, you need at least 10 qualifying trading days and 6% net profit on the account — after that, there's no further lock-up period."
+      a: "Payouts are available on a weekly basis. You keep 100% of your profits — we take no cut of what you earn, only the one-off entry fee. Minimum payout request is $50. Before your first payout, you need at least 10 qualifying trading days and 6% net profit on the account — after that, there's no further lock-up period."
     },
     {
       category: "Funded",
@@ -126,7 +126,7 @@ export default function LandingFAQ() {
   return (
     <section className="mp-section" id="faq" style={{ position: 'relative' }}>
       <div className="mp-container" style={{ maxWidth: '800px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '60px' }}>
+        <div style={{ textAlign: 'center', marginBottom: 'var(--space-10)' }}>
           <div className="mp-badge mp-reveal" style={{ marginBottom: 'var(--space-5)' }}>
             <span className="mp-badge-dot"></span>
             FAQ
@@ -181,7 +181,7 @@ export default function LandingFAQ() {
                 </div>
               </button>
               <div className="mp-faq-content">
-                <p className="mp-p-body" style={{ color: 'var(--muted)', lineHeight: 1.8, fontSize: '15px' }}>{faq.a}</p>
+                <p className="mp-p-body" style={{ color: 'var(--muted)', lineHeight: 1.8, fontSize: 'var(--fs-lg)' }}>{faq.a}</p>
               </div>
             </div>
           ))}

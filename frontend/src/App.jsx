@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import useDocumentMeta from './hooks/useDocumentMeta'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Toaster } from 'react-hot-toast'
 import { ThemeProvider } from './ThemeContext'
@@ -10,6 +11,8 @@ import PrivacyPolicy from './pages/PrivacyPolicy'
 import RefundPolicy from './pages/RefundPolicy'
 import CookiePolicy from './pages/CookiePolicy'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import VerifyEmailPage from './pages/VerifyEmailPage'
+import PublicRules from './pages/PublicRules'
 import { useAuth } from './providers/AuthProvider'
 import './App.css'
 import ConnectionStatusBar from './components/ConnectionStatusBar'
@@ -57,6 +60,8 @@ const AdminCommandCenter = lazy(() => import('./pages/admin/AdminCommandCenter')
 const AdminPromotionReviews = lazy(() => import('./pages/admin/AdminPromotionReviews'))
 const SupportAppealsCenter = lazy(() => import('./pages/admin/SupportAppealsCenter'))
 const AdminAnalytics = lazy(() => import('./pages/admin/AdminAnalytics'))
+const AdminIntelligence = lazy(() => import('./pages/admin/AdminIntelligence'))
+const AdminTraderIntelligence = lazy(() => import('./pages/admin/AdminTraderIntelligence'))
 const AdminCompetitions = lazy(() => import('./pages/admin/AdminCompetitions'))
 const AdminCompetitionDetail = lazy(() => import('./pages/admin/AdminCompetitionDetail'))
 const AdminCompetitionAnalytics = lazy(() => import('./pages/admin/AdminCompetitionAnalytics'))
@@ -108,6 +113,11 @@ function RouteFallback() {
 function AnimatedRoutes({ user, login, logout }) {
   const location = useLocation()
 
+  // Per-route <title>, description and canonical for the public pages. One
+  // static <head> used to serve all 59 routes, so /rules, /transparency and the
+  // legal pages were indistinguishable from the landing page in a search result.
+  useDocumentMeta()
+
   // Dev-only: a page that scrolls sideways is always a bug here, and the cause
   // is usually one element inside a tree of inline styles. Reports it in the
   // console instead of leaving it to be spotted by eye. Tree-shaken from
@@ -128,6 +138,8 @@ function AnimatedRoutes({ user, login, logout }) {
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
           <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Landing />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/rules" element={<PublicRules />} />
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/refund-policy" element={<RefundPolicy />} />
@@ -168,6 +180,8 @@ function AnimatedRoutes({ user, login, logout }) {
             <Route path="funded" element={<AdminFunded />} />
             <Route path="trades" element={<AdminTrades />} />
             <Route path="analytics" element={<AdminAnalytics />} />
+            <Route path="intelligence" element={<AdminIntelligence />} />
+            <Route path="trader-intelligence" element={<AdminTraderIntelligence />} />
             <Route path="payouts" element={<AdminPayouts />} />
             <Route path="certificates" element={<AdminCertificates />} />
             <Route path="certificates/templates" element={<AdminCertificateTemplates />} />

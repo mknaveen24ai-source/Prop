@@ -80,7 +80,6 @@ export default function TradingPanel({
   const [partialForm, setPartialForm] = useState(null)
   const [batchActionPending, setBatchActionPending] = useState('')
   const [batchFeedback, setBatchFeedback] = useState(null)
-  const [knownAvailableInstruments, setKnownAvailableInstruments] = useState([])
 
   const { tradingLayoutRef, splitPct, handleSplitDragStart, resetSplit } = useSplitPane()
 
@@ -98,9 +97,7 @@ export default function TradingPanel({
 
   const liveAvailableInstruments = useMemo(() => getAvailableInstrumentList(prices), [prices])
   const closingTradeSet = useMemo(() => new Set(closingTradeIds), [closingTradeIds])
-  const availableInstruments = knownAvailableInstruments.length > 0
-    ? knownAvailableInstruments
-    : liveAvailableInstruments
+  const availableInstruments = liveAvailableInstruments
   const {
     pinnedInstruments,
     togglePin,
@@ -300,15 +297,11 @@ export default function TradingPanel({
   const priceStatus = usePriceFeedStatus()
 
   useEffect(() => {
-    setBatchFeedback(null)
-    setBatchActionPending('')
+    queueMicrotask(() => {
+      setBatchFeedback(null)
+      setBatchActionPending('')
+    })
   }, [selectedAccount?.id])
-
-  useEffect(() => {
-    if (liveAvailableInstruments.length > 0) {
-      setKnownAvailableInstruments(liveAvailableInstruments)
-    }
-  }, [liveAvailableInstruments])
 
   useEffect(() => {
     if (!Array.isArray(availableInstruments) || availableInstruments.length === 0) return
@@ -511,7 +504,7 @@ export default function TradingPanel({
             type="button"
             onClick={() => setTickerCategory(tab.key)}
             style={{
-              padding: '3px 9px',
+              padding: 'var(--space-1) var(--space-2-5)',
               fontSize: 'var(--fs-2xs)',
               fontWeight: 700,
               borderRadius: 'var(--radius-pill)',
@@ -587,7 +580,7 @@ export default function TradingPanel({
                 title={isPinned ? 'Remove from watchlist' : 'Add to watchlist'}
                 style={{
                   position: 'absolute', top: '4px', right: '4px',
-                  background: 'transparent', border: 'none', padding: '2px',
+                  background: 'transparent', border: 'none', padding: 'var(--space-1)',
                   cursor: 'pointer', display: 'flex', lineHeight: 0
                 }}
               >
@@ -598,10 +591,10 @@ export default function TradingPanel({
                 })}
               </button>
               <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-muted)', letterSpacing: '0.08em', marginBottom: 'var(--space-1)' }}>{instrument}</div>
-              <div style={{ fontSize: '15px', fontWeight: 'bold', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
+              <div style={{ fontSize: 'var(--fs-lg)', fontWeight: 'bold', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
                 {bidText}
               </div>
-              <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-dim)', marginTop: '2px' }}>
+              <div style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-dim)', marginTop: 'var(--space-1)' }}>
                 {askText}
               </div>
             </div>
@@ -690,7 +683,7 @@ export default function TradingPanel({
             <Card ruled flush title="Watchlist" style={{ display: 'flex', flexDirection: 'column', maxHeight: '500px' }}>
               <div style={{ overflowY: 'auto' }}>
                 {pinnedInstruments.length === 0 ? (
-                  <div style={{ padding: 'var(--space-3-5) var(--space-4)', fontSize: '11.5px', color: 'var(--muted)', lineHeight: 1.5 }}>
+                  <div style={{ padding: 'var(--space-3-5) var(--space-4)', fontSize: 'var(--fs-sm)', color: 'var(--muted)', lineHeight: 1.5 }}>
                     Star an instrument below to pin it here.
                   </div>
                 ) : pinnedInstruments.map((instrument) => {
@@ -707,19 +700,19 @@ export default function TradingPanel({
                       onClick={() => setOrderForm((f) => ({ ...f, instrument, stop_loss: '', take_profit: '' }))}
                       style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)', width: '100%',
-                        padding: '9px 14px', border: 'none', borderBottom: '1px solid var(--rule-soft)',
+                        padding: 'var(--space-2-5) var(--space-3-5)', border: 'none', borderBottom: '1px solid var(--rule-soft)',
                         background: isSelected ? 'var(--accent-dim)' : 'transparent', cursor: 'pointer', textAlign: 'left',
                       }}
                     >
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 'var(--fs-base)', color: 'var(--ink)' }}>{instrument}</div>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11.5px', color: 'var(--muted)', marginTop: '2px' }}>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', color: 'var(--muted)', marginTop: 'var(--space-1)' }}>
                           {data ? formatPrice(data.bid, instrument) : '—'}
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '11.5px', color: tone }}>{changePct >= 0 ? '+' : ''}{changePct.toFixed(2)}%</div>
-                        <div style={{ width: '52px', height: '18px', marginTop: '3px' }}>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', color: tone }}>{changePct >= 0 ? '+' : ''}{changePct.toFixed(2)}%</div>
+                        <div style={{ width: '52px', height: '18px', marginTop: 'var(--space-1)' }}>
                           <Sparkline data={history} tone={tone} width={52} height={18} />
                         </div>
                       </div>
@@ -847,4 +840,3 @@ export default function TradingPanel({
     </div>
   )
 }
-

@@ -1,5 +1,4 @@
 const pool = require('../db')
-const logger = require('./logger')
 const { getTenantSettings } = require('../services/tenantPolicyService')
 const {
   buildEmailMessage,
@@ -145,6 +144,10 @@ async function enqueueTemplateEmail(templateKey, payload = {}, options = {}) {
 
 async function enqueuePasswordResetEmail(toEmail, resetLink, resetToken, options = {}) {
   return enqueueTemplateEmail('password_reset', { toEmail, resetLink, resetToken }, options)
+}
+
+async function enqueueEmailVerificationEmail(toEmail, fullName, verifyLink, options = {}) {
+  return enqueueTemplateEmail('email_verification', { toEmail, fullName, verifyLink }, options)
 }
 
 async function enqueueWelcomeOnboardingEmail(toEmail, fullName, traderUid, affiliateCode, options = {}) {
@@ -602,6 +605,7 @@ module.exports = {
   enqueueEmailJob,
   enqueueTemplateEmail,
   enqueuePasswordResetEmail,
+  enqueueEmailVerificationEmail,
   enqueueWelcomeOnboardingEmail,
   enqueueChallengeExpiryReminderEmail,
   enqueueChallengeInactivityReminderEmail,

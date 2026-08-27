@@ -389,7 +389,7 @@ async function replay() {
     }
 
     // Yield so the lag sampler gets a chance to observe the loop.
-    await new Promise((resolve) => setImmediate(resolve))
+    await new Promise((resolve) => { setImmediate(resolve) })
   }
 
   lag.stop()

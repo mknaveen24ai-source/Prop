@@ -1,0 +1,42 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": ".",
+    "outDir": "dist"
+  },
+  "include": [
+    "*.js",
+    "*.ts",
+    "config/**/*.js",
+    "config/**/*.ts",
+    "domain/**/*.js",
+    "domain/**/*.ts",
+    "migrations/**/*.js",
+    "migrations/**/*.ts",
+    "routes/**/*.js",
+    "routes/**/*.ts",
+    "scripts/**/*.js",
+    "scripts/**/*.ts",
+    "services/**/*.js",
+    "services/**/*.ts",
+    "types/**/*.d.ts",
+    "types/**/*.ts",
+    "utils/**/*.js",
+    "utils/**/*.ts",
+    "validation/**/*.ts",
+    "workers/**/*.js",
+    "workers/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".test-dist",
+    "test",
+    "type-tests",
+    "tools",
+    "generate_audit_pdf.js",
+    "scripts/v2_migrate.js",
+    "scripts/v2_upgrade_db.js"
+  ]
+}

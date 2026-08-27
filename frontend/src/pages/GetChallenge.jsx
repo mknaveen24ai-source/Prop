@@ -7,7 +7,7 @@ import { renderIcon } from '../utils/iconMap'
 function Pill({ children, color = 'var(--accent)' }) {
   return (
     <span style={{
-      display: 'inline-block', padding: '3px 10px', borderRadius: 'var(--radius-pill)',
+      display: 'inline-block', padding: 'var(--space-1) var(--space-2-5)', borderRadius: 'var(--radius-pill)',
       fontSize: 'var(--fs-xs)', fontWeight: 700, letterSpacing: '0.06em',
       color, border: `1px solid ${color}`,
       background: `color-mix(in srgb, ${color} 15%, transparent)`
@@ -72,7 +72,11 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
     [models, selectedModel]
   )
 
-  const kycBlocked = kycStatus !== 'approved'
+  // KYC no longer gates the purchase (see routes/accounts.js POST /create).
+  // It is required only once an account is FUNDED, so this is now an advance
+  // notice rather than a blocker — it must never disable a price tile or the
+  // confirm button.
+  const kycPending = kycStatus !== 'approved'
 
   function priceRange(m) {
     const prices = (m.pricing || []).filter((p) => p.is_active).map((p) => p.price)
@@ -116,12 +120,6 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
 
   async function handleConfirm() {
     if (!confirmSize || !model || creating) return
-    if (kycBlocked) {
-      setError('Complete KYC verification first before starting a challenge.')
-      setConfirmSize(null)
-      if (typeof setActivePage === 'function') setActivePage('kyc')
-      return
-    }
     setCreating(true)
     setError('')
     try {
@@ -169,7 +167,7 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
 
       {/* ── Header ── */}
       <div style={{ marginBottom: 'var(--space-7)' }}>
-        <h2 style={{ fontSize: '26px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 'var(--space-1-5)' }}>
+        <h2 style={{ fontSize: 'var(--fs-5xl)', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 'var(--space-1-5)' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             {renderIcon('trade', { size: 22, color: 'var(--accent)' })}
             <span>Choose Your Challenge</span>
@@ -182,11 +180,11 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
         </p>
       </div>
 
-      {/* ── KYC Gate ── */}
-      {kycBlocked && (
+      {/* ── KYC heads-up (advisory — does not block purchase) ── */}
+      {kycPending && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 'var(--space-4)',
-          padding: '18px 22px', borderRadius: '0', marginBottom: '28px',
+          padding: 'var(--space-4-5) var(--space-6)', borderRadius: '0', marginBottom: 'var(--space-7)',
           background: 'var(--warning-bg)',
           border: '1px solid var(--warn)',
         }}>
@@ -194,22 +192,22 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
             {renderIcon('kyc', { size: 28, color: 'var(--warn)' })}
           </span>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--warn)', marginBottom: 'var(--space-1)' }}>KYC Required</div>
+            <div style={{ fontSize: 'var(--fs-md)', fontWeight: 700, color: 'var(--warn)', marginBottom: 'var(--space-1)' }}>Verify before you get funded</div>
             <div style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)' }}>
-              Complete identity verification before starting a challenge.
+              You can start a challenge right now. Identity verification is only needed once you pass and your funded account is issued \u2014 doing it early means nothing to wait for.
             </div>
           </div>
           <button
             onClick={() => setActivePage('kyc')}
             style={{
-              padding: '9px 20px', borderRadius: '0', border: '1px solid var(--warn)',
+              padding: 'var(--space-2-5) var(--space-5)', borderRadius: '0', border: '1px solid var(--warn)',
               background: 'var(--warning-bg)', color: 'var(--warn)',
               fontSize: 'var(--fs-base)', fontWeight: 600, cursor: 'pointer',
               whiteSpace: 'nowrap'
             }}
           >
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
-              <span>Complete KYC</span>
+              <span>Verify now</span>
               {renderIcon('arrow', { size: 14, color: 'currentColor' })}
             </span>
           </button>
@@ -220,7 +218,7 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
       {purchaseLimit?.limited && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 'var(--space-4)',
-          padding: '14px 22px', borderRadius: '0', marginBottom: '28px',
+          padding: 'var(--space-3-5) var(--space-6)', borderRadius: '0', marginBottom: 'var(--space-7)',
           background: purchaseLimit.used >= purchaseLimit.max ? 'var(--warning-bg)' : 'var(--bg-surface)',
           border: `1px solid ${purchaseLimit.used >= purchaseLimit.max ? 'var(--warn)' : 'var(--border)'}`,
         }}>
@@ -286,13 +284,13 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
                 </div>
                 <p style={{ fontSize: 'var(--fs-base)', color: 'var(--text-muted)', marginBottom: 'var(--space-4-5)', minHeight: '36px' }}>{m.description}</p>
                 <div style={{ display: 'flex', gap: 'var(--space-3-5)', flexWrap: 'wrap', marginBottom: 'var(--space-4)' }}>
-                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
                     {renderIcon('target', { size: 12, color: 'var(--accent)' })}<span>{phase1.target}% target</span>
                   </span>
-                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
                     {renderIcon('floating_down', { size: 12, color: 'var(--accent-red)' })}<span>{parseFloat(m.max_drawdown_pct)}% DD</span>
                   </span>
-                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
                     {renderIcon('calendar', { size: 12, color: 'var(--text-secondary)' })}<span>{phase1.days}d</span>
                   </span>
                 </div>
@@ -351,7 +349,7 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
               const remaining = p.remaining
               const isUnlimited = p.is_unlimited
               const price = p.is_active ? p.price : null
-              const isLocked = locked || kycBlocked || price == null
+              const isLocked = locked || price == null
               const almostFull = !isUnlimited && remaining !== null && remaining <= 5
               const reason = locked ? (p.is_active ? 'No slots available' : 'Not offered at this size') : null
 
@@ -363,7 +361,7 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
                   style={{
                     position: 'relative', border: 'none', textAlign: 'left', cursor: isLocked ? 'not-allowed' : 'pointer',
                     background: isLocked ? 'var(--bg-surface)' : 'var(--bg-elevated)',
-                    borderRadius: '0', padding: '22px',
+                    borderRadius: '0', padding: 'var(--space-6)',
                     outline: confirmSize === size ? '2px solid var(--accent)' : `1px solid ${almostFull ? 'color-mix(in srgb, var(--warn) 50%, transparent)' : 'var(--border)'}`,
                     opacity: isLocked ? 0.52 : 1,
                     transition: 'all 0.2s ease',
@@ -488,7 +486,7 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
                       onChange={(e) => { setCouponCode(e.target.value); setCouponError('') }}
                       placeholder="e.g. SAVE20"
                       style={{
-                        flex: 1, padding: '9px 10px', textTransform: 'uppercase',
+                        flex: 1, padding: 'var(--space-2-5) var(--space-2-5)', textTransform: 'uppercase',
                         background: 'var(--bg-elevated)', border: '1px solid var(--border)',
                         color: 'var(--text-primary)', fontSize: 'var(--fs-base)'
                       }}
@@ -498,7 +496,7 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
                       onClick={handleApplyCoupon}
                       disabled={!couponCode.trim() || validatingCoupon}
                       style={{
-                        padding: '9px 16px', background: 'var(--accent)', color: 'var(--paper)',
+                        padding: 'var(--space-2-5) var(--space-4)', background: 'var(--accent)', color: 'var(--paper)',
                         border: 'none', fontSize: 'var(--fs-base)', fontWeight: 700,
                         cursor: (!couponCode.trim() || validatingCoupon) ? 'not-allowed' : 'pointer',
                         opacity: (!couponCode.trim() || validatingCoupon) ? 0.6 : 1
@@ -519,7 +517,7 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
                 onClick={handleConfirm}
                 disabled={creating}
                 style={{
-                  flex: 1, padding: '13px', borderRadius: '0',
+                  flex: 1, padding: 'var(--space-3-5)', borderRadius: '0',
                   background: 'var(--accent)', color: 'var(--paper)',
                   border: 'none', fontSize: 'var(--fs-md)', fontWeight: 700,
                   cursor: creating ? 'not-allowed' : 'pointer',
@@ -537,7 +535,7 @@ export default function GetChallenge({ onCreateAccount, kycStatus, setActivePage
                 onClick={() => { setConfirmSize(null); setError('') }}
                 disabled={creating}
                 style={{
-                  padding: '13px 20px', borderRadius: '0',
+                  padding: 'var(--space-3-5) var(--space-5)', borderRadius: '0',
                   background: 'transparent', border: '1px solid var(--border)',
                   color: 'var(--text-muted)', fontSize: 'var(--fs-md)', fontWeight: 600,
                   cursor: 'pointer'

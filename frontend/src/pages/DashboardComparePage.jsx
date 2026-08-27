@@ -104,23 +104,23 @@ export default function DashboardComparePage({ accounts = [] }) {
               <span className="lx-badge" style={{ color: getStatusToneColor(account.status) }}>{String(account.status || '').toUpperCase()}</span>
             </div>
             {failed || !stats ? (
-              <div style={{ color: 'var(--muted)', fontSize: '12.5px', padding: 'var(--space-3) 0' }}>Stats unavailable</div>
+              <div style={{ color: 'var(--muted)', fontSize: 'var(--fs-base)', padding: 'var(--space-3) 0' }}>Stats unavailable</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2-5)' }}>
                 <div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--muted)' }}>Equity</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '19px', marginTop: '3px', color: 'var(--ink)' }}>{formatCurrency(stats.equity || 0)}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--muted)' }}>Equity</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xl)', marginTop: 'var(--space-1)', color: 'var(--ink)' }}>{formatCurrency(stats.equity || 0)}</div>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)' }}>
                   <div>
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)' }}>P&amp;L</div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-md)', marginTop: '3px', color: stats.equity_profit_pct >= 0 ? 'var(--gain)' : 'var(--loss)' }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-md)', marginTop: 'var(--space-1)', color: stats.equity_profit_pct >= 0 ? 'var(--gain)' : 'var(--loss)' }}>
                       {stats.equity_profit_pct >= 0 ? '+' : ''}{stats.equity_profit_pct?.toFixed(2)}%
                     </div>
                   </div>
                   <div>
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-3xs)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)' }}>Today</div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-md)', marginTop: '3px', color: stats.today_pnl >= 0 ? 'var(--gain)' : 'var(--loss)' }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-md)', marginTop: 'var(--space-1)', color: stats.today_pnl >= 0 ? 'var(--gain)' : 'var(--loss)' }}>
                       {stats.today_pnl >= 0 ? '+' : ''}{formatCurrency(stats.today_pnl || 0)}
                     </div>
                   </div>

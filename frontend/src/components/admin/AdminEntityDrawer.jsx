@@ -10,6 +10,16 @@ function formatDateTime(value) {
   return date.toLocaleString();
 }
 
+function metaFromRow(row) {
+  return {
+    classification: row?.classification || '',
+    risk_tier: row?.risk_tier || '',
+    priority: row?.priority || 'normal',
+    status_reason: row?.status_reason || '',
+    linked_case_id: row?.linked_case_id || ''
+  };
+}
+
 export default function AdminEntityDrawer({
   open,
   entityType,
@@ -20,59 +30,60 @@ export default function AdminEntityDrawer({
   onClose,
   onRefresh
 }) {
-  const [notes, setNotes] = useState([]);
-  const [loadingNotes, setLoadingNotes] = useState(false);
+  const [notesState, setNotesState] = useState({ key: null, notes: [] });
   const [noteText, setNoteText] = useState('');
   const [tagText, setTagText] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
-  const [activitySpark, setActivitySpark] = useState(null);
-  const [metaForm, setMetaForm] = useState({
-    classification: '',
-    risk_tier: '',
-    priority: '',
-    status_reason: '',
-    linked_case_id: ''
-  });
-
-  useEffect(() => {
-    if (!row || !open) return;
-    setMetaForm({
-      classification: row.classification || '',
-      risk_tier: row.risk_tier || '',
-      priority: row.priority || 'normal',
-      status_reason: row.status_reason || '',
-      linked_case_id: row.linked_case_id || ''
+  const [activityState, setActivityState] = useState({ key: null, spark: null });
+  const [metaState, setMetaState] = useState({ key: null, form: null });
+  const entityKey = row ? `${entityType}:${row.id}` : null;
+  const notes = notesState.key === entityKey ? notesState.notes : [];
+  const loadingNotes = Boolean(open && row && notesState.key !== entityKey);
+  const activitySpark = entityType === 'user' && activityState.key === entityKey
+    ? activityState.spark
+    : null;
+  const metaForm = metaState.key === entityKey && metaState.form
+    ? metaState.form
+    : metaFromRow(row);
+  const setMetaForm = (updater) => {
+    setMetaState((current) => {
+      const currentForm = current.key === entityKey && current.form ? current.form : metaFromRow(row);
+      return {
+        key: entityKey,
+        form: typeof updater === 'function' ? updater(currentForm) : updater
+      };
     });
-  }, [open, row]);
+  };
 
   // 30-day realized-P&L trend — the prototype's isAdminUsers drawer `row.spark`.
   // Only meaningful for the trader entity, and only fetched when the drawer
   // actually opens on one (not baked into the list payload — 20+ sparklines
   // per page load would be wasteful for something only shown one row at a time).
   useEffect(() => {
-    if (!row || !open || entityType !== 'user') { setActivitySpark(null); return }
+    if (!row || !open || entityType !== 'user') return
     let cancelled = false
     adminAxios.get(`/api/admin/traders/${row.id}/activity-spark`)
-      .then((res) => { if (!cancelled) setActivitySpark(Array.isArray(res.data?.spark) ? res.data.spark : []) })
-      .catch(() => { if (!cancelled) setActivitySpark([]) })
+      .then((res) => {
+        if (!cancelled) setActivityState({ key: `${entityType}:${row.id}`, spark: Array.isArray(res.data?.spark) ? res.data.spark : [] })
+      })
+      .catch(() => {
+        if (!cancelled) setActivityState({ key: `${entityType}:${row.id}`, spark: [] })
+      })
     return () => { cancelled = true }
   }, [adminAxios, entityType, open, row]);
 
   useEffect(() => {
     if (!row || !open) return;
     let cancelled = false;
-    setLoadingNotes(true);
     adminAxios.get('/api/admin/notes', {
       params: {
         entity_type: entityType,
         entity_id: row.id
       }
     }).then((res) => {
-      if (!cancelled) setNotes(Array.isArray(res.data) ? res.data : []);
+      if (!cancelled) setNotesState({ key: `${entityType}:${row.id}`, notes: Array.isArray(res.data) ? res.data : [] });
     }).catch(() => {
-      if (!cancelled) setNotes([]);
-    }).finally(() => {
-      if (!cancelled) setLoadingNotes(false);
+      if (!cancelled) setNotesState({ key: `${entityType}:${row.id}`, notes: [] });
     });
     return () => {
       cancelled = true;
@@ -104,7 +115,7 @@ export default function AdminEntityDrawer({
     const res = await adminAxios.get('/api/admin/notes', {
       params: { entity_type: entityType, entity_id: row.id }
     });
-    setNotes(Array.isArray(res.data) ? res.data : []);
+    setNotesState({ key: entityKey, notes: Array.isArray(res.data) ? res.data : [] });
   };
 
   const addTag = async () => {

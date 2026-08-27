@@ -8,8 +8,8 @@
   .ui-shell-gutter,
   .dashboard-page-content,
   .admin-content {
-    padding-left: clamp(14px, 2vw, 20px);
-    padding-right: clamp(14px, 2vw, 20px);
+    padding-left: clamp(var(--space-3-5), 2vw, var(--space-5));
+    padding-right: clamp(var(--space-3-5), 2vw, var(--space-5));
   }
 
   .mode-public .mp-bg-orb-1,
@@ -31,8 +31,8 @@
 
   .mode-public .mp-hero {
     min-height: auto !important;
-    padding-top: calc(96px + var(--risk-warning-height, 0px)) !important;
-    padding-bottom: 72px !important;
+    padding-top: calc(var(--space-12) + var(--risk-warning-height, 0px)) !important;
+    padding-bottom: var(--space-11) !important;
   }
 
   /* Decorative, and it collides with the stacked hero stats once the hero
@@ -42,7 +42,7 @@
   }
 
   .mode-trader .dashboard-topbar {
-    margin: 12px 12px 18px !important;
+    margin: var(--space-3) var(--space-3) var(--space-4-5) !important;
   }
 
   .mode-trader .trader-service-layout {
@@ -90,13 +90,13 @@
   .mode-public .mp-p-lead {
     font-size: var(--fs-lg);
     line-height: 1.65;
-    margin-bottom: 28px;
+    margin-bottom: var(--space-7);
   }
 
   .mode-public .mp-stat-counter {
     width: 100%;
     align-items: stretch !important;
-    gap: 10px !important;
+    gap: var(--space-2-5) !important;
   }
 
   .mode-public .mp-stat-item {
@@ -110,7 +110,7 @@
 
   .mode-public .mp-footer-grid {
     grid-template-columns: 1fr !important;
-    gap: 28px !important;
+    gap: var(--space-7) !important;
   }
 
   .mode-public .mp-footer-brand {
@@ -127,7 +127,7 @@
   }
 
   .mode-trader .dashboard-main {
-    padding: 78px 12px 96px;
+    padding: var(--space-11) var(--space-3) var(--space-12);
   }
 
   .mode-trader .dashboard-page-content {
@@ -141,14 +141,14 @@
   .mode-trader .account-switcher-row {
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px !important;
-    margin-bottom: 18px !important;
+    gap: var(--space-3) !important;
+    margin-bottom: var(--space-4-5) !important;
   }
 
   .mode-trader .account-switcher-card {
     min-width: 0 !important;
     width: 100%;
-    padding: 14px !important;
+    padding: var(--space-3-5) !important;
   }
 
   .mode-trader .page-title {
@@ -186,12 +186,12 @@
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-    font-size: 15px !important;
+    font-size: var(--fs-lg) !important;
     letter-spacing: 0.04em !important;
   }
 
   .mode-public .mp-nav-actions {
-    gap: 8px !important;
+    gap: var(--space-2) !important;
   }
 
   /* .mp-nav-login used to be hidden here, which left a phone with no way to
@@ -203,13 +203,13 @@
 
   .mode-public .mp-nav-primary {
     min-height: 38px;
-    padding: 8px 12px !important;
+    padding: var(--space-2) var(--space-3) !important;
     font-size: var(--fs-sm) !important;
   }
 
   .mode-public .mp-hero {
-    padding-top: calc(88px + var(--risk-warning-height, 0px)) !important;
-    padding-bottom: 54px !important;
+    padding-top: calc(var(--space-12) + var(--risk-warning-height, 0px)) !important;
+    padding-bottom: var(--space-9) !important;
   }
 
   .mode-public .mp-h1 {
@@ -223,23 +223,23 @@
   }
 
   .mode-public .mp-section {
-    padding: 64px 0 !important;
+    padding: var(--space-10) 0 !important;
   }
 
   .mode-public .mp-btn-primary,
   .mode-public .mp-btn-secondary {
     width: 100%;
     justify-content: center;
-    padding: 14px 18px !important;
+    padding: var(--space-3-5) var(--space-4-5) !important;
     font-size: var(--fs-base) !important;
     letter-spacing: 0.04em;
     min-height: 48px;
   }
 
   .mode-trader .dashboard-topbar {
-    margin: 8px 0 16px !important;
+    margin: var(--space-2) 0 var(--space-4) !important;
     border-radius: var(--radius-lg) !important;
-    padding: 12px !important;
+    padding: var(--space-3) !important;
   }
 
   .mode-trader .dashboard-topbar-left,
@@ -249,11 +249,11 @@
 
   .mode-trader .dashboard-topbar-right {
     justify-content: flex-start;
-    gap: 8px !important;
+    gap: var(--space-2) !important;
   }
 
   .mode-trader .dashboard-topbar-left {
-    gap: 8px !important;
+    gap: var(--space-2) !important;
   }
 
   .mode-trader .dashboard-topbar-left > span:nth-child(2) {

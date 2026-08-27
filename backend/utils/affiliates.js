@@ -269,9 +269,59 @@ async function settleAffiliatePayoutAmount(client, referrerUserId, payoutRequest
   return Math.abs(parseFloat(result.rows[0].commission_amount))
 }
 
-// Manual admin correction — no automatic refund/chargeback clawback exists (v1
-// decision), so this is the only way an affiliate's balance is ever adjusted
-// outside of normal commission-earning. amount may be negative.
+/**
+ * Reverse the commission earned on an order that was refunded or disputed.
+ *
+ * A refunded order used to keep paying commission forever: the money went back
+ * to the buyer and the referrer kept their cut, which made self-referral on
+ * cheap orders a free money printer. This closes it.
+ *
+ * The original commission row is left intact and a compensating negative
+ * 'adjusted' row is inserted instead, exactly as settleAffiliatePayoutAmount
+ * does — available_balance is SUM over 'available' + 'adjusted', so the balance
+ * falls by the right amount while the earning history stays auditable. Deleting
+ * the original would erase the evidence of why the balance moved.
+ *
+ * Idempotent on redelivery: the guard checks for an existing clawback carrying
+ * this order's marker before inserting, so a Stripe retry cannot double-reverse.
+ * Returns the amount clawed back, or 0 if there was nothing to reverse.
+ */
+async function clawbackCommissionForOrder(client, orderId, reason = 'Order refunded') {
+  const db = client && typeof client.query === 'function' ? client : pool
+  const marker = `[clawback:order:${orderId}]`
+
+  const earned = await db.query(
+    `SELECT referrer_user_id, commission_amount
+       FROM affiliate_commissions
+      WHERE order_id = $1 AND commission_amount > 0`,
+    [orderId]
+  )
+  if (earned.rows.length === 0) return 0
+
+  const existing = await db.query(
+    `SELECT 1 FROM affiliate_commissions WHERE adjustment_note LIKE $1 LIMIT 1`,
+    [`%${marker}%`]
+  )
+  if (existing.rows.length > 0) return 0
+
+  let total = 0
+  for (const row of earned.rows) {
+    const amount = Math.round(parseFloat(row.commission_amount) * 100) / 100
+    if (!(amount > 0)) continue
+    await db.query(
+      `INSERT INTO affiliate_commissions
+         (referrer_user_id, commission_amount, status, adjustment_note, adjusted_at, earned_at)
+       VALUES ($1, $2, 'adjusted', $3, NOW(), NOW())`,
+      [row.referrer_user_id, -amount, `${reason} ${marker}`]
+    )
+    total += amount
+  }
+  return Math.round(total * 100) / 100
+}
+
+// Manual admin correction. Automatic refund/chargeback clawback now exists as
+// clawbackCommissionForOrder() above; this remains the way an affiliate's
+// balance is adjusted for anything else. amount may be negative.
 async function insertBalanceAdjustment(client, { referrerUserId, amount, note, adjustedBy }) {
   const db = client && typeof client.query === 'function' ? client : pool
   const result = await db.query(
@@ -374,6 +424,7 @@ module.exports = {
   fetchAffiliatePayouts,
   fetchAffiliateAnalytics,
   settleAffiliatePayoutAmount,
+  clawbackCommissionForOrder,
   insertBalanceAdjustment,
   fetchAllAffiliatesForAdmin,
   fetchAffiliateTiers,

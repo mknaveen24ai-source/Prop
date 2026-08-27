@@ -1,16 +1,20 @@
 require('./loadEnv')
+const path = require('path')
+
+const migrationsDirectory = path.join(__dirname, 'migrations')
+const seedsDirectory = path.join(__dirname, 'seeds')
 
 module.exports = {
   development: {
     client: 'pg',
     connection: process.env.DATABASE_URL,
     migrations: {
-      directory: './migrations',
+      directory: migrationsDirectory,
       extension: 'js',
       loadExtensions: ['.js']
     },
     seeds: {
-      directory: './seeds',
+      directory: seedsDirectory,
       extension: 'js'
     }
   },
@@ -19,12 +23,12 @@ module.exports = {
     client: 'pg',
     connection: process.env.DATABASE_URL,
     migrations: {
-      directory: './migrations',
+      directory: migrationsDirectory,
       extension: 'js',
       loadExtensions: ['.js']
     },
     seeds: {
-      directory: './seeds',
+      directory: seedsDirectory,
       extension: 'js'
     }
   }

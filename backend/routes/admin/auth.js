@@ -7,6 +7,7 @@ const router = express.Router()
 const pool = require('../../db')
 const {
   authenticateAdmin,
+  authenticateAdminEnrolmentOrSession,
   authenticateAdminPre2FA,
   buildAdminSessionPayload
 } = require('../middleware')
@@ -62,53 +63,49 @@ router.post('/login', adminLoginLimiter, async function(req, res) {
         return res.status(401).json({ error: 'Invalid admin credentials' })
       }
 
-      if (platformAdmin.totp_enabled && platformAdmin.totp_secret) {
-        const pre2faToken = signAdminToken(
-          {
-            id: platformAdmin.id,
-            token_version: platformAdmin.token_version || 1,
-            email: platformAdmin.email,
-            full_name: platformAdmin.full_name,
-            role: platformAdmin.role || 'super_admin',
-            auth_source: 'platform_admin'
-          },
-          { type: 'pre_2fa_admin' },
-          '5m'
-        )
-        return res.json({ requires2FA: true, pre2faToken, role: platformAdmin.role || 'super_admin' })
-      }
-
-      const token = signAdminToken({
+      const adminIdentity = {
         id: platformAdmin.id,
         token_version: platformAdmin.token_version || 1,
         email: platformAdmin.email,
         full_name: platformAdmin.full_name,
         role: platformAdmin.role || 'super_admin',
         auth_source: 'platform_admin'
+      }
+
+      if (platformAdmin.totp_enabled && platformAdmin.totp_secret) {
+        const pre2faToken = signAdminToken(adminIdentity, { type: 'pre_2fa_admin' }, '5m')
+        return res.json({ requires2FA: true, pre2faToken, role: platformAdmin.role || 'super_admin' })
+      }
+
+      // ── Mandatory enrolment ────────────────────────────────────────────────
+      //
+      // Admin 2FA was optional: an admin who never enrolled got a full session
+      // from a password alone, and that session could approve payouts, adjust
+      // balances through the ledger and override accounts. One phished password
+      // was the whole business.
+      //
+      // A hard refusal would lock every existing admin out of the very panel
+      // they enrol through, so the password check still has to pass — it just
+      // buys a 10-minute token that can reach the TOTP setup routes and nothing
+      // else (see authenticateAdminEnrolmentOrSession in routes/middleware.js).
+      // No admin cookie is set here, so no capability-gated route is reachable
+      // until the second factor exists.
+      const enrolmentToken = signAdminToken(adminIdentity, { type: 'pre_2fa_admin', enrol: true }, '10m')
+      logger.warn('[admin-auth] Admin logged in without 2FA — forcing enrolment', {
+        adminId: platformAdmin.id, email: platformAdmin.email
       })
-
-      await pool.query(
-        `UPDATE platform_admins
-            SET last_login_at = NOW(),
-                updated_at = NOW()
-          WHERE id = $1`,
-        [platformAdmin.id]
-      )
-
-      setAdminCookie(res, token)
-
       return res.json({
-        message: 'Admin login successful',
-        token,
-        admin: {
-          id: platformAdmin.id,
-          email: platformAdmin.email,
-          full_name: platformAdmin.full_name,
-          role: platformAdmin.role || 'super_admin',
-          auth_source: 'platform_admin',
-          totp_enabled: !!platformAdmin.totp_enabled
-        }
+        requiresTotpEnrolment: true,
+        enrolmentToken,
+        role: platformAdmin.role || 'super_admin',
+        message: 'Two-factor authentication is required for admin accounts. Set it up to continue.'
       })
+
+      // NOTE: the password-only full-session branch that used to live here is
+      // gone, not disabled. Every path out of this block now either demands the
+      // second factor (requires2FA) or demands enrolment (requiresTotpEnrolment).
+      // There is no longer a way for a platform admin to hold an admin cookie
+      // without TOTP.
     }
 
     if (activePlatformAdminCount > 0) {
@@ -146,6 +143,19 @@ router.post('/login', adminLoginLimiter, async function(req, res) {
     }
 
     const adminTokenVersion = await getLegacyAdminTokenVersion()
+
+    // Bootstrap-only: this branch is unreachable whenever any active
+    // platform_admins row exists (guarded above). It has no second factor
+    // because there is no admin account for one to protect yet — the response
+    // says requires_platform_admin_bootstrap so the UI pushes the operator
+    // straight into creating a real, TOTP-enrolled admin.
+    //
+    // Logged loudly because the branch reopening later means every DB-backed
+    // admin has been deactivated, which is worth noticing.
+    logger.warn('[admin-auth] ENV-FALLBACK admin login used — no platform admin exists', {
+      email: normalizedEmail || process.env.ADMIN_EMAIL || null,
+      node_env: process.env.NODE_ENV || 'development'
+    })
 
     const token = signAdminToken({
       token_version: adminTokenVersion,
@@ -368,7 +378,7 @@ router.get('/2fa/status', authenticateAdmin, async function(req, res) {
   }
 })
 
-router.post('/2fa/setup', authenticateAdmin, async function(req, res) {
+router.post('/2fa/setup', authenticateAdminEnrolmentOrSession, async function(req, res) {
   try {
     const record = await getAuthenticatedAdminRecord(req.admin)
     if (!record) {
@@ -399,7 +409,7 @@ router.post('/2fa/setup', authenticateAdmin, async function(req, res) {
 })
 
 // POST /api/admin/2fa/verify-setup — confirm first code, activate admin 2FA
-router.post('/2fa/verify-setup', authenticateAdmin, async function(req, res) {
+router.post('/2fa/verify-setup', authenticateAdminEnrolmentOrSession, async function(req, res) {
   try {
     const record = await getAuthenticatedAdminRecord(req.admin)
     if (!record) {
@@ -444,6 +454,40 @@ router.post('/2fa/verify-setup', authenticateAdmin, async function(req, res) {
     } catch (silentErr) { logger.warn("[admin] Non-critical operation failed silently:", { error: silentErr.message }) }
 
     logger.info('[admin/2fa] Admin 2FA enabled', { adminId: record.id, role: req.admin?.role })
+
+    // An admin who arrived here on a forced-enrolment token has no session yet:
+    // /admin/login deliberately issued no cookie. Now that the second factor
+    // exists, promote them straight into a full session rather than bouncing
+    // them back to a login screen they just came from.
+    if (req.admin?.enrolment_only) {
+      const sessionToken = signAdminToken({
+        id: record.id,
+        token_version: record.token_version || 1,
+        email: record.email,
+        full_name: record.full_name,
+        role: req.admin.role || 'super_admin',
+        auth_source: 'platform_admin'
+      })
+      await pool.query(
+        `UPDATE platform_admins SET last_login_at = NOW(), updated_at = NOW() WHERE id = $1`,
+        [record.id]
+      ).catch(() => {})
+      setAdminCookie(res, sessionToken)
+      return res.json({
+        message: 'Admin 2FA enabled successfully.',
+        backup_codes: backup.plain,
+        token: sessionToken,
+        admin: {
+          id: record.id,
+          email: record.email,
+          full_name: record.full_name,
+          role: req.admin.role || 'super_admin',
+          auth_source: 'platform_admin',
+          totp_enabled: true
+        }
+      })
+    }
+
     res.json({
       message: 'Admin 2FA enabled successfully.',
       backup_codes: backup.plain

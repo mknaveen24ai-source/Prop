@@ -769,7 +769,7 @@ export default function AdminChat() {
                     { label: 'Country', value: traderSnapshot.country || '—' },
                     { label: 'Joined', value: traderSnapshot.created_at ? formatDate(traderSnapshot.created_at) : '—' },
                   ].map((r) => (
-                    <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', padding: 'var(--space-2) 0', borderBottom: '1px solid var(--admin-border)', fontSize: '12.5px' }}>
+                    <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', padding: 'var(--space-2) 0', borderBottom: '1px solid var(--admin-border)', fontSize: 'var(--fs-base)' }}>
                       <span style={{ color: 'var(--admin-text-muted)' }}>{r.label}</span>
                       <span style={{ fontFamily: 'var(--admin-font-mono)', color: r.tone || 'var(--admin-text)', textAlign: 'right', textTransform: 'capitalize' }}>{r.value}</span>
                     </div>
@@ -783,20 +783,20 @@ export default function AdminChat() {
                   </button>
                 </>
               ) : (
-                <div style={{ color: 'var(--admin-text-faint)', fontSize: '12.5px' }}>No trader record found for this conversation.</div>
+                <div style={{ color: 'var(--admin-text-faint)', fontSize: 'var(--fs-base)' }}>No trader record found for this conversation.</div>
               )}
             </Card>
 
             {traderSnapshot && (traderSnapshot.is_banned || (traderSnapshot.kyc_status && traderSnapshot.kyc_status !== 'approved') || ['high', 'critical'].includes(traderSnapshot.risk_tier)) && (
               <Card title="Flags">
                 {traderSnapshot.is_banned && (
-                  <div style={{ padding: '9px 0', borderBottom: '1px solid var(--admin-border)', fontSize: '12.5px', color: 'var(--admin-danger)' }}>Trader is banned</div>
+                  <div style={{ padding: 'var(--space-2-5) 0', borderBottom: '1px solid var(--admin-border)', fontSize: 'var(--fs-base)', color: 'var(--admin-danger)' }}>Trader is banned</div>
                 )}
                 {traderSnapshot.kyc_status && traderSnapshot.kyc_status !== 'approved' && (
-                  <div style={{ padding: '9px 0', borderBottom: '1px solid var(--admin-border)', fontSize: '12.5px', color: 'var(--admin-warning)' }}>KYC {traderSnapshot.kyc_status}</div>
+                  <div style={{ padding: 'var(--space-2-5) 0', borderBottom: '1px solid var(--admin-border)', fontSize: 'var(--fs-base)', color: 'var(--admin-warning)' }}>KYC {traderSnapshot.kyc_status}</div>
                 )}
                 {['high', 'critical'].includes(traderSnapshot.risk_tier) && (
-                  <div style={{ padding: '9px 0', fontSize: '12.5px', color: 'var(--admin-danger)' }}>Risk tier: {traderSnapshot.risk_tier}</div>
+                  <div style={{ padding: 'var(--space-2-5) 0', fontSize: 'var(--fs-base)', color: 'var(--admin-danger)' }}>Risk tier: {traderSnapshot.risk_tier}</div>
                 )}
               </Card>
             )}

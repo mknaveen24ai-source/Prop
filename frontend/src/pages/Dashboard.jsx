@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState } from 'react'
+import React, { Suspense, lazy, useCallback, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import MarketStatusPill from '../components/MarketStatusPill'
 import CommandPaletteTrigger from '../components/CommandPaletteTrigger'
@@ -109,6 +109,18 @@ function Dashboard({ user, onLogout }) {
   const [showOnboarding, setShowOnboarding] = useState(() => shouldShowOnboarding())
 
   const { error, setError, success, setSuccess } = useDashboardFeedback()
+
+  // Execution announcements -- fills, stop-outs, take-profits. These were toast
+  // only, and a toast is not a signal a screen reader user can rely on for
+  // "money just moved". Cleared before each set so a repeated identical fill
+  // (two stop-outs at the same price) still changes the node, which is what
+  // makes a live region announce at all.
+  const [execution, setExecution] = useState('')
+  const announceExecution = useCallback((message) => {
+    if (!message) return
+    setExecution('')
+    requestAnimationFrame(() => setExecution(message))
+  }, [])
   const { sidebarCollapsed, handleToggleSidebar } = useSidebarCollapse()
   const { announcement, announcementDismissed, dismissAnnouncement } = useAnnouncement()
   const {
@@ -199,6 +211,7 @@ function Dashboard({ user, onLogout }) {
     selectedAccountRef,
     setError,
     setSuccess,
+    announceExecution,
     setKycStatus: kyc.setKycStatus,
     setSelectedAccount,
     pushNotification,
@@ -312,10 +325,10 @@ function Dashboard({ user, onLogout }) {
         boxShadow: 'none',
       }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.18em', textTransform: 'uppercase', color: 'var(--muted)' }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.18em', textTransform: 'uppercase', color: 'var(--muted)' }}>
             {(PAGE_TITLES[activePage] || ['Trader Desk'])[0]}
           </div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '23px', fontWeight: 500, margin: '2px 0 0', letterSpacing: '-.01em' }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-4xl)', fontWeight: 500, margin: 'var(--space-1) 0 0', letterSpacing: '-.01em' }}>
             {activePage === 'dashboard'
               ? `${greeting()}, ${(user?.full_name || 'Trader').split(' ')[0]}`
               : (PAGE_TITLES[activePage]?.[1] || 'Dashboard')}
@@ -344,7 +357,7 @@ function Dashboard({ user, onLogout }) {
             {notifications.filter(n => !n.read).length > 0 && (
               <span className="lx-badge" style={{
                 position: 'absolute', top: '-6px', right: '-6px', color: 'var(--loss)',
-                padding: '1px 5px', fontSize: 'var(--fs-3xs)',
+                padding: '1px var(--space-1-5)', fontSize: 'var(--fs-3xs)',
               }}>
                 {notifications.filter(n => !n.read).length}
               </span>
@@ -398,6 +411,13 @@ function Dashboard({ user, onLogout }) {
         </div>
         <div role="status" aria-live="polite" className={success ? 'success' : undefined}>
           {success || null}
+        </div>
+        {/* Assertive rather than polite: an involuntary close is not something a
+            trader should hear about after whatever else is mid-announcement.
+            Visually hidden -- the toast is already the sighted affordance, so
+            rendering this on screen too would just be duplicate noise. */}
+        <div role="status" aria-live="assertive" className="sr-only">
+          {execution || null}
         </div>
 
         {/* Dashboard Page */}

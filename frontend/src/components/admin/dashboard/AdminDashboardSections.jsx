@@ -60,16 +60,16 @@ export function AdminDashboardAlerts({ loading, error, alerts, navigate }) {
             background: 'var(--glass-2)', backdropFilter: 'blur(16px) saturate(140%)',
           }}
         >
-          <span style={{ display: 'inline-flex', color: `var(--${a.tone})`, marginTop: '2px' }}>
+          <span style={{ display: 'inline-flex', color: `var(--${a.tone})`, marginTop: 'var(--space-1)' }}>
             {renderIcon('warning', { size: 16, color: `var(--${a.tone})` })}
           </span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.15em', textTransform: 'uppercase', color: `var(--${a.tone})` }}>{a.kicker}</div>
-            <div style={{ fontSize: '13.5px', marginTop: 'var(--space-1)', lineHeight: 1.45 }}>{a.text}</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.15em', textTransform: 'uppercase', color: `var(--${a.tone})` }}>{a.kicker}</div>
+            <div style={{ fontSize: 'var(--fs-md)', marginTop: 'var(--space-1)', lineHeight: 1.45 }}>{a.text}</div>
           </div>
           <button
             onClick={() => navigate(ALERT_ROUTES[a.go] ? ALERT_ROUTES[a.go] : `/admin/${a.go}`)}
-            style={{ alignSelf: 'center', padding: '6px 11px', border: `1px solid var(--${a.tone})`, borderRadius: '4px', background: 'transparent', color: `var(--${a.tone})`, fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.1em', textTransform: 'uppercase', whiteSpace: 'nowrap', cursor: 'pointer' }}
+            style={{ alignSelf: 'center', padding: 'var(--space-1-5) var(--space-3)', border: `1px solid var(--${a.tone})`, borderRadius: '4px', background: 'transparent', color: `var(--${a.tone})`, fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.1em', textTransform: 'uppercase', whiteSpace: 'nowrap', cursor: 'pointer' }}
           >
             {a.cta}
           </button>
@@ -255,7 +255,7 @@ export function AdminDashboardAttention({ loading, error, overview, funnelData, 
       <Card
         title="Needs Attention"
         actions={attentionTotal > 0 && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--loss)', border: '1px solid var(--loss)', borderRadius: '99px', padding: '3px 9px' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--loss)', border: '1px solid var(--loss)', borderRadius: '99px', padding: 'var(--space-1) var(--space-2-5)' }}>
             {attentionTotal} open
           </span>
         )}
@@ -267,12 +267,12 @@ export function AdminDashboardAttention({ loading, error, overview, funnelData, 
             <button
               key={q.key}
               onClick={() => navigate(ATTENTION_ROUTES[q.key] || '/admin')}
-              style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', width: '100%', padding: '11px 6px', border: 'none', borderBottom: '1px solid var(--rule-soft)', background: 'transparent', color: 'var(--ink)', textAlign: 'left', cursor: 'pointer' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', width: '100%', padding: 'var(--space-3) var(--space-1-5)', border: 'none', borderBottom: '1px solid var(--rule-soft)', background: 'transparent', color: 'var(--ink)', textAlign: 'left', cursor: 'pointer' }}
             >
               <span style={{ display: 'inline-flex', color: 'var(--warn)' }}>{renderIcon(ATTENTION_ICONS[q.key] || 'flag', { size: 16, color: 'var(--warn)' })}</span>
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ display: 'block', fontSize: 'var(--fs-base)' }}>{q.label}</span>
-                <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: '3px' }}>{q.meta}</span>
+                <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', marginTop: 'var(--space-1)' }}>{q.meta}</span>
               </span>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-lg)', color: 'var(--warn)' }}>{q.n}</span>
             </button>
@@ -293,7 +293,7 @@ const EXPOSURE_COLUMNS = [
     render: (row) => (
       <span
         style={{
-          padding: '2px 8px',
+          padding: 'var(--space-1) var(--space-2)',
           borderRadius: 'var(--radius-pill)',
           fontSize: 'var(--fs-xs)',
           fontWeight: 700,

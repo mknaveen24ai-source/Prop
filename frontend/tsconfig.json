@@ -34,6 +34,11 @@
 
     "strict": true,
     "noImplicitAny": false,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
+    "useUnknownInCatchVariables": true,
 
     "noUnusedLocals": false,
     "noUnusedParameters": false,
@@ -54,7 +59,8 @@
     "src/utils/instruments.js",
     "src/services/api.js",
     "src/store/useStore.js",
-    "src/config/apiBase.js"
+    "src/config/apiBase.js",
+    "src/validation/**/*.ts"
   ],
   "exclude": ["node_modules", "build", "dist", "storybook-static"]
 }

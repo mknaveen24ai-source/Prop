@@ -54,15 +54,36 @@
     />
 
     <title>Funded Trading Challenges | Trade Our Capital</title>
+    <!--
+      JSON-LD. Organization and FAQPage were both absent, so no rich result of
+      any kind was possible. `name` and `url` deliberately carry no invented
+      entity: they describe the service, and the legal entity belongs here once
+      it exists (see the footer and Terms, which have the same gap).
+    -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "Funded Trading Challenges",
+        "description": "A proprietary trading evaluation platform. Traders pass a rules-based evaluation on simulated capital and keep 100% of the profits they make on a funded account.",
+        "logo": "/logo512.png"
+      }
+    </script>
     <meta
       name="description"
-      content="Prove your edge on a funded trading challenge and keep up to 90% of the profits. Real-time MT5 pricing, transparent rules, and fast payouts across forex, indices, metals and crypto."
+      content="Prove your edge on a funded trading challenge and keep 100% of your profits — we take no cut. Live institutional pricing in a browser terminal, published rules, and fast payouts across forex, indices and metals."
     />
     <!--
-      No <link rel="canonical"> here: the public domain is not known at build
-      time, and a relative canonical is meaningless. If you serve a single fixed
-      domain, add an absolute one via nginx sub_filter or a build-time replace.
+      The canonical and the absolute social-image URLs are injected at build time
+      from VITE_PUBLIC_ORIGIN — see seoPlugin() in vite.config.mjs. The domain is
+      not known when this file is authored, and a relative canonical is
+      meaningless, so with the variable unset this line becomes a comment and
+      both tags are simply absent rather than wrong.
+
+      useDocumentMeta() reads this same tag at runtime to build the per-route
+      canonical, so the build-time origin and the in-app one cannot disagree.
     -->
+    <meta name="site-origin" content="" />
 
     <!-- Open Graph — controls how links render on Discord, WhatsApp, LinkedIn, Slack -->
     <meta property="og:type" content="website" />
@@ -70,8 +91,9 @@
     <meta property="og:title" content="Funded Trading Challenges | Trade Our Capital" />
     <meta
       property="og:description"
-      content="Prove your edge on a funded trading challenge and keep up to 90% of the profits. Real-time MT5 pricing, transparent rules, and fast payouts."
+      content="Prove your edge on a funded trading challenge and keep 100% of your profits — we take no cut. Live institutional pricing, published rules, and fast payouts."
     />
+    <meta property="og:url" content="/" />
     <meta property="og:image" content="/logo512.png" />
     <meta property="og:image:alt" content="Funded trading challenge platform dashboard" />
 
@@ -80,7 +102,7 @@
     <meta name="twitter:title" content="Funded Trading Challenges | Trade Our Capital" />
     <meta
       name="twitter:description"
-      content="Prove your edge on a funded trading challenge and keep up to 90% of the profits."
+      content="Prove your edge on a funded trading challenge and keep 100% of your profits — we take no cut."
     />
     <meta name="twitter:image" content="/logo512.png" />
 

@@ -876,7 +876,7 @@ export default function Transparency() {
         {/* ── Footer ── */}
         <footer style={{
           borderTop: '1px solid var(--rule)',
-          padding: '24px clamp(16px, 3vw, 48px)',
+          padding: 'var(--space-6) clamp(var(--space-4), 3vw, var(--space-9))',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',

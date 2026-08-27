@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { useBranding } from '../BrandingContext'
 import AuthMasthead from '../components/auth/AuthMasthead'
 import EyeIcon from '../components/common/EyeIcon'
-import OtpInput from '../components/common/OtpInput'
 import { API_BASE_URL as API_URL } from '../config/apiBase'
 
 
@@ -24,12 +23,20 @@ function getPasswordStrength(password) {
   return { score, label, color, checks }
 }
 
-// ── Constants ──────────────────────────────────────────────────────────────────
-// STEP 1 = fill form
-// STEP 2 = enter OTP
-// STEP 3 = creating account (brief loading transition)
-const STEP_FORM  = 'form'
-const STEP_OTP   = 'otp'
+// ── Registration is a single step ─────────────────────────────────────────────
+//
+// This page used to POST to /api/auth/phone-otp/send as step 1 of a two-step
+// phone-OTP flow, then to /api/auth/phone-otp/verify, and only then to
+// /api/auth/register. NEITHER OTP ENDPOINT HAS EVER EXISTED in the backend —
+// routes/auth.js registers /register, /login, /me, /forgot-password,
+// /reset-password, /logout, /logout-all, /profile/:userId and the five 2FA
+// routes, and nothing else. Every signup therefore 404'd on the first submit
+// and no account could be created through the UI at all.
+//
+// The form now posts straight to /api/auth/register, which was always correct
+// and always unreachable. Identity assurance moved to email verification
+// (see the verification token issued by that route) plus the KYC review that
+// gates funded trading.
 
 function Register({ onLogin }) {
   const { tenant } = useBranding()
@@ -37,8 +44,6 @@ function Register({ onLogin }) {
   const navigate = useNavigate()
   const giftCode = (searchParams.get('gift') || '').trim().toUpperCase()
   const [giftPreview, setGiftPreview] = useState(null)
-
-  const [step, setStep] = useState(STEP_FORM)
 
   // Form data
   const [form, setForm] = useState({
@@ -52,18 +57,10 @@ function Register({ onLogin }) {
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
-  // OTP step
-  const [otpCode, setOtpCode] = useState('')
-  const [otpResetKey, setOtpResetKey] = useState(0)
-  const [otpCooldown, setOtpCooldown] = useState(0) // seconds until resend allowed
-
   // UI state
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
-
-  const cooldownIntervalRef = useRef(null)
-  useEffect(() => () => clearInterval(cooldownIntervalRef.current), [])
 
   // Prefill referral code from a ?ref= link (e.g. shared from the affiliate dashboard).
   useEffect(() => {
@@ -109,8 +106,8 @@ function Register({ onLogin }) {
     setError('')
   }
 
-  // ── Step 1 → 2: validate form then send OTP ─────────────────────────────────
-  async function handleSendOtp(e) {
+  // ── Submit: validate, then create the account ───────────────────────────────
+  async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     setSuccess('')
@@ -121,93 +118,24 @@ function Register({ onLogin }) {
     if (!passwordValid) {
       return setError('Please meet all password requirements before continuing.')
     }
-
-    const phone = form.phone.trim()
-    if (!phone) return setError('Please enter your phone number.')
-
-    setLoading(true)
-    try {
-      await axios.post(
-        `${API_URL}/api/auth/phone-otp/send`,
-        { phone }
-      )
-      setStep(STEP_OTP)
-      setSuccess('A 6-digit verification code has been sent to your phone.')
-      // Start 60-second cooldown for resend
-      startCooldown(60)
-    } catch (err) {
-      setError(err.response?.data?.error || 'Could not send verification code. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // ── Resend OTP ──────────────────────────────────────────────────────────────
-  async function handleResendOtp() {
-    if (otpCooldown > 0) return
-    setError('')
-    setSuccess('')
-    setOtpCode('')
-    setOtpResetKey(k => k + 1)
-    setLoading(true)
-    try {
-      await axios.post(
-        `${API_URL}/api/auth/phone-otp/send`,
-        { phone: form.phone.trim() }
-      )
-      setSuccess('A new code has been sent.')
-      startCooldown(60)
-    } catch (err) {
-      setError(err.response?.data?.error || 'Could not resend code.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  function startCooldown(seconds) {
-    clearInterval(cooldownIntervalRef.current)
-    setOtpCooldown(seconds)
-    cooldownIntervalRef.current = setInterval(() => {
-      setOtpCooldown(prev => {
-        if (prev <= 1) { clearInterval(cooldownIntervalRef.current); return 0 }
-        return prev - 1
-      })
-    }, 1000)
-  }
-
-  // ── Step 2: verify OTP code ─────────────────────────────────────────────────
-  async function handleVerifyOtp(e) {
-    e.preventDefault()
-    setError('')
-    setSuccess('')
-
-    if (!otpCode || otpCode.length !== 6) {
-      return setError('Please enter the 6-digit code sent to your phone.')
+    if (!form.phone.trim()) {
+      return setError('Please enter your phone number.')
     }
 
     setLoading(true)
     try {
-      const res = await axios.post(
-        `${API_URL}/api/auth/phone-otp/verify`,
-        { phone: form.phone.trim(), code: otpCode }
-      )
-      const token = res.data.phone_verified_token
-      setSuccess('Phone verified! Creating your account…')
-      // Immediately proceed to registration
-      await handleRegister(token)
-    } catch (err) {
-      setError(err.response?.data?.error || 'Invalid code. Please try again.')
+      await handleRegister()
     } finally {
       setLoading(false)
     }
   }
 
   // ── Final step: create the account ─────────────────────────────────────────
-  async function handleRegister(token) {
+  async function handleRegister() {
     try {
       const response = await axios.post(
         `${API_URL}/api/auth/register`,
-        { ...form, phone_verified_token: token, terms_accepted: termsAccepted, signup_source: sessionStorage.getItem('signup_source') || 'direct' }
+        { ...form, terms_accepted: termsAccepted, signup_source: sessionStorage.getItem('signup_source') || 'direct' }
       )
       // The register response already set the auth cookie (setAuthCookie in
       // auth.js), so this authenticated call works before onLogin() even
@@ -233,8 +161,6 @@ function Register({ onLogin }) {
       onLogin(response.data.user)
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed. Please try again.')
-      // Go back to form step so user can retry
-      setStep(STEP_FORM)
     }
   }
 
@@ -242,17 +168,15 @@ function Register({ onLogin }) {
   const cardHeader = (
     <div style={{ textAlign: 'center', marginBottom: 'var(--space-7)' }}>
       <span className="auth-eyebrow" style={{ display: 'block', marginBottom: 'var(--space-3)' }}>
-        {step === STEP_OTP ? 'Phone Verification' : 'New Account'}
+        New Account
       </span>
       <h1 style={{ fontSize: 'var(--fs-4xl)', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: 'var(--space-2)' }}>
-        {step === STEP_OTP ? 'Verify your phone' : `Create your ${tenant?.name || 'trading'} account.`}
+        {`Create your ${tenant?.name || 'trading'} account.`}
       </h1>
       <p style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-md)' }}>
-        {step === STEP_OTP
-          ? `Enter the 6-digit code sent to ${form.phone}`
-          : tenant?.brand?.tagline || 'Join the premium prop firm today'}
+        {tenant?.brand?.tagline || 'Join the premium prop firm today'}
       </p>
-      {step === STEP_FORM && giftCode && giftPreview?.valid && (
+      {giftCode && giftPreview?.valid && (
         <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-2-5) var(--space-4)', border: '1px solid var(--accent)', borderRadius: '6px', fontSize: 'var(--fs-base)', color: 'var(--accent)' }}>
           🎁 You've been sent a free ${Number(giftPreview.account_size).toLocaleString()} challenge account — sign up to claim it.
         </div>
@@ -291,40 +215,10 @@ function Register({ onLogin }) {
 
         {cardHeader}
 
-        {/* ── Step indicator ── */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: '28px' }}>
-          {['Details', 'Verify Phone'].map((label, i) => {
-            const active = (i === 0 && step === STEP_FORM) || (i === 1 && step === STEP_OTP)
-            const done   = (i === 0 && step === STEP_OTP)
-            return (
-              <React.Fragment key={label}>
-                {i > 0 && <div style={{ flex: 1, height: '1px', background: done || step === STEP_OTP ? 'var(--accent)' : 'var(--border)' }} />}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
-                  <div style={{
-                    width: '22px', height: '22px', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 'var(--fs-xs)', fontWeight: 700, fontFamily: 'var(--font-mono)',
-                    background: done ? 'var(--accent)' : active ? 'var(--accent)' : 'var(--bg-hover)',
-                    color: done || active ? 'var(--paper)' : 'var(--text-muted)',
-                    border: `1.5px solid ${done || active ? 'var(--accent)' : 'var(--border)'}`,
-                    transition: 'all 0.3s'
-                  }}>
-                    {done ? '✓' : i + 1}
-                  </div>
-                  <span style={{ fontSize: 'var(--fs-sm)', fontWeight: active ? 600 : 400, fontFamily: 'var(--font-mono)', letterSpacing: '0.04em', textTransform: 'uppercase', color: active ? 'var(--accent)' : 'var(--text-muted)' }}>{label}</span>
-                </div>
-              </React.Fragment>
-            )
-          })}
-        </div>
-
         {error  && <div className="error"  style={{ marginBottom: 'var(--space-4)' }}>{error}</div>}
         {success && <div className="success" style={{ marginBottom: 'var(--space-4)' }}>{success}</div>}
 
-        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        {/* STEP 1 — Registration form                                 */}
-        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        {step === STEP_FORM && (
-          <form onSubmit={handleSendOtp}>
+        <form onSubmit={handleSubmit}>
             <div className="input-group">
               <label className="input-label" htmlFor="register-full-name">FULL NAME</label>
               <input id="register-full-name" type="text" name="full_name" className="input-field" value={form.full_name} onChange={handleChange} placeholder="John Smith" required />
@@ -373,7 +267,7 @@ function Register({ onLogin }) {
                 </div>
                 <div className="ui-cols ui-cols--keep-2" style={{ '--cols-gap': '3px' }}>
                   {strength.checks.map(c => (
-                    <div key={c.label} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <div key={c.label} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
                       <span style={{ fontSize: 'var(--fs-2xs)', color: c.pass ? strength.color : 'var(--text-dim)' }}>{c.pass ? '✓' : '○'}</span>
                       <span style={{ fontSize: 'var(--fs-xs)', color: c.pass ? 'var(--text-muted)' : 'var(--text-dim)' }}>{c.label}</span>
                     </div>
@@ -406,10 +300,6 @@ function Register({ onLogin }) {
             <div className="input-group">
               <label className="input-label" htmlFor="register-phone" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)' }}>
                 PHONE / WHATSAPP
-                <span style={{
-                  fontSize: 'var(--fs-2xs)', fontWeight: 600, padding: '2px 7px', borderRadius: 'var(--radius-pill)',
-                  background: 'color-mix(in srgb, var(--accent) 12%, transparent)', color: 'var(--accent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)'
-                }}>OTP REQUIRED</span>
               </label>
               <input
                 type="text"
@@ -421,7 +311,7 @@ function Register({ onLogin }) {
                 placeholder="+91 9999999999 (with country code)"
                 required
               />
-              <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginTop: '5px', marginBottom: 0 }}>
+              <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginTop: 'var(--space-1-5)', marginBottom: 0 }}>
                 📱 We will send a verification code to this number. Your account will only be created after verification.
               </p>
             </div>
@@ -431,11 +321,11 @@ function Register({ onLogin }) {
               <input id="register-referral" type="text" name="referred_by" className="input-field" value={form.referred_by} onChange={handleChange} placeholder="Enter referral code if you have one" />
               {form.referred_by.trim() && !checkingReferral && referralCheck && (
                 referralCheck.valid ? (
-                  <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--gain)', marginTop: '5px', marginBottom: 0 }}>
+                  <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--gain)', marginTop: 'var(--space-1-5)', marginBottom: 0 }}>
                     ✓ Valid code — you'll get {referralCheck.discount_pct}% off your first challenge
                   </p>
                 ) : (
-                  <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginTop: '5px', marginBottom: 0 }}>
+                  <p style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-dim)', marginTop: 'var(--space-1-5)', marginBottom: 0 }}>
                     Code not recognized — you can still register without it
                   </p>
                 )
@@ -450,7 +340,7 @@ function Register({ onLogin }) {
               transition: 'border-color 0.2s ease'
             }}>
               <input type="checkbox" id="terms" checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)}
-                style={{ marginTop: '2px', accentColor: 'var(--accent)', cursor: 'pointer', flexShrink: 0 }} />
+                style={{ marginTop: 'var(--space-1)', accentColor: 'var(--accent)', cursor: 'pointer', flexShrink: 0 }} />
               <label htmlFor="terms" style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)', lineHeight: '1.6', cursor: 'pointer' }}>
                 I have read and agree to the{' '}
                 <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', textDecoration: 'underline' }}>Terms of Service</a>,{' '}
@@ -470,71 +360,14 @@ function Register({ onLogin }) {
               style={{ width: '100%', marginTop: 'var(--space-2)', opacity: (!termsAccepted || loading || !passwordValid) ? 0.6 : 1, transition: 'opacity 0.2s' }}
               disabled={loading || !termsAccepted || !passwordValid}
             >
-              {loading ? 'Sending code…' : 'Send Verification Code →'}
+              {loading ? 'Creating your account…' : 'Create Account →'}
             </button>
 
             <p style={{ textAlign: 'center', marginTop: 'var(--space-6)', color: 'var(--text-muted)', fontSize: 'var(--fs-md)' }}>
               Already have an account?{' '}
               <Link to="/login" style={{ color: 'var(--accent)' }}>Sign in here</Link>
             </p>
-          </form>
-        )}
-
-        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        {/* STEP 2 — Enter OTP code                                    */}
-        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        {step === STEP_OTP && (
-          <form onSubmit={handleVerifyOtp}>
-            {/* OTP digit input */}
-            <div className="input-group" style={{ marginBottom: 'var(--space-2)' }}>
-              <label className="input-label" style={{ textAlign: 'center', display: 'block' }}>6-DIGIT VERIFICATION CODE</label>
-              <OtpInput
-                idPrefix="register-otp"
-                resetKey={otpResetKey}
-                disabled={loading}
-                onChange={(code) => { setOtpCode(code); setError('') }}
-              />
-            </div>
-
-            {/* Resend + change number */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-5)' }}>
-              <button
-                type="button"
-                onClick={handleResendOtp}
-                disabled={otpCooldown > 0 || loading}
-                style={{
-                  background: 'none', border: 'none', cursor: otpCooldown > 0 ? 'default' : 'pointer',
-                  color: otpCooldown > 0 ? 'var(--text-dim)' : 'var(--accent)',
-                  fontSize: 'var(--fs-base)', padding: 0
-                }}
-              >
-                {otpCooldown > 0 ? `Resend in ${otpCooldown}s` : 'Resend code'}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setStep(STEP_FORM); setError(''); setSuccess(''); setOtpCode('') }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 'var(--fs-base)', padding: 0 }}
-              >
-                ← Change number
-              </button>
-            </div>
-
-            <button
-              id="register-verify-otp-btn"
-              className="btn btn-primary"
-              type="submit"
-              style={{ width: '100%', opacity: (loading || otpCode.length !== 6) ? 0.6 : 1, transition: 'opacity 0.2s' }}
-              disabled={loading || otpCode.length !== 6}
-            >
-              {loading ? 'Verifying…' : 'Verify & Create Account'}
-            </button>
-
-            <p style={{ textAlign: 'center', marginTop: 'var(--space-5)', fontSize: 'var(--fs-sm)', color: 'var(--text-dim)', lineHeight: 1.6 }}>
-              The code is valid for <strong>5 minutes</strong>.<br/>
-              Didn&apos;t receive it? Check that your number includes the country code (e.g. +91…).
-            </p>
-          </form>
-        )}
+        </form>
       </div>
     </div>
   )

@@ -43,7 +43,7 @@ class ErrorBoundary extends React.Component {
           </p>
           <button
             onClick={this.handleRetry}
-            style={{ padding: '9px 22px', background: 'var(--accent)', color: 'var(--paper, #fff)', border: '1px solid var(--accent)', cursor: 'pointer', fontWeight: 600 }}
+            style={{ padding: 'var(--space-2-5) var(--space-6)', background: 'var(--accent)', color: 'var(--paper, #fff)', border: '1px solid var(--accent)', cursor: 'pointer', fontWeight: 600 }}
           >
             Try Again
           </button>
@@ -73,7 +73,7 @@ class ErrorBoundary extends React.Component {
             We encountered an unexpected error while rendering this page.
             This might be due to a network interruption or missing data.
           </p>
-          <div style={{ marginTop: '30px', display: 'flex', gap: '15px' }}>
+          <div style={{ marginTop: 'var(--space-7)', display: 'flex', gap: 'var(--space-4)' }}>
             <button
               onClick={() => window.location.reload()}
               style={{ padding: 'var(--space-2-5) var(--space-5)', background: 'var(--ink, #e8e4d8)', color: 'var(--paper, #161616)', border: '1px solid var(--ink, #e8e4d8)', cursor: 'pointer', fontWeight: 'bold' }}

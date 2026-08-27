@@ -49,7 +49,7 @@ const { stringLiterals } = require('../check-sql-columns')
 
 const ROOT = path.join(__dirname, '..', '..')
 const SCAN_DIRS = ['routes', 'services', 'domain', 'utils', 'workers', 'jobs', 'middleware']
-const SCAN_FILES = ['server.js', 'challengeEngine.js']
+const SCAN_FILES = ['server.js', 'challengeEngine.ts']
 
 const VERBOSE = process.argv.includes('--verbose')
 
@@ -170,6 +170,9 @@ async function main() {
 
   for (const statement of statements) {
     if (statement.interpolated) {
+      // The ${...} below is prose describing an interpolated statement, not an
+      // unintended template literal.
+      // eslint-disable-next-line no-template-curly-in-string
       skipped.push({ ...statement, why: 'built with ${...} — not a complete statement until runtime' })
       continue
     }

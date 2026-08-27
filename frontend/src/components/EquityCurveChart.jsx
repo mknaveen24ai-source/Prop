@@ -28,14 +28,14 @@ function EquityTooltip({ active, payload, label, tone }) {
         WebkitBackdropFilter: 'blur(12px)',
         border: `1px solid ${tone}`,
         borderRadius: 'var(--radius-sm)',
-        padding: '7px 10px',
+        padding: 'var(--space-2) var(--space-2-5)',
         boxShadow: 'var(--elev)',
       }}
     >
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>
         {label}
       </div>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '15px', color: 'var(--ink)', marginTop: 2 }}>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-lg)', color: 'var(--ink)', marginTop: 2 }}>
         {formatCurrency(payload[0].value)}
       </div>
     </div>

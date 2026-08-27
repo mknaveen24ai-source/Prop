@@ -44,7 +44,9 @@ const fs = require('fs')
 const path = require('path')
 const { execFileSync } = require('child_process')
 
-const BACKEND_DIR = path.join(__dirname, '..')
+const BACKEND_DIR = process.env.BACKEND_SOURCE_ROOT
+  ? path.resolve(process.env.BACKEND_SOURCE_ROOT)
+  : path.join(__dirname, '..')
 const SCHEMA_FILE = path.join(BACKEND_DIR, 'migrations', '000_core_schema.sql')
 
 // Columns worth tracking: ones that exist on many tables with inconsistent types.

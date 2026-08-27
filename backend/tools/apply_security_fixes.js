@@ -421,9 +421,9 @@ const DEFAULT_PLATFORM_SETTINGS = {
   phase2_profit_target_pct: 5,
   phase2_max_drawdown_pct: 5,
   phase2_day_limit: 60,
-  funded_profit_split: 80,
+  funded_profit_split: 100,
   funded_max_drawdown_pct: 5,
-  max_accounts_per_user: 3,
+  max_accounts_per_user: 0,
   min_payout_amount: 100,
   payout_processing_days: 3
 }

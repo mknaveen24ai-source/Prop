@@ -112,7 +112,6 @@ async function buildTraderListResult({ query = {} } = {}) {
         ELSE 'low'
       END
     ) = ANY($${index}::text[])`)
-    index += 1
   }
 
   const orderByMap = {
@@ -322,7 +321,6 @@ async function buildAccountListResult({ query = {} } = {}) {
         AND aet.entity_id = CAST(a.id AS TEXT)
         AND aet.tag = ANY($${index}::text[])
     )`)
-    index += 1
   }
 
   const orderByMap = {
@@ -537,7 +535,6 @@ async function buildPayoutListResult({ query = {} } = {}) {
         AND aet.entity_id = CAST(p.id AS TEXT)
         AND aet.tag = ANY($${index}::text[])
     )`)
-    index += 1
   }
 
   const orderByMap = {
@@ -681,8 +678,8 @@ async function createAdminIssuedAccount(client, { userId, accountType, accountSi
   const currentBalance = overrides.current_balance != null ? parseFloat(overrides.current_balance) : startingBalance
   const peakBalance = overrides.peak_balance != null ? parseFloat(overrides.peak_balance) : startingBalance
 
-  let profitTarget = 0
-  let maxDrawdownPct = 5
+  let profitTarget
+  let maxDrawdownPct
 
   if (normalizedType === 'phase1') {
     const pct = parseFloat(overrides.profit_target_pct || settings.phase1_profit_target_pct || '10')

@@ -433,7 +433,7 @@ export default function AdminTrades() {
 
             <div style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', padding: 'var(--space-4)', marginBottom: 'var(--space-6)', textAlign: 'center' }}>
               <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--admin-text-muted)', textTransform: 'uppercase', marginBottom: 'var(--space-1)' }}>Net Floating P&L</div>
-              <div style={{ fontSize: '32px', fontFamily: 'var(--admin-font-mono)', fontWeight: 700, color: (parseFloat(selectedTrade.pnl) || 0) >= 0 ? 'var(--admin-success)' : 'var(--admin-danger)' }}>
+              <div style={{ fontSize: 'var(--fs-5xl)', fontFamily: 'var(--admin-font-mono)', fontWeight: 700, color: (parseFloat(selectedTrade.pnl) || 0) >= 0 ? 'var(--admin-success)' : 'var(--admin-danger)' }}>
                 {(parseFloat(selectedTrade.pnl) || 0) >= 0 ? '+' : ''}${(parseFloat(selectedTrade.pnl) || 0).toFixed(2)}
               </div>
             </div>

@@ -168,13 +168,13 @@ export default function AdminAffiliates() {
         Traders who have referred at least one signup. Commission is a lifetime revenue share, not a one-time bonus.
       </p>
 
-      <div style={{ display: 'flex', gap: '2px', padding: '3px', border: '1px solid var(--admin-border)', borderRadius: '4px', background: 'var(--admin-elevated)', width: 'fit-content', marginBottom: 'var(--space-6)' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-1)', padding: 'var(--space-1)', border: '1px solid var(--admin-border)', borderRadius: '4px', background: 'var(--admin-elevated)', width: 'fit-content', marginBottom: 'var(--space-6)' }}>
         {[{ id: 'directory', label: 'Directory' }, { id: 'analysis', label: 'Analysis' }].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             style={{
-              padding: '7px 16px', border: 'none', borderRadius: '3px', cursor: 'pointer',
+              padding: 'var(--space-2) var(--space-4)', border: 'none', borderRadius: '3px', cursor: 'pointer',
               background: activeTab === tab.id ? 'var(--admin-accent)' : 'transparent',
               color: activeTab === tab.id ? 'var(--paper)' : 'var(--admin-text-muted)',
               fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.08em', textTransform: 'uppercase'

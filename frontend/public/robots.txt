@@ -1,3 +1,26 @@
 # https://www.robotstxt.org/robotstxt.html
+#
+# This was `Disallow:` — i.e. everything crawlable, including /admin and
+# /dashboard. Not a security control (nothing here is enforcement), but there is
+# no reason to advertise the admin surface to a crawler, and no reason to spend
+# crawl budget on authenticated pages that render nothing without a session.
+#
+# The allowed set is frontend/src/config/publicRoutes.js. Keep the two in step:
+# a new public page needs an entry there (for its title, description and sitemap
+# row) and, if it sits under a disallowed prefix, an exception here.
+
 User-agent: *
-Disallow:
+
+# Operator surface — never indexed.
+Disallow: /admin
+
+# Authenticated trader surface — renders nothing to a crawler.
+Disallow: /dashboard
+Disallow: /reset-password
+
+# Public, but nothing to rank for: a checkout flow, and per-certificate
+# permalinks that would publish individual traders' records to search.
+Disallow: /checkout
+Disallow: /verify/
+
+Sitemap: /sitemap.xml

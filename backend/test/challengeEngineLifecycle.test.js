@@ -46,6 +46,15 @@ function installPoolMock({ account, queryHandlers = [], connectHandlers = [] }) 
   const calls = []
   pool.query = async (sql, values) => {
     calls.push({ sql, values })
+    // services/feedHealth.js asks for MAX(updated_at) before the engine will
+    // enforce anything, and treats an unanswerable feed as UNHEALTHY — which is
+    // the correct fail-safe in production and a silent "0 assertions ran" here.
+    // Answered before the per-test handlers because every test in this file is
+    // about what the engine does with a WORKING feed; the breaker itself is
+    // covered separately.
+    if (/MAX\(updated_at\)/i.test(sql)) {
+      return { rows: [{ newest: new Date() }] }
+    }
     if (ACTIVE_ACCOUNTS_QUERY.test(sql)) return { rows: [account] }
     for (const [pattern, handler] of queryHandlers) {
       if (pattern.test(sql)) return handler(sql, values)
@@ -104,6 +113,36 @@ test('runChallengeEngine fails an account whose balance has breached the drawdow
   assert.equal(failCall.values[0], 'acc-ce-1')
 })
 
+test('runChallengeEngine rolls back the account failure transaction when a trade close fails', async () => {
+  const account = baseAccount({ current_balance: '8000' })
+  const client = makeMockClient([
+    [FULL_ACCOUNT_LOCK_QUERY, () => ({ rows: [{ ...account, current_balance: '8000' }] })],
+    [/SELECT \* FROM trades WHERE account_id = \$1 AND status = 'open'/, () => ({
+      rows: [{
+        id: 'trade-ce-rollback',
+        instrument: 'EURUSD',
+        direction: 'buy',
+        open_price: '1.10000',
+        lot_size: '1',
+        commission: '7'
+      }]
+    })],
+    [/UPDATE trades SET[\s\S]*close_reason/i, () => {
+      throw new Error('forced trade settlement failure')
+    }]
+  ])
+  installPoolMock({ account })
+  pool.connect = async () => client
+
+  await runChallengeEngine(null)
+
+  assert.ok(client.calls.some(c => /ROLLBACK/.test(c.sql)), 'the failed settlement must roll back')
+  assert.equal(client.calls.find(c => /UPDATE accounts SET status = 'failed'/.test(c.sql)), undefined,
+    'the account status must not change outside the rolled-back transaction')
+  assert.equal(client.calls.find(c => /COMMIT/.test(c.sql)), undefined,
+    'a failed settlement must never commit a partial account failure')
+})
+
 test('runChallengeEngine leaves an account active when balance stays above the drawdown floor and below profit target', async () => {
   const account = baseAccount({ current_balance: '9800' }) // within the 9000 floor, under the 1000 profit target
   const client = makeMockClient()
@@ -155,4 +194,47 @@ test('runChallengeEngine passes an account that hit its profit target and raises
   assert.equal(accountInsert, undefined, 'the next account must wait for admin approval')
 
   assert.ok(client.calls.some(c => /COMMIT/.test(c.sql)), 'expected the pass to commit')
+})
+
+test('runChallengeEngine explains a qualifying-days hold instead of returning in silence', async () => {
+  // The consistency hold always emitted a socket message; the qualifying-days
+  // hold twenty lines above it returned bare. A trader who hit their target on
+  // day three saw the target met and then nothing at all — no counter, no
+  // message, no reason — which the examination named as one of the three
+  // support tickets the platform would field forever.
+  const account = {
+    id: 'acc-holds', user_id: 'user-holds', account_type: 'phase1', status: 'active',
+    starting_balance: '100000', current_balance: '116000', peak_balance: '116000',
+    profit_target: '16000', max_drawdown_pct: '4', account_size: '100000',
+    phase_end_date: new Date(Date.now() + 30 * 86400000),
+    min_trading_days: 5, min_daily_profit_pct: '0.75',
+    consistency_max_day_pct: null, challenge_model_slug: null,
+    daily_drawdown_pct: null, eod_peak_equity: null, eod_trailing_floor: null
+  }
+
+  installPoolMock({
+    account,
+    queryHandlers: [
+      // countQualifyingTradingDays — 2 of the 5 this model requires. It counts
+      // days FINISHED UP by min_daily_profit_pct, not days traded, and returns
+      // the tally as `days`.
+      [/SELECT COUNT\(\*\) AS days/i, () => ({ rows: [{ days: '2' }] })],
+      [/FROM trades WHERE account_id = \$1 AND status = 'open'/, () => ({ rows: [{ count: '0' }] })]
+    ]
+  })
+
+  const emitted = []
+  const io = { to: (room) => ({ emit: (event, payload) => emitted.push({ room, event, payload }) }) }
+
+  await runChallengeEngine(io)
+
+  const hold = emitted.find((e) => e.payload?.event === 'trading_days_hold')
+  assert.ok(hold, 'expected the qualifying-days hold to explain itself')
+  assert.equal(hold.room, 'user-holds')
+  assert.match(hold.payload.message, /3 more qualifying days/)
+  assert.match(hold.payload.message, /2 of 5/)
+  assert.match(hold.payload.message, /0\.75%/, 'the rule is not "a day you traded" — state the bar')
+
+  assert.equal(emitted.find((e) => /passed/.test(e.payload?.event || '')), undefined,
+    'the account must not pass while the hold is in force')
 })

@@ -617,7 +617,7 @@ export default function AdminAccess() {
                       <td className="admin-td">
                         <div style={{ display: 'flex', gap: 'var(--space-1-5)', flexWrap: 'wrap' }}>
                           {ROLE_PERMISSIONS[role].map((cap) => (
-                            <span key={cap} className="admin-font-mono" style={{ fontSize: 'var(--fs-xs)', padding: '3px 8px', border: '1px solid var(--admin-border)', borderRadius: 'var(--radius-sm)', color: 'var(--admin-text-muted)' }}>
+                            <span key={cap} className="admin-font-mono" style={{ fontSize: 'var(--fs-xs)', padding: 'var(--space-1) var(--space-2)', border: '1px solid var(--admin-border)', borderRadius: 'var(--radius-sm)', color: 'var(--admin-text-muted)' }}>
                               {cap}
                             </span>
                           ))}

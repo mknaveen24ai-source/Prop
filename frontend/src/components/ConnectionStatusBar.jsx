@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useApiState } from '../providers/ApiStateProvider'
 import { applyServiceWorkerUpdate } from '../utils/registerServiceWorker'
 
@@ -24,27 +24,29 @@ import { applyServiceWorkerUpdate } from '../utils/registerServiceWorker'
 export default function ConnectionStatusBar() {
   const { isOnline } = useApiState()
   const [updateReady, setUpdateReady] = useState(null)
-  const [wasOffline, setWasOffline] = useState(false)
+  const wasOffline = useRef(false)
   const [reconnected, setReconnected] = useState(false)
 
   useEffect(() => {
     if (!isOnline) {
-      setWasOffline(true)
-      setReconnected(false)
+      wasOffline.current = true
       return undefined
     }
-    if (!wasOffline) return undefined
+    if (!wasOffline.current) return undefined
 
     // Confirm the recovery rather than just removing the warning. A bar that
     // silently disappears leaves the trader unsure whether the figures are live
     // again or the warning simply gave up.
-    setReconnected(true)
+    const showTimer = setTimeout(() => setReconnected(true), 0)
     const timer = setTimeout(() => {
       setReconnected(false)
-      setWasOffline(false)
+      wasOffline.current = false
     }, 4000)
-    return () => clearTimeout(timer)
-  }, [isOnline, wasOffline])
+    return () => {
+      clearTimeout(showTimer)
+      clearTimeout(timer)
+    }
+  }, [isOnline])
 
   useEffect(() => {
     const onUpdate = (event) => setUpdateReady(event.detail)

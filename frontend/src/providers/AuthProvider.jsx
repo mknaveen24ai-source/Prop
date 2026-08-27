@@ -49,7 +49,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   useEffect(() => {
-    refreshSession()
+    queueMicrotask(() => { void refreshSession() })
   }, [refreshSession])
 
   const login = useCallback((nextUser) => {

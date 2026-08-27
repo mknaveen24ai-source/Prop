@@ -66,7 +66,7 @@ export default function PositionsPanel({
       )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-4)', gap: 'var(--space-2-5)', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
-          <h3 style={{ marginBottom: 0, color: 'var(--accent)', fontSize: '15px' }}>
+          <h3 style={{ marginBottom: 0, color: 'var(--accent)', fontSize: 'var(--fs-lg)' }}>
             Open Positions & Orders ({visibleOpenTrades.length})
           </h3>
           <div className="trade-batch-actions">
@@ -204,7 +204,7 @@ export default function PositionsPanel({
                                 onChange={e => setModifyForm(f => ({ ...f, pending_price: e.target.value }))}
                                 placeholder="Pending entry"
                                 step={getInputStepString(trade.instrument)}
-                                style={{ width: '140px', fontSize: 'var(--fs-base)', padding: '7px 10px' }}
+                                style={{ width: '140px', fontSize: 'var(--fs-base)', padding: 'var(--space-2) var(--space-2-5)' }}
                               />
                             </div>
                             <div>
@@ -217,7 +217,7 @@ export default function PositionsPanel({
                                 onChange={e => setModifyForm(f => ({ ...f, stop_loss: e.target.value }))}
                                 placeholder={`e.g. ${trade.pending_price ? (parseFloat(trade.pending_price) * (trade.direction === 'buy' ? 0.999 : 1.001)).toFixed(dec) : '-'}`}
                                 step={getInputStepString(trade.instrument)}
-                                style={{ width: '140px', fontSize: 'var(--fs-base)', padding: '7px 10px' }}
+                                style={{ width: '140px', fontSize: 'var(--fs-base)', padding: 'var(--space-2) var(--space-2-5)' }}
                               />
                             </div>
                             <div>
@@ -230,10 +230,10 @@ export default function PositionsPanel({
                                 onChange={e => setModifyForm(f => ({ ...f, take_profit: e.target.value }))}
                                 placeholder={`e.g. ${trade.pending_price ? (parseFloat(trade.pending_price) * (trade.direction === 'buy' ? 1.001 : 0.999)).toFixed(dec) : '-'}`}
                                 step={getInputStepString(trade.instrument)}
-                                style={{ width: '140px', fontSize: 'var(--fs-base)', padding: '7px 10px' }}
+                                style={{ width: '140px', fontSize: 'var(--fs-base)', padding: 'var(--space-2) var(--space-2-5)' }}
                               />
                             </div>
-                            <button className="btn btn-accent" onClick={() => submitModify(trade)} style={{ padding: '7px 20px', fontSize: 'var(--fs-sm)' }}>
+                            <button className="btn btn-accent" onClick={() => submitModify(trade)} style={{ padding: 'var(--space-2) var(--space-5)', fontSize: 'var(--fs-sm)' }}>
                               Save
                             </button>
                             <Button variant="secondary" size="sm" onClick={cancelModify}>Cancel</Button>
@@ -278,7 +278,7 @@ export default function PositionsPanel({
                                 onChange={e => setModifyForm(f => ({ ...f, stop_loss: e.target.value }))}
                                 placeholder={`e.g. ${trade.current_price ? (parseFloat(trade.current_price) * (trade.direction === 'buy' ? 0.999 : 1.001)).toFixed(dec) : '—'}`}
                                 step={getInputStepString(trade.instrument)}
-                                style={{ width: '140px', fontSize: 'var(--fs-base)', padding: '7px 10px' }}
+                                style={{ width: '140px', fontSize: 'var(--fs-base)', padding: 'var(--space-2) var(--space-2-5)' }}
                               />
                             </div>
                             <div>
@@ -291,14 +291,14 @@ export default function PositionsPanel({
                                 onChange={e => setModifyForm(f => ({ ...f, take_profit: e.target.value }))}
                                 placeholder={`e.g. ${trade.current_price ? (parseFloat(trade.current_price) * (trade.direction === 'buy' ? 1.001 : 0.999)).toFixed(dec) : '—'}`}
                                 step={getInputStepString(trade.instrument)}
-                                style={{ width: '140px', fontSize: 'var(--fs-base)', padding: '7px 10px' }}
+                                style={{ width: '140px', fontSize: 'var(--fs-base)', padding: 'var(--space-2) var(--space-2-5)' }}
                               />
                             </div>
                             <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                               <button
                                 className="btn btn-accent"
                                 onClick={() => submitModify(trade)}
-                                style={{ padding: '7px 20px', fontSize: 'var(--fs-sm)' }}>
+                                style={{ padding: 'var(--space-2) var(--space-5)', fontSize: 'var(--fs-sm)' }}>
                                 Save
                               </button>
                               <Button
@@ -329,7 +329,7 @@ export default function PositionsPanel({
             })}
             {visibleOpenTrades.length === 0 && (
               <tr>
-                <td colSpan="9" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '22px 10px' }}>
+                <td colSpan="9" style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 'var(--space-6) var(--space-2-5)' }}>
                   {positionView === 'open' && 'No open positions right now.'}
                   {positionView === 'pending' && 'No pending orders right now.'}
                   {positionView === 'all' && 'No active positions or orders right now.'}

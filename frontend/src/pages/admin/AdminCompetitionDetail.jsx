@@ -299,7 +299,7 @@ function BotRosterPanel({ adminAxios, toast, competition, onEntered }) {
 
         {/* Auto-enter toggle */}
         {canEnter && (
-          <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)', fontSize: 'var(--fs-base)', cursor: 'pointer', paddingBottom: '2px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1-5)', fontSize: 'var(--fs-base)', cursor: 'pointer', paddingBottom: 'var(--space-1)' }}>
             <input
               type="checkbox"
               checked={autoEnter}
@@ -501,7 +501,7 @@ export default function AdminCompetitionDetail() {
                 <td style={{ padding: 'var(--space-2) var(--space-2-5)' }}>
                   {entry.full_name}
                   {entry.is_bot && (
-                    <span style={{ marginLeft: 'var(--space-1-5)', fontSize: 'var(--fs-2xs)', padding: '2px 6px', borderRadius: '4px', background: 'var(--admin-bg-elevated)', border: '1px solid var(--admin-border)', opacity: 0.8 }}>
+                    <span style={{ marginLeft: 'var(--space-1-5)', fontSize: 'var(--fs-2xs)', padding: 'var(--space-1) var(--space-1-5)', borderRadius: '4px', background: 'var(--admin-bg-elevated)', border: '1px solid var(--admin-border)', opacity: 0.8 }}>
                       DEMO BOT
                     </span>
                   )}
@@ -557,7 +557,7 @@ export default function AdminCompetitionDetail() {
                   <td style={{ padding: 'var(--space-2) var(--space-2-5)' }}>
                     {row.full_name}
                     {row.is_bot && (
-                      <span style={{ marginLeft: 'var(--space-1-5)', fontSize: 'var(--fs-2xs)', padding: '2px 6px', borderRadius: '4px', background: 'var(--admin-bg-elevated)', border: '1px solid var(--admin-border)', opacity: 0.8 }}>
+                      <span style={{ marginLeft: 'var(--space-1-5)', fontSize: 'var(--fs-2xs)', padding: 'var(--space-1) var(--space-1-5)', borderRadius: '4px', background: 'var(--admin-bg-elevated)', border: '1px solid var(--admin-border)', opacity: 0.8 }}>
                         DEMO BOT
                       </span>
                     )}

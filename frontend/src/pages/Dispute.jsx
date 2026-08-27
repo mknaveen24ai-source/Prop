@@ -167,7 +167,7 @@ export default function Dispute({ user, accounts }) {
               disputable accounts; the prototype assumes a single violation
               context, this app doesn't. */}
           <Card>
-            <label style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Account to appeal</label>
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Account to appeal</label>
             <select
               value={form.account_id}
               onChange={(e) => setForm((f) => ({ ...f, account_id: e.target.value }))}
@@ -188,35 +188,35 @@ export default function Dispute({ user, accounts }) {
           {form.account_id && violation && (
             <div style={{ border: '1px solid var(--loss)', borderRadius: '4px', background: 'var(--glass-2)', backdropFilter: 'blur(16px)', boxShadow: 'var(--elev)', padding: 'var(--space-4-5) var(--space-5)' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
-                <span style={{ display: 'inline-flex', color: 'var(--loss)', marginTop: '3px' }}>{renderIcon('warning', { size: 18, color: 'var(--loss)' })}</span>
+                <span style={{ display: 'inline-flex', color: 'var(--loss)', marginTop: 'var(--space-1)' }}>{renderIcon('warning', { size: 18, color: 'var(--loss)' })}</span>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--loss)' }}>Violation under appeal · V-{violation.id}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--loss)' }}>Violation under appeal · V-{violation.id}</div>
                   <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-2xl)', marginTop: 'var(--space-1-5)' }}>{titleCase(violation.violation_type)}</div>
                   <div style={{ fontSize: 'var(--fs-base)', color: 'var(--muted)', marginTop: 'var(--space-1-5)', lineHeight: 1.6 }}>{violation.message}</div>
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 'var(--space-3)', marginTop: 'var(--space-4)', borderTop: '1px solid var(--rule-soft)', paddingTop: 'var(--space-3-5)' }}>
                 <div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Account</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '15px', marginTop: 'var(--space-1)' }}>{violationContext.account_uid}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Account</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-lg)', marginTop: 'var(--space-1)' }}>{violationContext.account_uid}</div>
                 </div>
                 <div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Detected</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '15px', marginTop: 'var(--space-1)' }}>{formatDateTime(violation.first_detected_at)}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Detected</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-lg)', marginTop: 'var(--space-1)' }}>{formatDateTime(violation.first_detected_at)}</div>
                 </div>
                 <div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Severity</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '15px', marginTop: 'var(--space-1)', color: 'var(--loss)' }}>{titleCase(violation.severity)}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Severity</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-lg)', marginTop: 'var(--space-1)', color: 'var(--loss)' }}>{titleCase(violation.severity)}</div>
                 </div>
                 <div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Source</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '15px', marginTop: 'var(--space-1)' }}>System-flagged</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Source</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-lg)', marginTop: 'var(--space-1)' }}>System-flagged</div>
                 </div>
               </div>
             </div>
           )}
           {form.account_id && !violation && (
-            <Card style={{ padding: 'var(--space-3-5) var(--space-4-5)', fontSize: '12.5px', color: 'var(--muted)' }}>
+            <Card style={{ padding: 'var(--space-3-5) var(--space-4-5)', fontSize: 'var(--fs-base)', color: 'var(--muted)' }}>
               No system-flagged violation found for this account — you can still describe what happened below.
             </Card>
           )}
@@ -236,19 +236,19 @@ export default function Dispute({ user, accounts }) {
                     type="button"
                     onClick={() => setForm((f) => ({ ...f, reason: r }))}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: '9px', padding: '9px 12px',
+                      display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)', padding: 'var(--space-2-5) var(--space-3)',
                       border: `1px solid ${active ? 'var(--accent)' : 'var(--rule)'}`, borderRadius: '4px',
                       background: active ? 'var(--glass)' : 'transparent', cursor: 'pointer'
                     }}
                   >
                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: active ? 'var(--accent)' : 'var(--rule)', flex: '0 0 auto' }} />
-                    <span style={{ flex: 1, textAlign: 'left', fontSize: '12.5px' }}>{r}</span>
+                    <span style={{ flex: 1, textAlign: 'left', fontSize: 'var(--fs-base)' }}>{r}</span>
                   </button>
                 )
               })}
             </div>
 
-            <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', margin: '18px 0 7px' }}>
+            <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)', margin: 'var(--space-4-5) 0 var(--space-2)' }}>
               Your account of what happened
             </label>
             <textarea
@@ -263,7 +263,7 @@ export default function Dispute({ user, accounts }) {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginTop: 'var(--space-3)', padding: 'var(--space-3) var(--space-3-5)', border: '1px dashed var(--rule)', borderRadius: '4px' }}>
               <span style={{ display: 'inline-flex', color: 'var(--accent)' }}>{renderIcon('file', { size: 16, color: 'var(--accent)' })}</span>
-              <div style={{ flex: 1, fontSize: '12.5px', color: 'var(--muted)' }}>
+              <div style={{ flex: 1, fontSize: 'var(--fs-base)', color: 'var(--muted)' }}>
                 {evidenceFile ? `${evidenceFile.name} (${Math.round(evidenceFile.size / 1024)}KB)` : `Attach evidence — trade log, platform screenshot or broker statement (under ${Math.round(MAX_EVIDENCE_BYTES / 1024)}KB)`}
                 {evidenceError && <div style={{ color: 'var(--loss)', marginTop: 'var(--space-1)' }}>{evidenceError}</div>}
               </div>
@@ -277,14 +277,14 @@ export default function Dispute({ user, accounts }) {
               <button
                 onClick={handleSubmit}
                 disabled={loading}
-                style={{ flex: 1, padding: '13px', border: '1px solid var(--accent)', borderRadius: '4px', background: 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: '11.5px', letterSpacing: '.12em', textTransform: 'uppercase', cursor: loading ? 'default' : 'pointer', opacity: loading ? 0.6 : 1 }}
+                style={{ flex: 1, padding: 'var(--space-3-5)', border: '1px solid var(--accent)', borderRadius: '4px', background: 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', letterSpacing: '.12em', textTransform: 'uppercase', cursor: loading ? 'default' : 'pointer', opacity: loading ? 0.6 : 1 }}
               >
                 {loading ? 'Submitting…' : 'Submit appeal'}
               </button>
               <button
                 type="button"
                 onClick={saveDraft}
-                style={{ padding: '13px 18px', border: '1px solid var(--rule)', borderRadius: '4px', background: 'transparent', color: draftSaved ? 'var(--gain)' : 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: '11.5px', letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer' }}
+                style={{ padding: 'var(--space-3-5) var(--space-4-5)', border: '1px solid var(--rule)', borderRadius: '4px', background: 'transparent', color: draftSaved ? 'var(--gain)' : 'var(--muted)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-sm)', letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer' }}
               >
                 {draftSaved ? 'Saved ✓' : 'Save draft'}
               </button>
@@ -298,11 +298,11 @@ export default function Dispute({ user, accounts }) {
               <div key={t.label} style={{ display: 'flex', gap: 'var(--space-3)' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: '0 0 auto' }}>
                   <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: 'var(--accent)', flex: '0 0 auto' }} />
-                  {idx < APPEAL_TIMELINE.length - 1 && <span style={{ width: '1px', flex: 1, background: 'var(--rule)', marginTop: '2px' }} />}
+                  {idx < APPEAL_TIMELINE.length - 1 && <span style={{ width: '1px', flex: 1, background: 'var(--rule)', marginTop: 'var(--space-1)' }} />}
                 </div>
                 <div style={{ paddingBottom: 'var(--space-4)' }}>
                   <div style={{ fontSize: 'var(--fs-base)' }}>{t.label}</div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)', marginTop: '3px' }}>{t.meta}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', color: 'var(--muted)', marginTop: 'var(--space-1)' }}>{t.meta}</div>
                 </div>
               </div>
             ))}
@@ -310,15 +310,15 @@ export default function Dispute({ user, accounts }) {
 
           <Card title="Overturn rates" eyebrow="Platform-wide, decided appeals">
             {overturnRates.length === 0 ? (
-              <div style={{ fontSize: '12.5px', color: 'var(--muted)' }}>Not enough decided appeals yet to show a rate.</div>
+              <div style={{ fontSize: 'var(--fs-base)', color: 'var(--muted)' }}>Not enough decided appeals yet to show a rate.</div>
             ) : (
               overturnRates.map((o) => (
                 <div key={o.label} style={{ padding: 'var(--space-2-5) 0', borderBottom: '1px solid var(--rule-soft)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', fontSize: '12.5px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', fontSize: 'var(--fs-base)' }}>
                     <span>{o.label}</span>
                     <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--gain)' }}>{o.pct}%</span>
                   </div>
-                  <div style={{ height: '6px', marginTop: '7px', border: '1px solid var(--rule)', borderRadius: '99px', background: 'var(--paper)', overflow: 'hidden' }}>
+                  <div style={{ height: '6px', marginTop: 'var(--space-2)', border: '1px solid var(--rule)', borderRadius: '99px', background: 'var(--paper)', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${o.pct}%`, background: 'var(--gain)' }} />
                   </div>
                 </div>
@@ -364,7 +364,7 @@ export default function Dispute({ user, accounts }) {
                   </tr>
                   {d.admin_response && (
                     <tr>
-                      <td colSpan={6} style={{ background: 'var(--glass)', fontSize: '12.5px', color: 'var(--muted)', padding: 'var(--space-2-5) var(--space-3-5)' }}>
+                      <td colSpan={6} style={{ background: 'var(--glass)', fontSize: 'var(--fs-base)', color: 'var(--muted)', padding: 'var(--space-2-5) var(--space-3-5)' }}>
                         <strong style={{ color: 'var(--ink)' }}>Admin response: </strong>{d.admin_response}
                       </td>
                     </tr>

@@ -15,15 +15,15 @@ export function getChallengeFeeDisplay() {
 
 export function getTenantLandingCopy() {
   return {
-    heroBadge: 'live funding · real payouts · no hidden rules',
+    heroBadge: 'live funding · 100% profit split · published rules',
     heroTitleLead: 'Stop Risking',
     heroTitleHighlight: 'Your Own Capital.',
-    heroSubtitle: 'Pass one evaluation — 1, 2, or 3 steps, your choice — and trade up to $400,000 of our capital. Keep 75% of every payout, paid weekly.',
-    heroPrimaryCta: 'Start From $4',
+    heroSubtitle: 'Pass one evaluation — 1, 2, or 3 steps, your choice — and trade our capital, scaling to $30,000,000. Keep 100% of every payout. We make our money on the entry fee, not your profits.',
+    heroPrimaryCta: 'Get Funded — From $4',
     heroStatsLead: '3',
     heroStatsLeadSuffix: 'Challenge Models',
     featuresHeadline: 'Institutional Grade. Challenge Ready.',
-    featuresSubtitle: 'Run a transparent prop challenge with live quota controls, clear progression, and funded scaling once you pass.',
+    featuresSubtitle: 'Every rule published before you pay, every payout kept in full, and funded scaling once you pass.',
     faqLead: 'Every real objection, answered up front — not buried in a support queue.',
     faqItems: [
       {
@@ -34,12 +34,12 @@ export function getTenantLandingCopy() {
       {
         category: 'General',
         q: 'Are account tiers always available?',
-        a: 'Each account size has its own monthly allocation. Once that size is filled, it reopens automatically at the start of the next month.'
+        a: 'Most sizes are open continuously. Where a size has a capacity limit, the counter on the pricing table shows the remaining places live.'
       }
     ],
     footerHeadline: 'The Capital Is Ready. Are You?',
-    footerSubtitle: 'Every account size updates in real time. Pick the model that fits your trading style before this month\'s batch fills.',
+    footerSubtitle: 'Every account size updates in real time. Pick the model that fits how you actually trade.',
     footerButton: 'Get Started',
-    footerBrand: 'Prop trading challenges with transparent rules, per-size monthly quota enforcement, and funded progression once you pass.'
+    footerBrand: 'Prop trading challenges with published rules, a 100% trader profit split, and funded progression once you pass.'
   }
 }

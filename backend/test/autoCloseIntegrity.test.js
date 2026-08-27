@@ -73,7 +73,10 @@ test('autoCloseAndPass does not swallow trade close errors', () => {
 test('autoCloseAndFail keeps Decimal PnL conversion before balance, violation, and socket use', () => {
   const source = functionBody('autoCloseAndFail', 'autoCloseAndPass', engineSource)
 
-  assert.match(source, /let totalPnlDec = new Decimal\(0\)/)
+  // CommonJS compilation rewrites the default Decimal import to
+  // `decimal_js_1.default`; accept both authored and emitted spellings while
+  // keeping the accumulator/order invariant intact.
+  assert.match(source, /let totalPnlDec = new (?:Decimal|decimal_js_1\.default)\(0\)/)
   assert.match(source, /const totalPnl = totalPnlDec\.toDecimalPlaces\(2\)\.toNumber\(\)/)
   assert.match(source, /total_closed_pnl: totalPnl/)
   assert.match(source, /pnl: totalPnl/)
@@ -136,7 +139,10 @@ test('settlementFor closes a priceless trade flat, at the open price, for zero P
 test('challengeEngine failAccount does not swallow close failures before failing account', () => {
   const source = functionBody('failAccount', 'passAccount', challengeSource)
 
-  assert.match(source, /let totalPnlDec = new Decimal\(0\)/)
+  // CommonJS compilation rewrites the default Decimal import to
+  // `decimal_js_1.default`; accept both spellings without weakening the
+  // accumulator invariant.
+  assert.match(source, /let totalPnlDec = new (?:Decimal|decimal_js_1\.default)\(0\)/)
   assert.match(source, /throw new Error\(`Failed to close trade \$\{trade\.id\} while failing account`\)/)
   assert.doesNotMatch(source, /failAccount: error closing trade \$\{trade\.id\}/)
 })
@@ -146,21 +152,24 @@ test('pending, modify, cancel, and batch action routes protect race side effects
   assert.match(pendingSource, /FOR UPDATE SKIP LOCKED/)
   assert.match(pendingSource, /Account inactive/)
 
-  // /cancel is last in close.js, so the module end bounds it.
-  const cancelSource = routeBody('close', 'post', '/cancel')
+  // The converted close route registers a named handler; inspect the handler
+  // body rather than the short router registration at the module end.
+  const cancelSource = functionBody('cancelTradeHandler', null, tradesModule('close'))
   assert.match(cancelSource, /WHERE id = \$1 AND status = 'pending'/)
   assert.match(cancelSource, /Pending order was already processed/)
 
-  const pendingModifySource = routeBody('modify', 'patch', '/modify-pending', "router.patch('/modify'")
+  const modifyModuleSource = tradesModule('modify')
+  const pendingModifySource = functionBody('modifyPendingHandler', 'modifyTradeHandler', modifyModuleSource)
   assert.match(pendingModifySource, /validatePendingOrderPrice\(trade\.order_type, nextPendingPrice, bid, ask\)/)
-  assert.match(pendingModifySource, /WHERE id = \$\$\{idx\} AND status = 'pending' RETURNING \*/)
+  assert.match(pendingModifySource, /WHERE id = \$\$\{parameterIndex\} AND status = 'pending' RETURNING \*/)
 
-  // /modify is last in modify.js; /batch-action is the only route in batch.js.
-  const modifySource = routeBody('modify', 'patch', '/modify')
-  assert.match(modifySource, /WHERE id = \$\$\{idx\} AND status = 'open'/)
+  // /modify is last in modify.js. The converted batch route now registers a
+  // named handler, so inspect that function rather than the short router call.
+  const modifySource = functionBody('modifyTradeHandler', null, modifyModuleSource)
+  assert.match(modifySource, /WHERE id = \$\$\{parameterIndex\} AND status = 'open'/)
   assert.match(modifySource, /Trade was already processed/)
 
-  const batchSource = routeBody('batch', 'post', '/batch-action')
+  const batchSource = functionBody('batchActionHandler', null, tradesModule('batch'))
   assert.match(batchSource, /FOR UPDATE SKIP LOCKED/)
   assert.match(batchSource, /Batch Close/)
 })

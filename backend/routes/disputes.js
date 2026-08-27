@@ -3,7 +3,7 @@ const router = express.Router()
 const fs = require('fs')
 const path = require('path')
 const pool = require('../db')
-const { authenticateToken, authenticateAdmin } = require('./middleware')
+const { authenticateToken, authenticateAdmin, requireAdminCapability } = require('./middleware')
 const logger = require('../utils/logger')
 const { createLimiter } = require('../utils/security')
 const { ipKeyGenerator } = require('express-rate-limit')
@@ -316,6 +316,22 @@ router.patch('/:id', authenticateAdmin, async (req, res) => {
   }
 })
 
+// Resolves a stored evidence path and streams it, or answers with the right
+// status. Shared by the owner route and the admin route below so the
+// path-traversal guard exists once rather than once per caller.
+async function sendEvidenceFile(res, evidencePath) {
+  if (!evidencePath) return res.status(404).json({ error: 'Evidence not found' })
+
+  const absoluteFilePath = path.resolve(EVIDENCE_UPLOAD_ROOT, evidencePath)
+  if (!absoluteFilePath.startsWith(path.resolve(EVIDENCE_UPLOAD_ROOT) + path.sep)) {
+    return res.status(400).json({ error: 'Invalid evidence path' })
+  }
+  if (!fs.existsSync(absoluteFilePath)) {
+    return res.status(404).json({ error: 'Evidence file missing' })
+  }
+  return res.sendFile(absoluteFilePath)
+}
+
 // GET /api/disputes/:id/evidence — serves the uploaded evidence file back to
 // the dispute's owner. Path-traversal guarded the same way trades.js's
 // screenshot route and admin.js's KYC document route are.
@@ -329,22 +345,41 @@ router.get('/:id/evidence', authenticateToken, async (req, res) => {
       `SELECT evidence_path FROM disputes WHERE id = $1 AND user_id::text = $2::text`,
       [id, String(userId)]
     )
-    if (result.rows.length === 0 || !result.rows[0].evidence_path) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Evidence not found' })
     }
 
-    const relPath = result.rows[0].evidence_path
-    const absoluteFilePath = path.resolve(EVIDENCE_UPLOAD_ROOT, relPath)
-    if (!absoluteFilePath.startsWith(path.resolve(EVIDENCE_UPLOAD_ROOT) + path.sep)) {
-      return res.status(400).json({ error: 'Invalid evidence path' })
-    }
-    if (!fs.existsSync(absoluteFilePath)) {
-      return res.status(404).json({ error: 'Evidence file missing' })
-    }
-
-    res.sendFile(absoluteFilePath)
+    return await sendEvidenceFile(res, result.rows[0].evidence_path)
   } catch (error) {
     logger.error('Fetch dispute evidence error:', { error: error.message })
+    res.status(500).json({ error: 'Could not fetch evidence' })
+  }
+})
+
+// GET /api/disputes/admin/:id/evidence — the same file, for the admin actually
+// adjudicating the dispute.
+//
+// The owner route above filters on `user_id = $2`, which is correct for a
+// trader but meant an admin reviewing an appeal got a 404 for the very
+// evidence the appeal rests on — decisions were being made on the trader's
+// description of a screenshot nobody could open. Three segments, so it cannot
+// collide with the two-segment owner route.
+router.get('/admin/:id/evidence', authenticateAdmin, requireAdminCapability('violation:read:scoped'), async (req, res) => {
+  try {
+    await ensureDisputesInfrastructure()
+    const { id } = req.params
+
+    const result = await pool.query(
+      `SELECT evidence_path FROM disputes WHERE id = $1`,
+      [id]
+    )
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Evidence not found' })
+    }
+
+    return await sendEvidenceFile(res, result.rows[0].evidence_path)
+  } catch (error) {
+    logger.error('Admin fetch dispute evidence error:', { error: error.message })
     res.status(500).json({ error: 'Could not fetch evidence' })
   }
 })

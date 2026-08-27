@@ -75,7 +75,7 @@ export default function Support({ user }) {
     return (
       <div>
         <h2 style={{ fontFamily: 'var(--font-ui)', color: 'var(--accent)', marginBottom: 'var(--space-2)', fontSize: 'var(--fs-3xl)' }}>Support Chat</h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-md)', marginBottom: '28px' }}>Chatting with our support team.</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-md)', marginBottom: 'var(--space-7)' }}>Chatting with our support team.</p>
         <TicketChat ticket={selectedTicket} user={user} onBack={() => { setSelectedTicket(null); loadTickets() }} />
       </div>
     )
@@ -178,7 +178,7 @@ export default function Support({ user }) {
           <Card style={{ padding: 'var(--space-4) var(--space-5)' }}>
             <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-dim)', marginBottom: 'var(--space-3)', letterSpacing: '0.08em' }}>RESPONSE TIMES</div>
             {[ { label: 'KYC / Payout', time: '24 hours' }, { label: 'Account Issues', time: '24–48 hours' }, { label: 'Technical Bugs', time: '48–72 hours' } ].map(row => (
-              <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid var(--navy-border)' }}>
+              <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', padding: 'var(--space-2) 0', borderBottom: '1px solid var(--navy-border)' }}>
                 <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--text-muted)' }}>{row.label}</span>
                 <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{row.time}</span>
               </div>

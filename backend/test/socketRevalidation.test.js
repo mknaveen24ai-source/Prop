@@ -108,7 +108,7 @@ test('a revoked session disconnects the socket on re-check', async (t) => {
   // Jittered first run lands somewhere inside the window; clear the whole
   // window so it has definitely fired.
   t.mock.timers.tick(SESSION_REVALIDATE_MS)
-  await new Promise((resolve) => setImmediate(resolve))
+  await new Promise((resolve) => { setImmediate(resolve) })
 
   assert.equal(socket.disconnected, true)
   assert.equal(socket.data._revalidateTimer, null)
@@ -121,7 +121,7 @@ test('a still-valid session keeps the socket open', async (t) => {
 
   startSessionRevalidation(pool, socket)
   t.mock.timers.tick(SESSION_REVALIDATE_MS)
-  await new Promise((resolve) => setImmediate(resolve))
+  await new Promise((resolve) => { setImmediate(resolve) })
 
   assert.equal(socket.disconnected, false)
 })
@@ -137,7 +137,7 @@ test('a database fault does not disconnect the socket', async (t) => {
 
   startSessionRevalidation(pool, socket)
   t.mock.timers.tick(SESSION_REVALIDATE_MS)
-  await new Promise((resolve) => setImmediate(resolve))
+  await new Promise((resolve) => { setImmediate(resolve) })
 
   assert.equal(socket.disconnected, false)
 })
@@ -156,7 +156,7 @@ test('stopSessionRevalidation clears the timer so disconnect leaks nothing', asy
   // No further queries once stopped.
   const before = pool.calls.length
   t.mock.timers.tick(SESSION_REVALIDATE_MS * 3)
-  await new Promise((resolve) => setImmediate(resolve))
+  await new Promise((resolve) => { setImmediate(resolve) })
   assert.equal(pool.calls.length, before)
 })
 
@@ -167,7 +167,7 @@ test('an admin socket re-checks the platform admin token version', async (t) => 
 
   startSessionRevalidation(pool, socket)
   t.mock.timers.tick(SESSION_REVALIDATE_MS)
-  await new Promise((resolve) => setImmediate(resolve))
+  await new Promise((resolve) => { setImmediate(resolve) })
 
   assert.equal(socket.disconnected, true)
 })

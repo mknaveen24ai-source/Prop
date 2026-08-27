@@ -313,10 +313,10 @@ function Chat() {
           on Trade/Competitions. */}
       <div className="chat-pane chat-pane--list" style={{ background: 'var(--glass)', backdropFilter: 'blur(16px)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         <div style={{ padding: 'var(--space-3-5) var(--space-4)', borderBottom: '1px solid var(--rule)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontFamily: 'var(--font-display)', fontSize: '15px' }}>Conversations</span>
+          <span style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-lg)' }}>Conversations</span>
           <button
             onClick={() => setShowNewChat((v) => !v)}
-            style={{ padding: '5px 10px', border: '1px solid var(--accent)', borderRadius: '4px', background: 'transparent', color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.08em', textTransform: 'uppercase', cursor: 'pointer' }}
+            style={{ padding: 'var(--space-1-5) var(--space-2-5)', border: '1px solid var(--accent)', borderRadius: '4px', background: 'transparent', color: 'var(--accent)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.08em', textTransform: 'uppercase', cursor: 'pointer' }}
           >
             + New
           </button>
@@ -331,7 +331,7 @@ function Chat() {
               onChange={(e) => setNewSubject(e.target.value)}
               disabled={sending}
               autoFocus
-              style={{ padding: '9px 10px', border: '1px solid var(--rule)', borderRadius: '4px', background: 'var(--paper)', color: 'var(--ink)', fontSize: 'var(--fs-base)' }}
+              style={{ padding: 'var(--space-2-5) var(--space-2-5)', border: '1px solid var(--rule)', borderRadius: '4px', background: 'var(--paper)', color: 'var(--ink)', fontSize: 'var(--fs-base)' }}
             />
             <button type="submit" disabled={sending || !newSubject.trim()} className="lx-btn lx-btn--sm lx-btn--primary">
               {sending ? 'Creating…' : 'Start Chat'}
@@ -352,7 +352,7 @@ function Chat() {
                   key={conv.id}
                   onClick={() => loadConversation(conv.id)}
                   style={{
-                    padding: '11px 16px', cursor: 'pointer', borderBottom: '1px solid var(--rule-soft)',
+                    padding: 'var(--space-3) var(--space-4)', cursor: 'pointer', borderBottom: '1px solid var(--rule-soft)',
                     borderLeft: active ? '3px solid var(--accent)' : '3px solid transparent',
                     background: active ? 'var(--glass-2)' : 'transparent',
                     opacity: conv.status === 'closed' ? 0.6 : 1,
@@ -361,7 +361,7 @@ function Chat() {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)', marginBottom: 'var(--space-1)' }}>
                     <span style={{ fontSize: 'var(--fs-base)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{conv.subject}</span>
                     {conv.unread_user_count > 0 && (
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', color: 'var(--paper)', background: 'var(--accent)', borderRadius: '99px', padding: '1px var(--space-1-5)', flex: '0 0 auto' }}>{conv.unread_user_count}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', color: 'var(--paper)', background: 'var(--accent)', borderRadius: '99px', padding: '1px var(--space-1-5)', flex: '0 0 auto' }}>{conv.unread_user_count}</span>
                     )}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
@@ -379,7 +379,7 @@ function Chat() {
       <div className="chat-pane chat-pane--thread" style={{ background: 'var(--glass)', backdropFilter: 'blur(16px) saturate(140%)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', display: 'flex', flexDirection: 'column', height: '100%' }}>
         {selectedConversation ? (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '15px 18px', borderBottom: '3px double var(--rule)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-4) var(--space-4-5)', borderBottom: '3px double var(--rule)' }}>
               {/* Mobile-only: the conversation list is a separate view there,
                   so the thread needs a way back to it. */}
               <button
@@ -395,7 +395,7 @@ function Chat() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-xl)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedConversation.assigned_to || 'Support Desk'}</div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.13em', textTransform: 'uppercase', color: getStatusToneColor(selectedConversation.status), marginTop: '2px' }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.13em', textTransform: 'uppercase', color: getStatusToneColor(selectedConversation.status), marginTop: 'var(--space-1)' }}>
                   ● {selectedConversation.status}
                 </div>
               </div>
@@ -415,19 +415,19 @@ function Chat() {
                 return (
                   <React.Fragment key={msg.id}>
                     {showDate && (
-                      <div style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--muted)' }}>
+                      <div style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--muted)' }}>
                         — {formatDate(msg.created_at)} —
                       </div>
                     )}
                     <div style={{ display: 'flex', justifyContent: msg.is_admin ? 'flex-start' : 'flex-end' }}>
                       <div style={{
-                        maxWidth: '70%', padding: '11px 14px', borderRadius: '4px',
+                        maxWidth: '70%', padding: 'var(--space-3) var(--space-3-5)', borderRadius: '4px',
                         background: msg.is_admin ? 'var(--paper-2)' : 'var(--accent)',
                         border: `1px solid ${msg.is_admin ? 'var(--rule)' : 'var(--accent)'}`,
                         color: msg.is_admin ? 'var(--ink)' : 'var(--paper)',
                       }}>
                         <div style={{ fontSize: 'var(--fs-control)', lineHeight: 1.55 }}>{msg.message}</div>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', marginTop: '7px', textAlign: 'right', opacity: 0.75 }}>{formatTime(msg.created_at)}</div>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', marginTop: 'var(--space-2)', textAlign: 'right', opacity: 0.75 }}>{formatTime(msg.created_at)}</div>
                       </div>
                     </div>
                   </React.Fragment>
@@ -452,7 +452,7 @@ function Chat() {
                   placeholder="Write to the desk… (Enter to send)"
                   rows={2}
                   disabled={sending}
-                  style={{ flex: 1, resize: 'none', padding: '11px 13px', border: '1px solid var(--rule)', borderRadius: '4px', background: 'var(--paper)', color: 'var(--ink)', fontSize: 'var(--fs-control)', lineHeight: 1.5 }}
+                  style={{ flex: 1, resize: 'none', padding: 'var(--space-3) var(--space-3-5)', border: '1px solid var(--rule)', borderRadius: '4px', background: 'var(--paper)', color: 'var(--ink)', fontSize: 'var(--fs-control)', lineHeight: 1.5 }}
                 />
                 <button
                   type="submit"
@@ -471,7 +471,7 @@ function Chat() {
               <p style={{ color: 'var(--muted)', fontSize: 'var(--fs-base)', margin: 'var(--space-1-5) 0' }}>Start a conversation and the desk will pick it up here.</p>
               <button
                 onClick={() => setShowNewChat(true)}
-                style={{ marginTop: 'var(--space-4)', padding: '11px 24px', border: '1px solid var(--accent)', borderRadius: '4px', background: 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer' }}
+                style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3) var(--space-6)', border: '1px solid var(--accent)', borderRadius: '4px', background: 'var(--accent)', color: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.12em', textTransform: 'uppercase', cursor: 'pointer' }}
               >
                 Start a New Conversation
               </button>
@@ -485,9 +485,9 @@ function Chat() {
       <div className="chat-pane chat-pane--meta" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
         {selectedConversation && (
           <div style={{ background: 'var(--glass)', backdropFilter: 'blur(16px) saturate(140%)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', padding: 'var(--space-4) var(--space-4-5)' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px', borderBottom: '1px solid var(--rule)', paddingBottom: 'var(--space-2-5)', marginBottom: 'var(--space-1)' }}>This Ticket</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-xl)', borderBottom: '1px solid var(--rule)', paddingBottom: 'var(--space-2-5)', marginBottom: 'var(--space-1)' }}>This Ticket</div>
             {ticketMeta.map((r) => (
-              <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', padding: '9px 0', borderBottom: '1px solid var(--rule-soft)', fontSize: '12.5px' }}>
+              <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2-5)', padding: 'var(--space-2-5) 0', borderBottom: '1px solid var(--rule-soft)', fontSize: 'var(--fs-base)' }}>
                 <span style={{ color: 'var(--muted)' }}>{r.label}</span>
                 <span style={{ fontFamily: 'var(--font-mono)', color: r.tone, textAlign: 'right', textTransform: r.label === 'Status' ? 'capitalize' : 'none' }}>{r.value}</span>
               </div>
@@ -495,13 +495,13 @@ function Chat() {
           </div>
         )}
         <div style={{ background: 'var(--glass)', backdropFilter: 'blur(16px) saturate(140%)', border: '1px solid var(--rule)', borderRadius: '4px', boxShadow: 'var(--elev)', padding: 'var(--space-4) var(--space-4-5)' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px', borderBottom: '1px solid var(--rule)', paddingBottom: 'var(--space-2-5)', marginBottom: 'var(--space-3)' }}>Common Answers</div>
+          <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-xl)', borderBottom: '1px solid var(--rule)', paddingBottom: 'var(--space-2-5)', marginBottom: 'var(--space-3)' }}>Common Answers</div>
           {FAQS.map((q) => (
             <button
               key={q}
               onClick={() => sendFaq(q)}
               disabled={!selectedConversation || selectedConversation.status === 'closed'}
-              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 10px', marginBottom: 'var(--space-1-5)', border: '1px solid var(--rule)', borderRadius: '4px', background: 'transparent', color: 'var(--ink)', fontSize: '12.5px', cursor: 'pointer' }}
+              style={{ display: 'block', width: '100%', textAlign: 'left', padding: 'var(--space-2-5) var(--space-2-5)', marginBottom: 'var(--space-1-5)', border: '1px solid var(--rule)', borderRadius: '4px', background: 'transparent', color: 'var(--ink)', fontSize: 'var(--fs-base)', cursor: 'pointer' }}
             >
               {q}
             </button>

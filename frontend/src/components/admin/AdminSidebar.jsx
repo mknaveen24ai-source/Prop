@@ -138,6 +138,8 @@ export default function AdminSidebar({
 
           <NavGroup id="analytics" label="Analytics" isCollapsed={isCollapsed} collapsedGroups={collapsedGroups} onToggle={toggleGroup}>
             <NavItem to="/admin/analytics" icon="analytics" label="Analytics" />
+            <NavItem to="/admin/intelligence" icon="pnl" label="Firm Intelligence" />
+            <NavItem to="/admin/trader-intelligence" icon="activity" label="Trader & Risk" />
           </NavGroup>
 
           <NavGroup id="support" label="Support" isCollapsed={isCollapsed} collapsedGroups={collapsedGroups} onToggle={toggleGroup}>

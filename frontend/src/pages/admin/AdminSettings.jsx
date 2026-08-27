@@ -49,7 +49,7 @@ const SETTINGS_GROUPS = [
     title: 'Funded & Payouts',
     fields: [
       { key: 'funded_max_drawdown_pct', label: 'Max Drawdown (%)', type: 'number', hint: 'e.g. 5' },
-      { key: 'profit_share_pct', label: 'Profit Share (%)', type: 'number', hint: 'e.g. 80 (trader keeps 80%)' },
+      { key: 'profit_share_pct', label: 'Profit Share (%)', type: 'number', hint: 'Currently 100 — the trader keeps all realised profit. Firm revenue is challenge fees.' },
       { key: 'payouts_enabled', label: 'Payout Requests Enabled', type: 'select', options: ['true', 'false'] },
       { key: 'min_payout_amount', label: 'Minimum Payout Amount', type: 'number', hint: 'e.g. 50' },
       { key: 'payout_request_cooldown_hours', label: 'Payout Cooldown (hours)', type: 'number', hint: 'e.g. 24' },
@@ -62,10 +62,12 @@ const SETTINGS_GROUPS = [
     fields: [
       { key: 'min_hold_seconds', label: 'Min Hold Time (s)', type: 'number', hint: 'e.g. 60' },
       { key: 'min_lot_size', label: 'Minimum Lot Size', type: 'number', hint: 'e.g. 0.01' },
-      { key: 'forex_lots_per_1k', label: 'Forex Lots per $1k', type: 'number', hint: 'e.g. 0.20' },
-      { key: 'commodity_lots_per_1k', label: 'Commodity Lots per $1k', type: 'number', hint: 'e.g. 0.02' },
-      { key: 'max_trades_per_1k', label: 'Max Open Trades per $1k', type: 'number', hint: 'e.g. 1' },
-      { key: 'max_daily_trades', label: 'Max Daily Trades', type: 'number', hint: 'e.g. 20 per account, per UTC day' },
+      // The per-$1k lot caps, max trades per $1k and the daily trade limit were
+      // removed with the move to unlimited leverage — none of them is enforced,
+      // so none of them is editable. Position size is bounded only by the two
+      // controls below.
+      { key: 'max_open_positions', label: 'Max Open Positions', type: 'number', hint: 'Open + pending at once, per account. 0 disables the limit.' },
+      { key: 'max_notional_multiple', label: 'Per-Order Notional Ceiling', type: 'number', hint: 'Fat-finger guard, as a multiple of account size. 500 = a $10k account can open $5m of notional in one order. 0 disables it.' },
       { key: 'weekend_holding_enabled', label: 'Weekend Holding', type: 'select', hint: 'true = allow existing exposure into the weekend. false = flatten open trades and cancel pending orders after Friday 21:00 UTC.', options: ['true', 'false'] },
       { key: 'news_protection_enabled', label: 'News Protection', type: 'select', options: ['true', 'false'], hint: 'Blocks new market and pending orders during High-impact news windows' },
       { key: 'news_protection_block_new_orders', label: 'News Blocks New Orders', type: 'select', options: ['true', 'false'] },
@@ -343,8 +345,8 @@ export default function AdminSettings() {
               return isBooleanToggle ? (
                 <div key={field.key} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4-5)', padding: 'var(--space-3-5) 0', borderBottom: '1px solid var(--admin-border)' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '13.5px' }}>{field.label}</div>
-                    {field.hint && <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)', marginTop: '3px', lineHeight: 1.5 }}>{field.hint}</div>}
+                    <div style={{ fontSize: 'var(--fs-md)' }}>{field.label}</div>
+                    {field.hint && <div style={{ fontSize: 'var(--fs-sm)', color: 'var(--admin-text-muted)', marginTop: 'var(--space-1)', lineHeight: 1.5 }}>{field.hint}</div>}
                   </div>
                   <SettingToggle checked={values[field.key] === 'true'} onChange={(next) => handleChange(field.key, next)} />
                 </div>

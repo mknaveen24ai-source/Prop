@@ -107,7 +107,7 @@ class SecurityAuditor {
   checkDependencies() {
     console.log('🔍 Checking for insecure dependencies...');
     
-    let auditRaw = '';
+    let auditRaw;
     try {
       auditRaw = execSync('npm audit --json', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
     } catch (error) {
@@ -278,10 +278,12 @@ class SecurityAuditor {
       if (fs.existsSync(filePath)) {
         try {
           const stats = fs.statSync(filePath);
-          const mode = stats.mode;
+          const permissions = stats.mode % 0o1000;
+          const groupReadable = Math.floor(permissions / 0o40) % 2 === 1;
+          const otherReadable = Math.floor(permissions / 0o4) % 2 === 1;
           
           // Check if file is readable by others
-          if (mode & 0o044) {
+          if (groupReadable || otherReadable) {
             this.addIssue(
               'HIGH',
               'File Permissions',

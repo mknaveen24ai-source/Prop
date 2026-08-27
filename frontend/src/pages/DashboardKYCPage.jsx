@@ -62,7 +62,7 @@ function ReplaceDocButton({ docType, onUpload, uploading }) {
         onClick={() => inputRef.current?.click()}
         disabled={busy}
         className="lx-btn"
-        style={{ marginTop: 'var(--space-2)', padding: 'var(--space-1-5) var(--space-3)', border: '1px solid var(--warn)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--warn)', fontSize: '11.5px', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}
+        style={{ marginTop: 'var(--space-2)', padding: 'var(--space-1-5) var(--space-3)', border: '1px solid var(--warn)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--warn)', fontSize: 'var(--fs-sm)', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}
       >
         {busy ? 'Uploading…' : 'Replace this document'}
       </button>
@@ -191,8 +191,8 @@ export default function DashboardKYCPage({
         <Card style={{ border: '1px solid var(--warn)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3-5)', flexWrap: 'wrap' }}>
             <div>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--warn)' }}>Couldn't load your document status</div>
-              <div style={{ fontSize: '12.5px', color: 'var(--muted)', marginTop: '5px' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--warn)' }}>Couldn't load your document status</div>
+              <div style={{ fontSize: 'var(--fs-base)', color: 'var(--muted)', marginTop: 'var(--space-1-5)' }}>
                 {detail ? 'Showing your last known status — this may be out of date.' : "The document cards below can't be confirmed right now, so they may not reflect what you've actually submitted."}
               </div>
             </div>
@@ -205,7 +205,7 @@ export default function DashboardKYCPage({
 
       {kycStatus === 'rejected' && user?.kyc_rejection_reason && (
         <Card style={{ border: '1px solid var(--loss)' }}>
-          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--loss)' }}>Reason from admin</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--loss)' }}>Reason from admin</div>
           <div style={{ fontSize: 'var(--fs-md)', marginTop: 'var(--space-2)' }}>{user.kyc_rejection_reason}</div>
         </Card>
       )}
@@ -217,8 +217,8 @@ export default function DashboardKYCPage({
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)' }}>
               <span style={{ width: '9px', height: '9px', borderRadius: '50%', background: st.tone, flex: '0 0 auto' }} />
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.14em', textTransform: 'uppercase', color: st.tone }}>{st.state}</div>
-                <div style={{ fontSize: '13.5px', marginTop: '3px' }}>{st.label}</div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.14em', textTransform: 'uppercase', color: st.tone }}>{st.state}</div>
+                <div style={{ fontSize: 'var(--fs-md)', marginTop: 'var(--space-1)' }}>{st.label}</div>
               </div>
             </div>
           </div>
@@ -242,12 +242,12 @@ export default function DashboardKYCPage({
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2-5)', flexWrap: 'wrap' }}>
-                      <div style={{ fontFamily: 'var(--font-display)', fontSize: '17px' }}>{doc.title}</div>
+                      <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-xl)' }}>{doc.title}</div>
                       <span className="lx-badge" style={{ color: status.tone }}>{status.label}</span>
                     </div>
-                    <div style={{ fontSize: '12.5px', color: 'var(--muted)', marginTop: '5px', lineHeight: 1.55 }}>{doc.note}</div>
+                    <div style={{ fontSize: 'var(--fs-base)', color: 'var(--muted)', marginTop: 'var(--space-1-5)', lineHeight: 1.55 }}>{doc.note}</div>
                     {doc.present && submittedDate && (
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px', color: 'var(--muted)', marginTop: '7px' }}>Submitted {submittedDate}</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', color: 'var(--muted)', marginTop: 'var(--space-2)' }}>Submitted {submittedDate}</div>
                     )}
                     {allowPerDocReplace && (
                       <ReplaceDocButton docType={doc.docType} onUpload={uploadSingleKycDocument} uploading={kycUploading} />
@@ -297,19 +297,19 @@ export default function DashboardKYCPage({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           <Card ruled title="What we check">
             {KYC_REQS.map((label) => (
-              <div key={label} style={{ display: 'flex', gap: 'var(--space-2-5)', padding: '9px 0', borderBottom: '1px solid var(--rule-soft)' }}>
-                <span style={{ color: 'var(--accent)', marginTop: '2px' }}>·</span>
-                <div style={{ fontSize: '12.5px', lineHeight: 1.55, color: 'var(--muted)' }}>{label}</div>
+              <div key={label} style={{ display: 'flex', gap: 'var(--space-2-5)', padding: 'var(--space-2-5) 0', borderBottom: '1px solid var(--rule-soft)' }}>
+                <span style={{ color: 'var(--accent)', marginTop: 'var(--space-1)' }}>·</span>
+                <div style={{ fontSize: 'var(--fs-base)', lineHeight: 1.55, color: 'var(--muted)' }}>{label}</div>
               </div>
             ))}
           </Card>
 
           <Card style={{ border: '1px solid var(--accent)', background: 'var(--glass-2)' }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: '9.5px', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--accent)' }}>Why now</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-xl)', marginTop: '7px' }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-2xs)', letterSpacing: '.16em', textTransform: 'uppercase', color: 'var(--accent)' }}>Why now</div>
+            <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--fs-xl)', marginTop: 'var(--space-2)' }}>
               {kycStatus === 'approved' ? 'Your identity is verified' : 'Verification is required before your first payout'}
             </div>
-            <div style={{ fontSize: '12.5px', color: 'var(--muted)', marginTop: '7px', lineHeight: 1.6 }}>
+            <div style={{ fontSize: 'var(--fs-base)', color: 'var(--muted)', marginTop: 'var(--space-2)', lineHeight: 1.6 }}>
               {kycStatus === 'approved'
                 ? 'You can request payouts on any funded account without further checks.'
                 : 'Payout requests are blocked until an admin approves your identity documents. Trading is unaffected — verify whenever you’re ready to withdraw.'}

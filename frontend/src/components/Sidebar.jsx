@@ -170,7 +170,7 @@ export default function Sidebar({
       badge = (
         <span className="badge badge-danger" style={{
           marginLeft: collapsed ? 0 : 'auto', flexShrink: 0,
-          padding: '2px 6px', fontSize: 'var(--fs-2xs)', borderRadius: 'var(--radius-pill)',
+          padding: 'var(--space-1) var(--space-1-5)', fontSize: 'var(--fs-2xs)', borderRadius: 'var(--radius-pill)',
           position: collapsed ? 'absolute' : 'static',
           top: collapsed ? '2px' : undefined, right: collapsed ? '2px' : undefined,
         }}>
@@ -182,7 +182,7 @@ export default function Sidebar({
       badge = (
         <span className="badge badge-danger" style={{
           marginLeft: collapsed ? 0 : 'auto', flexShrink: 0,
-          padding: '2px 6px', fontSize: 'var(--fs-2xs)', borderRadius: 'var(--radius-pill)',
+          padding: 'var(--space-1) var(--space-1-5)', fontSize: 'var(--fs-2xs)', borderRadius: 'var(--radius-pill)',
           position: collapsed ? 'absolute' : 'static',
           top: collapsed ? '2px' : undefined, right: collapsed ? '2px' : undefined,
         }}>
@@ -291,7 +291,7 @@ export default function Sidebar({
                 transition={{ duration: 0.2 }}
                 style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}
               >
-                <div style={{ fontSize: '15px', fontWeight: 800, letterSpacing: '0.02em', color: 'var(--text-primary)' }}>
+                <div style={{ fontSize: 'var(--fs-lg)', fontWeight: 800, letterSpacing: '0.02em', color: 'var(--text-primary)' }}>
                   PROP FIRM
                 </div>
                 <div style={{ fontSize: 'var(--fs-xs)', color: 'var(--text-secondary)' }}>Trader Portal</div>
@@ -347,13 +347,13 @@ export default function Sidebar({
         {/* Footer — theme toggle + profile (click through to Profile tab) */}
         <div className="sidebar-footer" style={{ borderTop: '1px solid var(--border)', padding: collapsed ? '16px 8px' : '20px 16px', transition: 'padding 0.25s', display: 'flex', flexDirection: 'column', gap: 'var(--space-2-5)' }}>
           {!collapsed && (
-            <div style={{ display: 'flex', gap: 'var(--space-1-5)', padding: '3px', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper)' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-1-5)', padding: 'var(--space-1)', border: '1px solid var(--rule)', borderRadius: 'var(--radius-sm)', background: 'var(--paper)' }}>
               <button
                 type="button"
                 onClick={() => theme !== 'dark' && toggleTheme()}
                 style={{
                   flex: 1, padding: 'var(--space-1-5) 0', border: 'none', borderRadius: '3px', cursor: 'pointer',
-                  fontFamily: 'var(--font-mono)', fontSize: '10.5px', letterSpacing: '.08em', textTransform: 'uppercase',
+                  fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.08em', textTransform: 'uppercase',
                   background: theme === 'dark' ? 'var(--accent)' : 'transparent',
                   color: theme === 'dark' ? 'var(--paper)' : 'var(--muted)',
                 }}
@@ -365,7 +365,7 @@ export default function Sidebar({
                 onClick={() => theme !== 'light' && toggleTheme()}
                 style={{
                   flex: 1, padding: 'var(--space-1-5) 0', border: 'none', borderRadius: '3px', cursor: 'pointer',
-                  fontFamily: 'var(--font-mono)', fontSize: '10.5px', letterSpacing: '.08em', textTransform: 'uppercase',
+                  fontFamily: 'var(--font-mono)', fontSize: 'var(--fs-xs)', letterSpacing: '.08em', textTransform: 'uppercase',
                   background: theme === 'light' ? 'var(--accent)' : 'transparent',
                   color: theme === 'light' ? 'var(--paper)' : 'var(--muted)',
                 }}
@@ -377,7 +377,7 @@ export default function Sidebar({
                   type="button"
                   onClick={onLogout}
                   title="Log out"
-                  style={{ padding: '6px 9px', border: 'none', borderRadius: '3px', cursor: 'pointer', background: 'transparent', color: 'var(--muted)', display: 'inline-flex', alignItems: 'center' }}
+                  style={{ padding: 'var(--space-1-5) var(--space-2-5)', border: 'none', borderRadius: '3px', cursor: 'pointer', background: 'transparent', color: 'var(--muted)', display: 'inline-flex', alignItems: 'center' }}
                 >
                   {renderIcon('logout', { size: 13, color: 'currentColor' })}
                 </button>
@@ -507,7 +507,7 @@ export default function Sidebar({
                   </span>
                 )}
               </span>
-              <span style={{ fontSize: 'var(--fs-2xs)', fontWeight: isActive ? '600' : '400', marginTop: '3px' }}>
+              <span style={{ fontSize: 'var(--fs-2xs)', fontWeight: isActive ? '600' : '400', marginTop: 'var(--space-1)' }}>
                 {item.label}
               </span>
             </button>
@@ -536,7 +536,7 @@ export default function Sidebar({
               }} />
             )}
           </span>
-          <span style={{ fontSize: 'var(--fs-2xs)', fontWeight: showMoreSheet ? '600' : '400', marginTop: '3px' }}>
+          <span style={{ fontSize: 'var(--fs-2xs)', fontWeight: showMoreSheet ? '600' : '400', marginTop: 'var(--space-1)' }}>
             More
           </span>
         </button>
@@ -556,7 +556,7 @@ export default function Sidebar({
           <span style={{ display: 'inline-flex', lineHeight: 1 }}>
             {renderIcon('profile', { size: 18, color: activePage === 'profile' ? 'var(--accent)' : 'var(--text-muted)' })}
           </span>
-          <span style={{ fontSize: 'var(--fs-2xs)', fontWeight: activePage === 'profile' ? '600' : '400', marginTop: '3px' }}>
+          <span style={{ fontSize: 'var(--fs-2xs)', fontWeight: activePage === 'profile' ? '600' : '400', marginTop: 'var(--space-1)' }}>
             Profile
           </span>
         </button>
@@ -596,7 +596,7 @@ export default function Sidebar({
                   </span>
                   <span className="sidebar-more-item__label">{item.label}</span>
                   {item.id === 'payouts' && pendingPayouts > 0 && (
-                    <span className="badge badge-danger" style={{ padding: '2px 6px', fontSize: 'var(--fs-2xs)', borderRadius: 'var(--radius-pill)' }}>
+                    <span className="badge badge-danger" style={{ padding: 'var(--space-1) var(--space-1-5)', fontSize: 'var(--fs-2xs)', borderRadius: 'var(--radius-pill)' }}>
                       {pendingPayouts}
                     </span>
                   )}

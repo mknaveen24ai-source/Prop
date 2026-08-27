@@ -22,7 +22,7 @@ export default function RealTimeMonitoringTab() {
     const fetchOnce = async (silent) => {
       if (!silent) setLoading(true);
       try {
-        // TODO: GET /api/admin/analytics/open-positions (backend/routes/adminAnalytics.js)
+        // Backed by GET /api/admin/analytics/open-positions (backend/routes/adminAnalytics.js)
         // Polled every 5s per your call — no new socket-push infrastructure.
         const res = await adminAxios.get('/api/admin/analytics/open-positions');
         if (!cancelled) setData(res.data);

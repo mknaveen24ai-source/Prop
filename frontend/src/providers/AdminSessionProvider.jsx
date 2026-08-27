@@ -74,15 +74,11 @@ export function AdminSessionProvider({ children }) {
   }, [])
 
   useEffect(() => {
-    refreshSession()
+    queueMicrotask(() => { void refreshSession() })
   }, [refreshSession])
 
   useEffect(() => {
     if (!session.authenticated) {
-      setSocket((current) => {
-        closeSocket(current)
-        return null
-      })
       return undefined
     }
 
